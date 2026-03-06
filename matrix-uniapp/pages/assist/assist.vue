@@ -1,0 +1,1752 @@
+<template>
+  <view class="assist-page" :class="{ 'light-theme': false }">
+    <!-- 状态栏占位 -->
+    <!-- #ifdef MP-WEIXIN -->
+    <view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
+    <!-- #endif -->
+    
+    <!-- 行导航弹窗 -->
+    <view v-if="isRowListOpen" class="modal-overlay" @click="isRowListOpen = false">
+      <view class="row-list-modal" @click.stop>
+        <view class="modal-header">
+          <text class="modal-title">行导航</text>
+          <view class="close-btn" @click="goToOverview">
+            <text class="close-icon">×</text>
+          </view>
+        </view>
+        
+        <scroll-view scroll-y class="row-grid-scroll">
+          <view class="row-grid">
+            <view
+              v-for="i in 52"
+              :key="i - 1"
+              class="row-grid-item"
+              :class="{
+                'current': currentRow === i - 1,
+                'completed': completedRows.has(i - 1) && currentRow !== i - 1
+              }"
+              @click="handleRowListSelect(i - 1)"
+            >
+              <text class="row-number">{{ i }}</text>
+              <Icon name="check-item" v-if="completedRows.has(i - 1)" :size="32" class="check-mark" />
+            </view>
+          </view>
+        </scroll-view>
+
+        <view class="modal-footer">
+          <view class="legend-item">
+            <view class="legend-box completed-box"></view>
+            <text class="legend-text">已完成</text>
+          </view>
+          <view class="legend-item">
+            <view class="legend-box current-box"></view>
+            <text class="legend-text">当前行</text>
+          </view>
+          <view class="legend-item">
+            <view class="legend-box uncompleted-box"></view>
+            <text class="legend-text">未完成</text>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <!-- 头部 -->
+    <view class="header">
+      <view class="header-left">
+        <view class="back-btn" @click="goToOverview">
+          <text class="icon">‹</text>
+        </view>
+        <text class="board-id">{{ boardId }}</text>
+      </view>
+      
+      <!-- 模式切换 -->
+      <view class="mode-switch">
+        <view 
+          class="mode-btn"
+          :class="{ 'active': assistMode === 'color' }"
+          @click="setAssistMode('color')"
+        >
+          <Icon name="picture" :size="28" />
+          <text class="mode-label">颜色</text>
+        </view>
+        <view 
+          class="mode-btn"
+          :class="{ 'active': assistMode === 'row' }"
+          @click="setAssistMode('row')"
+        >
+          <Icon name="menu" :size="28" />
+          <text class="mode-label">逐行</text>
+        </view>
+      </view>
+      
+      <view class="header-actions">
+        <view 
+          class="icon-btn device-btn"
+          :class="{ 'connected': deviceConnected }"
+          @click="toggleDeviceSync"
+        >
+          <Icon :name="deviceConnected ? 'link' : 'unlink'" :size="28" />
+        </view>
+        <view class="icon-btn" @click="handleFit">
+          <Icon name="fullscreen-expand" :size="28" />
+        </view>
+        <view 
+          class="icon-btn"
+          :class="{ 'active': focusMode }"
+          @click="focusMode = !focusMode"
+        >
+          <Icon name="browse" v-if="focusMode" :size="28" />
+          <Icon name="eye-close" v-else :size="28" />
+        </view>
+      </view>
+    </view>
+
+    <!-- 当前信息提示 -->
+    <view v-if="assistMode === 'row'" class="info-banner">
+      <text class="info-text">行 {{ currentRow + 1 }} / 52</text>
+    </view>
+    
+    <view v-if="assistMode === 'color' && highlightColor" class="info-banner">
+      <view class="color-dot" :style="{ backgroundColor: highlightColor }"></view>
+      <text class="info-text">{{ getColorCode(highlightColor) }} ({{ boardColors.get(highlightColor) }})</text>
+    </view>
+
+    <!-- Canvas 画布 -->
+    <view class="canvas-container" v-if="!isHelpOpen && !isRowListOpen">
+      <PixelCanvas
+        v-if="canvasReady"
+        :width="52"
+        :height="52"
+        :pixels="isCalculated ? localPixels : new Map()"
+        :zoom="zoom"
+        :offset-x="pan.x"
+        :offset-y="pan.y"
+        :canvas-width="canvasWidth"
+        :canvas-height="canvasHeight"
+        :grid-visible="true"
+        :highlight-color="highlightColor"
+        :highlight-row="focusMode && assistMode === 'row' ? currentRow : null"
+        :allow-single-touch-pan="true"
+        :is-dark-mode="themeStore && themeStore.isDarkMode"
+        canvas-id="assistCanvas"
+        @pan="handlePan"
+        @zoom="handlePinchZoom"
+      />
+    </view>
+
+    <!-- 底部控制区 -->
+    <view class="controls">
+      <!-- 颜色列表 -->
+      <view class="color-section">
+        <view class="section-header">
+          <text class="section-title">{{ assistMode === 'row' ? '行颜色' : '全部颜色' }} ({{ displayedColors.size }})</text>
+        </view>
+        
+        <scroll-view 
+          scroll-y 
+          class="color-list"
+          :scroll-into-view="scrollIntoView"
+          :scroll-top="colorListScrollTop"
+          :scroll-with-animation="true"
+          @scroll="handleColorScroll"
+        >
+          <view v-if="assistMode === 'color' && colorGroups.length > 0">
+            <!-- 按字母分组显示 -->
+            <view v-for="group in colorGroups" :key="group.letter" class="color-group">
+              <!-- 分组标题 -->
+              <view 
+                :id="'letter-' + group.letter"
+                class="group-header"
+              >
+                <text class="group-letter">{{ group.letter }}</text>
+                <text class="group-count">({{ group.colors.length }})</text>
+              </view>
+              
+              <!-- 该字母下的颜色 -->
+              <view class="color-grid">
+                <view 
+                  v-for="[color, count] in group.colors"
+                  :key="color"
+                  class="color-item"
+                  :class="{
+                    'active': highlightColor === color,
+                    'completed': isColorCompleted(color) && highlightColor !== color
+                  }"
+                  @click="setHighlightColor(highlightColor === color ? null : color)"
+                >
+                  <!-- 左侧：颜色和色号 -->
+                  <view class="color-info">
+                    <view class="color-swatch" :style="{ backgroundColor: color }"></view>
+                    <text class="color-code">{{ getColorCode(color) }}</text>
+                  </view>
+                  
+                  <!-- 右侧：勾选框和数量 -->
+                  <view class="color-actions">
+                    <view 
+                      class="check-btn"
+                      :class="{ 'checked': isColorCompleted(color) }"
+                      @click.stop="toggleColorComplete(color)"
+                    >
+                      <text v-if="isColorCompleted(color)" class="check-icon">✓</text>
+                      <view v-else class="check-box"></view>
+                    </view>
+                    <text class="color-count">×{{ count }}</text>
+                  </view>
+                </view>
+              </view>
+            </view>
+          </view>
+          
+          <view v-else>
+            <!-- 逐行模式：不分组 -->
+            <view class="color-grid">
+              <view 
+                v-for="[color, count] in Array.from(displayedColors.entries())"
+                :key="color"
+                class="color-item"
+                :class="{
+                  'active': highlightColor === color,
+                  'completed': isColorCompleted(color) && highlightColor !== color
+                }"
+                @click="setHighlightColor(highlightColor === color ? null : color)"
+              >
+                <view class="color-info">
+                  <view class="color-swatch" :style="{ backgroundColor: color }"></view>
+                  <text class="color-code">{{ getColorCode(color) }}</text>
+                </view>
+                
+                <view class="color-actions">
+                  <view 
+                    class="check-btn"
+                    :class="{ 'checked': isColorCompleted(color) }"
+                    @click.stop="toggleColorComplete(color)"
+                  >
+                    <Icon name="check-item" v-if="isColorCompleted(color)" :size="28" color="#ffffff" />
+                    <view v-else class="check-box"></view>
+                  </view>
+                  <text class="color-count">×{{ count }}</text>
+                </view>
+              </view>
+            </view>
+          </view>
+        </scroll-view>
+        
+        <!-- 右侧字母索引条（仅颜色模式） -->
+        <view 
+          v-if="assistMode === 'color' && availableColorLetters.length > 1"
+          class="index-bar"
+          @touchstart="handleIndexTouchStart"
+          @touchmove="handleIndexTouchMove"
+          @touchend="handleIndexTouchEnd"
+        >
+          <view
+            v-for="letter in availableColorLetters"
+            :key="letter"
+            :data-letter="letter"
+            class="index-letter"
+            :class="{ 'active': currentVisibleLetter === letter }"
+            @click="scrollToColorLetter(letter)"
+          >
+            {{ letter }}
+          </view>
+        </view>
+        
+        <!-- 字母提示气泡 -->
+        <view 
+          v-if="showLetterBubble && currentTouchLetter"
+          class="letter-bubble"
+          :style="{ left: bubblePosition.x + 'px', top: bubblePosition.y + 'px' }"
+        >
+          {{ currentTouchLetter }}
+        </view>
+      </view>
+
+      <!-- 行控制（仅逐行模式） -->
+      <view v-if="assistMode === 'row'" class="row-controls">
+        <view class="row-btn" @click="prevRow">
+          <text class="row-icon">▲</text>
+        </view>
+        
+        <view class="row-info-container">
+          <view class="row-list-btn" @click="isRowListOpen = true">
+            <Icon name="column-4" :size="32" />
+            <text class="list-label">列表</text>
+          </view>
+          
+          <view class="row-info">
+            <text class="row-number">{{ currentRow + 1 }}</text>
+            <text class="row-total">/ 52</text>
+          </view>
+          
+          <view 
+            class="row-complete-btn"
+            :class="{ 'completed': completedRows.has(currentRow) }"
+            @click="toggleRowComplete"
+          >
+            <Icon name="check-item" v-if="completedRows.has(currentRow)" :size="28" color="#ffffff" />
+            <view v-else class="complete-box"></view>
+            <text class="complete-text">{{ completedRows.has(currentRow) ? '完成' : '标记' }}</text>
+          </view>
+        </view>
+
+        <view class="row-btn" @click="nextRow">
+          <text class="row-icon">▼</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- HelpModal -->
+    <HelpModal 
+      :is-open="isHelpOpen"
+      @close="isHelpOpen = false"
+      title="拼豆操作指南"
+      :items="helpItems"
+    />
+    
+    <!-- 自定义 Toast 组件 -->
+    <Toast ref="toastRef" />
+  </view>
+</template>
+
+<script>
+import { useThemeStore } from '../../store/theme.js'
+import { useProjectStore } from '../../store/project.js'
+import { useDeviceStore } from '../../store/device.js'
+import { useToast } from '../../composables/useToast.js'
+import { ARTKAL_COLORS_FULL } from '../../data/artkal-colors-full.js'
+import statusBarMixin from '../../mixins/statusBar.js'
+import PixelCanvas from '../../components/PixelCanvas.vue'
+import HelpModal from '../../components/HelpModal.vue'
+import Toast from '../../components/Toast.vue'
+import Icon from "../../components/Icon.vue"
+
+
+
+
+
+
+
+
+// 创建颜色查找映射
+const colorCodeMap = new Map()
+ARTKAL_COLORS_FULL.forEach(color => {
+  colorCodeMap.set(color.hex.toLowerCase(), color.code)
+})
+
+export default {
+  mixins: [statusBarMixin],
+  components: {
+    PixelCanvas,
+    HelpModal,
+    Toast,
+    Icon
+  },
+
+  data() {
+    return {
+      themeStore: null,
+      projectStore: null,
+      deviceStore: null,
+      toast: null,
+      projectId: '',
+      boardId: '',
+      project: null,
+      
+      // 数据
+      pixels: new Map(),
+      localPixels: new Map(),
+      
+      // 模式
+      assistMode: 'color',
+      focusMode: true,
+      currentRow: 0,
+      highlightColor: null,
+      lastSyncedRow: undefined,
+      
+      // 进度
+      completedRows: new Set(),
+      completedColors: new Set(),
+      
+      // 视图
+      zoom: 7,
+      pan: { x: 0, y: 0 },
+      
+      // 容器
+      canvasWidth: 0,
+      canvasHeight: 0,
+      canvasReady: false,
+      isCalculated: false,
+      
+      // UI
+      isHelpOpen: false,
+      isRowListOpen: false,
+      scrollIntoView: '',
+      colorListScrollTop: -1,
+      currentVisibleLetter: '',
+      showLetterBubble: false,
+      currentTouchLetter: '',
+      bubblePosition: { x: 0, y: 0 },
+      isIndexTouching: false,
+      
+      helpItems: [
+        { iconText: '🎨', title: '颜色模式 (默认)', description: '查看当前板子用到的所有颜色。点击某个颜色，画布上对应位置会高亮闪烁，方便批量拼装同色豆子。' },
+        { iconText: '📋', title: '逐行模式', description: '按行进行拼装。画布会自动遮罩其他行，专注于当前行。拼完一行后可点击「标记完成」并自动跳转下一行。空行会自动标记为完成，您也可以手动取消。' },
+        { iconText: '⊞', title: '行导航', description: '点击行控制栏左侧的「列表」图标，可以查看所有行的完成状态，并快速跳转到指定行。' },
+        { iconText: '👆', title: '高亮辅助', description: '点击任意颜色块即可高亮显示。再次点击取消高亮。' },
+        { iconText: '🔍', title: '画布操作', description: '双指捏合缩放画布，单指拖动查看细节。网格线会随缩放自动显示。' }
+      ]
+    }
+  },
+
+  computed: {
+    deviceConnected() {
+      return this.deviceStore?.connected || false
+    },
+    
+    boardX() {
+      const colIndex = parseInt(this.boardId.slice(1)) - 1
+      return colIndex * 52
+    },
+    
+    boardY() {
+      const rowIndex = this.boardId.charCodeAt(0) - 65
+      return rowIndex * 52
+    },
+    
+    rowColorsMap() {
+      const map = new Map()
+      this.localPixels.forEach((color, key) => {
+        const [, ly] = key.split(',').map(Number)
+        if (!map.has(ly)) map.set(ly, new Set())
+        map.get(ly).add(color)
+      })
+      return map
+    },
+    
+    colorRowsMap() {
+      const map = new Map()
+      this.localPixels.forEach((color, key) => {
+        const [, ly] = key.split(',').map(Number)
+        if (!map.has(color)) map.set(color, new Set())
+        map.get(color).add(ly)
+      })
+      return map
+    },
+    
+    currentRowColors() {
+      const colors = new Map()
+      this.localPixels.forEach((color, key) => {
+        const [, ly] = key.split(',').map(Number)
+        if (ly === this.currentRow) {
+          colors.set(color, (colors.get(color) || 0) + 1)
+        }
+      })
+      return colors
+    },
+    
+    boardColors() {
+      const colors = new Map()
+      this.localPixels.forEach((color) => {
+        colors.set(color, (colors.get(color) || 0) + 1)
+      })
+      return colors
+    },
+    
+    displayedColors() {
+      return this.assistMode === 'row' ? this.currentRowColors : this.boardColors
+    },
+    
+    // 按字母分组颜色（仅颜色模式）
+    colorGroups() {
+      if (this.assistMode !== 'color') return []
+      
+      const groups = new Map()
+      
+      // 将颜色按色号分组
+      Array.from(this.displayedColors.entries()).forEach(([color, count]) => {
+        const code = this.getColorCode(color)
+        if (code && code !== '?') {
+          const letter = code.charAt(0).toUpperCase()
+          if (!groups.has(letter)) {
+            groups.set(letter, [])
+          }
+          groups.get(letter).push([color, count])
+        }
+      })
+      
+      // 排序并转换为数组
+      return Array.from(groups.entries())
+        .sort((a, b) => a[0].localeCompare(b[0]))
+        .map(([letter, colors]) => ({
+          letter,
+          colors: colors.sort((a, b) => {
+            const codeA = this.getColorCode(a[0])
+            const codeB = this.getColorCode(b[0])
+            return codeA.localeCompare(codeB)
+          })
+        }))
+    },
+    
+    // 可用的字母列表
+    availableColorLetters() {
+      return this.colorGroups.map(g => g.letter)
+    }
+  },
+
+  watch: {
+    assistMode() {
+      this.highlightColor = null
+      this.saveProgress()
+    },
+    completedRows: {
+      handler() {
+        this.saveProgress()
+      },
+      deep: true
+    },
+    completedColors: {
+      handler() {
+        this.saveProgress()
+      },
+      deep: true
+    }
+  },
+
+  onLoad(options) {
+    this.themeStore = useThemeStore()
+    this.projectStore = useProjectStore()
+    this.deviceStore = useDeviceStore()
+    this.toast = useToast()
+    
+    // 立即应用主题，避免闪烁
+    this.themeStore.applyTheme()
+    
+    this.projectId = options.id
+    this.boardId = options.board
+    this.project = this.projectStore.getProject(this.projectId)
+    
+    if (!this.project) {
+      this.toast.showError('项目不存在')
+      setTimeout(() => {
+        uni.reLaunch({
+          url: '/pages/library/library'
+        })
+      }, 1000)
+      return
+    }
+    
+    // 检查是否首次使用
+    const hasSeenHelp = uni.getStorageSync('hasSeenBoardHelp')
+    if (!hasSeenHelp) {
+      this.isHelpOpen = true
+      uni.setStorageSync('hasSeenBoardHelp', 'true')
+    }
+    
+    this.loadPixels()
+    this.loadProgress()
+  },
+
+  onReady() {
+    // 注册自定义 Toast 实例
+    if (this.$refs.toastRef) {
+      this.toast.setToastInstance(this.$refs.toastRef)
+    }
+    
+    setTimeout(() => {
+      const query = uni.createSelectorQuery().in(this)
+      query.select('.canvas-container').boundingClientRect(data => {
+        if (data && data.width > 0 && data.height > 0) {
+          this.canvasWidth = data.width
+          this.canvasHeight = data.height
+          
+          const fitZoomW = (data.width * 0.9) / 52
+          const fitZoomH = (data.height * 0.9) / 52
+          const fitZoom = Math.min(fitZoomW, fitZoomH, 50)
+          
+          const boardPixelWidth = 52 * fitZoom
+          const boardPixelHeight = 52 * fitZoom
+          
+          this.zoom = fitZoom
+          this.pan = {
+            x: (data.width - boardPixelWidth) / 2,
+            y: (data.height - boardPixelHeight) / 2
+          }
+          
+          this.canvasReady = true
+          
+          setTimeout(() => {
+            this.isCalculated = true
+          }, 10)
+        }
+      }).exec()
+    }, 100)
+  },
+
+  onShow() {
+    this.themeStore.applyTheme()
+  },
+
+  onUnload() {
+    this.saveProgress()
+  },
+
+  methods: {
+    // ========== 设备同步方法 ==========
+    toggleDeviceSync() {
+      if (this.deviceConnected) {
+        // 断开连接
+        this.deviceStore.disconnect()
+        this.toast.showInfo('设备已断开')
+      } else {
+        // 连接设备
+        uni.showModal({
+          title: '连接 LED 矩阵板',
+          editable: true,
+          placeholderText: this.deviceStore.deviceIp || '192.168.31.84',
+          content: '请输入设备 IP 地址',
+          success: async (res) => {
+            if (res.confirm && res.content) {
+              const ip = res.content.trim()
+              
+              try {
+                const result = await this.deviceStore.connect(ip)
+                if (result.success) {
+                  this.toast.showSuccess('设备已连接')
+                  // 连接成功后立即同步当前画布
+                  this.syncToDevice()
+                } else {
+                  this.toast.showError('连接失败')
+                }
+              } catch (err) {
+                console.error('连接失败:', err)
+                this.toast.showError('连接失败')
+              }
+            }
+          }
+        })
+      }
+    },
+    
+    // 同步画布到设备（根据当前模式）
+    async syncToDevice() {
+      if (!this.deviceConnected) return
+      
+      try {
+        const pixels = []
+        
+        // hex 转 RGB 的辅助函数
+        const hexToRgb = (hex) => {
+          const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex)
+          return result ? {
+            r: parseInt(result[1], 16),
+            g: parseInt(result[2], 16),
+            b: parseInt(result[3], 16)
+          } : { r: 0, g: 0, b: 0 }
+        }
+        
+        // 使用 localPixels（已经是相对坐标0-51）
+        for (let y = 0; y < 52; y++) {
+          for (let x = 0; x < 52; x++) {
+            const key = `${x},${y}`
+            const hexColor = this.localPixels.get(key)
+            
+            if (hexColor) {
+              // 用 hex 查找颜色对象
+              const colorObj = ARTKAL_COLORS_FULL.find(c => c.hex.toLowerCase() === hexColor.toLowerCase())
+              
+              if (colorObj) {
+                // 将 hex 转换为 RGB
+                const rgb = hexToRgb(colorObj.hex)
+                let r = rgb.r
+                let g = rgb.g
+                let b = rgb.b
+                
+                // 逐行模式：当前行高亮，其他行降低亮度
+                if (this.assistMode === 'row' && y !== this.currentRow) {
+                  r = Math.floor(r * 0.2)
+                  g = Math.floor(g * 0.2)
+                  b = Math.floor(b * 0.2)
+                }
+                // 颜色模式：如果有高亮颜色，非高亮颜色降低亮度
+                else if (this.assistMode === 'color' && this.highlightColor && hexColor.toLowerCase() !== this.highlightColor.toLowerCase()) {
+                  r = Math.floor(r * 0.2)
+                  g = Math.floor(g * 0.2)
+                  b = Math.floor(b * 0.2)
+                }
+                
+                pixels.push(r, g, b)
+              } else {
+                pixels.push(0, 0, 0)
+              }
+            } else {
+              pixels.push(0, 0, 0)
+            }
+          }
+        }
+        
+        await this.deviceStore.sendImage(pixels, 52, 52)
+      } catch (err) {
+        console.error('同步到设备失败:', err)
+      }
+    },
+    
+    // 快速更新行亮度（仅逐行模式）
+    async updateRowBrightness() {
+      if (!this.deviceConnected || this.assistMode !== 'row') return
+      
+      try {
+        // hex 转 RGB 的辅助函数
+        const hexToRgb = (hex) => {
+          const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex)
+          return result ? {
+            r: parseInt(result[1], 16),
+            g: parseInt(result[2], 16),
+            b: parseInt(result[3], 16)
+          } : { r: 0, g: 0, b: 0 }
+        }
+        
+        const updatePixels = []
+        
+        // 只更新当前行和上一行（如果有）
+        const rowsToUpdate = [this.currentRow]
+        if (this.lastSyncedRow !== undefined && this.lastSyncedRow !== this.currentRow) {
+          rowsToUpdate.push(this.lastSyncedRow)
+        }
+        
+        for (const y of rowsToUpdate) {
+          for (let x = 0; x < 52; x++) {
+            const key = `${x},${y}`
+            const hexColor = this.localPixels.get(key)
+            
+            if (hexColor) {
+              const colorObj = ARTKAL_COLORS_FULL.find(c => c.hex.toLowerCase() === hexColor.toLowerCase())
+              
+              if (colorObj) {
+                const rgb = hexToRgb(colorObj.hex)
+                let r = rgb.r
+                let g = rgb.g
+                let b = rgb.b
+                
+                // 不是当前行，降低亮度
+                if (y !== this.currentRow) {
+                  r = Math.floor(r * 0.2)
+                  g = Math.floor(g * 0.2)
+                  b = Math.floor(b * 0.2)
+                }
+                
+                updatePixels.push(x, y, r, g, b)
+              }
+            }
+          }
+        }
+        
+        // 记录当前同步的行
+        this.lastSyncedRow = this.currentRow
+        
+        // 发送更新
+        if (updatePixels.length > 0) {
+          await this.deviceStore.sendPartialUpdate(updatePixels)
+        }
+      } catch (err) {
+        console.error('更新行亮度失败:', err)
+      }
+    },
+    
+    // ========== 原有方法 ==========
+    handlePan(dx, dy) {
+      this.pan = { x: this.pan.x + dx, y: this.pan.y + dy }
+    },
+
+    handlePinchZoom(delta, centerX, centerY) {
+      const newZoom = Math.max(1, Math.min(50, this.zoom + delta))
+      const scaleFactor = newZoom / this.zoom
+
+      this.pan = {
+        x: centerX - (centerX - this.pan.x) * scaleFactor,
+        y: centerY - (centerY - this.pan.y) * scaleFactor
+      }
+      this.zoom = newZoom
+    },
+
+    handleFit() {
+      if (this.canvasWidth > 0 && this.canvasHeight > 0) {
+        const maxW = this.canvasWidth - 26
+        const maxH = this.canvasHeight - 26
+        
+        const zoomW = maxW / 52
+        const zoomH = maxH / 52
+        
+        const newZoom = Math.max(1, Math.min(zoomW, zoomH, 10))
+        this.zoom = newZoom
+        
+        const contentW = 52 * newZoom
+        const contentH = 52 * newZoom
+        this.pan = {
+          x: (this.canvasWidth - contentW) / 2,
+          y: (this.canvasHeight - contentH) / 2
+        }
+      }
+    },
+    
+    loadPixels() {
+      this.pixels = this.projectStore.getProjectPixels(this.projectId)
+      
+      // 提取当前画布的像素
+      const local = new Map()
+      this.pixels.forEach((color, key) => {
+        const [px, py] = key.split(',').map(Number)
+        if (px >= this.boardX && px < this.boardX + 52 && 
+            py >= this.boardY && py < this.boardY + 52) {
+          local.set(`${px - this.boardX},${py - this.boardY}`, color)
+        }
+      })
+      this.localPixels = local
+    },
+
+    loadProgress() {
+      const progress = this.projectStore.getBoardProgress(this.projectId, this.boardId)
+      if (progress) {
+        this.completedRows = new Set(progress.completedRows || [])
+        this.completedColors = new Set(progress.completedColors || [])
+        if (progress.lastMode) {
+          this.assistMode = progress.lastMode
+        }
+      }
+    },
+
+    saveProgress() {
+      const pixelProgress = this.calculatePixelProgress()
+      const rowProgress = this.completedRows.size / 52
+      const completion = Math.max(pixelProgress, rowProgress)
+      
+      const progress = {
+        boardId: this.boardId,
+        completion,
+        lastMode: this.assistMode,
+        completedRows: Array.from(this.completedRows),
+        completedColors: Array.from(this.completedColors)
+      }
+      
+      this.projectStore.saveBoardProgress(this.projectId, this.boardId, progress)
+      this.projectStore.updateProjectProgress(this.projectId)
+    },
+
+    calculatePixelProgress() {
+      if (this.localPixels.size === 0) return 0
+      let completedPixels = 0
+      this.localPixels.forEach((color, key) => {
+        const [, ly] = key.split(',').map(Number)
+        if (this.completedColors.has(`${ly}:${color}`)) {
+          completedPixels++
+        }
+      })
+      return completedPixels / this.localPixels.size
+    },
+
+    getColorCode(hex) {
+      const code = colorCodeMap.get(hex.toLowerCase())
+      return code || '?'
+    },
+
+    setHighlightColor(color) {
+      this.highlightColor = color
+      // 如果设备已连接，同步高亮效果到设备
+      if (this.deviceConnected) {
+        this.syncToDevice()
+      }
+    },
+    
+    setAssistMode(mode) {
+      if (this.assistMode !== mode) {
+        this.assistMode = mode
+        this.highlightColor = null
+        // 切换模式后同步到设备
+        if (this.deviceConnected) {
+          this.syncToDevice()
+        }
+      }
+    },
+
+    isColorCompleted(color) {
+      if (this.assistMode === 'row') {
+        return this.completedColors.has(`${this.currentRow}:${color}`)
+      } else {
+        const rows = this.colorRowsMap.get(color)
+        if (!rows || rows.size === 0) return false
+        for (const r of rows) {
+          if (!this.completedColors.has(`${r}:${color}`)) return false
+        }
+        return true
+      }
+    },
+
+    toggleColorComplete(color) {
+      const newSet = new Set(this.completedColors)
+
+      if (this.assistMode === 'row') {
+        const key = `${this.currentRow}:${color}`
+        if (newSet.has(key)) {
+          newSet.delete(key)
+        } else {
+          newSet.add(key)
+        }
+      } else {
+        const rows = this.colorRowsMap.get(color)
+        if (!rows || rows.size === 0) return
+        
+        let allChecked = true
+        for (const r of rows) {
+          if (!newSet.has(`${r}:${color}`)) {
+            allChecked = false
+            break
+          }
+        }
+
+        if (allChecked) {
+          for (const r of rows) {
+            newSet.delete(`${r}:${color}`)
+          }
+        } else {
+          for (const r of rows) {
+            newSet.add(`${r}:${color}`)
+          }
+        }
+      }
+
+      this.completedColors = newSet
+    },
+
+    toggleRowComplete() {
+      const newSet = new Set(this.completedRows)
+      const newColorSet = new Set(this.completedColors)
+      const isCompleting = !newSet.has(this.currentRow)
+
+      if (isCompleting) {
+        newSet.add(this.currentRow)
+        const rowColors = this.rowColorsMap.get(this.currentRow)
+        if (rowColors) {
+          rowColors.forEach(c => newColorSet.add(`${this.currentRow}:${c}`))
+        }
+      } else {
+        newSet.delete(this.currentRow)
+        const rowColors = this.rowColorsMap.get(this.currentRow)
+        if (rowColors) {
+          rowColors.forEach(c => newColorSet.delete(`${this.currentRow}:${c}`))
+        }
+      }
+      
+      this.completedRows = newSet
+      this.completedColors = newColorSet
+    },
+
+    prevRow() {
+      if (this.currentRow > 0) {
+        this.currentRow--
+        // 逐行模式下，使用快速更新
+        if (this.deviceConnected && this.assistMode === 'row') {
+          this.updateRowBrightness()
+        }
+      }
+    },
+
+    nextRow() {
+      if (this.currentRow < 51) {
+        this.currentRow++
+        // 逐行模式下，使用快速更新
+        if (this.deviceConnected && this.assistMode === 'row') {
+          this.updateRowBrightness()
+        }
+      }
+    },
+    
+    handleRowListSelect(row) {
+      this.currentRow = row
+      this.isRowListOpen = false
+      // 逐行模式下，使用快速更新
+      if (this.deviceConnected && this.assistMode === 'row') {
+        this.updateRowBrightness()
+      }
+    },
+
+    // 字母索引相关方法
+    scrollToColorLetter(letter) {
+      this.currentVisibleLetter = letter
+      
+      // 如果是A，直接滚到顶部
+      if (letter === 'A') {
+        // 先清空 scrollIntoView，然后设置 scrollTop 为 0
+        this.scrollIntoView = ''
+        this.$nextTick(() => {
+          this.colorListScrollTop = 0
+        })
+      } else {
+        // 其他字母使用 scroll-into-view
+        this.colorListScrollTop = -1 // 重置 scrollTop，让 scroll-into-view 生效
+        this.$nextTick(() => {
+          this.scrollIntoView = 'letter-' + letter
+        })
+      }
+    },
+    
+    handleColorScroll(e) {
+      // 更新当前可见字母（简化版，uni-app 中较难实现精确的滚动监听）
+      // 可以根据需要进一步优化
+    },
+    
+    handleIndexTouchStart(e) {
+      this.isIndexTouching = true
+      this.showLetterBubble = true
+      
+      const touch = e.touches[0]
+      this.handleIndexTouch(touch)
+    },
+    
+    handleIndexTouchMove(e) {
+      if (!this.isIndexTouching) return
+      
+      const touch = e.touches[0]
+      this.handleIndexTouch(touch)
+    },
+    
+    handleIndexTouchEnd() {
+      this.isIndexTouching = false
+      this.showLetterBubble = false
+      this.currentTouchLetter = ''
+    },
+    
+    handleIndexTouch(touch) {
+      const letters = this.availableColorLetters
+      if (letters.length === 0) return
+      
+      // 获取索引条的位置信息
+      const query = uni.createSelectorQuery().in(this)
+      query.select('.index-bar').boundingClientRect((rect) => {
+        if (!rect) return
+        
+        // 计算相对位置
+        const relativeY = touch.pageY - rect.top
+        const itemHeight = rect.height / letters.length
+        const index = Math.max(0, Math.min(Math.floor(relativeY / itemHeight), letters.length - 1))
+        
+        const letter = letters[index]
+        
+        // 更新气泡位置和字母
+        this.bubblePosition = { x: touch.pageX - 64, y: touch.pageY }
+        
+        // 只有当字母改变时才滚动
+        if (letter !== this.currentTouchLetter) {
+          this.currentTouchLetter = letter
+          this.scrollToColorLetter(letter)
+        }
+      }).exec()
+    },
+
+    goToOverview() {
+      this.saveProgress()
+      uni.navigateBack()
+    },
+
+    goBack() {
+      this.saveProgress()
+      uni.navigateBack()
+    }
+  }
+}
+</script>
+
+<style scoped>
+.assist-page {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--bg-primary);
+  overflow: hidden;
+}
+
+/* 行导航弹窗 */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 32rpx;
+}
+
+.row-list-modal {
+  width: 100%;
+  max-width: 600rpx;
+  max-height: 80vh;
+  background-color: var(--bg-tertiary);
+  border-radius: 32rpx;
+  border: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 32rpx;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.modal-title {
+  font-size: 32rpx;
+  font-weight: bold;
+  color: var(--text-primary);
+}
+
+.close-btn {
+  width: 56rpx;
+  height: 56rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12rpx;
+  background-color: var(--bg-elevated);
+  transition: all 0.2s;
+}
+
+.close-icon {
+  font-size: 48rpx;
+  color: var(--text-secondary);
+}
+
+.row-grid-scroll {
+  flex: 1;
+  padding: 32rpx;
+}
+
+.row-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 20rpx;
+}
+
+.row-grid-item {
+  aspect-ratio: 1;
+  border-radius: 16rpx;
+  border: 2px solid var(--border-color);
+  background-color: var(--bg-tertiary);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  transition: all 0.2s;
+}
+
+.row-grid-item.current {
+  border-color: var(--accent-color);
+  background-color: rgba(0, 243, 255, 0.1);
+  box-shadow: 0 0 20rpx rgba(0, 243, 255, 0.3);
+}
+
+.row-grid-item.completed {
+  border-color: rgba(0, 255, 157, 0.3);
+  background-color: rgba(0, 255, 157, 0.1);
+}
+
+.row-number {
+  font-size: 28rpx;
+  color: var(--text-secondary);
+  font-family: monospace;
+  font-weight: 500;
+}
+
+.row-grid-item.current .row-number {
+  color: var(--accent-color);
+  font-weight: bold;
+}
+
+.check-mark {
+  position: absolute;
+  font-size: 32rpx;
+  color: var(--success-color);
+  opacity: 0.2;
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: space-between;
+  padding: 24rpx 32rpx;
+  border-top: 1px solid var(--border-color);
+  background-color: var(--bg-tertiary);
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+}
+
+.legend-box {
+  width: 24rpx;
+  height: 24rpx;
+  border-radius: 6rpx;
+  border: 2px solid;
+}
+
+.completed-box {
+  background-color: rgba(0, 255, 157, 0.1);
+  border-color: rgba(0, 255, 157, 0.3);
+}
+
+.current-box {
+  background-color: rgba(0, 243, 255, 0.1);
+  border-color: var(--accent-color);
+}
+
+.uncompleted-box {
+  background-color: var(--bg-tertiary);
+  border-color: var(--border-color);
+}
+
+.legend-text {
+  font-size: 22rpx;
+  color: var(--text-secondary);
+}
+
+/* 头部 */
+.header {
+  height: 112rpx;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 30rpx;
+  border-bottom: 2rpx solid var(--border-primary);
+  background-color: var(--bg-elevated);
+  z-index: 20;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+  flex-shrink: 0;
+}
+
+.back-btn {
+  width: 60rpx;
+  height: 60rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 16rpx;
+  background-color: var(--bg-tertiary);
+  border: 2rpx solid var(--border-primary);
+  transition: var(--transition-base);
+}
+
+.back-btn:active {
+  transform: scale(0.95);
+  background-color: var(--bg-elevated);
+}
+
+.icon {
+  font-size: 48rpx;
+  color: var(--text-primary);
+}
+
+.board-id {
+  font-size: 32rpx;
+  font-weight: bold;
+  color: var(--text-primary);
+  font-family: monospace;
+}
+
+.mode-switch {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  max-width: 400rpx;
+  gap: 8rpx;
+  padding: 8rpx;
+  background-color: var(--bg-tertiary);
+  border-radius: 24rpx;
+  border: 2rpx solid var(--border-primary);
+}
+
+.mode-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12rpx;
+  padding: 16rpx 24rpx;
+  border-radius: 16rpx;
+  transition: var(--transition-base);
+  color: var(--text-primary);
+}
+
+.mode-btn.active {
+  background-color: var(--accent-primary);
+  box-shadow: var(--shadow-glow);
+  color: var(--text-inverse);
+}
+
+.mode-icon {
+  font-size: 28rpx;
+}
+
+.mode-label {
+  font-size: 24rpx;
+  font-weight: bold;
+  color: inherit;
+}
+
+.header-actions {
+  display: flex;
+  gap: 16rpx;
+  flex-shrink: 0;
+}
+
+.icon-btn {
+  width: 60rpx;
+  height: 60rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 16rpx;
+  background-color: var(--bg-tertiary);
+  border: 2rpx solid var(--border-primary);
+  transition: var(--transition-base);
+}
+
+.icon-btn:active {
+  transform: scale(0.95);
+}
+
+.icon-btn.active {
+  background-color: rgba(0, 243, 255, 0.1);
+  border-color: var(--accent-primary);
+  box-shadow: var(--shadow-glow);
+}
+
+.device-btn.connected {
+  color: var(--accent-primary);
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+@keyframes pulse-glow {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+.info-banner {
+  padding: 20rpx 30rpx;
+  background-color: rgba(0, 243, 255, 0.1);
+  border-bottom: 2rpx solid var(--accent-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16rpx;
+  z-index: 10;
+}
+
+.color-dot {
+  width: 28rpx;
+  height: 28rpx;
+  border-radius: 50%;
+  border: 2rpx solid var(--accent-primary);
+  box-shadow: 0 0 8rpx rgba(0, 243, 255, 0.3);
+}
+
+.info-text {
+  font-size: 24rpx;
+  color: var(--accent-primary);
+  font-weight: bold;
+  font-family: monospace;
+}
+
+/* Canvas 画布 */
+.canvas-container {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  background-color: var(--bg-primary);
+  min-height: 0;
+}
+
+.assist-canvas {
+  width: 100%;
+  height: 100%;
+}
+
+/* 底部控制区 */
+.controls {
+  background-color: var(--bg-elevated);
+  border-top: 1px solid var(--border-color);
+  padding-bottom: env(safe-area-inset-bottom);
+  z-index: 20;
+}
+
+.color-section {
+  padding: 24rpx 30rpx;
+  position: relative;
+}
+
+.section-header {
+  margin-bottom: 16rpx;
+}
+
+.section-title {
+  font-size: 24rpx;
+  color: var(--text-secondary);
+  font-family: monospace;
+}
+
+.color-list {
+  max-height: 400rpx;
+}
+
+.color-group {
+  margin-bottom: 24rpx;
+}
+
+.group-header {
+  position: sticky;
+  top: 0;
+  padding: 12rpx 16rpx;
+  margin-bottom: 16rpx;
+  background: linear-gradient(90deg, rgba(0, 243, 255, 0.1), transparent);
+  backdrop-filter: blur(20rpx);
+  border-left: 4rpx solid var(--accent-primary);
+  border-radius: 0 8rpx 8rpx 0;
+  z-index: 10;
+}
+
+.group-letter {
+  font-size: 28rpx;
+  font-weight: bold;
+  color: var(--accent-primary);
+  font-family: monospace;
+  text-shadow: 0 0 8rpx rgba(0, 243, 255, 0.3);
+}
+
+.group-count {
+  font-size: 20rpx;
+  color: var(--text-tertiary);
+  margin-left: 12rpx;
+}
+
+.color-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16rpx;
+  margin-bottom: 16rpx;
+}
+
+.color-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12rpx;
+  padding: 16rpx;
+  background-color: var(--bg-tertiary);
+  border: 2rpx solid var(--border-primary);
+  border-radius: 16rpx;
+  box-shadow: var(--shadow-sm);
+  transition: var(--transition-base);
+  position: relative;
+  overflow: hidden;
+}
+
+.color-item.active {
+  border-color: var(--accent-primary);
+  background-color: rgba(0, 243, 255, 0.1);
+  box-shadow: var(--shadow-glow);
+}
+
+.color-item.completed {
+  opacity: 0.6;
+  border-color: rgba(0, 255, 157, 0.5);
+  background-color: rgba(0, 255, 157, 0.05);
+}
+
+.color-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8rpx;
+}
+
+.color-swatch {
+  width: 48rpx;
+  height: 48rpx;
+  border-radius: 12rpx;
+  border: 2rpx solid var(--border-color);
+  flex-shrink: 0;
+}
+
+.color-code {
+  font-size: 20rpx;
+  font-weight: bold;
+  color: var(--text-primary);
+  font-family: monospace;
+}
+
+.color-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8rpx;
+  flex-shrink: 0;
+}
+
+.check-btn {
+  width: 48rpx;
+  height: 48rpx;
+  border: 2rpx solid var(--border-primary);
+  border-radius: 12rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: var(--transition-base);
+  z-index: 10;
+}
+
+.check-btn:active {
+  transform: scale(0.9);
+}
+
+.check-btn.checked {
+  background-color: var(--success-color);
+  border-color: var(--success-color);
+  box-shadow: 0 0 16rpx rgba(0, 255, 157, 0.4);
+}
+
+.check-icon {
+  font-size: 28rpx;
+  color: var(--text-inverse);
+  font-weight: bold;
+}
+
+.check-box {
+  width: 32rpx;
+  height: 32rpx;
+}
+
+.color-count {
+  font-size: 20rpx;
+  color: var(--text-tertiary);
+  font-family: monospace;
+}
+
+/* 字母索引条 */
+.index-bar {
+  position: absolute;
+  right: 30rpx;
+  top: 80rpx;
+  bottom: 20rpx;
+  width: 40rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4rpx;
+  z-index: 15;
+}
+
+.index-letter {
+  font-size: 20rpx;
+  font-weight: bold;
+  color: var(--text-tertiary);
+  font-family: monospace;
+  width: 32rpx;
+  height: 32rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8rpx;
+  transition: var(--transition-fast);
+}
+
+.index-letter.active {
+  color: var(--accent-primary);
+  background-color: rgba(0, 243, 255, 0.2);
+  transform: scale(1.3);
+}
+
+/* 字母提示气泡 */
+.letter-bubble {
+  position: fixed;
+  width: 128rpx;
+  height: 128rpx;
+  background-color: var(--accent-primary);
+  color: var(--text-inverse);
+  font-size: 56rpx;
+  font-weight: bold;
+  font-family: monospace;
+  border-radius: 32rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--shadow-glow);
+  z-index: 2000;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  animation: bubble-in var(--transition-fast);
+}
+
+@keyframes bubble-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+/* 行控制 */
+.row-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24rpx 30rpx;
+  gap: 16rpx;
+  border-top: 1px solid var(--border-color);
+}
+
+.row-btn {
+  width: 96rpx;
+  height: 96rpx;
+  background-color: var(--bg-tertiary);
+  border: 2rpx solid var(--border-primary);
+  border-radius: 24rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: var(--transition-base);
+  flex-shrink: 0;
+}
+
+.row-btn:active {
+  transform: scale(0.95);
+  background-color: var(--bg-elevated);
+}
+
+.row-icon {
+  font-size: 40rpx;
+  color: var(--text-primary);
+}
+
+.row-info-container {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16rpx;
+  height: 96rpx;
+  background-color: var(--bg-tertiary);
+  border: 2rpx solid var(--border-primary);
+  border-radius: 24rpx;
+}
+
+.row-list-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 0 24rpx;
+  height: 100%;
+  border-right: 1px solid var(--border-color);
+  transition: all 0.2s;
+}
+
+.row-list-btn:active {
+  background-color: var(--bg-elevated);
+}
+
+.grid-icon {
+  font-size: 32rpx;
+  color: var(--text-secondary);
+}
+
+.list-label {
+  font-size: 18rpx;
+  color: var(--text-secondary);
+  font-family: monospace;
+  margin-top: 4rpx;
+}
+
+.row-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.row-number {
+  font-size: 48rpx;
+  font-weight: bold;
+  color: var(--accent-primary);
+  font-family: monospace;
+  line-height: 1;
+  text-shadow: 0 0 8rpx rgba(0, 243, 255, 0.3);
+}
+
+.row-total {
+  font-size: 20rpx;
+  color: var(--text-secondary);
+  font-family: monospace;
+  margin-top: 4rpx;
+}
+
+.row-complete-btn {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  padding: 20rpx 32rpx;
+  background-color: var(--bg-tertiary);
+  border: 2rpx solid var(--border-primary);
+  border-radius: 16rpx;
+  transition: var(--transition-base);
+}
+
+.row-complete-btn:active {
+  transform: scale(0.95);
+}
+
+.row-complete-btn.completed {
+  background-color: var(--success-color);
+  border-color: var(--success-color);
+  box-shadow: 0 0 20rpx rgba(0, 255, 157, 0.4);
+}
+
+.complete-icon {
+  font-size: 28rpx;
+  color: var(--text-inverse);
+  font-weight: bold;
+}
+
+.complete-box {
+  width: 28rpx;
+  height: 28rpx;
+  border: 2px solid currentColor;
+  border-radius: 6rpx;
+}
+
+.complete-text {
+  font-size: 24rpx;
+  font-weight: bold;
+  color: var(--text-primary);
+}
+
+.row-complete-btn.completed .complete-text {
+  color: var(--text-inverse);
+}
+
+</style>
+

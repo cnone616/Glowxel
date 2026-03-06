@@ -1,0 +1,57 @@
+/* MATRIX 浅色主题 */
+
+page.light-theme {
+  /* 背景色 */
+  --bg-primary: #fafafa;
+  --bg-secondary: #f5f5f5;
+  --bg-tertiary: #eeeeee;
+  --bg-elevated: #ffffff;
+  
+  /* 文字色 */
+  --text-primary: #2c2c2c;
+  --text-secondary: #5a5a5a;
+  --text-tertiary: #8a8a8a;
+  --text-inverse: #ffffff;
+  
+  /* 边框色 */
+  --border-primary: #e0e0e0;
+  --border-secondary: #cccccc;
+  --border-color: #e0e0e0;
+  
+  /* 强调色 */
+  --accent-primary: #0099cc;
+  --accent-secondary: #00aa88;
+  --accent-hover: #007799;
+  --accent-color: #0099cc;
+  
+  /* 状态色 */
+  --success-color: #00aa88;
+  --error-color: #dd4444;
+  --warning-color: #ee9900;
+  --info-color: #0099cc;
+  
+  /* 阴影 */
+  --shadow-sm: 0 2rpx 8rpx rgba(0, 0, 0, 0.1);
+  --shadow-md: 0 4rpx 16rpx rgba(0, 0, 0, 0.15);
+  --shadow-lg: 0 8rpx 32rpx rgba(0, 0, 0, 0.2);
+  --shadow-glow: 0 0 30rpx rgba(0, 153, 204, 0.3);
+  
+  /* Canvas */
+  --canvas-bg: #ffffff;
+  --canvas-grid: #000000;
+  
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+
+  /* 新增项目 */
+  --create-tabs-active-bg: #5a5a5a;
+  --create-tabs-active-box-shadow: none;
+  --create-size-active-bg: #ffffff;
+  --create-size-active-border-color: #5a5a5a;
+  --create-size-active-box-shadow: none;
+  --create-preset-card-bg: #ffffff;
+  --create-preset-card-border-color: #5a5a5a;
+  --create-preset-name: #333333;
+  --create-preset-count: #333333;
+  --create-info-value-clr: #00f3ff;
+}

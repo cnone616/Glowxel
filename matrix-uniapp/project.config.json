@@ -1,0 +1,41 @@
+{
+  "cloudfunctionRoot": "cloudfunctions-aliyun/",
+  "cloudbaseRoot": "./",
+  "cloudenv": "cloud1-8gyb5ui915c88712",
+  "setting": {
+    "es6": true,
+    "postcss": true,
+    "minified": true,
+    "uglifyFileName": false,
+    "enhance": true,
+    "packNpmRelationList": [],
+    "babelSetting": {
+      "ignore": [],
+      "disablePlugins": [],
+      "outputPath": ""
+    },
+    "useCompilerPlugins": false,
+    "minifyWXML": true,
+    "compileWorklet": false,
+    "uploadWithSourceMap": true,
+    "packNpmManually": false,
+    "minifyWXSS": true,
+    "localPlugins": false,
+    "disableUseStrict": false,
+    "condition": false,
+    "swc": false,
+    "disableSWC": true,
+    "urlCheck": false,
+    "checkSiteMap": false
+  },
+  "compileType": "miniprogram",
+  "simulatorPluginLibVersion": {},
+  "packOptions": {
+    "ignore": [],
+    "include": []
+  },
+  "appid": "wx835e6dedfe866432",
+  "editorSetting": {},
+  "libVersion": "3.14.3",
+  "cloudfunctionTemplateRoot": "cloudfunctionTemplate/"
+}

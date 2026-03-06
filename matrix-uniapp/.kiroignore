@@ -1,0 +1,43 @@
+# Kiro 索引忽略文件
+# 这个文件告诉 Kiro 不要索引这些文件和文件夹，提升性能
+
+# 依赖和构建产物
+node_modules/
+unpackage/
+.hbuilderx/
+dist/
+build/
+
+# 编译缓存
+.cache/
+.vite/
+.sourcemap/
+
+# 日志文件
+*.log
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# 静态资源（字体、图标）
+*.woff
+*.woff2
+*.ttf
+*.eot
+
+# 图片文件（除了重要的 logo）
+*.png
+*.jpg
+*.jpeg
+*.gif
+!static/matrix-logo.png
+!image.png
+
+# 配置文件
+project.config.json
+project.private.config.json
+manifest.json
+
+# Git
+.git/

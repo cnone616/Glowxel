@@ -1,0 +1,102 @@
+{
+	"easycom": {
+		"autoscan": true,
+		"custom": {
+			"^uni-(.*)": "@dcloudio/uni-ui/lib/uni-$1/uni-$1.vue"
+		}
+	},
+	"pages": [
+		{
+			"path": "pages/library/library",
+			"style": {
+				"navigationStyle": "custom",
+				"navigationBarTextStyle": "white",
+				"backgroundColor": "#1a1a1a",
+				"enablePullDownRefresh": false
+			}
+		},
+		{
+			"path": "pages/create/create",
+			"style": {
+				"navigationStyle": "custom",
+				"navigationBarTextStyle": "white",
+				"backgroundColor": "#1a1a1a",
+				"enablePullDownRefresh": false
+			}
+		},
+		{
+			"path": "pages/editor/editor",
+			"style": {
+				"navigationStyle": "custom",
+				"navigationBarTextStyle": "white",
+				"backgroundColor": "#1a1a1a",
+				"enablePullDownRefresh": false
+			}
+		},
+		{
+			"path": "pages/overview/overview",
+			"style": {
+				"navigationStyle": "custom",
+				"navigationBarTextStyle": "white",
+				"backgroundColor": "#1a1a1a",
+				"enablePullDownRefresh": false
+			}
+		},
+		{
+			"path": "pages/assist/assist",
+			"style": {
+				"navigationStyle": "custom",
+				"navigationBarTextStyle": "white",
+				"backgroundColor": "#1a1a1a",
+				"enablePullDownRefresh": false
+			}
+		},
+		{
+			"path": "pages/control/control",
+			"style": {
+				"navigationStyle": "custom",
+				"navigationBarTextStyle": "white",
+				"backgroundColor": "#1a1a1a",
+				"enablePullDownRefresh": false
+			}
+		},
+		{
+			"path": "pages/user/user",
+			"style": {
+				"navigationStyle": "custom",
+				"navigationBarTextStyle": "white",
+				"backgroundColor": "#1a1a1a",
+				"enablePullDownRefresh": false
+			}
+		},
+		{
+			"path": "pages/profile/profile",
+			"style": {
+				"navigationStyle": "custom",
+				"navigationBarTextStyle": "white",
+				"backgroundColor": "#1a1a1a",
+				"enablePullDownRefresh": false
+			}
+		},
+		{
+			"path": "pages/clock-editor/clock-editor",
+			"style": {
+				"navigationStyle": "custom",
+				"navigationBarTextStyle": "white",
+				"backgroundColor": "#1a1a1a",
+				"enablePullDownRefresh": false
+			}
+		}
+	],
+	"globalStyle": {
+		"navigationStyle": "custom",
+		"navigationBarTextStyle": "white",
+		"navigationBarTitleText": "MATRIX",
+		"navigationBarBackgroundColor": "#1a1a1a",
+		"backgroundColor": "#1a1a1a",
+		"backgroundTextStyle": "dark",
+		"animationType": "pop-in",
+		"animationDuration": 200,
+		"enablePullDownRefresh": false
+	}
+}
