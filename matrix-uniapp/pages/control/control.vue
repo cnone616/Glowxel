@@ -78,7 +78,10 @@
             <Icon name="edit" :size="32" />
             <text class="btn-text">自定义闹钟样式</text>
           </view>
-          
+          <view v-if="deviceMode === 'clock'" class="clock-edit-btn" @click="editClock">
+            <Icon name="edit" :size="32" />
+            <text class="btn-text">自定义闹钟样式</text>
+          </view>
           <view v-if="deviceMode === 'clock'" class="clock-edit-btn secondary" @click="importJSON">
             <Icon name="add" :size="32" />
             <text class="btn-text">导入 JSON 配置</text>
@@ -399,10 +402,13 @@ export default {
             }
           }
           
+          // 闹钟背景图必须用闹钟模式接收，先切换模式
+          await ws.setMode('clock')
+          
           // 发送配置
           await ws.send({ cmd: 'set_clock_config', config: configData })
           
-          // 如果有像素数据，使用二进制方式发送
+          // 如果有像素数据，使用二进制方式发送（闹钟背景图）
           if (jsonData.imagePixels && jsonData.imagePixels.length > 0) {
             await this.sendImagePixelsBinary(jsonData.imagePixels)
             this.toast.showSuccess(`配置已发送！包含 ${jsonData.imagePixels.length} 个像素点`)

@@ -102,6 +102,9 @@ bool binaryDataPending = false;
 #define PANEL_RES_Y 64
 #define PANEL_CHAIN 1
 
+// 最大支持的像素数量（64x64 单格 RGB）
+const int MAX_PIXELS = PANEL_RES_X * PANEL_RES_Y;
+
 MatrixPanel_I2S_DMA *dma_display = nullptr;
 AsyncWebServer server(80);
 DNSServer dnsServer;
@@ -438,6 +441,11 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventTyp
           int validPixels = 0;
           // 复制像素数据
           for (size_t i = 0; i + 4 < len; i += 5) {
+            // 达到最大像素数量后，忽略后续数据，避免占用过多 NVS 空间
+            if (imagePixelCount >= MAX_PIXELS) {
+              break;
+            }
+            
             uint8_t x = data[i];
             uint8_t y = data[i + 1];
             uint8_t r = data[i + 2];
@@ -508,7 +516,7 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventTyp
       response["message"] = "pong";
     }
     else if (cmd == "status") {
-      response["ip"] = WiFi.localIP().toString();
+      response["ip"] = config_mode ? WiFi.softAPIP().toString() : WiFi.localIP().toString();
       response["width"] = PANEL_RES_X;
       response["height"] = PANEL_RES_Y;
       response["brightness"] = currentBrightness;
@@ -626,8 +634,12 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventTyp
           imagePixels = nullptr;
         }
         
-        // 分配新的像素数据
+        // 分配新的像素数据（最多 64x64 像素）
         imagePixelCount = pixels.size();
+        if (imagePixelCount > MAX_PIXELS) {
+          Serial.printf("像素数量过大（%d），截断到最大值 %d\n", imagePixelCount, MAX_PIXELS);
+          imagePixelCount = MAX_PIXELS;
+        }
         imagePixels = (PixelData*)malloc(sizeof(PixelData) * imagePixelCount);
         
         if (imagePixels == nullptr) {
@@ -648,14 +660,17 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventTyp
             if (i % 100 == 0) yield();
           }
           
-          // 保存像素数据到 Preferences（如果数据不太大）
+          // 保存像素数据到 Preferences（限制为最多 64x64 像素）
           preferences.begin("clock", false);
-          if (imagePixelCount * sizeof(PixelData) < 500000) { // 限制500KB
-            preferences.putBytes("pixels", imagePixels, sizeof(PixelData) * imagePixelCount);
+          size_t dataSize = imagePixelCount * sizeof(PixelData);
+          size_t maxDataSize = MAX_PIXELS * sizeof(PixelData);
+          if (dataSize <= maxDataSize) {
+            preferences.putBytes("pixels", imagePixels, dataSize);
             preferences.putInt("pixelCount", imagePixelCount);
-            Serial.printf("像素数据已保存: %d 个像素\n", imagePixelCount);
+            Serial.printf("像素数据已保存: %d 个像素（%d bytes）\n", imagePixelCount, dataSize);
           } else {
-            Serial.println("像素数据太大，无法保存到 Preferences");
+            Serial.printf("像素数据太大（%d bytes），无法保存到 Preferences，最大允许 %d bytes\n",
+              dataSize, maxDataSize);
           }
           preferences.end();
           
@@ -712,8 +727,13 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventTyp
       int r = doc["r"] | 255;
       int g = doc["g"] | 255;
       int b = doc["b"] | 255;
-      dma_display->drawPixelRGB888(x, y, r, g, b);
-      response["message"] = "pixel set";
+      if (x >= 0 && x < PANEL_RES_X && y >= 0 && y < PANEL_RES_Y) {
+        dma_display->drawPixelRGB888(x, y, r, g, b);
+        response["message"] = "pixel set";
+      } else {
+        response["status"] = "error";
+        response["message"] = "pixel out of range";
+      }
     }
     else if (cmd == "image") {
       JsonArray pixels = doc["pixels"];
@@ -924,9 +944,20 @@ void setupServer() {
       
       if (final) {
         Serial.printf("接收完成，大小: %d bytes\n", imageSize);
-        int width = request->hasParam("width") ? request->getParam("width")->value().toInt() : PANEL_RES_X;
-        int height = request->hasParam("height") ? request->getParam("height")->value().toInt() : PANEL_RES_Y;
-        displayImage(imageBuffer, imageSize, width, height);
+        if (imageBuffer != nullptr && imageSize > 0) {
+          int width = request->hasParam("width") ? request->getParam("width")->value().toInt() : PANEL_RES_X;
+          int height = request->hasParam("height") ? request->getParam("height")->value().toInt() : PANEL_RES_Y;
+          displayImage(imageBuffer, imageSize, width, height);
+        } else {
+          Serial.println("✗ 图片缓冲区为空，无法显示");
+        }
+        
+        // 释放缓冲区，避免内存泄漏
+        if (imageBuffer) {
+          free(imageBuffer);
+          imageBuffer = nullptr;
+        }
+        imageSize = 0;
       }
     }
   );
@@ -1068,7 +1099,8 @@ void loop() {
       size_t dataSize = imagePixelCount * sizeof(PixelData);
       Serial.printf("数据大小: %d bytes\n", dataSize);
       
-      if (dataSize < 500000) { // 限制500KB
+      size_t maxDataSize = MAX_PIXELS * sizeof(PixelData);
+      if (dataSize <= maxDataSize) {
         preferences.putBytes("pixels", imagePixels, dataSize);
         preferences.putInt("pixelCount", imagePixelCount);
         
@@ -1078,7 +1110,7 @@ void loop() {
         preferences.end();
         
         Serial.println("✓✓✓ 像素数据已保存到 Preferences ✓✓✓");
-        Serial.printf("保存了 %d 个像素，image.show=%d\n", imagePixelCount, clockConfig.image.show);
+        Serial.printf("保存了 %d 个像素（%d bytes），image.show=%d\n", imagePixelCount, dataSize, clockConfig.image.show);
         
         // 发送确认消息给客户端，告知实际接收的像素数量
         StaticJsonDocument<128> confirmDoc;
@@ -1092,7 +1124,8 @@ void loop() {
         
       } else {
         preferences.end();
-        Serial.println("✗✗✗ 像素数据太大，无法保存 ✗✗✗");
+        Serial.printf("✗✗✗ 像素数据太大（%d bytes），无法保存，最大允许 %d bytes ✗✗✗\n",
+          dataSize, maxDataSize);
       }
       
       // 保存完成后，如果是闹钟模式，刷新显示

@@ -94,13 +94,15 @@ export const useDeviceStore = defineStore('device', {
       this.deviceInfo = null
     },
 
-    // 发送图片数据到设备
+    // 发送图片数据到设备（画板模式）
     async sendImage(pixels, width, height) {
       if (!this.connected || !this.webSocket) {
         throw new Error('设备未连接')
       }
       
       try {
+        // 发送画布数据前必须先切换到画板模式，否则会被误存为闹钟背景图
+        await this.webSocket.setMode('canvas')
         await this.webSocket.showImage(pixels, width, height)
         return { success: true }
       } catch (err) {
@@ -109,13 +111,15 @@ export const useDeviceStore = defineStore('device', {
       }
     },
     
-    // 发送部分更新（仅更新指定像素）
+    // 发送部分更新（仅更新指定像素，画板模式）
     async sendPartialUpdate(pixelData) {
       if (!this.connected || !this.webSocket) {
         throw new Error('设备未连接')
       }
       
       try {
+        // 发送画布数据前必须先切换到画板模式
+        await this.webSocket.setMode('canvas')
         await this.webSocket.sendPartialUpdate(pixelData)
         return { success: true }
       } catch (err) {

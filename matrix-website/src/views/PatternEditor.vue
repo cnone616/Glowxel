@@ -107,7 +107,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import StepMode from '@/components/pattern/StepMode.vue'
 import StepSize from '@/components/pattern/StepSize.vue'
 import StepColorSet from '@/components/pattern/StepColorSet.vue'
@@ -164,20 +164,38 @@ const canProceed = computed(() => {
 })
 
 // 初始化
-onMounted(() => {
-  if (canvas.value) {
-    ctx.value = canvas.value.getContext('2d')
-    resizeCanvas()
-    window.addEventListener('resize', resizeCanvas)
-  }
+onMounted(async () => {
+  await nextTick()
+  // Canvas 会在步骤3时才渲染，所以这里不需要初始化
+  window.addEventListener('resize', handleResize)
 })
 
+// 清理
+onUnmounted(() => {
+  window.removeEventListener('resize', handleResize)
+})
+
+// 处理窗口大小变化
+function handleResize() {
+  if (step.value === 3 && canvas.value) {
+    resizeCanvas()
+  }
+}
+
 // 监听步骤变化
-watch(step, (newStep) => {
+watch(step, async (newStep) => {
   if (newStep === 3) {
+    await nextTick()
     initEditor()
   }
 })
+
+// 监听像素变化，自动重绘
+watch(() => pixels.value, () => {
+  if (step.value === 3 && ctx.value) {
+    drawCanvas()
+  }
+}, { deep: true })
 
 // 步骤导航
 function prevStep() {
@@ -199,46 +217,88 @@ async function nextStep() {
 
 // 处理图片
 async function processImage() {
-  if (!imageFile.value) return
+  if (!imageFile.value) {
+    console.error('没有图片文件')
+    return
+  }
   
+  console.log('开始处理图片...')
   const img = new Image()
   img.src = imageUrl.value
   
-  await new Promise((resolve) => {
+  await new Promise((resolve, reject) => {
     img.onload = () => {
+      console.log('图片加载完成:', img.width, 'x', img.height)
       const colorCodes = ARTKAL_OFFICIAL_SETS[selectedPreset.value]?.colors || []
+      console.log('使用颜色套装:', selectedPreset.value, '颜色数量:', colorCodes.length)
+      console.log('目标尺寸:', width.value, 'x', height.value)
+      
       const pixelMap = imageToPixels(img, width.value, height.value, colorCodes)
+      console.log('图片转换完成，生成像素数量:', pixelMap.size)
+      
       pixels.value = pixelMap
       saveHistory()
       resolve()
+    }
+    img.onerror = (err) => {
+      console.error('图片加载失败:', err)
+      reject(err)
     }
   })
 }
 
 // 初始化编辑器
-function initEditor() {
+async function initEditor() {
+  // 等待 DOM 更新
+  await nextTick()
+  
+  // 初始化 canvas context
+  if (canvas.value && !ctx.value) {
+    ctx.value = canvas.value.getContext('2d')
+  }
+  
+  // 设置默认颜色
   if (!selectedColor.value && paletteColors.value.length > 0) {
     selectedColor.value = paletteColors.value[0].code
   }
   
+  // 空白模式初始化
   if (mode.value === 'blank' && pixels.value.size === 0) {
     pixels.value = new Map()
     saveHistory()
   }
   
-  resizeCanvas()
-  fitCanvas()
-  drawCanvas()
+  // 再次等待确保 canvas 完全渲染
+  await nextTick()
+  
+  // 调整 canvas 大小并绘制
+  if (canvas.value && canvasWrapper.value) {
+    resizeCanvas()
+    await nextTick()
+    fitCanvas()
+  }
 }
 
 // Canvas 操作
 function resizeCanvas() {
-  if (!canvas.value || !canvasWrapper.value) return
+  if (!canvas.value || !canvasWrapper.value) {
+    console.warn('Canvas 或 wrapper 未就绪')
+    return
+  }
   
   const wrapper = canvasWrapper.value
-  canvas.value.width = wrapper.clientWidth
-  canvas.value.height = wrapper.clientHeight
+  const newWidth = wrapper.clientWidth
+  const newHeight = wrapper.clientHeight
   
+  if (newWidth === 0 || newHeight === 0) {
+    console.warn('Canvas wrapper 尺寸为 0')
+    return
+  }
+  
+  canvas.value.width = newWidth
+  canvas.value.height = newHeight
+  
+  console.log('Canvas 已调整大小:', newWidth, 'x', newHeight)
   drawCanvas()
 }
 
@@ -262,7 +322,12 @@ function fitCanvas() {
 }
 
 function drawCanvas() {
-  if (!ctx.value || !canvas.value) return
+  if (!ctx.value || !canvas.value) {
+    console.warn('Canvas context 未初始化')
+    return
+  }
+  
+  console.log('开始绘制 canvas, 像素数量:', pixels.value.size)
   
   const c = ctx.value
   c.clearRect(0, 0, canvas.value.width, canvas.value.height)
@@ -294,6 +359,7 @@ function drawCanvas() {
   }
   
   // 绘制像素
+  let drawnCount = 0
   pixels.value.forEach((colorCode, key) => {
     const [x, y] = key.split(',').map(Number)
     const color = getColorByCode(colorCode)
@@ -305,8 +371,11 @@ function drawCanvas() {
         zoom.value,
         zoom.value
       )
+      drawnCount++
     }
   })
+  
+  console.log('已绘制像素数量:', drawnCount)
 }
 
 // 鼠标事件

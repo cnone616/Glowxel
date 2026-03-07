@@ -26,38 +26,14 @@
       </view>
     </view>
 
+    <!-- 提示：无实时预览，保存后发送到设备查看 -->
+    <view class="preview-hint">
+      <text class="preview-hint-text">64×64 效果请在下方设置完成后，点击「保存」再点击「发送」到设备查看</text>
+    </view>
+
+    <!-- 主内容：当前 Tab 的表单 -->
     <scroll-view scroll-y class="content" :style="{ height: contentHeight }">
       <view class="content-wrapper">
-        <!-- 预览区域 -->
-        <view class="preview-card">
-          <view class="card-title-section">
-            <text class="card-title">实时预览</text>
-            <text class="card-subtitle">64x64 像素</text>
-          </view>
-          <view class="preview-container">
-            <canvas 
-              type="2d"
-              canvas-id="previewCanvas" 
-              id="previewCanvas"
-              class="preview-canvas"
-              :style="{ width: canvasSize + 'px', height: canvasSize + 'px' }"
-            ></canvas>
-          </view>
-        </view>
-
-        <!-- Tab 切换 -->
-        <view class="tabs-inline">
-          <view 
-            v-for="(tab, index) in tabs" 
-            :key="index"
-            class="tab-item"
-            :class="{ 'active': currentTab === index }"
-            @click="currentTab = index"
-          >
-            <text class="tab-text">{{ tab }}</text>
-          </view>
-        </view>
-
         <!-- 时间设置 -->
         <view v-show="currentTab === 0" class="settings-card">
           <view class="card-title-section">
@@ -380,6 +356,24 @@
         </view>
       </view>
     </scroll-view>
+
+    <!-- 底部 Tab 切换：时间 / 日期 / 星期 / 图片 -->
+    <view class="bottom-tabs">
+      <view 
+        v-for="(tab, index) in tabs" 
+        :key="index"
+        class="bottom-tab-item"
+        :class="{ 'active': currentTab === index }"
+        @click="currentTab = index"
+      >
+        <Icon 
+          :name="tabIconNames[index]" 
+          :size="36" 
+          :color="currentTab === index ? accentColor : 'var(--text-secondary)'"
+        />
+        <text class="bottom-tab-text">{{ tab }}</text>
+      </view>
+    </view>
     
     <Toast ref="toastRef" />
   </view>
@@ -405,12 +399,11 @@ export default {
       deviceStore: null,
       toast: null,
       
-      canvasSize: 280,
-      ctx: null,
-      contentHeight: 'calc(100vh - 112rpx)',
+      contentHeight: 'calc(100vh - 112rpx - 120rpx - 80rpx)',
       
       currentTab: 0,
       tabs: ['时间', '日期', '星期', '图片'],
+      tabIconNames: ['time', 'calendar', 'calendar-days', 'picture'],
       
       config: {
         time: {
@@ -459,21 +452,6 @@ export default {
   computed: {
     accentColor() {
       return this.themeStore && this.themeStore.isDarkMode ? '#00f3ff' : '#0099cc'
-    },
-    
-    previewTime() {
-      const now = new Date()
-      return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
-    },
-    
-    previewDate() {
-      const now = new Date()
-      return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
-    },
-    
-    previewWeek() {
-      const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-      return weekDays[new Date().getDay()]
     }
   },
 
@@ -491,11 +469,7 @@ export default {
       if (this.$refs.toastRef) {
         this.toast.setToastInstance(this.$refs.toastRef)
       }
-      
-      setTimeout(() => {
-        this.initCanvas()
-        this.loadConfig()
-      }, 300)
+      this.loadConfig()
     })
     
     this.themeStore.applyTheme()
@@ -506,138 +480,8 @@ export default {
   },
 
   methods: {
-    initCanvas() {
-      // #ifdef MP-WEIXIN
-      const query = uni.createSelectorQuery().in(this)
-      query.select('#previewCanvas')
-        .fields({ node: true, size: true })
-        .exec((res) => {
-          if (res && res[0] && res[0].node) {
-            const canvas = res[0].node
-            this.ctx = canvas.getContext('2d')
-            
-            const dpr = uni.getSystemInfoSync().pixelRatio
-            canvas.width = 64 * dpr
-            canvas.height = 64 * dpr
-            this.ctx.scale(dpr, dpr)
-            
-            this.drawPreview()
-          } else {
-            console.error('Canvas 初始化失败')
-          }
-        })
-      // #endif
-      
-      // #ifndef MP-WEIXIN
-      this.ctx = uni.createCanvasContext('previewCanvas', this)
-      this.drawPreview()
-      // #endif
-    },
-
-    drawPreview() {
-      if (!this.ctx) {
-        console.log('ctx 未初始化')
-        return
-      }
-      
-      const ctx = this.ctx
-      
-      // 清空画布
-      ctx.fillStyle = '#000000'
-      ctx.fillRect(0, 0, 64, 64)
-      
-      // 如果有背景图片，先绘制图片
-      if (this.config.image.show && this.config.image.data) {
-        // #ifdef MP-WEIXIN
-        // 微信小程序使用 canvas.createImage()
-        const query = uni.createSelectorQuery().in(this)
-        query.select('#previewCanvas')
-          .fields({ node: true })
-          .exec((res) => {
-            if (res && res[0] && res[0].node) {
-              const canvas = res[0].node
-              const img = canvas.createImage()
-              img.onload = () => {
-                ctx.drawImage(
-                  img, 
-                  this.config.image.x, 
-                  this.config.image.y, 
-                  this.config.image.width, 
-                  this.config.image.height
-                )
-                // 图片加载完成后再绘制文字
-                this.drawText(ctx)
-              }
-              img.onerror = (err) => {
-                console.error('图片加载失败:', err)
-                this.drawText(ctx)
-              }
-              img.src = this.config.image.data
-            }
-          })
-        // #endif
-        
-        // #ifndef MP-WEIXIN
-        // 非微信小程序使用 Image
-        const img = new Image()
-        img.onload = () => {
-          ctx.drawImage(
-            img, 
-            this.config.image.x, 
-            this.config.image.y, 
-            this.config.image.width, 
-            this.config.image.height
-          )
-          this.drawText(ctx)
-        }
-        img.src = this.config.image.data
-        // #endif
-      } else {
-        // 没有图片，直接绘制文字
-        this.drawText(ctx)
-      }
-    },
-    
-    drawText(ctx) {
-      const now = new Date()
-      const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
-      const dateStr = `${now.getMonth() + 1}-${String(now.getDate()).padStart(2, '0')}`
-      const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-      const weekStr = weekDays[now.getDay()]
-      
-      // 设置文本基线
-      ctx.textBaseline = 'top'
-      
-      // 绘制时间
-      const timeFontSize = this.config.time.fontSize * 8
-      ctx.font = `${timeFontSize}px Arial`
-      ctx.fillStyle = this.config.time.color
-      ctx.fillText(timeStr, this.config.time.x, this.config.time.y)
-      
-      // 绘制日期
-      if (this.config.date.show) {
-        const dateFontSize = this.config.date.fontSize * 6
-        ctx.font = `${dateFontSize}px Arial`
-        ctx.fillStyle = this.config.date.color
-        ctx.fillText(dateStr, this.config.date.x, this.config.date.y)
-      }
-      
-      // 绘制星期
-      if (this.config.week.show) {
-        ctx.font = '8px Arial'
-        ctx.fillStyle = this.config.week.color
-        ctx.fillText(weekStr, this.config.week.x, this.config.week.y)
-      }
-      
-      // #ifndef MP-WEIXIN
-      // 非微信小程序需要调用 draw() 来渲染
-      ctx.draw()
-      // #endif
-    },
-
     updateConfig(section, key, value) {
       this.config[section][key] = value
-      this.drawPreview()
     },
     
     handleImageSizeChange(dimension, event) {
@@ -647,32 +491,25 @@ export default {
       if (value > 64) {
         this.toast.showWarning(`${dimension === 'width' ? '宽度' : '高度'}超过64，可能显示不完整`)
       }
-      
-      this.drawPreview()
     },
     
     setSquareSize() {
-      // 取宽高中较小的值，确保不超过64
       const size = Math.min(this.config.image.width, this.config.image.height, 64)
       this.config.image.width = size
       this.config.image.height = size
       this.toast.showSuccess(`已设置为 ${size}x${size}`)
-      this.drawPreview()
     },
 
     toggleDateShow() {
       this.config.date.show = !this.config.date.show
-      this.drawPreview()
     },
 
     toggleWeekShow() {
       this.config.week.show = !this.config.week.show
-      this.drawPreview()
     },
     
     toggleImageShow() {
       this.config.image.show = !this.config.image.show
-      this.drawPreview()
     },
     
     chooseImage() {
@@ -689,7 +526,6 @@ export default {
             success: (fileRes) => {
               this.config.image.data = 'data:image/png;base64,' + fileRes.data
               this.config.image.show = true
-              this.drawPreview()
               this.toast.showSuccess('图片已上传')
             },
             fail: (err) => {
@@ -707,7 +543,6 @@ export default {
     removeImage() {
       this.config.image.data = null
       this.config.image.show = false
-      this.drawPreview()
       this.toast.showInfo('图片已删除')
     },
 
@@ -721,7 +556,6 @@ export default {
       if (saved) {
         try {
           this.config = JSON.parse(saved)
-          this.drawPreview()
         } catch (e) {
           console.error('加载配置失败:', e)
         }
@@ -756,6 +590,13 @@ export default {
             x: this.config.week.x,
             y: this.config.week.y,
             color: this.hexToRgb(this.config.week.color)
+          },
+          image: {
+            show: this.config.image.show,
+            x: this.config.image.x,
+            y: this.config.image.y,
+            width: this.config.image.width,
+            height: this.config.image.height
           }
         }
         
@@ -873,8 +714,22 @@ export default {
   border-color: var(--accent-primary);
 }
 
+.preview-hint {
+  padding: 20rpx 32rpx;
+  background-color: var(--bg-tertiary);
+  border-bottom: 2rpx solid var(--border-primary);
+}
+
+.preview-hint-text {
+  font-size: 22rpx;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
 .content {
+  flex: 1;
   width: 100%;
+  min-height: 0;
   box-sizing: border-box;
 }
 
@@ -883,48 +738,48 @@ export default {
   padding-bottom: 48rpx;
 }
 
-.tabs-inline {
+/* 底部 Tab 栏：与拼豆辅助页底部控制区风格一致 */
+.bottom-tabs {
   display: flex;
-  background-color: var(--bg-tertiary);
-  border: 2rpx solid var(--border-primary);
-  border-radius: 24rpx;
-  padding: 8rpx;
-  margin-bottom: 24rpx;
+  flex-shrink: 0;
+  height: 100rpx;
+  padding: 12rpx 16rpx;
+  padding-bottom: calc(12rpx + env(safe-area-inset-bottom));
+  background-color: var(--bg-elevated);
+  border-top: 2rpx solid var(--border-primary);
   gap: 8rpx;
 }
 
-.tabs-inline .tab-item {
+.bottom-tab-item {
   flex: 1;
-  height: 64rpx;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  position: relative;
-  transition: var(--transition-base);
+  gap: 4rpx;
   border-radius: 16rpx;
+  transition: var(--transition-base);
 }
 
-.tabs-inline .tab-item:active {
-  background-color: var(--bg-secondary);
+.bottom-tab-item:active {
+  background-color: var(--bg-tertiary);
 }
 
-.tabs-inline .tab-item.active {
-  background-color: var(--bg-secondary);
+.bottom-tab-item.active {
+  background-color: var(--bg-tertiary);
   box-shadow: var(--shadow-sm);
 }
 
-.tabs-inline .tab-text {
-  font-size: 24rpx;
+.bottom-tab-text {
+  font-size: 20rpx;
   color: var(--text-secondary);
-  transition: var(--transition-base);
 }
 
-.tabs-inline .tab-item.active .tab-text {
+.bottom-tab-item.active .bottom-tab-text {
   color: var(--accent-primary);
   font-weight: 500;
 }
 
-.preview-card,
 .settings-card {
   background-color: var(--bg-tertiary);
   border: 2rpx solid var(--border-primary);
@@ -946,26 +801,6 @@ export default {
   font-weight: 500;
   color: var(--text-primary);
   flex: 1;
-}
-
-.card-subtitle {
-  font-size: 20rpx;
-  color: var(--text-secondary);
-}
-
-.preview-container {
-  display: flex;
-  justify-content: center;
-  padding: 24rpx;
-  background-color: var(--bg-secondary);
-  border-radius: 16rpx;
-  border: 2rpx solid var(--border-secondary);
-}
-
-.preview-canvas {
-  border: 2rpx solid var(--border-primary);
-  border-radius: 8rpx;
-  display: block;
 }
 
 .setting-group {
