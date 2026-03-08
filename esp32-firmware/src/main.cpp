@@ -343,17 +343,13 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventTyp
     Serial.printf("WebSocket 客户端已连接: %u\n", client->id());
     clientConnected = true;
     
-    // 如果当前是闹钟模式，显示时钟；否则清空屏幕
-    if (currentMode == MODE_CLOCK) {
-      displayClock();
-    } else {
-      dma_display->clearScreen();
-    }
+    // 每次连接都强制回到闹钟模式
+    currentMode = MODE_CLOCK;
+    canvasInitialized = false; // 重置画布初始化标志
+    displayClock();
     
-    // 发送连接成功消息，包含当前模式
-    String response = "{\"status\":\"connected\",\"device\":\"LED-Matrix\",\"mode\":\"";
-    response += (currentMode == MODE_CLOCK) ? "clock" : "canvas";
-    response += "\"}";
+    // 发送连接成功消息，始终返回 clock 模式
+    String response = "{\"status\":\"connected\",\"device\":\"LED-Matrix\",\"mode\":\"clock\"}";
     client->text(response);
   }
   else if (type == WS_EVT_DISCONNECT) {
@@ -362,6 +358,7 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventTyp
     
     // 断开连接后，回到闹钟模式
     currentMode = MODE_CLOCK;
+    canvasInitialized = false; // 重置画布初始化标志
     displayClock();
   }
   else if (type == WS_EVT_DATA) {
@@ -709,6 +706,100 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventTyp
       } else {
         response["status"] = "error";
         response["message"] = "brightness must be 0-255";
+      }
+    }
+    else if (cmd == "highlight_color") {
+      // 高亮指定颜色，其他颜色降低亮度
+      // 如果 color 为空或 null，则恢复所有颜色的原亮度
+      if (currentMode == MODE_CANVAS && canvasInitialized) {
+        bool hasHighlight = doc.containsKey("color") && !doc["color"].isNull();
+        uint8_t highlightR = 0, highlightG = 0, highlightB = 0;
+        
+        if (hasHighlight) {
+          JsonObject color = doc["color"];
+          highlightR = color["r"] | 0;
+          highlightG = color["g"] | 0;
+          highlightB = color["b"] | 0;
+          Serial.printf("高亮颜色: RGB(%d, %d, %d)\n", highlightR, highlightG, highlightB);
+        } else {
+          Serial.println("取消高亮，恢复所有颜色");
+        }
+        
+        // 遍历画布缓冲区，调整亮度
+        for (int y = 0; y < PANEL_RES_Y; y++) {
+          for (int x = 0; x < PANEL_RES_X; x++) {
+            uint8_t r = canvasBuffer[y][x][0];
+            uint8_t g = canvasBuffer[y][x][1];
+            uint8_t b = canvasBuffer[y][x][2];
+            
+            if (r > 0 || g > 0 || b > 0) {
+              uint8_t displayR = r, displayG = g, displayB = b;
+              
+              if (hasHighlight) {
+                // 判断是否是高亮颜色（允许一定误差）
+                bool isHighlight = (abs(r - highlightR) <= 2 && 
+                                   abs(g - highlightG) <= 2 && 
+                                   abs(b - highlightB) <= 2);
+                
+                if (!isHighlight) {
+                  // 不是高亮颜色，降低亮度到20%
+                  displayR = r * 0.2;
+                  displayG = g * 0.2;
+                  displayB = b * 0.2;
+                }
+              }
+              
+              dma_display->drawPixelRGB888(x, y, displayR, displayG, displayB);
+            }
+          }
+          if (y % 8 == 0) yield();
+        }
+        
+        response["message"] = hasHighlight ? "color highlighted" : "highlight cleared";
+      } else {
+        response["status"] = "error";
+        response["message"] = "not in canvas mode or canvas not initialized";
+      }
+    }
+    else if (cmd == "highlight_row") {
+      // 高亮指定行，其他行降低亮度
+      // 如果 row 为 -1 或 null，则恢复所有行的原亮度
+      if (currentMode == MODE_CANVAS && canvasInitialized) {
+        int highlightRow = doc["row"] | -1;
+        
+        if (highlightRow >= 0 && highlightRow < PANEL_RES_Y) {
+          Serial.printf("高亮行: %d\n", highlightRow);
+        } else {
+          Serial.println("取消行高亮，恢复所有行");
+        }
+        
+        // 遍历画布缓冲区，调整亮度
+        for (int y = 0; y < PANEL_RES_Y; y++) {
+          for (int x = 0; x < PANEL_RES_X; x++) {
+            uint8_t r = canvasBuffer[y][x][0];
+            uint8_t g = canvasBuffer[y][x][1];
+            uint8_t b = canvasBuffer[y][x][2];
+            
+            if (r > 0 || g > 0 || b > 0) {
+              uint8_t displayR = r, displayG = g, displayB = b;
+              
+              if (highlightRow >= 0 && y != highlightRow) {
+                // 不是高亮行，降低亮度到20%
+                displayR = r * 0.2;
+                displayG = g * 0.2;
+                displayB = b * 0.2;
+              }
+              
+              dma_display->drawPixelRGB888(x, y, displayR, displayG, displayB);
+            }
+          }
+          if (y % 8 == 0) yield();
+        }
+        
+        response["message"] = (highlightRow >= 0) ? "row highlighted" : "highlight cleared";
+      } else {
+        response["status"] = "error";
+        response["message"] = "not in canvas mode or canvas not initialized";
       }
     }
     else if (cmd == "text") {

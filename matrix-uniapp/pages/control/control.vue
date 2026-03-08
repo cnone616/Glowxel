@@ -18,7 +18,7 @@
       </view>
     </view>
 
-    <scroll-view scroll-y class="content">
+    <scroll-view scroll-y class="content" :show-scrollbar="true">
       <!-- 设备连接卡片 -->
       <view class="connection-card">
         <view class="card-title-section">
@@ -42,8 +42,8 @@
           <text class="info-value">{{ deviceIp }}</text>
         </view>
       </view>
-
-      <!-- 亮度控制 -->
+      
+      <!-- 设备模式和功能 -->
       <view v-if="connectionStatus === 'connected'" class="settings-section">
         <!-- 模式切换 -->
         <view class="mode-switch-card">
@@ -74,40 +74,41 @@
             </view>
           </view>
           
-          <view v-if="deviceMode === 'clock'" class="clock-edit-btn" @click="editClock">
-            <Icon name="edit" :size="32" />
-            <text class="btn-text">自定义闹钟样式</text>
-          </view>
-          <view v-if="deviceMode === 'clock'" class="clock-edit-btn" @click="editClock">
-            <Icon name="edit" :size="32" />
-            <text class="btn-text">自定义闹钟样式</text>
-          </view>
-          <view v-if="deviceMode === 'clock'" class="clock-edit-btn secondary" @click="importJSON">
-            <Icon name="add" :size="32" />
-            <text class="btn-text">导入 JSON 配置</text>
+          <view v-if="deviceMode === 'clock'" class="clock-actions">
+            <view class="clock-edit-btn" @click="editClock">
+              <Icon name="edit" :size="32" />
+              <text class="btn-text">自定义闹钟样式</text>
+            </view>
+            <view class="clock-edit-btn secondary" @click="importJSON">
+              <Icon name="add" :size="32" />
+              <text class="btn-text">导入 JSON 配置</text>
+            </view>
           </view>
         </view>
         
-        <view class="setting-item">
-          <view class="setting-header">
-            <view class="setting-label">
-              <view class="setting-icon">
-                <Icon name="prompt" :size="28" />
+        <!-- 亮度控制 -->
+        <view class="brightness-card">
+          <view class="setting-item">
+            <view class="setting-header">
+              <view class="setting-label">
+                <view class="setting-icon">
+                  <Icon name="prompt" :size="28" />
+                </view>
+                <text class="setting-text">亮度</text>
               </view>
-              <text class="setting-text">亮度</text>
+              <text class="setting-value accent-primary">{{ brightness }}%</text>
             </view>
-            <text class="setting-value accent-primary">{{ brightness }}%</text>
+            <slider 
+              :value="brightness"
+              @change="handleBrightnessChange"
+              min="0"
+              max="100"
+              :activeColor="(themeStore && themeStore.isDarkMode) ? '#00f3ff' : '#0099cc'"
+              :backgroundColor="(themeStore && themeStore.isDarkMode) ? '#333333' : '#e0e0e0'"
+              block-size="20"
+              class="setting-slider"
+            />
           </view>
-          <slider 
-            :value="brightness"
-            @change="handleBrightnessChange"
-            min="0"
-            max="100"
-            :activeColor="(themeStore && themeStore.isDarkMode) ? '#00f3ff' : '#0099cc'"
-            :backgroundColor="(themeStore && themeStore.isDarkMode) ? '#333333' : '#e0e0e0'"
-            block-size="20"
-            class="setting-slider"
-          />
         </view>
       </view>
     </scroll-view>
@@ -271,6 +272,29 @@ export default {
         const result = await this.deviceStore.connect(ip)
         if (result.success) {
           this.connectionStatus = 'connected'
+          
+          // 连接成功后，ESP32 肯定是闹钟模式（断开连接后会回到闹钟模式）
+          // 重置前端的模式状态为闹钟模式
+          this.deviceMode = 'clock'
+          uni.setStorageSync('device_mode', 'clock')
+          
+          // 获取设备状态（包括亮度）
+          try {
+            const ws = this.deviceStore.getWebSocket()
+            const status = await ws.getStatus()
+            
+            if (status && status.brightness !== undefined) {
+              // 将板子的亮度值（0-178）映射回前端显示（0-100）
+              const maxBrightness = 178 // 255 * 0.7
+              this.brightness = Math.round(status.brightness * 100 / maxBrightness)
+              // 保存到缓存
+              uni.setStorageSync('device_brightness', this.brightness)
+              console.log('同步板子亮度:', status.brightness, '→', this.brightness + '%')
+            }
+          } catch (err) {
+            console.error('获取设备状态失败:', err)
+          }
+          
           this.$refs.connectModal.onSuccess()
           this.toast.showSuccess('已连接到 LED 矩阵板')
         } else {
@@ -558,6 +582,7 @@ export default {
 
 /* 头部 */
 .header {
+  flex-shrink: 0;
   height: 112rpx;
   display: flex;
   align-items: center;
@@ -615,6 +640,7 @@ export default {
   flex: 1;
   padding: 32rpx;
   box-sizing: border-box;
+  overflow-y: auto;
 }
 
 /* 连接卡片 */
@@ -811,7 +837,6 @@ export default {
   justify-content: center;
   gap: 16rpx;
   padding: 24rpx;
-  margin-top: 24rpx;
   background-color: var(--bg-secondary);
   border: 2rpx solid var(--border-primary);
   border-radius: 16rpx;
@@ -824,9 +849,29 @@ export default {
   box-shadow: var(--shadow-glow);
 }
 
+.clock-edit-btn.secondary {
+  border-color: var(--border-secondary);
+}
+
+.clock-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
+  margin-top: 24rpx;
+}
+
 .btn-text {
   font-size: 24rpx;
   color: var(--text-primary);
+}
+
+/* 亮度卡片 */
+.brightness-card {
+  background-color: var(--bg-tertiary);
+  border: 2rpx solid var(--border-primary);
+  border-radius: 32rpx;
+  padding: 48rpx;
+  box-shadow: var(--shadow-md);
 }
 
 .setting-item {
