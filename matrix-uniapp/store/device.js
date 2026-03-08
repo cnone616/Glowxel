@@ -40,11 +40,14 @@ export const useDeviceStore = defineStore('device', {
       this.webSocket.onDisconnect(() => {
         this.connected = false
         this.deviceInfo = null
+        // 注意：ESP32 断开连接后会自动回到闹钟模式
+        // 各页面重连后需要根据需要重新设置模式
       })
       
       this.webSocket.onError((err) => {
         this.connected = false
         this.deviceInfo = null
+        // 注意：ESP32 断开连接后会自动回到闹钟模式
       })
       
       this.webSocket.onMessage((data) => {
@@ -118,8 +121,6 @@ export const useDeviceStore = defineStore('device', {
       }
       
       try {
-        // 发送画布数据前必须先切换到画板模式
-        await this.webSocket.setMode('canvas')
         await this.webSocket.sendPartialUpdate(pixelData)
         return { success: true }
       } catch (err) {

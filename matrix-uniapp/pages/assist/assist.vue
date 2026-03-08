@@ -51,7 +51,7 @@
     </view>
 
     <!-- 头部 -->
-    <view class="header">
+    <view class="header" :style="{ paddingRight: capsuleRight + 'px' }">
       <view class="header-left">
         <view class="back-btn" @click="goToOverview">
           <text class="icon">‹</text>
@@ -78,27 +78,6 @@
           <text class="mode-label">逐行</text>
         </view>
       </view>
-      
-      <view class="header-actions">
-        <view 
-          class="icon-btn device-btn"
-          :class="{ 'connected': deviceConnected }"
-          @click="toggleDeviceSync"
-        >
-          <Icon :name="deviceConnected ? 'link' : 'unlink'" :size="28" />
-        </view>
-        <view class="icon-btn" @click="handleFit">
-          <Icon name="fullscreen-expand" :size="28" />
-        </view>
-        <view 
-          class="icon-btn"
-          :class="{ 'active': focusMode }"
-          @click="focusMode = !focusMode"
-        >
-          <Icon name="browse" v-if="focusMode" :size="28" />
-          <Icon name="eye-close" v-else :size="28" />
-        </view>
-      </view>
     </view>
 
     <!-- 当前信息提示 -->
@@ -112,7 +91,7 @@
     </view>
 
     <!-- Canvas 画布 -->
-    <view class="canvas-container" v-if="!isHelpOpen && !isRowListOpen">
+    <view class="canvas-container" v-if="!isHelpOpen && !isRowListOpen && !showConnectModal">
       <PixelCanvas
         v-if="canvasReady"
         :width="52"
@@ -140,6 +119,28 @@
       <view class="color-section">
         <view class="section-header">
           <text class="section-title">{{ assistMode === 'row' ? '行颜色' : '全部颜色' }} ({{ displayedColors.size }})</text>
+          
+          <!-- 操作按钮 -->
+          <view class="header-actions">
+            <view 
+              class="icon-btn device-btn"
+              :class="{ 'connected': deviceConnected }"
+              @click="toggleDeviceSync"
+            >
+              <Icon name="link" :size="24" />
+            </view>
+            <view class="icon-btn" @click="handleFit">
+              <Icon name="fullscreen-expand" :size="24" />
+            </view>
+            <view 
+              class="icon-btn"
+              :class="{ 'active': focusMode }"
+              @click="focusMode = !focusMode"
+            >
+              <Icon name="browse" v-if="focusMode" :size="24" />
+              <Icon name="eye-close" v-else :size="24" />
+            </view>
+          </view>
         </view>
         
         <scroll-view 
@@ -269,7 +270,7 @@
         
         <view class="row-info-container">
           <view class="row-list-btn" @click="isRowListOpen = true">
-            <Icon name="column-4" :size="32" />
+            <Icon name="column-3" :size="32" />
             <text class="list-label">列表</text>
           </view>
           
@@ -303,6 +304,18 @@
       :items="helpItems"
     />
     
+    <!-- 连接弹窗 -->
+    <ConnectModal
+      :visible.sync="showConnectModal"
+      title="连接 LED 矩阵板"
+      description="请输入设备 IP 地址"
+      :placeholder="deviceStore.deviceIp || '192.168.31.84'"
+      :defaultValue="deviceStore.deviceIp"
+      ref="connectModal"
+      @confirm="handleConnectConfirm"
+      @cancel="handleConnectCancel"
+    />
+    
     <!-- 自定义 Toast 组件 -->
     <Toast ref="toastRef" />
   </view>
@@ -317,6 +330,7 @@ import { ARTKAL_COLORS_FULL } from '../../data/artkal-colors-full.js'
 import statusBarMixin from '../../mixins/statusBar.js'
 import PixelCanvas from '../../components/PixelCanvas.vue'
 import HelpModal from '../../components/HelpModal.vue'
+import ConnectModal from '../../components/ConnectModal.vue'
 import Toast from '../../components/Toast.vue'
 import Icon from "../../components/Icon.vue"
 
@@ -338,6 +352,7 @@ export default {
   components: {
     PixelCanvas,
     HelpModal,
+    ConnectModal,
     Toast,
     Icon
   },
@@ -380,6 +395,7 @@ export default {
       // UI
       isHelpOpen: false,
       isRowListOpen: false,
+      showConnectModal: false,
       scrollIntoView: '',
       colorListScrollTop: -1,
       currentVisibleLetter: '',
@@ -584,6 +600,26 @@ export default {
 
   onShow() {
     this.themeStore.applyTheme()
+    
+    // 如果设备已连接，确保模式正确并同步画布
+    if (this.deviceConnected && this.localPixels.size > 0) {
+      console.log('页面显示，确保画板模式并同步画布')
+      // 延迟一下，确保页面完全加载
+      setTimeout(async () => {
+        try {
+          const ws = this.deviceStore.getWebSocket()
+          if (ws) {
+            // 先切换到画板模式（可能从其他页面回来，板子可能是闹钟模式）
+            await ws.send({ cmd: 'set_mode', mode: 'canvas' })
+            await new Promise(resolve => setTimeout(resolve, 200))
+            // 同步画布
+            await this.syncToDevice()
+          }
+        } catch (err) {
+          console.error('切换模式或同步失败:', err)
+        }
+      }, 300)
+    }
   },
 
   onUnload() {
@@ -598,40 +634,64 @@ export default {
         this.deviceStore.disconnect()
         this.toast.showInfo('设备已断开')
       } else {
-        // 连接设备
-        uni.showModal({
-          title: '连接 LED 矩阵板',
-          editable: true,
-          placeholderText: this.deviceStore.deviceIp || '192.168.31.84',
-          content: '请输入设备 IP 地址',
-          success: async (res) => {
-            if (res.confirm && res.content) {
-              const ip = res.content.trim()
-              
-              try {
-                const result = await this.deviceStore.connect(ip)
-                if (result.success) {
-                  this.toast.showSuccess('设备已连接')
-                  // 连接成功后立即同步当前画布
-                  this.syncToDevice()
-                } else {
-                  this.toast.showError('连接失败')
-                }
-              } catch (err) {
-                console.error('连接失败:', err)
-                this.toast.showError('连接失败')
-              }
-            }
-          }
-        })
+        // 显示连接弹窗
+        this.showConnectModal = true
       }
+    },
+    
+    async handleConnectConfirm(ip) {
+      try {
+        const result = await this.deviceStore.connect(ip)
+        if (result.success) {
+          // 连接成功后，ESP32 肯定是闹钟模式（断开连接后会回到闹钟模式）
+          // 需要先切换到画板模式，再同步画布
+          setTimeout(async () => {
+            try {
+              const ws = this.deviceStore.getWebSocket()
+              if (ws) {
+                console.log('切换到画板模式')
+                await ws.send({ cmd: 'set_mode', mode: 'canvas' })
+                // 等待模式切换完成
+                await new Promise(resolve => setTimeout(resolve, 200))
+                // 同步画布
+                await this.syncToDevice()
+              }
+            } catch (err) {
+              console.error('切换模式或同步失败:', err)
+              this.toast.showError('同步失败')
+            }
+          }, 500)
+          
+          this.$refs.connectModal.onSuccess()
+          this.toast.showSuccess('设备已连接')
+        } else {
+          this.$refs.connectModal.onError('连接失败，请检查 IP 地址')
+        }
+      } catch (err) {
+        console.error('连接失败:', err)
+        this.$refs.connectModal.onError('连接失败，请检查 IP 地址')
+      }
+    },
+    
+    handleConnectCancel() {
+      // 取消连接
     },
     
     // 同步画布到设备（根据当前模式）
     async syncToDevice() {
-      if (!this.deviceConnected) return
+      if (!this.deviceConnected) {
+        console.log('设备未连接，跳过同步')
+        return
+      }
+      
+      // 检查是否有像素数据
+      if (this.localPixels.size === 0) {
+        console.log('没有像素数据，跳过同步')
+        return
+      }
       
       try {
+        console.log('开始同步画布到设备，模式:', this.assistMode)
         const pixels = []
         
         // hex 转 RGB 的辅助函数
@@ -685,16 +745,69 @@ export default {
         }
         
         await this.deviceStore.sendImage(pixels, 52, 52)
+        console.log('画布同步成功')
       } catch (err) {
         console.error('同步到设备失败:', err)
+        this.toast.showError('同步失败')
       }
     },
     
     // 快速更新行亮度（仅逐行模式）
     async updateRowBrightness() {
-      if (!this.deviceConnected || this.assistMode !== 'row') return
+      if (!this.deviceConnected) {
+        console.log('设备未连接，跳过行亮度更新')
+        return
+      }
+      
+      if (this.assistMode !== 'row') {
+        console.log('不在逐行模式，跳过行亮度更新')
+        return
+      }
       
       try {
+        const ws = this.deviceStore.getWebSocket()
+        if (!ws) {
+          console.error('WebSocket 未初始化')
+          return
+        }
+        
+        console.log('发送高亮行命令:', this.currentRow)
+        
+        // 使用 highlight_row 命令
+        await ws.send({
+          cmd: 'highlight_row',
+          row: this.currentRow
+        })
+        
+        // 记录当前同步的行
+        this.lastSyncedRow = this.currentRow
+      } catch (err) {
+        console.error('更新行亮度失败:', err)
+        // 任何错误都尝试完整同步（可能是画布未初始化）
+        console.log('回退到完整同步')
+        await this.syncToDevice()
+      }
+    },
+    
+    // 快速更新高亮颜色亮度（仅颜色模式）
+    async updateHighlightBrightness(previousColor, newColor) {
+      if (!this.deviceConnected) {
+        console.log('设备未连接，跳过高亮更新')
+        return
+      }
+      
+      if (this.assistMode !== 'color') {
+        console.log('不在颜色模式，跳过高亮更新')
+        return
+      }
+      
+      try {
+        const ws = this.deviceStore.getWebSocket()
+        if (!ws) {
+          console.error('WebSocket 未初始化')
+          return
+        }
+        
         // hex 转 RGB 的辅助函数
         const hexToRgb = (hex) => {
           const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex)
@@ -702,53 +815,35 @@ export default {
             r: parseInt(result[1], 16),
             g: parseInt(result[2], 16),
             b: parseInt(result[3], 16)
-          } : { r: 0, g: 0, b: 0 }
+          } : null
         }
         
-        const updatePixels = []
-        
-        // 只更新当前行和上一行（如果有）
-        const rowsToUpdate = [this.currentRow]
-        if (this.lastSyncedRow !== undefined && this.lastSyncedRow !== this.currentRow) {
-          rowsToUpdate.push(this.lastSyncedRow)
-        }
-        
-        for (const y of rowsToUpdate) {
-          for (let x = 0; x < 52; x++) {
-            const key = `${x},${y}`
-            const hexColor = this.localPixels.get(key)
-            
-            if (hexColor) {
-              const colorObj = ARTKAL_COLORS_FULL.find(c => c.hex.toLowerCase() === hexColor.toLowerCase())
-              
-              if (colorObj) {
-                const rgb = hexToRgb(colorObj.hex)
-                let r = rgb.r
-                let g = rgb.g
-                let b = rgb.b
-                
-                // 不是当前行，降低亮度
-                if (y !== this.currentRow) {
-                  r = Math.floor(r * 0.2)
-                  g = Math.floor(g * 0.2)
-                  b = Math.floor(b * 0.2)
-                }
-                
-                updatePixels.push(x, y, r, g, b)
-              }
+        // 如果有新颜色，发送高亮命令
+        if (newColor) {
+          const colorObj = ARTKAL_COLORS_FULL.find(c => c.hex.toLowerCase() === newColor.toLowerCase())
+          if (colorObj) {
+            const rgb = hexToRgb(colorObj.hex)
+            if (rgb) {
+              console.log('发送高亮颜色命令:', colorObj.code, rgb)
+              await ws.send({
+                cmd: 'highlight_color',
+                color: rgb
+              })
             }
           }
-        }
-        
-        // 记录当前同步的行
-        this.lastSyncedRow = this.currentRow
-        
-        // 发送更新
-        if (updatePixels.length > 0) {
-          await this.deviceStore.sendPartialUpdate(updatePixels)
+        } else {
+          // 取消高亮
+          console.log('发送取消高亮命令')
+          await ws.send({
+            cmd: 'highlight_color',
+            color: null
+          })
         }
       } catch (err) {
-        console.error('更新行亮度失败:', err)
+        console.error('更新高亮亮度失败:', err)
+        // 任何错误都尝试完整同步（可能是画布未初始化）
+        console.log('回退到完整同步')
+        await this.syncToDevice()
       }
     },
     
@@ -849,20 +944,36 @@ export default {
     },
 
     setHighlightColor(color) {
+      const previousColor = this.highlightColor
       this.highlightColor = color
-      // 如果设备已连接，同步高亮效果到设备
+      
+      // 如果设备已连接，智能更新
       if (this.deviceConnected) {
-        this.syncToDevice()
+        // 颜色模式：使用 highlight_color 命令
+        if (this.assistMode === 'color') {
+          this.updateHighlightBrightness(previousColor, color)
+        } else {
+          // 逐行模式：完整同步
+          this.syncToDevice()
+        }
       }
     },
     
     setAssistMode(mode) {
       if (this.assistMode !== mode) {
+        const oldMode = this.assistMode
         this.assistMode = mode
         this.highlightColor = null
-        // 切换模式后同步到设备
+        
+        // 切换模式后智能更新设备
         if (this.deviceConnected) {
-          this.syncToDevice()
+          if (mode === 'row') {
+            // 切换到逐行模式：使用 highlight_row 命令
+            this.updateRowBrightness()
+          } else if (mode === 'color') {
+            // 切换到颜色模式：取消高亮
+            this.updateHighlightBrightness(null, null)
+          }
         }
       }
     },
@@ -1219,7 +1330,6 @@ export default {
 .header {
   height: 112rpx;
   display: flex;
-  justify-content: space-between;
   align-items: center;
   padding: 0 30rpx;
   border-bottom: 2rpx solid var(--border-primary);
@@ -1303,44 +1413,6 @@ export default {
   color: inherit;
 }
 
-.header-actions {
-  display: flex;
-  gap: 16rpx;
-  flex-shrink: 0;
-}
-
-.icon-btn {
-  width: 60rpx;
-  height: 60rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 16rpx;
-  background-color: var(--bg-tertiary);
-  border: 2rpx solid var(--border-primary);
-  transition: var(--transition-base);
-}
-
-.icon-btn:active {
-  transform: scale(0.95);
-}
-
-.icon-btn.active {
-  background-color: rgba(0, 243, 255, 0.1);
-  border-color: var(--accent-primary);
-  box-shadow: var(--shadow-glow);
-}
-
-.device-btn.connected {
-  color: var(--accent-primary);
-  animation: pulse-glow 2s ease-in-out infinite;
-}
-
-@keyframes pulse-glow {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.6; }
-}
-
 .info-banner {
   padding: 20rpx 30rpx;
   background-color: rgba(0, 243, 255, 0.1);
@@ -1374,6 +1446,7 @@ export default {
   overflow: hidden;
   background-color: var(--bg-primary);
   min-height: 0;
+  max-height: calc(100vh - 112rpx - 600rpx);
 }
 
 .assist-canvas {
@@ -1383,10 +1456,14 @@ export default {
 
 /* 底部控制区 */
 .controls {
+  flex-shrink: 0;
+  max-height: 600rpx;
   background-color: var(--bg-elevated);
   border-top: 1px solid var(--border-color);
   padding-bottom: env(safe-area-inset-bottom);
   z-index: 20;
+  display: flex;
+  flex-direction: column;
 }
 
 .color-section {
@@ -1395,6 +1472,9 @@ export default {
 }
 
 .section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   margin-bottom: 16rpx;
 }
 
@@ -1402,6 +1482,48 @@ export default {
   font-size: 24rpx;
   color: var(--text-secondary);
   font-family: monospace;
+}
+
+.header-actions {
+  display: flex;
+  gap: 12rpx;
+  flex-shrink: 0;
+}
+
+.icon-btn {
+  width: 56rpx;
+  height: 56rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12rpx;
+  background-color: var(--bg-tertiary);
+  border: 2rpx solid var(--border-primary);
+  transition: var(--transition-base);
+  color: var(--text-primary);
+}
+
+.icon-btn:active {
+  transform: scale(0.9);
+}
+
+.icon-btn.active {
+  background-color: rgba(0, 243, 255, 0.1);
+  border-color: var(--accent-primary);
+  box-shadow: var(--shadow-glow);
+  color: var(--accent-primary);
+}
+
+.icon-btn.device-btn.connected {
+  background-color: rgba(0, 243, 255, 0.1);
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+@keyframes pulse-glow {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
 }
 
 .color-list {

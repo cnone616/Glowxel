@@ -39,7 +39,7 @@
       <text class="project-name">{{ project.name }}</text>
       <view class="project-meta">
         <view class="meta-item">
-          <Icon name="column-4" :size="20" />
+          <Icon name="column-3" :size="20" />
           <text class="meta-text">{{ project.width }}×{{ project.height }}</text>
         </view>
         <view v-if="project.paddedWidth && (project.paddedWidth !== project.width || project.paddedHeight !== project.height)" class="meta-item">

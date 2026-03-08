@@ -126,7 +126,7 @@
             :class="{ 'active': gridVisible }"
             @click="gridVisible = !gridVisible"
           >
-            <Icon name="column-4" :size="36" />
+            <Icon name="3column" :size="36" />
           </view>
           <view class="divider"></view>
           <view class="action-btn" @click="handleFit">
@@ -313,7 +313,6 @@
 <script>
 import { useThemeStore } from '../../store/theme.js'
 import { useProjectStore } from '../../store/project.js'
-import { useDeviceStore } from '../../store/device.js'
 import { useToast } from '../../composables/useToast.js'
 import { getColorByCode } from '../../data/artkal-colors-full.js'
 import statusBarMixin from '../../mixins/statusBar.js'
@@ -353,7 +352,6 @@ export default {
     return {
       themeStore: null,
       projectStore: null,
-      deviceStore: null,
       toast: null,
       
       showRenameModal: false,
@@ -388,6 +386,7 @@ export default {
       showLeaveConfirm: false,
       showExportConfirm: false,
       showSaveToAlbumConfirm: false,
+      showConnectModal: false,
       exportedImagePath: '',
       hasUnsavedChanges: false,
       savedPixelsSnapshot: '',
@@ -493,7 +492,6 @@ export default {
   onLoad(options) {
     this.themeStore = useThemeStore()
     this.projectStore = useProjectStore()
-    this.deviceStore = useDeviceStore()
     this.toast = useToast()
     
     // 立即应用主题，避免闪烁
@@ -587,33 +585,33 @@ export default {
         this.deviceStore.disconnect()
         this.toast.showInfo('设备已断开')
       } else {
-        // 连接设备
-        uni.showModal({
-          title: '连接 LED 矩阵板',
-          editable: true,
-          placeholderText: this.deviceStore.deviceIp || '192.168.31.84',
-          content: '请输入设备 IP 地址',
-          success: async (res) => {
-            if (res.confirm && res.content) {
-              const ip = res.content.trim()
-              
-              try {
-                const result = await this.deviceStore.connect(ip)
-                if (result.success) {
-                  this.toast.showSuccess('设备已连接')
-                  // 连接成功后立即同步当前画布
-                  this.syncToDevice()
-                } else {
-                  this.toast.showError('连接失败')
-                }
-              } catch (err) {
-                console.error('连接失败:', err)
-                this.toast.showError('连接失败')
-              }
-            }
-          }
-        })
+        // 显示连接弹窗
+        this.showConnectModal = true
       }
+    },
+    
+    async handleConnectConfirm(ip) {
+      try {
+        const result = await this.deviceStore.connect(ip)
+        if (result.success) {
+          // 连接成功后立即同步当前画布
+          setTimeout(() => {
+            this.syncToDevice()
+          }, 500)
+          
+          this.$refs.connectModal.onSuccess()
+          this.toast.showSuccess('设备已连接')
+        } else {
+          this.$refs.connectModal.onError('连接失败，请检查 IP 地址')
+        }
+      } catch (err) {
+        console.error('连接失败:', err)
+        this.$refs.connectModal.onError('连接失败，请检查 IP 地址')
+      }
+    },
+    
+    handleConnectCancel() {
+      // 取消连接
     },
     
     // 同步整个画布到设备

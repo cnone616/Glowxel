@@ -191,11 +191,12 @@ watch(step, async (newStep) => {
 })
 
 // 监听像素变化，自动重绘
-watch(() => pixels.value, () => {
+watch(pixels, () => {
   if (step.value === 3 && ctx.value) {
+    console.log('像素数据变化，重新绘制')
     drawCanvas()
   }
-}, { deep: true })
+})
 
 // 步骤导航
 function prevStep() {
@@ -249,34 +250,57 @@ async function processImage() {
 
 // 初始化编辑器
 async function initEditor() {
+  console.log('初始化编辑器, 当前像素数量:', pixels.value.size)
+  
   // 等待 DOM 更新
   await nextTick()
   
+  // 检查 canvas 元素
+  if (!canvas.value) {
+    console.error('Canvas 元素未找到')
+    return
+  }
+  
+  if (!canvasWrapper.value) {
+    console.error('Canvas wrapper 未找到')
+    return
+  }
+  
   // 初始化 canvas context
-  if (canvas.value && !ctx.value) {
+  if (!ctx.value) {
     ctx.value = canvas.value.getContext('2d')
+    console.log('Canvas context 已初始化')
   }
   
   // 设置默认颜色
   if (!selectedColor.value && paletteColors.value.length > 0) {
     selectedColor.value = paletteColors.value[0].code
+    console.log('设置默认颜色:', selectedColor.value)
   }
   
   // 空白模式初始化
   if (mode.value === 'blank' && pixels.value.size === 0) {
     pixels.value = new Map()
     saveHistory()
+    console.log('空白模式初始化')
   }
   
   // 再次等待确保 canvas 完全渲染
   await nextTick()
   
-  // 调整 canvas 大小并绘制
-  if (canvas.value && canvasWrapper.value) {
-    resizeCanvas()
-    await nextTick()
-    fitCanvas()
-  }
+  // 调整 canvas 大小
+  const wrapper = canvasWrapper.value
+  canvas.value.width = wrapper.clientWidth
+  canvas.value.height = wrapper.clientHeight
+  console.log('Canvas 尺寸设置为:', canvas.value.width, 'x', canvas.value.height)
+  
+  // 计算合适的缩放和位置
+  fitCanvas()
+  
+  // 强制绘制一次
+  console.log('强制绘制 canvas')
+  drawCanvas()
+}
 }
 
 // Canvas 操作
