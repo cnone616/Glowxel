@@ -91,57 +91,84 @@ defineEmits(['update:tool', 'update:gridVisible', 'undo', 'redo', 'fit', 'export
 .pattern-toolbar {
   display: flex;
   gap: 16px;
-  padding: 16px;
-  background: rgba(0, 0, 0, 0.3);
-  border-radius: 12px;
+  padding: 20px;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(20px);
+  border-radius: 20px;
   flex-wrap: wrap;
   justify-content: center;
+  border: 2px solid rgba(255, 107, 107, 0.15);
+  box-shadow: 0 4px 20px rgba(255, 107, 107, 0.1);
 }
 
 .tool-group {
   display: flex;
   gap: 8px;
-  padding: 4px;
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 8px;
+  padding: 6px;
+  background: rgba(255, 107, 107, 0.08);
+  border-radius: 12px;
 }
 
 .tool-btn {
-  padding: 10px 20px;
-  background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 6px;
-  color: rgba(255, 255, 255, 0.7);
+  padding: 12px 24px;
+  background: white;
+  border: 2px solid rgba(255, 107, 107, 0.15);
+  border-radius: 10px;
+  color: #4a5568;
   font-size: 14px;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 8px rgba(255, 107, 107, 0.08);
 }
 
 .tool-btn:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.1);
-  color: #fff;
+  background: #fff5f5;
+  color: #ff6b6b;
+  border-color: #ff6b6b;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(255, 107, 107, 0.2);
 }
 
 .tool-btn.active {
-  background: rgba(0, 243, 255, 0.2);
-  border-color: #00f3ff;
-  color: #00f3ff;
+  background: linear-gradient(135deg, #ff6b6b 0%, #ffa500 100%);
+  border-color: #ff6b6b;
+  color: #fff;
+  box-shadow: 0 4px 16px rgba(255, 107, 107, 0.3);
 }
 
 .tool-btn.primary {
-  background: #00f3ff;
-  border-color: #00f3ff;
-  color: #000;
-  font-weight: 600;
+  background: linear-gradient(135deg, #ff6b6b 0%, #ffa500 100%);
+  border-color: #ff6b6b;
+  color: #fff;
+  font-weight: 700;
+  box-shadow: 0 4px 16px rgba(255, 107, 107, 0.3);
 }
 
 .tool-btn.primary:hover {
-  background: #00d4e0;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 24px rgba(255, 107, 107, 0.4);
 }
 
 .tool-btn:disabled {
-  opacity: 0.3;
+  opacity: 0.4;
   cursor: not-allowed;
 }
 </style>
+
+@media (max-width: 768px) {
+  .pattern-toolbar {
+    padding: 16px;
+    gap: 12px;
+  }
+  
+  .tool-group {
+    width: 100%;
+    justify-content: center;
+  }
+  
+  .tool-btn {
+    padding: 10px 16px;
+    font-size: 13px;
+  }
+}

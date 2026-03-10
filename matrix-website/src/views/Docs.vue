@@ -92,24 +92,27 @@
 }
 
 .page-title {
-  font-size: 42px;
-  margin-bottom: 40px;
+  font-size: 48px;
+  font-weight: 800;
+  margin-bottom: 48px;
   text-align: center;
-  background: linear-gradient(135deg, #00f3ff 0%, #c864ff 100%);
+  background: linear-gradient(135deg, #ff6b6b 0%, #ffa500 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
 
 .docs-content {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
-  padding: 40px;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(20px);
+  border: 2px solid rgba(255, 107, 107, 0.15);
+  border-radius: 24px;
+  padding: 48px;
+  box-shadow: 0 8px 32px rgba(255, 107, 107, 0.12);
 }
 
 .doc-section {
-  margin-bottom: 50px;
+  margin-bottom: 56px;
 }
 
 .doc-section:last-child {
@@ -117,55 +120,98 @@
 }
 
 .doc-section h2 {
-  color: #00f3ff;
-  font-size: 28px;
-  margin-bottom: 20px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  color: #ff6b6b;
+  font-size: 32px;
+  font-weight: 700;
+  margin-bottom: 24px;
+  padding-bottom: 12px;
+  border-bottom: 3px solid rgba(255, 107, 107, 0.2);
 }
 
 .doc-section h3 {
-  color: #fff;
-  font-size: 20px;
-  margin: 25px 0 15px;
+  color: #2d3748;
+  font-size: 22px;
+  font-weight: 700;
+  margin: 28px 0 16px;
 }
 
 .doc-section p {
-  color: rgba(255, 255, 255, 0.7);
+  color: #4a5568;
   line-height: 1.8;
-  margin-bottom: 15px;
+  margin-bottom: 16px;
+  font-size: 15px;
 }
 
 .doc-section ul {
-  color: rgba(255, 255, 255, 0.7);
+  color: #4a5568;
   line-height: 1.8;
-  margin-left: 20px;
-  margin-bottom: 15px;
+  margin-left: 24px;
+  margin-bottom: 16px;
 }
 
 .doc-section li {
-  margin-bottom: 8px;
+  margin-bottom: 10px;
 }
 
 pre {
-  background: #0a0a0a;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-  padding: 20px;
+  background: #2d3748;
+  border: 2px solid rgba(255, 107, 107, 0.2);
+  border-radius: 12px;
+  padding: 24px;
   overflow-x: auto;
-  margin: 20px 0;
+  margin: 24px 0;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
 }
 
 code {
-  color: #00f3ff;
-  font-family: 'Courier New', monospace;
+  color: #ffa500;
+  font-family: 'SF Mono', 'Monaco', 'Courier New', monospace;
   font-size: 14px;
   line-height: 1.6;
 }
 
 @media (max-width: 768px) {
+  .docs {
+    padding: 24px 0 60px;
+  }
+  
+  .page-title {
+    font-size: 36px;
+    margin-bottom: 32px;
+  }
+  
   .docs-content {
-    padding: 24px;
+    padding: 32px 24px;
+    border-radius: 20px;
+  }
+  
+  .doc-section {
+    margin-bottom: 40px;
+  }
+  
+  .doc-section h2 {
+    font-size: 26px;
+    margin-bottom: 20px;
+  }
+  
+  .doc-section h3 {
+    font-size: 20px;
+    margin: 24px 0 14px;
+  }
+  
+  .doc-section p,
+  .doc-section ul {
+    font-size: 14px;
+  }
+  
+  pre {
+    padding: 20px;
+    margin: 20px 0;
+    overflow-x: auto;
+  }
+  
+  code {
+    font-size: 13px;
   }
 }
 </style>

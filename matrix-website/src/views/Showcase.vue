@@ -125,10 +125,11 @@ onMounted(() => {
 }
 
 .page-title {
-  font-size: 42px;
-  margin-bottom: 40px;
+  font-size: 48px;
+  font-weight: 800;
+  margin-bottom: 48px;
   text-align: center;
-  background: linear-gradient(135deg, #00f3ff 0%, #c864ff 100%);
+  background: linear-gradient(135deg, #ff6b6b 0%, #ffa500 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -143,17 +144,26 @@ onMounted(() => {
 
 .search-box input {
   width: 100%;
-  padding: 12px 20px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-  color: #fff;
+  padding: 16px 24px;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(20px);
+  border: 2px solid rgba(255, 107, 107, 0.2);
+  border-radius: 16px;
+  color: #2d3748;
   font-size: 15px;
+  box-shadow: 0 4px 16px rgba(255, 107, 107, 0.1);
+  transition: all 0.3s ease;
+}
+
+.search-box input::placeholder {
+  color: #a0aec0;
 }
 
 .search-box input:focus {
   outline: none;
-  border-color: #64c8ff;
+  border-color: #ff6b6b;
+  background: white;
+  box-shadow: 0 6px 24px rgba(255, 107, 107, 0.2);
 }
 
 .filters {
@@ -163,46 +173,57 @@ onMounted(() => {
 }
 
 .filter-btn {
-  padding: 8px 16px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 20px;
-  color: rgba(255, 255, 255, 0.7);
+  padding: 10px 20px;
+  background: rgba(255, 255, 255, 0.9);
+  border: 2px solid rgba(255, 107, 107, 0.15);
+  border-radius: 24px;
+  color: #4a5568;
   cursor: pointer;
-  transition: all 0.3s;
+  transition: all 0.3s ease;
   font-size: 14px;
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(255, 107, 107, 0.08);
 }
 
 .filter-btn:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: #fff;
+  background: white;
+  color: #ff6b6b;
+  border-color: #ff6b6b;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(255, 107, 107, 0.15);
 }
 
 .filter-btn.active {
-  background: #00f3ff;
-  color: #0a0a0a;
-  border-color: #00f3ff;
+  background: linear-gradient(135deg, #ff6b6b 0%, #ffa500 100%);
+  color: white;
+  border-color: #ff6b6b;
+  box-shadow: 0 4px 16px rgba(255, 107, 107, 0.3);
 }
 
 .sort-select {
-  padding: 10px 16px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-  color: #fff;
+  padding: 12px 20px;
+  background: rgba(255, 255, 255, 0.9);
+  border: 2px solid rgba(255, 107, 107, 0.2);
+  border-radius: 12px;
+  color: #2d3748;
   cursor: pointer;
   max-width: 200px;
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(255, 107, 107, 0.08);
+  transition: all 0.3s ease;
 }
 
 .sort-select:focus {
   outline: none;
-  border-color: #00f3ff;
+  border-color: #ff6b6b;
+  box-shadow: 0 4px 16px rgba(255, 107, 107, 0.15);
 }
 
 .loading {
   text-align: center;
-  padding: 60px 0;
-  color: rgba(255, 255, 255, 0.5);
+  padding: 80px 0;
+  color: #a0aec0;
+  font-size: 16px;
 }
 
 .showcase-grid {
@@ -212,72 +233,126 @@ onMounted(() => {
 }
 
 .showcase-item {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(20px);
+  border: 2px solid rgba(255, 107, 107, 0.15);
+  border-radius: 20px;
   overflow: hidden;
   cursor: pointer;
-  transition: all 0.3s;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 20px rgba(255, 107, 107, 0.1);
 }
 
 .showcase-item:hover {
-  transform: translateY(-5px);
-  border-color: #00f3ff;
-  box-shadow: 0 10px 30px rgba(0, 243, 255, 0.2);
+  transform: translateY(-8px);
+  border-color: #ff6b6b;
+  box-shadow: 0 12px 40px rgba(255, 107, 107, 0.25);
 }
 
 .item-image {
   width: 100%;
   height: 280px;
-  background: #111;
+  background: linear-gradient(135deg, #fff5f5 0%, #ffe0e0 100%);
   display: flex;
   align-items: center;
   justify-content: center;
+  overflow: hidden;
 }
 
 .item-image img {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  transition: transform 0.4s ease;
+}
+
+.showcase-item:hover .item-image img {
+  transform: scale(1.08);
 }
 
 .item-info {
-  padding: 20px;
+  padding: 24px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.9) 100%);
 }
 
 .item-info h3 {
-  color: #fff;
+  color: #2d3748;
   margin-bottom: 8px;
   font-size: 18px;
+  font-weight: 700;
 }
 
 .author {
-  color: rgba(255, 255, 255, 0.5);
+  color: #718096;
   font-size: 14px;
   margin-bottom: 12px;
 }
 
 .stats {
   display: flex;
-  gap: 15px;
+  gap: 16px;
   font-size: 14px;
-  color: rgba(255, 255, 255, 0.6);
+  color: #a0aec0;
+  font-weight: 500;
 }
 
 .empty {
   text-align: center;
-  padding: 80px 0;
-  color: rgba(255, 255, 255, 0.4);
+  padding: 100px 0;
+  color: #a0aec0;
+  font-size: 16px;
 }
 
 @media (max-width: 768px) {
-  .showcase-grid {
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  .showcase {
+    padding: 24px 0 60px;
+  }
+  
+  .page-title {
+    font-size: 36px;
+    margin-bottom: 32px;
+  }
+  
+  .controls {
     gap: 16px;
+    margin-bottom: 32px;
+  }
+  
+  .search-box input {
+    padding: 14px 20px;
+    font-size: 14px;
+  }
+  
+  .filters {
+    gap: 8px;
+  }
+  
+  .filter-btn {
+    padding: 8px 16px;
+    font-size: 13px;
+  }
+  
+  .sort-select {
+    width: 100%;
+    max-width: 100%;
+    padding: 12px 18px;
+  }
+  
+  .showcase-grid {
+    grid-template-columns: 1fr;
+    gap: 20px;
   }
   
   .item-image {
-    height: 200px;
+    height: 240px;
+  }
+  
+  .item-info {
+    padding: 20px;
+  }
+  
+  .item-info h3 {
+    font-size: 17px;
   }
 }
 </style>
