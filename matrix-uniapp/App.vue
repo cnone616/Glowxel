@@ -1,19 +1,10 @@
 <script>
-import { useThemeStore } from './store/theme.js'
 import { useProjectStore } from './store/project.js'
 import { useUserStore } from './store/user.js'
 import { useDeviceStore } from './store/device.js'
 
 export default {
   onLaunch: function() {
-    // 初始化主题（确保深色模式）
-    const themeStore = useThemeStore()
-    themeStore.loadTheme()
-    // 如果没有保存的主题，强制设置为深色
-    if (!uni.getStorageSync('theme')) {
-      themeStore.setTheme('dark')
-    }
-    
     // 初始化项目数据
     const projectStore = useProjectStore()
     projectStore.init()

@@ -106,7 +106,7 @@
         :highlight-color="highlightColor"
         :highlight-row="focusMode && assistMode === 'row' ? currentRow : null"
         :allow-single-touch-pan="true"
-        :is-dark-mode="themeStore && themeStore.isDarkMode"
+        :is-dark-mode="false"
         canvas-id="assistCanvas"
         @pan="handlePan"
         @zoom="handlePinchZoom"
@@ -322,7 +322,6 @@
 </template>
 
 <script>
-import { useThemeStore } from '../../store/theme.js'
 import { useProjectStore } from '../../store/project.js'
 import { useDeviceStore } from '../../store/device.js'
 import { useToast } from '../../composables/useToast.js'
@@ -359,7 +358,6 @@ export default {
 
   data() {
     return {
-      themeStore: null,
       projectStore: null,
       deviceStore: null,
       toast: null,
@@ -529,13 +527,9 @@ export default {
   },
 
   onLoad(options) {
-    this.themeStore = useThemeStore()
     this.projectStore = useProjectStore()
     this.deviceStore = useDeviceStore()
     this.toast = useToast()
-    
-    // 立即应用主题，避免闪烁
-    this.themeStore.applyTheme()
     
     this.projectId = options.id
     this.boardId = options.board
@@ -599,8 +593,6 @@ export default {
   },
 
   onShow() {
-    this.themeStore.applyTheme()
-    
     // 如果设备已连接，确保模式正确并同步画布
     if (this.deviceConnected && this.localPixels.size > 0) {
       console.log('页面显示，确保画板模式并同步画布')

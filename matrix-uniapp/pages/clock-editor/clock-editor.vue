@@ -1,5 +1,5 @@
 <template>
-  <view class="clock-editor-page" :class="{ 'light-theme': themeStore && !themeStore.isDarkMode }">
+  <view class="clock-editor-page">
     <!-- 状态栏占位 -->
     <!-- #ifdef MP-WEIXIN -->
     <view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
@@ -525,7 +525,6 @@
 </template>
 
 <script>
-import { useThemeStore } from '../../store/theme.js'
 import { useDeviceStore } from '../../store/device.js'
 import { useToast } from '../../composables/useToast.js'
 import statusBarMixin from '../../mixins/statusBar.js'
@@ -550,7 +549,6 @@ export default {
   },
   data() {
     return {
-      themeStore: null,
       deviceStore: null,
       toast: null,
       isReady: false,
@@ -635,7 +633,7 @@ export default {
 
   computed: {
     accentColor() {
-      return this.themeStore && this.themeStore.isDarkMode ? '#00f3ff' : '#0099cc'
+      return '#4F7FFF'
     }
   },
 
@@ -643,7 +641,6 @@ export default {
     // 先加载配置，确保 config 有值
     this.loadConfig()
     
-    this.themeStore = useThemeStore()
     this.deviceStore = useDeviceStore()
     this.toast = useToast()
     
@@ -651,8 +648,6 @@ export default {
     const statusBarHeight = systemInfo.statusBarHeight || 0
     const headerHeight = 56
     this.contentHeight = `${systemInfo.windowHeight - statusBarHeight - headerHeight - 300}px`
-    
-    this.themeStore.applyTheme()
     
     // 延迟初始化 canvas，确保 DOM 已渲染
     this.$nextTick(() => {
@@ -673,7 +668,7 @@ export default {
   },
 
   onShow() {
-    this.themeStore.applyTheme()
+    // 页面显示时的处理
   },
 
   methods: {

@@ -1,5 +1,5 @@
 <template>
-  <view class="profile-page" :class="{ 'light-theme': themeStore && !themeStore.isDarkMode }">
+  <view class="profile-page">
     <!-- 状态栏占位 -->
     <!-- #ifdef MP-WEIXIN -->
     <view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
@@ -10,11 +10,11 @@
       <view class="user-card">
         <view v-if="!userStore.hasLogin" class="login-prompt">
           <view class="avatar-placeholder">
-            <Icon name="people" :size="80" />
+            <Icon name="user" :size="80" />
           </view>
           <text class="prompt-text">登录后可同步数据到云端</text>
           <button class="login-btn" @click="handleLogin">
-            <Icon name="wechat" :size="32" />
+            <Icon name="user" :size="32" />
             <text>微信登录</text>
           </button>
         </view>
@@ -27,7 +27,7 @@
             mode="aspectFill"
           />
           <view v-else class="avatar-placeholder">
-            <Icon name="people" :size="80" />
+            <Icon name="user" :size="80" />
           </view>
           
           <view class="info-content">
@@ -53,7 +53,7 @@
           <view class="setting-row">
             <view class="setting-left">
               <view class="setting-icon">
-                <Icon name="cloud" :size="40" />
+                <Icon name="upload" :size="40" />
               </view>
               <view class="setting-info">
                 <text class="setting-label">自动同步</text>
@@ -63,7 +63,7 @@
             <switch 
               :checked="userStore.syncEnabled" 
               @change="handleSyncChange"
-              color="#00f3ff"
+              color="#4F7FFF"
             />
           </view>
           
@@ -106,7 +106,7 @@
         
         <view class="setting-card">
           <button class="logout-btn" @click="handleLogout">
-            <Icon name="exit" :size="32" />
+            <Icon name="sign-out" :size="32" />
             <text>退出登录</text>
           </button>
         </view>
@@ -124,7 +124,6 @@
 <script>
 import { useUserStore } from '../../store/user.js'
 import { useProjectStore } from '../../store/project.js'
-import { useThemeStore } from '../../store/theme.js'
 import { useToast } from '../../composables/useToast.js'
 import statusBarMixin from '../../mixins/statusBar.js'
 import Icon from '../../components/Icon.vue'
@@ -144,12 +143,10 @@ export default {
     // 直接初始化 store
     const userStore = useUserStore()
     const projectStore = useProjectStore()
-    const themeStore = useThemeStore()
     
     return {
       userStore,
       projectStore,
-      themeStore,
       toast: null,
       cloudProjectCount: 0,
       storageSize: '0 KB'

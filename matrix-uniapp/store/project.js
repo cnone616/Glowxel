@@ -1,49 +1,109 @@
 import { defineStore } from 'pinia'
 import { generateId } from '../utils/index.js'
+import { MockAPI } from '../data/mock/index.js'
 
 export const useProjectStore = defineStore('project', {
   state: () => ({
     projects: [],
-    currentProject: null
+    currentProject: null,
+    isLoading: false,
+    error: null
   }),
   
   getters: {
     // 获取项目列表（按最后编辑时间排序）
     sortedProjects: (state) => {
       return [...state.projects].sort((a, b) => {
-        return new Date(b.lastEdited) - new Date(a.lastEdited)
+        return new Date(b.updateTime || b.lastEdited) - new Date(a.updateTime || a.lastEdited)
       })
+    },
+    
+    // 获取进行中的项目
+    inProgressProjects: (state) => {
+      return state.projects.filter(p => p.status === 'in_progress')
+    },
+    
+    // 获取已完成的项目
+    completedProjects: (state) => {
+      return state.projects.filter(p => p.status === 'completed')
+    },
+    
+    // 获取草稿项目
+    draftProjects: (state) => {
+      return state.projects.filter(p => p.status === 'draft')
     }
   },
   
   actions: {
     // 初始化 - 加载项目列表
-    init() {
-      this.loadProjects()
+    async init() {
+      await this.loadProjects()
     },
     
-    // 加载项目列表
-    loadProjects() {
+    // 加载项目列表 - 使用Mock数据
+    async loadProjects() {
+      this.isLoading = true
+      this.error = null
+      
       try {
-        const data = uni.getStorageSync('projects')
-        if (data) {
-          this.projects = JSON.parse(data).map(p => ({
+        // 首先尝试从本地存储加载
+        const localData = uni.getStorageSync('projects')
+        if (localData) {
+          this.projects = JSON.parse(localData).map(p => ({
             ...p,
-            lastEdited: new Date(p.lastEdited)
+            lastEdited: new Date(p.lastEdited || p.updateTime)
           }))
+        } else {
+          // 如果本地没有数据，使用Mock数据初始化
+          const mockProjects = MockAPI.projects.getAll()
+          this.projects = mockProjects.map(p => ({
+            ...p,
+            lastEdited: new Date(p.updateTime),
+            // 转换Mock数据格式到本地格式
+            width: parseInt(p.size.split('x')[0]),
+            height: parseInt(p.size.split('x')[1]),
+            paddedWidth: parseInt(p.size.split('x')[0]),
+            paddedHeight: parseInt(p.size.split('x')[1]),
+            paletteSize: p.colorCount,
+            palette: [],
+            thumbnail: p.thumbnail
+          }))
+          // 保存到本地存储
+          this.saveToStorage()
         }
       } catch (e) {
         console.error('加载项目失败:', e)
+        this.error = '加载项目失败'
+        // 使用Mock数据作为备选
+        const mockProjects = MockAPI.projects.getAll()
+        this.projects = mockProjects.map(p => ({
+          ...p,
+          lastEdited: new Date(p.updateTime),
+          width: parseInt(p.size.split('x')[0]),
+          height: parseInt(p.size.split('x')[1]),
+          paddedWidth: parseInt(p.size.split('x')[0]),
+          paddedHeight: parseInt(p.size.split('x')[1]),
+          paletteSize: p.colorCount,
+          palette: [],
+          thumbnail: p.thumbnail
+        }))
+      } finally {
+        this.isLoading = false
       }
     },
     
-    // 保存项目列表
-    saveProjects() {
+    // 保存到本地存储
+    saveToStorage() {
       try {
         uni.setStorageSync('projects', JSON.stringify(this.projects))
       } catch (e) {
         console.error('保存项目失败:', e)
       }
+    },
+    
+    // 保存项目列表（兼容旧方法名）
+    saveProjects() {
+      this.saveToStorage()
     },
     
     // 添加项目
@@ -53,16 +113,23 @@ export const useProjectStore = defineStore('project', {
         name,
         width,
         height,
-        paddedWidth: paddedWidth || width,  // 填充后的宽度
-        paddedHeight: paddedHeight || height,  // 填充后的高度
+        paddedWidth: paddedWidth || width,
+        paddedHeight: paddedHeight || height,
         progress: 0,
         lastEdited: new Date(),
+        updateTime: new Date().toISOString().split('T')[0],
+        createTime: new Date().toISOString().split('T')[0],
         paletteSize,
         palette: palette || [],
-        thumbnail: '' // 缩略图 base64
+        thumbnail: '',
+        size: `${width}x${height}`,
+        colorCount: paletteSize,
+        status: 'draft',
+        description: '',
+        icon: 'picture'
       }
       this.projects.unshift(newProject)
-      this.saveProjects()
+      this.saveToStorage()
       return newProject.id
     },
     
@@ -78,9 +145,10 @@ export const useProjectStore = defineStore('project', {
         this.projects[index] = { 
           ...this.projects[index], 
           ...updates, 
-          lastEdited: new Date() 
+          lastEdited: new Date(),
+          updateTime: new Date().toISOString().split('T')[0]
         }
-        this.saveProjects()
+        this.saveToStorage()
       }
     },
     
@@ -96,9 +164,10 @@ export const useProjectStore = defineStore('project', {
         this.projects[index] = { 
           ...this.projects[index], 
           thumbnail,
-          lastEdited: new Date() 
+          lastEdited: new Date(),
+          updateTime: new Date().toISOString().split('T')[0]
         }
-        this.saveProjects()
+        this.saveToStorage()
       }
     },
     
@@ -108,10 +177,11 @@ export const useProjectStore = defineStore('project', {
       // 同时删除项目的像素数据
       try {
         uni.removeStorageSync(`project-pixels-${id}`)
+        uni.removeStorageSync(`pixels-${id}`)
       } catch (e) {
         console.error('删除项目数据失败:', e)
       }
-      this.saveProjects()
+      this.saveToStorage()
     },
     
     // 设置当前项目
@@ -169,7 +239,6 @@ export const useProjectStore = defineStore('project', {
       const proj = this.getProject(projectId)
       if (!proj) return
 
-      // 使用填充后的尺寸计算板子数量
       const paddedWidth = proj.paddedWidth || proj.width
       const paddedHeight = proj.paddedHeight || proj.height
       
@@ -195,7 +264,18 @@ export const useProjectStore = defineStore('project', {
       const progressPercent = Math.round((sumCompletion / totalBoards) * 100)
       
       if (progressPercent !== proj.progress) {
-        this.updateProject(projectId, { progress: progressPercent })
+        // 根据进度更新状态
+        let status = 'draft'
+        if (progressPercent > 0 && progressPercent < 100) {
+          status = 'in_progress'
+        } else if (progressPercent === 100) {
+          status = 'completed'
+        }
+        
+        this.updateProject(projectId, { 
+          progress: progressPercent,
+          status: status
+        })
       }
     },
     
@@ -204,7 +284,6 @@ export const useProjectStore = defineStore('project', {
       try {
         uni.setStorageSync(`board-thumbnail-${projectId}-${boardId}`, thumbnail)
       } catch (e) {
-        // 存储空间不足时，不保存缩略图，但不影响使用
         if (e.name === 'QuotaExceededError') {
           console.warn('存储空间不足，跳过看板缩略图保存')
         } else {
@@ -221,6 +300,11 @@ export const useProjectStore = defineStore('project', {
         console.error('加载看板缩略图失败:', e)
         return null
       }
+    },
+    
+    // 获取最近项目
+    getRecentProjects(limit = 3) {
+      return this.sortedProjects.slice(0, limit)
     }
   }
 })

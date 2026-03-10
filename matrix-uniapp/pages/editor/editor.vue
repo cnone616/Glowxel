@@ -1,5 +1,5 @@
 <template>
-  <view class="editor-page" :class="{ 'light-theme': themeStore && !themeStore.isDarkMode }">
+  <view class="editor-page light-theme">
     <!-- 状态栏占位 -->
     <!-- #ifdef MP-WEIXIN -->
     <view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
@@ -74,7 +74,7 @@
         :canvas-height="containerSize.height"
         :grid-visible="gridVisible"
         :allow-single-touch-pan="tool === 'move'"
-        :is-dark-mode="themeStore && themeStore.isDarkMode"
+        :is-dark-mode="false"
         canvas-id="editorCanvas"
         @pixel-click="handlePixelClick"
         @pan="handlePan"
@@ -311,7 +311,6 @@
 
 
 <script>
-import { useThemeStore } from '../../store/theme.js'
 import { useProjectStore } from '../../store/project.js'
 import { useToast } from '../../composables/useToast.js'
 import { getColorByCode } from '../../data/artkal-colors-full.js'
@@ -350,7 +349,6 @@ export default {
   
   data() {
     return {
-      themeStore: null,
       projectStore: null,
       toast: null,
       
@@ -490,12 +488,8 @@ export default {
   },
 
   onLoad(options) {
-    this.themeStore = useThemeStore()
     this.projectStore = useProjectStore()
     this.toast = useToast()
-    
-    // 立即应用主题，避免闪烁
-    this.themeStore.applyTheme()
     
     this.projectId = options.id
     this.boardId = options.board || ''
@@ -523,7 +517,7 @@ export default {
   },
 
   onShow() {
-    this.themeStore.applyTheme()
+    // 页面显示时的处理
   },
   
   onReady() {

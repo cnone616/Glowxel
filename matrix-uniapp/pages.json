@@ -25,6 +25,33 @@
 			}
 		},
 		{
+			"path": "pages/community/community",
+			"style": {
+				"navigationStyle": "custom",
+				"navigationBarTextStyle": "white",
+				"backgroundColor": "#1a1a1a",
+				"enablePullDownRefresh": false
+			}
+		},
+		{
+			"path": "pages/control/control",
+			"style": {
+				"navigationStyle": "custom",
+				"navigationBarTextStyle": "white",
+				"backgroundColor": "#1a1a1a",
+				"enablePullDownRefresh": false
+			}
+		},
+		{
+			"path": "pages/profile/profile",
+			"style": {
+				"navigationStyle": "custom",
+				"navigationBarTextStyle": "white",
+				"backgroundColor": "#1a1a1a",
+				"enablePullDownRefresh": false
+			}
+		},
+		{
 			"path": "pages/editor/editor",
 			"style": {
 				"navigationStyle": "custom",
@@ -52,15 +79,6 @@
 			}
 		},
 		{
-			"path": "pages/control/control",
-			"style": {
-				"navigationStyle": "custom",
-				"navigationBarTextStyle": "white",
-				"backgroundColor": "#1a1a1a",
-				"enablePullDownRefresh": false
-			}
-		},
-		{
 			"path": "pages/user/user",
 			"style": {
 				"navigationStyle": "custom",
@@ -70,7 +88,7 @@
 			}
 		},
 		{
-			"path": "pages/profile/profile",
+			"path": "pages/clock-editor/clock-editor",
 			"style": {
 				"navigationStyle": "custom",
 				"navigationBarTextStyle": "white",
@@ -79,7 +97,25 @@
 			}
 		},
 		{
-			"path": "pages/clock-editor/clock-editor",
+			"path": "pages/artwork-detail/artwork-detail",
+			"style": {
+				"navigationStyle": "custom",
+				"navigationBarTextStyle": "white",
+				"backgroundColor": "#1a1a1a",
+				"enablePullDownRefresh": false
+			}
+		},
+		{
+			"path": "pages/user-detail/user-detail",
+			"style": {
+				"navigationStyle": "custom",
+				"navigationBarTextStyle": "white",
+				"backgroundColor": "#1a1a1a",
+				"enablePullDownRefresh": false
+			}
+		},
+		{
+			"path": "pages/user-list/user-list",
 			"style": {
 				"navigationStyle": "custom",
 				"navigationBarTextStyle": "white",

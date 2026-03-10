@@ -192,8 +192,8 @@ export default {
       // 清空画布（使用逻辑像素，因为 ctx 已经缩放过了）
       ctx.clearRect(0, 0, width, height)
       
-      // 背景色 - 使用深灰色背景，让网格线可见
-      ctx.fillStyle = '#1a1a1a'
+      // 背景色 - 根据主题模式设置
+      ctx.fillStyle = this.isDarkMode ? '#1a1a1a' : '#FFFFFF'
       ctx.fillRect(0, 0, width, height)
       
       ctx.save()
