@@ -17,9 +17,9 @@ const routes = [
     component: () => import('@/views/ClockDesigner.vue')
   },
   {
-    path: '/pattern-editor',
-    name: 'PatternEditor',
-    component: () => import('@/views/PatternEditor.vue')
+    path: '/pindou-generator',
+    name: 'PindouGenerator',
+    component: () => import('@/views/PindouGenerator.vue')
   },
   {
     path: '/docs',

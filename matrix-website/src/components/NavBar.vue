@@ -10,7 +10,7 @@
         <router-link to="/" @click="closeMobileMenu">首页</router-link>
         <router-link to="/showcase" @click="closeMobileMenu">作品展示</router-link>
         <router-link to="/clock-designer" @click="closeMobileMenu">时钟设计</router-link>
-        <router-link to="/pattern-editor" @click="closeMobileMenu">图案编辑</router-link>
+        <router-link to="/pindou-generator" @click="closeMobileMenu">拼豆生成器</router-link>
         <router-link to="/docs" @click="closeMobileMenu">文档</router-link>
       </div>
 
@@ -25,7 +25,7 @@
 
 <script setup>
 import { ref } from 'vue'
-import logoUrl from '@/assets/images/matrix-logo.png'
+import logoUrl from '@/assets/images/matrix-logo.svg'
 
 const mobileMenuOpen = ref(false)
 
@@ -40,12 +40,13 @@ const closeMobileMenu = () => {
 
 <style scoped>
 .navbar {
-  background: rgba(10, 10, 10, 0.95);
-  backdrop-filter: blur(10px);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(20px);
+  border-bottom: 2px solid rgba(255, 107, 107, 0.15);
   position: sticky;
   top: 0;
   z-index: 1000;
+  box-shadow: 0 4px 24px rgba(255, 107, 107, 0.08);
 }
 
 .container {
@@ -63,9 +64,14 @@ const closeMobileMenu = () => {
   align-items: center;
   gap: 12px;
   text-decoration: none;
-  color: #fff;
-  font-size: 20px;
-  font-weight: 600;
+  color: #2d3748;
+  font-size: 22px;
+  font-weight: 700;
+  transition: transform 0.3s ease;
+}
+
+.logo:hover {
+  transform: scale(1.05);
 }
 
 .logo-image {
@@ -74,9 +80,12 @@ const closeMobileMenu = () => {
 }
 
 .logo-text {
-  color: #00f3ff;
-  font-family: monospace;
-  font-weight: bold;
+  background: linear-gradient(135deg, #ff6b6b 0%, #ffa500 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  font-family: 'SF Mono', 'Monaco', 'Courier New', monospace;
+  font-weight: 800;
   letter-spacing: 0.15em;
 }
 
@@ -86,15 +95,34 @@ const closeMobileMenu = () => {
 }
 
 .nav-links a {
-  color: rgba(255, 255, 255, 0.7);
+  color: #4a5568;
   text-decoration: none;
-  transition: color 0.3s;
+  transition: all 0.3s ease;
   font-size: 15px;
+  font-weight: 500;
+  position: relative;
+  padding: 8px 0;
+}
+
+.nav-links a::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 0;
+  height: 2px;
+  background: linear-gradient(90deg, #ff6b6b 0%, #ffa500 100%);
+  transition: width 0.3s ease;
+}
+
+.nav-links a:hover::after,
+.nav-links a.router-link-active::after {
+  width: 100%;
 }
 
 .nav-links a:hover,
 .nav-links a.router-link-active {
-  color: #00f3ff;
+  color: #ff6b6b;
 }
 
 .mobile-menu-btn {
@@ -109,9 +137,10 @@ const closeMobileMenu = () => {
 
 .mobile-menu-btn span {
   width: 25px;
-  height: 2px;
-  background: #fff;
+  height: 3px;
+  background: #ff6b6b;
   transition: all 0.3s;
+  border-radius: 2px;
 }
 
 @media (max-width: 768px) {
@@ -124,20 +153,37 @@ const closeMobileMenu = () => {
     top: 70px;
     left: 0;
     right: 0;
-    background: rgba(10, 10, 10, 0.98);
+    background: rgba(255, 255, 255, 0.98);
+    backdrop-filter: blur(20px);
     flex-direction: column;
-    padding: 20px;
-    gap: 20px;
+    padding: 30px 20px;
+    gap: 24px;
     transform: translateY(-100%);
     opacity: 0;
-    transition: all 0.3s;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     pointer-events: none;
+    box-shadow: 0 8px 32px rgba(255, 107, 107, 0.15);
   }
 
   .nav-links.active {
     transform: translateY(0);
     opacity: 1;
     pointer-events: all;
+  }
+  
+  .nav-links a {
+    font-size: 16px;
+    padding: 12px 0;
+    text-align: center;
+  }
+  
+  .logo-text {
+    font-size: 18px;
+  }
+  
+  .logo-image {
+    width: 28px;
+    height: 28px;
   }
 }
 </style>

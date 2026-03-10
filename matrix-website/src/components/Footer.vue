@@ -30,10 +30,12 @@
 
 <style scoped>
 .footer {
-  background: #0a0a0a;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-  padding: 40px 0 20px;
-  margin-top: 80px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.85) 100%);
+  backdrop-filter: blur(20px);
+  border-top: 2px solid rgba(255, 107, 107, 0.2);
+  padding: 60px 0 30px;
+  margin-top: 100px;
+  box-shadow: 0 -4px 24px rgba(255, 107, 107, 0.08);
 }
 
 .container {
@@ -44,43 +46,83 @@
 
 .footer-content {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 40px;
-  margin-bottom: 30px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 48px;
+  margin-bottom: 40px;
 }
 
 .footer-section h3 {
-  color: #00f3ff;
-  margin-bottom: 10px;
-  font-family: monospace;
-  font-weight: bold;
+  background: linear-gradient(135deg, #ff6b6b 0%, #ffa500 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 16px;
+  font-family: 'SF Mono', 'Monaco', 'Courier New', monospace;
+  font-weight: 800;
   letter-spacing: 0.15em;
+  font-size: 20px;
 }
 
 .footer-section h4 {
-  color: #fff;
-  margin-bottom: 15px;
-  font-size: 16px;
+  color: #2d3748;
+  margin-bottom: 20px;
+  font-size: 17px;
+  font-weight: 700;
 }
 
 .footer-section p,
 .footer-section a {
-  color: rgba(255, 255, 255, 0.6);
+  color: #718096;
   text-decoration: none;
   display: block;
-  margin-bottom: 8px;
-  font-size: 14px;
+  margin-bottom: 10px;
+  font-size: 15px;
+  transition: all 0.3s ease;
 }
 
 .footer-section a:hover {
-  color: #00f3ff;
+  color: #ff6b6b;
+  transform: translateX(4px);
 }
 
 .footer-bottom {
   text-align: center;
-  padding-top: 20px;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-  color: rgba(255, 255, 255, 0.4);
+  padding-top: 30px;
+  border-top: 2px solid rgba(255, 107, 107, 0.15);
+  color: #a0aec0;
   font-size: 14px;
+  margin-top: 20px;
 }
 </style>
+
+@media (max-width: 768px) {
+  .footer {
+    padding: 40px 0 24px;
+    margin-top: 60px;
+  }
+  
+  .footer-content {
+    grid-template-columns: 1fr;
+    gap: 32px;
+    margin-bottom: 32px;
+  }
+  
+  .footer-section h3 {
+    font-size: 18px;
+  }
+  
+  .footer-section h4 {
+    font-size: 16px;
+    margin-bottom: 16px;
+  }
+  
+  .footer-section p,
+  .footer-section a {
+    font-size: 14px;
+  }
+  
+  .footer-bottom {
+    padding-top: 24px;
+    font-size: 13px;
+  }
+}

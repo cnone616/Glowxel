@@ -140,7 +140,7 @@
         </view>
 
         <!-- 日期设置 -->
-        <view v-show="currentTab === 1" class="settings-card">
+        <view v-show="currentTab === 3" class="settings-card">
           <view class="card-title-section">
             <Icon name="calendar" :size="32" />
             <text class="card-title">日期显示</text>
@@ -235,9 +235,9 @@
         </view>
 
         <!-- 星期设置 -->
-        <view v-show="currentTab === 2" class="settings-card">
+        <view v-show="currentTab === 4" class="settings-card">
           <view class="card-title-section">
-            <Icon name="calendar-days" :size="32" />
+            <Icon name="rili5" :size="32" />
             <text class="card-title">星期显示</text>
             <view class="toggle-switch" @click="toggleWeekShow">
               <view class="switch-track" :class="{ 'active': config.week.show }">
@@ -317,7 +317,7 @@
         </view>
 
         <!-- 背景图片 -->
-        <view v-show="currentTab === 3" class="settings-card">
+        <view v-show="currentTab === 2" class="settings-card">
           <view class="card-title-section">
             <Icon name="picture" :size="32" />
             <text class="card-title">背景图片</text>
@@ -417,7 +417,7 @@
         </view>
         
         <!-- 绘制工具 -->
-        <view v-show="currentTab === 4" class="settings-card">
+        <view v-show="currentTab === 1" class="settings-card">
           <view class="card-title-section">
             <Icon name="edit" :size="32" />
             <text class="card-title">绘制工具</text>
@@ -572,8 +572,8 @@ export default {
       commonColors: COMMON_COLORS,
       
       currentTab: 0,
-      tabs: ['时间', '日期', '星期', '图片', '绘制'],
-      tabIconNames: ['time', 'calendar', 'calendar-days', 'picture', 'edit'],
+      tabs: ['时间', '绘制', '图片', '日期', '星期'],
+      tabIconNames: ['time', 'edit', 'picture', 'calendar', 'rili5'],
       
       config: {
         time: {

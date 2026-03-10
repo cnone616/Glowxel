@@ -26,8 +26,9 @@ import Footer from './components/Footer.vue'
 
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-  background: #0a0a0a;
-  color: #ffffff;
+  background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 50%, #ff9a9e 100%);
+  background-attachment: fixed;
+  color: #2d3748;
 }
 
 #app {

@@ -52,7 +52,7 @@ export function imageToPixels(image, targetWidth, targetHeight, colorCodes) {
 /**
  * 统计使用的颜色
  * @param {Map} pixels - 像素数据
- * @returns {Array} 使用的颜色及数量
+ * @returns {Map} 使用的颜色及数量的 Map
  */
 export function getUsedColors(pixels) {
   const colorCount = new Map()
@@ -61,19 +61,5 @@ export function getUsedColors(pixels) {
     colorCount.set(colorCode, (colorCount.get(colorCode) || 0) + 1)
   })
   
-  const usedColors = []
-  colorCount.forEach((count, code) => {
-    const color = getColorByCode(code)
-    if (color) {
-      usedColors.push({
-        ...color,
-        count
-      })
-    }
-  })
-  
-  // 按数量排序
-  usedColors.sort((a, b) => b.count - a.count)
-  
-  return usedColors
+  return colorCount
 }

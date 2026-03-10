@@ -57,6 +57,7 @@
             <canvas
               ref="canvas"
               class="pattern-canvas"
+              :data-tool="tool"
               @mousedown="handleMouseDown"
               @mousemove="handleMouseMove"
               @mouseup="handleMouseUp"
@@ -238,6 +239,8 @@ async function processImage() {
       console.log('图片转换完成，生成像素数量:', pixelMap.size)
       
       pixels.value = pixelMap
+      // 图片生成后默认使用拖动工具
+      tool.value = 'move'
       saveHistory()
       resolve()
     }
@@ -301,7 +304,6 @@ async function initEditor() {
   console.log('强制绘制 canvas')
   drawCanvas()
 }
-}
 
 // Canvas 操作
 function resizeCanvas() {
@@ -356,13 +358,13 @@ function drawCanvas() {
   const c = ctx.value
   c.clearRect(0, 0, canvas.value.width, canvas.value.height)
   
-  // 绘制背景
-  c.fillStyle = '#1a1a1a'
+  // 绘制背景 - 改为白色
+  c.fillStyle = '#ffffff'
   c.fillRect(0, 0, canvas.value.width, canvas.value.height)
   
-  // 绘制网格
+  // 绘制网格 - 改为浅灰色
   if (gridVisible.value) {
-    c.strokeStyle = 'rgba(255, 255, 255, 0.1)'
+    c.strokeStyle = 'rgba(0, 0, 0, 0.08)'
     c.lineWidth = 1
     
     for (let x = 0; x <= width.value; x++) {
@@ -541,10 +543,11 @@ async function exportPattern() {
 }
 
 .page-title {
-  font-size: 42px;
-  margin-bottom: 40px;
+  font-size: 48px;
+  font-weight: 800;
+  margin-bottom: 48px;
   text-align: center;
-  background: linear-gradient(135deg, #00f3ff 0%, #c864ff 100%);
+  background: linear-gradient(135deg, #ff6b6b 0%, #ffa500 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -573,33 +576,43 @@ async function exportPattern() {
 }
 
 .step-number {
-  width: 40px;
-  height: 40px;
+  width: 48px;
+  height: 48px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.1);
-  border: 2px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.9);
+  border: 3px solid rgba(255, 107, 107, 0.2);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: bold;
-  color: #fff;
+  font-weight: 700;
+  color: #a0aec0;
+  box-shadow: 0 4px 12px rgba(255, 107, 107, 0.1);
+  transition: all 0.3s ease;
 }
 
 .step-item.active .step-number {
-  background: #00f3ff;
-  border-color: #00f3ff;
-  color: #000;
+  background: linear-gradient(135deg, #ff6b6b 0%, #ffa500 100%);
+  border-color: #ff6b6b;
+  color: #fff;
+  box-shadow: 0 6px 20px rgba(255, 107, 107, 0.4);
+  transform: scale(1.1);
 }
 
 .step-item.completed .step-number {
-  background: rgba(0, 243, 255, 0.2);
-  border-color: #00f3ff;
-  color: #00f3ff;
+  background: rgba(255, 107, 107, 0.15);
+  border-color: #ff6b6b;
+  color: #ff6b6b;
 }
 
 .step-label {
   font-size: 14px;
-  color: rgba(255, 255, 255, 0.7);
+  font-weight: 500;
+  color: #718096;
+}
+
+.step-item.active .step-label {
+  color: #2d3748;
+  font-weight: 600;
 }
 
 .step-content {
@@ -610,15 +623,17 @@ async function exportPattern() {
 .editor-container {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 24px;
 }
 
 .canvas-wrapper {
   width: 100%;
-  height: 600px;
-  background: #0a0a0a;
-  border-radius: 12px;
+  height: 650px;
+  background: #ffffff;
+  border-radius: 20px;
   overflow: hidden;
+  box-shadow: 0 8px 32px rgba(255, 107, 107, 0.12);
+  border: 2px solid rgba(255, 107, 107, 0.15);
 }
 
 .pattern-canvas {
@@ -626,16 +641,28 @@ async function exportPattern() {
   cursor: crosshair;
 }
 
+.pattern-canvas[data-tool="move"] {
+  cursor: grab;
+}
+
+.pattern-canvas[data-tool="move"]:active {
+  cursor: grabbing;
+}
+
 .color-palette-wrapper {
-  padding: 20px;
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 12px;
+  padding: 28px;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(20px);
+  border-radius: 20px;
+  border: 2px solid rgba(255, 107, 107, 0.15);
+  box-shadow: 0 4px 20px rgba(255, 107, 107, 0.1);
 }
 
 .color-palette-wrapper h3 {
-  font-size: 18px;
-  color: #fff;
-  margin-bottom: 16px;
+  font-size: 20px;
+  font-weight: 700;
+  color: #2d3748;
+  margin-bottom: 20px;
 }
 
 .color-grid {
@@ -646,73 +673,141 @@ async function exportPattern() {
 
 .color-item {
   aspect-ratio: 1;
-  border-radius: 8px;
-  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-radius: 12px;
+  border: 3px solid rgba(255, 107, 107, 0.15);
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   display: flex;
   align-items: center;
   justify-content: center;
   position: relative;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
 .color-item:hover {
-  transform: scale(1.1);
-  border-color: #fff;
+  transform: scale(1.12);
+  border-color: #ff6b6b;
+  box-shadow: 0 4px 16px rgba(255, 107, 107, 0.3);
 }
 
 .color-item.active {
-  border-color: #00f3ff;
-  border-width: 3px;
-  box-shadow: 0 0 20px rgba(0, 243, 255, 0.5);
+  border-color: #ff6b6b;
+  border-width: 4px;
+  box-shadow: 0 6px 24px rgba(255, 107, 107, 0.5);
+  transform: scale(1.15);
 }
 
 .color-code {
-  font-size: 10px;
-  font-weight: bold;
-  color: #fff;
-  text-shadow: 0 0 4px rgba(0, 0, 0, 0.8);
+  font-size: 11px;
+  font-weight: 800;
+  color: #2d3748;
+  text-shadow: 0 1px 3px rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.85);
+  padding: 2px 6px;
+  border-radius: 4px;
 }
 
 .navigation {
   display: flex;
   justify-content: center;
-  gap: 16px;
+  gap: 20px;
+  margin-top: 20px;
 }
 
 .btn-primary,
 .btn-secondary {
-  padding: 16px 48px;
+  padding: 18px 56px;
   border: none;
-  border-radius: 12px;
-  font-size: 16px;
-  font-weight: 600;
+  border-radius: 16px;
+  font-size: 17px;
+  font-weight: 700;
   cursor: pointer;
-  transition: all 0.3s;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  min-width: 160px;
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, #00f3ff 0%, #00d4e0 100%);
-  color: #000;
+  background: linear-gradient(135deg, #ff6b6b 0%, #ffa500 100%);
+  color: #ffffff;
+  box-shadow: 0 6px 20px rgba(255, 107, 107, 0.3);
 }
 
 .btn-primary:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(0, 243, 255, 0.3);
+  transform: translateY(-3px);
+  box-shadow: 0 10px 32px rgba(255, 107, 107, 0.4);
 }
 
 .btn-primary:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+  transform: none;
 }
 
 .btn-secondary {
-  background: rgba(255, 255, 255, 0.1);
-  color: #fff;
-  border: 2px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.95);
+  color: #ff6b6b;
+  border: 2px solid rgba(255, 107, 107, 0.3);
+  box-shadow: 0 4px 16px rgba(255, 107, 107, 0.1);
 }
 
 .btn-secondary:hover {
-  background: rgba(255, 255, 255, 0.15);
+  background: #ffffff;
+  border-color: #ff6b6b;
+  transform: translateY(-3px);
+  box-shadow: 0 8px 24px rgba(255, 107, 107, 0.2);
+}
+
+@media (max-width: 768px) {
+  .pattern-editor {
+    padding: 24px 0 60px;
+  }
+  
+  .page-title {
+    font-size: 36px;
+    margin-bottom: 32px;
+  }
+  
+  .steps-indicator {
+    gap: 20px;
+    margin-bottom: 40px;
+  }
+  
+  .step-number {
+    width: 40px;
+    height: 40px;
+  }
+  
+  .step-label {
+    font-size: 12px;
+  }
+  
+  .canvas-wrapper {
+    height: 400px;
+  }
+  
+  .color-grid {
+    grid-template-columns: repeat(auto-fill, minmax(50px, 1fr));
+    gap: 6px;
+  }
+  
+  .color-item {
+    border-width: 2px;
+  }
+  
+  .color-code {
+    font-size: 9px;
+    padding: 1px 4px;
+  }
+  
+  .navigation {
+    flex-direction: column;
+    gap: 12px;
+  }
+  
+  .btn-primary,
+  .btn-secondary {
+    width: 100%;
+    padding: 16px 32px;
+  }
 }
 </style>
