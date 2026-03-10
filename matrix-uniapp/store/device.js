@@ -1,5 +1,6 @@
-// 设备连接状态管理
+// 设备连接状态管理 - 使用Mock数据
 import { defineStore } from 'pinia'
+import { MockAPI } from '../data/mock/index.js'
 import WebSocket from '../utils/webSocket.js'
 
 export const useDeviceStore = defineStore('device', {
@@ -7,18 +8,39 @@ export const useDeviceStore = defineStore('device', {
     webSocket: null,
     connected: false,
     deviceIp: '',
-    deviceInfo: null
+    deviceInfo: null,
+    devices: [], // Mock设备列表
+    currentDevice: null, // 当前选中的设备
+    isLoading: false,
+    error: null
   }),
 
   getters: {
     isConnected: (state) => state.connected,
     getDeviceIp: (state) => state.deviceIp,
-    getDeviceInfo: (state) => state.deviceInfo
+    getDeviceInfo: (state) => state.deviceInfo,
+    
+    // 获取已连接的设备
+    connectedDevices: (state) => {
+      return state.devices.filter(device => device.status === 'connected')
+    },
+    
+    // 获取设备统计
+    deviceStats: (state) => {
+      const total = state.devices.length
+      const connected = state.devices.filter(d => d.status === 'connected').length
+      const disconnected = state.devices.filter(d => d.status === 'disconnected').length
+      const lowBattery = state.devices.filter(d => d.battery < 20).length
+      
+      return { total, connected, disconnected, lowBattery }
+    }
   },
 
   actions: {
-    // 初始化 WebSocket（单例模式）
-    init() {
+    // 初始化
+    async init() {
+      await this.loadDevices()
+      
       if (!this.webSocket) {
         this.webSocket = new WebSocket()
         this.setupCallbacks()
@@ -30,24 +52,90 @@ export const useDeviceStore = defineStore('device', {
         this.deviceIp = savedIp
       }
     },
+    
+    // 加载设备列表 - 使用Mock数据
+    async loadDevices() {
+      this.isLoading = true
+      this.error = null
+      
+      try {
+        // 从本地存储加载设备状态
+        const localDevices = uni.getStorageSync('devices')
+        if (localDevices) {
+          this.devices = JSON.parse(localDevices)
+        } else {
+          // 使用Mock数据初始化
+          this.devices = MockAPI.devices.getAll()
+          this.saveDevicesToStorage()
+        }
+      } catch (e) {
+        console.error('加载设备失败:', e)
+        this.error = '加载设备失败'
+        // 使用Mock数据作为备选
+        this.devices = MockAPI.devices.getAll()
+      } finally {
+        this.isLoading = false
+      }
+    },
+    
+    // 保存设备到本地存储
+    saveDevicesToStorage() {
+      try {
+        uni.setStorageSync('devices', JSON.stringify(this.devices))
+      } catch (e) {
+        console.error('保存设备失败:', e)
+      }
+    },
+    
+    // 获取设备列表
+    getDevices() {
+      return this.devices
+    },
+    
+    // 根据ID获取设备
+    getDeviceById(id) {
+      return this.devices.find(device => device.id === id)
+    },
+    
+    // 更新设备状态
+    updateDeviceStatus(deviceId, status, additionalData = {}) {
+      const deviceIndex = this.devices.findIndex(d => d.id === deviceId)
+      if (deviceIndex !== -1) {
+        this.devices[deviceIndex] = {
+          ...this.devices[deviceIndex],
+          status,
+          lastConnected: status === 'connected' ? new Date().toLocaleString() : this.devices[deviceIndex].lastConnected,
+          ...additionalData
+        }
+        this.saveDevicesToStorage()
+      }
+    },
 
     // 设置 WebSocket 回调
     setupCallbacks() {
       this.webSocket.onConnect(() => {
         this.connected = true
+        // 更新当前设备状态
+        if (this.currentDevice) {
+          this.updateDeviceStatus(this.currentDevice.id, 'connected')
+        }
       })
       
       this.webSocket.onDisconnect(() => {
         this.connected = false
         this.deviceInfo = null
-        // 注意：ESP32 断开连接后会自动回到闹钟模式
-        // 各页面重连后需要根据需要重新设置模式
+        // 更新当前设备状态
+        if (this.currentDevice) {
+          this.updateDeviceStatus(this.currentDevice.id, 'disconnected')
+        }
       })
       
       this.webSocket.onError((err) => {
         this.connected = false
         this.deviceInfo = null
-        // 注意：ESP32 断开连接后会自动回到闹钟模式
+        if (this.currentDevice) {
+          this.updateDeviceStatus(this.currentDevice.id, 'disconnected')
+        }
       })
       
       this.webSocket.onMessage((data) => {
@@ -57,10 +145,40 @@ export const useDeviceStore = defineStore('device', {
       })
     },
 
-    // 连接设备
-    async connect(ip) {
+    // 连接设备 - 支持Mock设备
+    async connect(deviceIdOrIp) {
       if (!this.webSocket) {
         this.init()
+      }
+      
+      let device = null
+      let ip = deviceIdOrIp
+      
+      // 如果传入的是设备ID，获取设备信息
+      if (typeof deviceIdOrIp === 'number') {
+        device = this.getDeviceById(deviceIdOrIp)
+        if (device) {
+          // 模拟从设备获取IP地址
+          ip = `192.168.1.${100 + device.id}`
+          this.currentDevice = device
+          
+          // 更新设备状态为连接中
+          this.updateDeviceStatus(device.id, 'connecting')
+          
+          // 模拟连接过程
+          setTimeout(() => {
+            this.connected = true
+            this.deviceIp = ip
+            this.updateDeviceStatus(device.id, 'connected', {
+              lastConnected: new Date().toLocaleString()
+            })
+            uni.setStorageSync('device_ip', ip)
+          }, 2000)
+          
+          return { success: true, message: '正在连接设备...' }
+        } else {
+          return { success: false, error: '设备不存在' }
+        }
       }
       
       // 如果已经连接到同一个 IP，直接返回
@@ -84,17 +202,29 @@ export const useDeviceStore = defineStore('device', {
         return { success: true }
       } catch (err) {
         console.error('连接失败:', err)
+        if (device) {
+          this.updateDeviceStatus(device.id, 'disconnected')
+        }
         return { success: false, error: err }
       }
     },
 
     // 断开连接
-    disconnect() {
+    disconnect(deviceId = null) {
       if (this.webSocket) {
         this.webSocket.disconnect()
       }
       this.connected = false
       this.deviceInfo = null
+      
+      // 更新设备状态
+      if (deviceId) {
+        this.updateDeviceStatus(deviceId, 'disconnected')
+      } else if (this.currentDevice) {
+        this.updateDeviceStatus(this.currentDevice.id, 'disconnected')
+      }
+      
+      this.currentDevice = null
     },
 
     // 发送图片数据到设备（画板模式）
@@ -130,9 +260,15 @@ export const useDeviceStore = defineStore('device', {
     },
 
     // 设置亮度
-    async setBrightness(value) {
+    async setBrightness(value, deviceId = null) {
+      // 更新Mock设备的亮度
+      if (deviceId) {
+        this.updateDeviceStatus(deviceId, null, { brightness: value })
+      }
+      
       if (!this.connected || !this.webSocket) {
-        throw new Error('设备未连接')
+        // 如果设备未连接，只更新本地状态
+        return { success: true, message: '亮度设置已保存' }
       }
       
       try {
@@ -165,6 +301,41 @@ export const useDeviceStore = defineStore('device', {
         this.init()
       }
       return this.webSocket
+    },
+    
+    // 添加新设备
+    addDevice(deviceInfo) {
+      const newDevice = {
+        id: Date.now(),
+        name: deviceInfo.name || '新设备',
+        type: deviceInfo.type || '52x52',
+        icon: 'electronics',
+        status: 'disconnected',
+        battery: 100,
+        brightness: 80,
+        lastConnected: null,
+        macAddress: deviceInfo.macAddress || 'AA:BB:CC:DD:EE:XX',
+        firmwareVersion: 'v2.1.0',
+        connectionType: deviceInfo.connectionType || 'bluetooth',
+        signalStrength: 0,
+        temperature: 25,
+        workingHours: 0
+      }
+      
+      this.devices.push(newDevice)
+      this.saveDevicesToStorage()
+      return newDevice
+    },
+    
+    // 删除设备
+    removeDevice(deviceId) {
+      this.devices = this.devices.filter(d => d.id !== deviceId)
+      this.saveDevicesToStorage()
+      
+      // 如果删除的是当前设备，断开连接
+      if (this.currentDevice && this.currentDevice.id === deviceId) {
+        this.disconnect()
+      }
     }
   }
 })

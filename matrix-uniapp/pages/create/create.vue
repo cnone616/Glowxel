@@ -1,5 +1,5 @@
 <template>
-  <view class="create-page" :class="{ 'light-theme': themeStore && !themeStore.isDarkMode }">
+  <view class="create-page">
     <!-- 状态栏占位 -->
     <!-- #ifdef MP-WEIXIN -->
     <view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
@@ -11,19 +11,72 @@
     
     <!-- 顶部栏 -->
     <view class="header">
-      <view class="back-btn" @click="handleBack">
+      <text class="header-title">{{ showWizard ? '新建画布' : '创作中心' }}</text>
+      <view v-if="showWizard" class="back-btn" @click="handleBack">
         <text class="back-icon">‹</text>
       </view>
-      <text class="header-title">新建画布</text>
     </view>
     
-    <!-- 内容区域 -->
-    <!-- 步骤 0: 名称 -->
-    <scroll-view 
-      v-if="step === 0"
-      scroll-y 
-      class="content-area"
-    >
+    <!-- 主要内容 -->
+    <scroll-view v-if="!showWizard" scroll-y class="main-content">
+      <!-- 快速开始 -->
+      <view class="quick-actions">
+        <text class="section-title">快速开始</text>
+        <view class="action-grid">
+          <view class="action-card" @click="startBlankCanvas">
+            <view class="action-icon">
+              <Icon name="add" :size="48" color="#4F7FFF" />
+            </view>
+            <text class="action-title">新建画布</text>
+            <text class="action-subtitle">从空白开始创作</text>
+          </view>
+          
+          <view class="action-card" @click="startImageImport">
+            <view class="action-icon">
+              <Icon name="upload" :size="48" color="#2ECC71" />
+            </view>
+            <text class="action-title">导入图片</text>
+            <text class="action-subtitle">转换为像素画</text>
+          </view>
+        </view>
+      </view>
+      
+      <!-- 我的画布 -->
+      <view class="my-projects">
+        <view class="section-header">
+          <text class="section-title">我的画布</text>
+          <text class="project-count">{{ filteredProjects.length }} 个</text>
+        </view>
+        
+        <view v-if="filteredProjects.length === 0" class="empty-state">
+          <view class="empty-icon">
+            <Icon name="picture" :size="80" color="#AAAAAA" />
+          </view>
+          <text class="empty-title">还没有画布</text>
+          <text class="empty-subtitle">开始您的第一个创作吧！</text>
+          <view class="empty-btn" @click="startBlankCanvas">
+            <text class="empty-btn-text">立即创建</text>
+          </view>
+        </view>
+        
+        <view v-else class="projects-grid">
+          <ProjectCard 
+            v-for="project in filteredProjects" 
+            :key="project.id"
+            :project="project"
+          />
+        </view>
+      </view>
+    </scroll-view>
+    
+    <!-- 创建向导 -->
+    <view v-if="showWizard" class="wizard-container">
+      <!-- 步骤 0: 名称 -->
+      <scroll-view 
+        v-if="step === 0"
+        scroll-y 
+        class="content-area"
+      >
         <view 
           class="step-content step-name"
           :class="stepAnimationClass"
@@ -53,143 +106,133 @@
         </view>
       </scroll-view>
       
-      <!-- 步骤 1: 模式和尺寸 -->
-      <view 
-        v-if="step === 1" 
-        class="step-1-wrapper"
+      <!-- 步骤 1: 图片上传（仅导入图片模式） -->
+      <scroll-view 
+        v-if="step === 1 && mode === 'image'"
+        scroll-y 
+        class="content-area"
       >
-        <!-- 模式选择 - 固定在顶部 -->
-        <view class="mode-selector-fixed">
-          <view class="mode-selector">
-            <view 
-              class="mode-btn"
-              :class="{ 'active': mode === 'blank' }"
-              @click="mode = 'blank'"
-            >
-              <text class="mode-text">空白画布</text>
-            </view>
-            <view 
-              class="mode-btn"
-              :class="{ 'active': mode === 'image' }"
-              @click="mode = 'image'"
-            >
-              <text class="mode-text">导入图片</text>
-            </view>
-          </view>
-        </view>
-        
-        <!-- 可滚动内容区域 -->
-        <scroll-view scroll-y class="content-area step-1-scroll">
-          <view 
-            class="step-content step-size"
-            :class="stepAnimationClass"
-          >
-        <!-- 图片上传（仅图片模式） -->
-        <view v-if="mode === 'image'" class="image-upload">
-          <view v-if="!previewUrl" class="upload-area" @click="chooseImage">
-            <view class="upload-icon-wrapper">
-              <Icon name="upload" :size="64" />
-            </view>
-            <text class="upload-text">点击上传图片</text>
-            <text class="upload-hint">支持 JPG, PNG</text>
-          </view>
-          
-          <view v-else class="preview-area">
-            <image :src="previewUrl" mode="aspectFit" class="preview-image" />
-            <view class="preview-actions">
-              <view class="preview-btn" @click="chooseImage">
-                <text class="preview-btn-text">更换图片</text>
+        <view 
+          class="step-content step-image"
+          :class="stepAnimationClass"
+        >
+          <!-- 图片上传 -->
+          <view class="image-upload">
+            <view v-if="!previewUrl" class="upload-area" @click="chooseImage">
+              <view class="upload-icon-wrapper">
+                <Icon name="upload" :size="64" />
               </view>
-              <view class="preview-btn danger" @click="clearImage">
-                <Icon name="close" :size="28" />
-              </view>
-            </view>
-          </view>
-        </view>
-        
-        <!-- 尺寸选择 -->
-        <view class="size-section">
-          <view class="size-header">
-            <Icon name="3column" :size="32" />
-            <text class="size-title">{{ mode === 'image' ? '目标尺寸 (像素化)' : '画布尺寸' }}</text>
-          </view>
-          
-          <view class="size-grid">
-            <!-- 自定义尺寸输入 -->
-            <view class="size-column full-width">
-              <view class="size-column-header">
-                <text class="size-label">自定义尺寸</text>
-                <view v-if="customWidth > 0 && customHeight > 0" class="size-preview-inline">
-                  <text class="size-preview-value">{{ customWidth }}×{{ customHeight }}</text>
-                </view>
-                <text v-else class="size-hint">最大520×520像素</text>
-              </view>
-              
-              <view class="custom-size-inputs">
-                <view class="size-input-group">
-                  <text class="size-input-label">宽度</text>
-                  <input 
-                    v-model.number="customWidth"
-                    type="number"
-                    class="size-input"
-                    placeholder="例如: 30"
-                    @input="handleSizeInput"
-                  />
-                </view>
-                <text class="size-separator">×</text>
-                <view class="size-input-group">
-                  <text class="size-input-label">高度</text>
-                  <input 
-                    v-model.number="customHeight"
-                    type="number"
-                    class="size-input"
-                    placeholder="例如: 20"
-                    @input="handleSizeInput"
-                  />
-                </view>
-              </view>
+              <text class="upload-text">点击上传图片</text>
+              <text class="upload-hint">支持 JPG, PNG</text>
             </view>
             
-            <!-- 快捷尺寸选择 -->
-            <view class="size-column full-width">
-              <view class="size-column-header">
-                <text class="size-label">快捷尺寸 (正方形)</text>
-                <text class="size-hint">52的倍数标准尺寸</text>
-              </view>
-              
-              <view class="size-options">
-                <view 
-                  v-for="preset in sizePresets"
-                  :key="`preset-${preset.width}-${preset.height}`"
-                  class="size-option"
-                  :class="{ 'active': customWidth === preset.width && customHeight === preset.height }"
-                  @click="selectPresetSize(preset.width, preset.height)"
-                >
-                  <text class="size-option-text">{{ preset.width }}×{{ preset.height }}</text>
+            <view v-else class="preview-area">
+              <image :src="previewUrl" mode="aspectFit" class="preview-image" />
+              <view class="preview-actions">
+                <view class="preview-btn" @click="chooseImage">
+                  <text class="preview-btn-text">更换图片</text>
+                </view>
+                <view class="preview-btn danger" @click="clearImage">
+                  <Icon name="close" :size="28" />
                 </view>
               </view>
             </view>
           </view>
         </view>
-        
-        <!-- 统计信息 -->
-        <view v-if="customWidth > 0 && customHeight > 0" class="stats-card">
-          <view class="stat-row">
-            <text class="stat-label">板子布局</text>
-            <text class="stat-value">{{ boardsX }}×{{ boardsY }} ({{ totalBoards }}块)</text>
+      </scroll-view>
+      
+      <!-- 步骤 1: 尺寸选择（仅新建画布模式） 或 步骤 2: 尺寸选择（导入图片模式） -->
+      <scroll-view 
+        v-if="(step === 1 && mode === 'blank') || (step === 2 && mode === 'image')"
+        scroll-y 
+        class="content-area"
+      >
+        <view 
+          class="step-content step-size"
+          :class="stepAnimationClass"
+        >
+          <!-- 尺寸选择 -->
+          <view class="size-section">
+            <view class="size-header">
+              <Icon name="3column" :size="32" />
+              <text class="size-title">{{ mode === 'image' ? '目标尺寸 (像素化)' : '画布尺寸' }}</text>
+            </view>
+            
+            <view class="size-grid">
+              <!-- 自定义尺寸输入 -->
+              <view class="size-column full-width">
+                <view class="size-column-header">
+                  <text class="size-label">自定义尺寸</text>
+                  <view v-if="customWidth > 0 && customHeight > 0" class="size-preview-inline">
+                    <text class="size-preview-value">{{ customWidth }}×{{ customHeight }}</text>
+                  </view>
+                  <text v-else class="size-hint">最大520×520像素</text>
+                </view>
+                
+                <view class="custom-size-inputs">
+                  <view class="size-input-group">
+                    <text class="size-input-label">宽度</text>
+                    <input 
+                      v-model.number="customWidth"
+                      type="number"
+                      class="size-input"
+                      placeholder="例如: 30"
+                      @input="handleSizeInput"
+                    />
+                  </view>
+                  <text class="size-separator">×</text>
+                  <view class="size-input-group">
+                    <text class="size-input-label">高度</text>
+                    <input 
+                      v-model.number="customHeight"
+                      type="number"
+                      class="size-input"
+                      placeholder="例如: 20"
+                      @input="handleSizeInput"
+                    />
+                  </view>
+                </view>
+              </view>
+              
+              <!-- 快捷尺寸选择 -->
+              <view class="size-column full-width">
+                <view class="size-column-header">
+                  <text class="size-label">快捷尺寸 (正方形)</text>
+                  <text class="size-hint">52的倍数标准尺寸</text>
+                </view>
+                
+                <view class="size-options">
+                  <view 
+                    v-for="preset in sizePresets"
+                    :key="`preset-${preset.width}-${preset.height}`"
+                    class="size-option"
+                    :class="{ 'active': customWidth === preset.width && customHeight === preset.height }"
+                    @click="selectPresetSize(preset.width, preset.height)"
+                  >
+                    <text class="size-option-text">{{ preset.width }}×{{ preset.height }}</text>
+                  </view>
+                </view>
+              </view>
+            </view>
           </view>
-          <view class="stat-row">
-            <text class="stat-label">总像素数</text>
-            <text class="stat-value">{{ (customWidth * customHeight).toLocaleString() }}</text>
+          
+          <!-- 统计信息 -->
+          <view v-if="customWidth > 0 && customHeight > 0" class="stats-card">
+            <view class="stat-row">
+              <text class="stat-label">板子布局</text>
+              <text class="stat-value">{{ boardsX }}×{{ boardsY }} ({{ totalBoards }}块)</text>
+            </view>
+            <view class="stat-row">
+              <text class="stat-label">总像素数</text>
+              <text class="stat-value">{{ (customWidth * customHeight).toLocaleString() }}</text>
+            </view>
           </view>
         </view>
-          </view>
-        </scroll-view>
-      </view>
+      </scroll-view>
       
-      <!-- 步骤 2: 颜色 -->
+      <!-- 步骤 2: 颜色选择（新建画布模式） 或 步骤 3: 颜色选择（导入图片模式） -->
       <scroll-view 
-        v-if="step === 2"
+        v-if="(step === 2 && mode === 'blank') || (step === 3 && mode === 'image')"
         scroll-y 
         class="content-area"
       >
@@ -225,9 +268,9 @@
       </view>
     </scroll-view>
     
-    <!-- 步骤 3: 预览确认 (仅图片模式) -->
+    <!-- 步骤 4: 预览确认 (仅图片模式) -->
     <scroll-view 
-      v-if="step === 3"
+      v-if="step === 4 && mode === 'image'"
       scroll-y 
       class="content-area"
     >
@@ -307,9 +350,10 @@
         </view>
       </view>
     </scroll-view>
+    </view>
     
     <!-- 底部按钮 -->
-    <view class="footer">
+    <view v-if="showWizard" class="footer">
       <view 
         class="next-btn"
         :class="{ 'disabled': !canProceed || isProcessing }"
@@ -370,11 +414,13 @@
       cancelText="取消"
       @confirm="goToLogin"
     />
+    
+    <!-- 自定义底部导航栏 -->
+    <CustomTabBar v-if="!showWizard" />
   </view>
 </template>
 
 <script>
-import { useThemeStore } from '../../store/theme.js'
 import { useUserStore } from '../../store/user.js'
 import { useProjectStore } from '../../store/project.js'
 import { useToast } from '../../composables/useToast.js'
@@ -383,19 +429,24 @@ import statusBarMixin from '../../mixins/statusBar.js'
 import Icon from '../../components/Icon.vue'
 import Toast from '../../components/Toast.vue'
 import ConfirmModal from '../../components/ConfirmModal.vue'
+import CustomTabBar from '../../components/CustomTabBar.vue'
+import ProjectCard from '../../components/ProjectCard.vue'
 
 export default {
   mixins: [statusBarMixin],
   components: {
     Icon,
     Toast,
-    ConfirmModal
+    ConfirmModal,
+    CustomTabBar,
+    ProjectCard
   },
   data() {
     return {
-      themeStore: null,
       projectStore: null,
       toast: null,
+      
+      showWizard: false, // 控制是否显示创建向导
       
       name: '',
       customWidth: 52,
@@ -457,30 +508,69 @@ export default {
       return this.boardsX * this.boardsY
     },
     
+    // 过滤后的项目列表
+    filteredProjects() {
+      if (!this.projectStore || !this.projectStore.projects) {
+        return []
+      }
+      return this.projectStore.projects
+    },
+    
     canProceed() {
       if (this.step === 0) return this.name.trim().length > 0
       if (this.step === 1) {
-        if (this.mode === 'image' && !this.imageFile) return false
-        // 检查尺寸是否有效且不超过最大限制
-        return this.customWidth > 0 && 
-               this.customHeight > 0 && 
-               this.paddedWidth <= 520 && 
-               this.paddedHeight <= 520
+        if (this.mode === 'image') {
+          // 图片模式第1步：需要上传图片
+          return this.imageFile !== null
+        } else {
+          // 空白画布第1步：需要设置尺寸
+          return this.customWidth > 0 && 
+                 this.customHeight > 0 && 
+                 this.paddedWidth <= 520 && 
+                 this.paddedHeight <= 520
+        }
       }
-      if (this.step === 2) return true
-      if (this.step === 3) return true // 预览步骤
+      if (this.step === 2) {
+        if (this.mode === 'image') {
+          // 图片模式第2步：需要设置尺寸
+          return this.customWidth > 0 && 
+                 this.customHeight > 0 && 
+                 this.paddedWidth <= 520 && 
+                 this.paddedHeight <= 520
+        } else {
+          // 空白画布第2步：颜色选择，总是可以进行
+          return true
+        }
+      }
+      if (this.step === 3) return true // 图片模式的颜色选择
+      if (this.step === 4) return true // 图片模式的预览步骤
       return true
     },
     
     buttonText() {
       if (this.step === 0) return '下一步'
-      if (this.step === 1) return '选择颜色'
-      if (this.step === 2 && this.mode === 'image') {
-        if (this.isProcessing) return '正在生成中...'
-        return '生成预览'
+      if (this.step === 1) {
+        if (this.mode === 'image') {
+          return '选择尺寸'
+        } else {
+          return '选择颜色'
+        }
       }
-      if (this.step === 2) return '创建画布'
+      if (this.step === 2) {
+        if (this.mode === 'image') {
+          return '选择颜色'
+        } else {
+          // 空白画布直接创建
+          return '创建画布'
+        }
+      }
       if (this.step === 3) {
+        if (this.mode === 'image') {
+          if (this.isProcessing) return '正在生成中...'
+          return '生成预览'
+        }
+      }
+      if (this.step === 4) {
         if (this.isProcessing) return '生成中...'
         return '确认创建'
       }
@@ -488,7 +578,7 @@ export default {
     }
   },
   
-  onLoad() {
+  onLoad(options) {
     // 检查登录状态
     const userStore = useUserStore()
     if (!userStore.hasLogin) {
@@ -496,9 +586,16 @@ export default {
       return
     }
     
-    this.themeStore = useThemeStore()
     this.projectStore = useProjectStore()
     this.toast = useToast()
+    
+    // 检查是否直接进入向导模式
+    if (options && options.mode === 'image') {
+      this.showWizard = true
+      this.mode = 'image'
+    } else if (options && options.wizard === 'true') {
+      this.showWizard = true
+    }
     
     // 注册自定义 Toast 实例
     this.$nextTick(() => {
@@ -506,16 +603,44 @@ export default {
         this.toast.setToastInstance(this.$refs.toastRef)
       }
     })
-    
-    // 立即应用主题，避免闪烁
-    this.themeStore.applyTheme()
   },
   
   onShow() {
-    this.themeStore.applyTheme()
+    // 页面显示时的处理
   },
   
   methods: {
+    // 新增：快速开始方法
+    startBlankCanvas() {
+      this.showWizard = true
+      this.mode = 'blank'
+      this.step = 0
+      this.resetForm()
+    },
+    
+    startImageImport() {
+      this.showWizard = true
+      this.mode = 'image'
+      this.step = 0
+      this.resetForm()
+    },
+    
+    resetForm() {
+      this.name = ''
+      this.customWidth = 52
+      this.customHeight = 52
+      this.selectedPreset = 'set24'
+      this.selectedColors = new Set(ARTKAL_OFFICIAL_SETS.set24.colors)
+      this.imageFile = null
+      this.previewUrl = null
+      this.previewPixels = null
+      this.previewImageUrl = ''
+      this.usedColors = []
+      this.isProcessing = false
+      this.stepAnimationClass = 'step-enter'
+      this.isNameFocused = false
+    },
+    
     // 前往登录
     goToLogin() {
       uni.reLaunch({
@@ -580,10 +705,10 @@ export default {
       }
       
       if (this.step === 0) {
-        uni.reLaunch({
-          url: '/pages/library/library'
-        })
+        // 在向导第一步，返回到主界面
+        this.showWizard = false
       } else {
+        // 在向导其他步骤，返回上一步
         this.stepAnimationClass = 'step-exit-reverse'
         setTimeout(() => {
           this.step--
@@ -968,7 +1093,7 @@ export default {
       this.isProcessing = false
       this.stepAnimationClass = 'step-exit'
       setTimeout(() => {
-        this.step = 3
+        this.step = 4  // 图片模式的预览是第4步
         this.stepAnimationClass = 'step-enter'
       }, 150)
     },
@@ -1008,7 +1133,7 @@ export default {
             canvas.height = containerHeight
             
             // 清空背景
-            ctx.fillStyle = (this.themeStore && this.themeStore.isDarkMode) ? '#1a1a1a' : '#f5f5f5'
+            ctx.fillStyle = '#f5f5f5'
             ctx.fillRect(0, 0, containerWidth, containerHeight)
             
             // 使用最大边作为正方形基准
@@ -1101,23 +1226,33 @@ export default {
     handleNext() {
       if (!this.canProceed || this.isProcessing) return
       
-      if (this.step < 2) {
-        this.stepAnimationClass = 'step-exit'
-        setTimeout(() => {
-          this.step++
-          this.stepAnimationClass = 'step-enter'
-        }, 150)
-      } else if (this.step === 2) {
-        // 如果是图片模式，进入预览步骤
-        if (this.mode === 'image') {
-          this.generatePreview()
-        } else {
+      if (this.mode === 'blank') {
+        // 空白画布流程：名称(0) → 尺寸(1) → 颜色(2) → 创建
+        if (this.step === 0 || this.step === 1) {
+          this.stepAnimationClass = 'step-exit'
+          setTimeout(() => {
+            this.step++
+            this.stepAnimationClass = 'step-enter'
+          }, 150)
+        } else if (this.step === 2) {
           // 空白画布直接创建
           this.handleCreate()
         }
-      } else if (this.step === 3) {
-        // 预览步骤，确认创建
-        this.handleCreate()
+      } else if (this.mode === 'image') {
+        // 图片导入流程：名称(0) → 图片(1) → 尺寸(2) → 颜色(3) → 预览(4) → 创建
+        if (this.step === 0 || this.step === 1 || this.step === 2) {
+          this.stepAnimationClass = 'step-exit'
+          setTimeout(() => {
+            this.step++
+            this.stepAnimationClass = 'step-enter'
+          }, 150)
+        } else if (this.step === 3) {
+          // 生成预览
+          this.generatePreview()
+        } else if (this.step === 4) {
+          // 确认创建
+          this.handleCreate()
+        }
       }
     },
     
@@ -1172,9 +1307,9 @@ export default {
             this.toast.showSuccess('画布创建成功！')
             this.isProcessing = false
             
-            uni.reLaunch({
-              url: '/pages/library/library'
-            })
+            // 回到创作中心主界面
+            this.showWizard = false
+            this.resetForm()
           })
         } catch (error) {
           console.error('保存失败:', error)
@@ -1198,9 +1333,9 @@ export default {
         // 空白画布生成一个空缩略图，完成后再跳转
         this.saveThumbnailForProject(projectId, new Map(), () => {
           this.toast.showSuccess('画布创建成功！')
-          uni.reLaunch({
-            url: '/pages/library/library'
-          })
+          // 回到创作中心主界面
+          this.showWizard = false
+          this.resetForm()
         })
       }
     },
@@ -1329,13 +1464,172 @@ export default {
   height: 100vh;
   display: flex;
   flex-direction: column;
-  background-color: var(--bg-secondary);
+  background-color: var(--color-app-background);
   position: relative;
   overflow: hidden;
   user-select: none;
   -webkit-user-drag: none;
   -webkit-touch-callout: none;
   box-sizing: border-box;
+}
+
+/* 主要内容 */
+.main-content {
+  flex: 1;
+  overflow-y: auto;
+  padding-bottom: 200rpx; /* 增加底部间距，确保不被导航栏遮挡 */
+}
+
+/* 创建向导容器 */
+.wizard-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding-bottom: 0; /* 确保为底部按钮留出空间 */
+}
+
+/* 通用区块样式 */
+.section-title {
+  font-size: 36rpx;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  margin-bottom: 24rpx;
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24rpx;
+}
+
+.project-count {
+  font-size: 24rpx;
+  color: var(--color-text-secondary);
+  font-weight: 500;
+}
+
+/* 快速操作 */
+.quick-actions {
+  margin: 32rpx;
+  margin-bottom: 48rpx;
+}
+
+.action-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 24rpx;
+}
+
+.action-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 24rpx;
+}
+
+.action-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 32rpx 16rpx;
+  background-color: var(--color-card-background);
+  border-radius: var(--radius-medium);
+  box-shadow: var(--shadow-card);
+  transition: all 0.2s ease;
+}
+
+.action-card:active {
+  transform: scale(0.95);
+  box-shadow: var(--shadow-floating);
+}
+
+.action-icon {
+  width: 96rpx;
+  height: 96rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--color-app-background);
+  border-radius: var(--radius-medium);
+  margin-bottom: 16rpx;
+}
+
+.action-title {
+  font-size: 26rpx;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin-bottom: 8rpx;
+  text-align: center;
+}
+
+.action-subtitle {
+  font-size: 22rpx;
+  color: var(--color-text-secondary);
+  text-align: center;
+  line-height: 1.4;
+}
+
+/* 我的画布 */
+.my-projects {
+  margin: 0 32rpx 48rpx;
+}
+
+.projects-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 24rpx;
+}
+
+/* 空状态 */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 64rpx 32rpx;
+  text-align: center;
+}
+
+.empty-icon {
+  width: 160rpx;
+  height: 160rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--color-app-background);
+  border-radius: 50%;
+  margin-bottom: 32rpx;
+}
+
+.empty-title {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin-bottom: 12rpx;
+}
+
+.empty-subtitle {
+  font-size: 26rpx;
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+  margin-bottom: 32rpx;
+}
+
+.empty-btn {
+  padding: 20rpx 40rpx;
+  background-color: var(--color-brand-primary);
+  border-radius: var(--radius-small);
+  transition: all 0.2s ease;
+}
+
+.empty-btn:active {
+  transform: scale(0.95);
+}
+
+.empty-btn-text {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #FFFFFF;
 }
 
 /* 背景装饰 */
@@ -1350,7 +1644,7 @@ export default {
 
 /* 状态栏占位 */
 .status-bar {
-  background-color: var(--bg-secondary);
+  background-color: var(--color-app-background);
   flex-shrink: 0;
 }
 
@@ -1359,7 +1653,7 @@ export default {
   right: 0;
   width: 400rpx;
   height: 400rpx;
-  background-color: var(--accent-primary);
+  background-color: var(--color-brand-primary);
 }
 
 .bg-decoration-2 {
@@ -1367,12 +1661,14 @@ export default {
   left: 0;
   width: 400rpx;
   height: 400rpx;
-  background-color: var(--accent-secondary);
+  background-color: var(--color-brand-accent);
 }
 
 .header {
   display: flex;
   align-items: center;
+  justify-content: center;
+  position: relative;
   padding: 32rpx;
   z-index: 10;
   flex-shrink: 0;
@@ -1387,25 +1683,26 @@ export default {
 /* #endif */
 
 .back-btn {
+  position: absolute;
+  left: 32rpx;
   width: 64rpx;
   height: 64rpx;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  margin-right: 32rpx;
 }
 
 .back-icon {
   font-size: 64rpx;
-  color: var(--text-primary);
+  color: var(--color-text-primary);
   line-height: 1;
 }
 
 .header-title {
   font-size: 40rpx;
   font-weight: 300;
-  color: var(--text-primary);
+  color: var(--color-text-primary);
 }
 
 .content-area {
@@ -1414,6 +1711,7 @@ export default {
   overflow-y: auto;
   z-index: 10;
   box-sizing: border-box;
+  margin-bottom: 0; /* 确保不与底部按钮重叠 */
 }
 
 /* 步骤1特殊布局 */
@@ -2154,16 +2452,18 @@ export default {
 /* 底部按钮 */
 .footer {
   position: relative;
-  padding: 24rpx;
-  padding-bottom: 24rpx;
+  padding: 24rpx 32rpx;
+  padding-bottom: 48rpx; /* 增加底部安全距离 */
   z-index: 20;
   box-sizing: border-box;
+  flex-shrink: 0;
+  background-color: var(--color-app-background);
 }
 
 /* 小程序底部安全区域 */
 /* #ifdef MP-WEIXIN */
 .footer {
-  padding-bottom: 48rpx;
+  padding-bottom: 68rpx; /* 小程序需要更多底部空间 */
 }
 /* #endif */
 

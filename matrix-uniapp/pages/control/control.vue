@@ -1,5 +1,5 @@
 <template>
-  <view class="control-page" :class="{ 'light-theme': themeStore && !themeStore.isDarkMode }">
+  <view class="control-page">
     <!-- 状态栏占位 -->
     <!-- #ifdef MP-WEIXIN -->
     <view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
@@ -103,8 +103,8 @@
               @change="handleBrightnessChange"
               min="0"
               max="100"
-              :activeColor="(themeStore && themeStore.isDarkMode) ? '#00f3ff' : '#0099cc'"
-              :backgroundColor="(themeStore && themeStore.isDarkMode) ? '#333333' : '#e0e0e0'"
+              activeColor="#4F7FFF"
+              backgroundColor="#e0e0e0"
               block-size="20"
               class="setting-slider"
             />
@@ -139,11 +139,13 @@
       @confirm="handleJsonImport"
       @error="handleJsonImportError"
     />
+    
+    <!-- 自定义底部导航栏 -->
+    <CustomTabBar />
   </view>
 </template>
 
 <script>
-import { useThemeStore } from '../../store/theme.js'
 import { useDeviceStore } from '../../store/device.js'
 import { useToast } from '../../composables/useToast.js'
 import statusBarMixin from '../../mixins/statusBar.js'
@@ -151,6 +153,7 @@ import Icon from '../../components/Icon.vue'
 import Toast from '../../components/Toast.vue'
 import ConnectModal from '../../components/ConnectModal.vue'
 import JsonImportModal from '../../components/JsonImportModal.vue'
+import CustomTabBar from '../../components/CustomTabBar.vue'
 
 export default {
   mixins: [statusBarMixin],
@@ -158,11 +161,11 @@ export default {
     Icon,
     Toast,
     ConnectModal,
-    JsonImportModal
+    JsonImportModal,
+    CustomTabBar
   },
   data() {
     return {
-      themeStore: null,
       deviceStore: null,
       toast: null,
       
@@ -186,19 +189,8 @@ export default {
   },
 
   onLoad(options) {
-    this.themeStore = useThemeStore()
     this.deviceStore = useDeviceStore()
     this.toast = useToast()
-    
-    // 注册自定义 Toast 实例
-    this.$nextTick(() => {
-      if (this.$refs.toastRef) {
-        this.toast.setToastInstance(this.$refs.toastRef)
-      }
-    })
-    
-    // 立即应用主题，避免闪烁
-    this.themeStore.applyTheme()
     
     // 从缓存读取设备 IP
     const savedIp = uni.getStorageSync('device_ip')
@@ -229,7 +221,6 @@ export default {
   },
 
   onShow() {
-    this.themeStore.applyTheme()
     this.updateConnectionStatus()
   },
 

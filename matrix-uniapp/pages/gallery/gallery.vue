@@ -1,5 +1,5 @@
 <template>
-  <view class="community-page">
+  <view class="gallery-page">
     <!-- 状态栏占位 -->
     <!-- #ifdef MP-WEIXIN -->
     <view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
@@ -8,11 +8,12 @@
     <!-- 顶部导航 -->
     <view class="header">
       <view class="header-content">
-        <text class="header-title">社区</text>
-        <view class="header-actions">
-          <view class="search-btn" @click="toggleSearch">
-            <Icon name="search" :size="40" color="#4F7FFF" />
-          </view>
+        <view class="back-btn" @click="handleBack">
+          <Icon name="arrow-left" :size="40" color="#1F1F1F" />
+        </view>
+        <text class="header-title">{{ pageTitle }}</text>
+        <view class="search-btn" @click="toggleSearch">
+          <Icon name="search" :size="40" color="#4F7FFF" />
         </view>
       </view>
       
@@ -42,7 +43,7 @@
           v-model="searchTerm"
           type="text"
           class="search-input"
-          placeholder="搜索作品、用户、标签..."
+          placeholder="搜索作品、用户..."
           @blur="handleSearchBlur"
           :focus="showSearch"
         />
@@ -61,63 +62,46 @@
       :refresher-triggered="isRefreshing"
       @refresherrefresh="handleRefresh"
     >
-      <!-- 推荐用户（仅推荐分类显示） -->
-      <view v-if="activeCategory === 'recommended'" class="recommended-users">
-        <view class="section-header">
-          <text class="section-title">推荐创作者</text>
-          <view class="more-btn" @click="goToUserList">
-            <text class="more-text">查看更多</text>
-            <Icon name="arrow-right" :size="24" color="#4F7FFF" />
-          </view>
-        </view>
-        
-        <scroll-view scroll-x class="users-scroll">
-          <view class="users-list">
-            <view 
-              v-for="user in recommendedUsers" 
-              :key="user.id"
-              class="user-card"
-              @click="goToUserProfile(user)"
-            >
-              <Avatar 
-                :src="user.avatar" 
-                size="large"
-                :showBadge="user.isOnline"
-                :status="user.isOnline ? 'online' : 'offline'"
-              />
-              <text class="user-name">{{ user.name }}</text>
-              <text class="user-works">{{ user.worksCount }} 作品</text>
-              <view 
-                class="follow-btn"
-                :class="{ 'following': user.isFollowing }"
-                @click.stop="toggleFollow(user)"
-              >
-                <text class="follow-text">{{ user.isFollowing ? '已关注' : '关注' }}</text>
-              </view>
-            </view>
-          </view>
-        </scroll-view>
-      </view>
-      
-      <!-- 作品列表 -->
-      <view class="artworks-section">
-        <view v-if="filteredArtworks.length === 0 && !isLoading" class="empty-state">
+      <!-- 内容列表 -->
+      <view class="content-section">
+        <view v-if="filteredContent.length === 0 && !isLoading" class="empty-state">
           <view class="empty-icon">
             <Icon name="picture" :size="80" color="#AAAAAA" />
           </view>
-          <text class="empty-title">{{ searchTerm ? '未找到相关作品' : '暂无作品' }}</text>
-          <text class="empty-subtitle">{{ searchTerm ? '尝试其他关键词' : '快来发布第一个作品吧！' }}</text>
+          <text class="empty-title">{{ getEmptyTitle() }}</text>
+          <text class="empty-subtitle">{{ getEmptySubtitle() }}</text>
         </view>
         
-        <view v-else class="artworks-grid">
+        <view v-else class="content-grid">
+          <!-- 作品卡片 -->
           <ArtworkCard 
-            v-for="artwork in filteredArtworks" 
+            v-if="pageType === 'artworks'"
+            v-for="artwork in filteredContent" 
             :key="artwork.id"
             :artwork="artwork"
             :liked="likedArtworks.has(artwork.id)"
             @click="handleArtworkClick"
             @like="handleArtworkLike"
             @comment="handleArtworkComment"
+          />
+          
+          <!-- 模板卡片 -->
+          <TemplateCard 
+            v-if="pageType === 'templates'"
+            v-for="template in filteredContent" 
+            :key="template.id"
+            :template="template"
+            @click="handleTemplateClick"
+          />
+          
+          <!-- 挑战卡片 -->
+          <ChallengeCard 
+            v-if="pageType === 'challenges'"
+            v-for="challenge in filteredContent" 
+            :key="challenge.id"
+            :challenge="challenge"
+            @click="handleChallengeClick"
+            @join="handleChallengeJoin"
           />
         </view>
         
@@ -127,18 +111,15 @@
           <text class="loading-text">加载中...</text>
         </view>
         
-        <view v-if="hasMore && !isLoading && filteredArtworks.length > 0" class="load-more-btn" @click="loadMore">
+        <view v-if="hasMore && !isLoading && filteredContent.length > 0" class="load-more-btn" @click="loadMore">
           <text class="load-more-text">加载更多</text>
         </view>
         
-        <view v-if="!hasMore && filteredArtworks.length > 0" class="no-more">
+        <view v-if="!hasMore && filteredContent.length > 0" class="no-more">
           <text class="no-more-text">没有更多了</text>
         </view>
       </view>
     </scroll-view>
-    
-    <!-- 自定义底部导航栏 -->
-    <CustomTabBar />
   </view>
 </template>
 
@@ -146,78 +127,142 @@
 import { MockAPI } from '../../data/mock/index.js'
 import statusBarMixin from '../../mixins/statusBar.js'
 import ArtworkCard from '../../components/ArtworkCard.vue'
-import Avatar from '../../components/Avatar.vue'
+import TemplateCard from '../../components/TemplateCard.vue'
+import ChallengeCard from '../../components/ChallengeCard.vue'
 import Icon from '../../components/Icon.vue'
-import CustomTabBar from '../../components/CustomTabBar.vue'
 
 export default {
   mixins: [statusBarMixin],
   components: {
     ArtworkCard,
-    Avatar,
-    Icon,
-    CustomTabBar
+    TemplateCard,
+    ChallengeCard,
+    Icon
   },
   
   data() {
     return {
+      // 页面参数
+      pageType: 'artworks', // artworks, templates, challenges
+      pageTitle: '推荐作品',
+      
+      // 搜索相关
       searchTerm: '',
       showSearch: false,
-      activeCategory: 'recommended',
+      
+      // 分类相关
+      activeCategory: 'all',
+      categories: [
+        { key: 'all', name: '全部' },
+        { key: 'popular', name: '最热' },
+        { key: 'latest', name: '最新' },
+        { key: 'following', name: '关注' }
+      ],
+      
+      // 数据相关
       artworks: [],
-      recommendedUsers: [],
       likedArtworks: new Set(),
       isLoading: false,
       isRefreshing: false,
       hasMore: true,
       currentPage: 1,
-      pageSize: 10,
-      categories: [
-        { key: 'recommended', name: '推荐' },
-        { key: 'latest', name: '最新' },
-        { key: 'popular', name: '热门' },
-        { key: 'pixel-art', name: '像素画' },
-        { key: 'animation', name: '动画' },
-        { key: 'character', name: '角色' },
-        { key: 'landscape', name: '风景' },
-        { key: 'abstract', name: '抽象' }
-      ]
+      pageSize: 20
     }
   },
   
   computed: {
-    filteredArtworks() {
+    filteredContent() {
       if (!this.searchTerm) {
         return this.artworks
       }
       
       const term = this.searchTerm.toLowerCase()
-      return this.artworks.filter(artwork => 
-        artwork.title.toLowerCase().includes(term) ||
-        artwork.author.name.toLowerCase().includes(term) ||
-        (artwork.tags && artwork.tags.some(tag => tag.toLowerCase().includes(term)))
-      )
+      
+      // 根据页面类型进行不同的搜索
+      if (this.pageType === 'templates') {
+        return this.artworks.filter(template => 
+          template.name.toLowerCase().includes(term) ||
+          template.category.toLowerCase().includes(term) ||
+          (template.tags && template.tags.some(tag => tag.toLowerCase().includes(term)))
+        )
+      } else if (this.pageType === 'challenges') {
+        return this.artworks.filter(challenge => 
+          challenge.title.toLowerCase().includes(term) ||
+          challenge.description.toLowerCase().includes(term) ||
+          (challenge.tags && challenge.tags.some(tag => tag.toLowerCase().includes(term)))
+        )
+      } else {
+        // artworks
+        return this.artworks.filter(artwork => 
+          artwork.title.toLowerCase().includes(term) ||
+          artwork.author.name.toLowerCase().includes(term) ||
+          (artwork.tags && artwork.tags.some(tag => tag.toLowerCase().includes(term)))
+        )
+      }
     }
   },
   
-  onLoad() {
+  onLoad(options) {
+    // 根据传入参数设置页面类型和标题
+    this.pageType = options.type || 'artworks'
+    this.pageTitle = this.getPageTitle(options.title)
+    
+    // 根据页面类型设置分类
+    this.setupCategories()
+    
+    // 加载数据
     this.loadInitialData()
   },
   
-  onShow() {
-    // 刷新数据
-    this.handleRefresh()
-  },
-  
   methods: {
+    getPageTitle(customTitle) {
+      if (customTitle) return decodeURIComponent(customTitle)
+      
+      const titleMap = {
+        artworks: '推荐作品',
+        templates: '官方模板',
+        challenges: '热门挑战',
+        popular: '热门作品',
+        latest: '最新作品'
+      }
+      return titleMap[this.pageType] || '作品展示'
+    },
+    
+    setupCategories() {
+      // 根据页面类型设置不同的分类
+      const categoryMap = {
+        artworks: [
+          { key: 'all', name: '全部' },
+          { key: 'popular', name: '最热' },
+          { key: 'latest', name: '最新' },
+          { key: 'following', name: '关注' }
+        ],
+        templates: [
+          { key: 'all', name: '全部' },
+          { key: 'game', name: '游戏角色' },
+          { key: 'anime', name: '动漫角色' },
+          { key: 'symbol', name: '图案符号' },
+          { key: 'fantasy', name: '奇幻生物' },
+          { key: 'nature', name: '自然植物' },
+          { key: 'scifi', name: '科幻载具' },
+          { key: 'food', name: '美食' },
+          { key: 'building', name: '建筑' }
+        ],
+        challenges: [
+          { key: 'all', name: '全部' },
+          { key: 'active', name: '进行中' },
+          { key: 'upcoming', name: '即将开始' },
+          { key: 'ended', name: '已结束' }
+        ]
+      }
+      
+      this.categories = categoryMap[this.pageType] || categoryMap.artworks
+    },
+    
     async loadInitialData() {
       this.isLoading = true
       
       try {
-        // 加载推荐用户
-        this.recommendedUsers = MockAPI.users.getRecommended().slice(0, 8)
-        
-        // 加载作品
         await this.loadArtworks(true)
       } catch (error) {
         console.error('加载数据失败:', error)
@@ -240,19 +285,16 @@ export default {
       try {
         let newArtworks = []
         
-        switch (this.activeCategory) {
-          case 'recommended':
-            newArtworks = MockAPI.artworks.getPopular()
+        // 根据页面类型和分类获取数据
+        switch (this.pageType) {
+          case 'templates':
+            newArtworks = this.getTemplateData()
             break
-          case 'latest':
-            newArtworks = MockAPI.artworks.getLatest()
-            break
-          case 'popular':
-            newArtworks = MockAPI.artworks.getPopular()
+          case 'challenges':
+            newArtworks = this.getChallengeData()
             break
           default:
-            // 按标签搜索
-            newArtworks = MockAPI.artworks.searchByTag(this.activeCategory)
+            newArtworks = this.getArtworkData()
             break
         }
         
@@ -275,16 +317,64 @@ export default {
       }
     },
     
+    getArtworkData() {
+      switch (this.activeCategory) {
+        case 'popular':
+          return MockAPI.artworks.getPopular()
+        case 'latest':
+          return MockAPI.artworks.getLatest()
+        case 'following':
+          // TODO: 获取关注用户的作品
+          return MockAPI.artworks.getPopular().slice(0, 10)
+        default:
+          return MockAPI.artworks.getAll()
+      }
+    },
+    
+    getTemplateData() {
+      // 分类key到分类名称的映射
+      const categoryNameMap = {
+        'game': '游戏角色',
+        'anime': '动漫角色', 
+        'symbol': '图案符号',
+        'fantasy': '奇幻生物',
+        'nature': '自然植物',
+        'scifi': '科幻载具',
+        'food': '美食',
+        'building': '建筑'
+      }
+      
+      switch (this.activeCategory) {
+        case 'all':
+          return MockAPI.templates.getAll()
+        default:
+          // 根据分类获取模板
+          const categoryName = categoryNameMap[this.activeCategory]
+          if (categoryName) {
+            return MockAPI.templates.getByCategory(categoryName)
+          }
+          return MockAPI.templates.getAll()
+      }
+    },
+    
+    getChallengeData() {
+      switch (this.activeCategory) {
+        case 'active':
+          return MockAPI.challenges.getActive()
+        case 'upcoming':
+          return MockAPI.challenges.getUpcoming()
+        case 'ended':
+          return MockAPI.challenges.getChallengesByStatus('ended')
+        default:
+          return MockAPI.challenges.getAll()
+      }
+    },
+    
     async handleRefresh() {
       this.isRefreshing = true
       
       try {
         await this.loadArtworks(true)
-        
-        // 刷新推荐用户
-        if (this.activeCategory === 'recommended') {
-          this.recommendedUsers = MockAPI.users.getRecommended().slice(0, 8)
-        }
       } catch (error) {
         console.error('刷新失败:', error)
       } finally {
@@ -311,6 +401,10 @@ export default {
       
       this.activeCategory = category
       await this.loadArtworks(true)
+    },
+    
+    handleBack() {
+      uni.navigateBack()
     },
     
     toggleSearch() {
@@ -348,7 +442,6 @@ export default {
         artwork.likes = Math.max(0, (artwork.likes || 0) - 1)
       }
       
-      // TODO: 发送点赞请求到服务器
       console.log('点赞作品:', artwork.id, liked)
     },
     
@@ -360,36 +453,52 @@ export default {
       })
     },
     
-    toggleFollow(user) {
-      user.isFollowing = !user.isFollowing
-      
-      if (user.isFollowing) {
-        user.followersCount = (user.followersCount || 0) + 1
-      } else {
-        user.followersCount = Math.max(0, (user.followersCount || 0) - 1)
+    getEmptyTitle() {
+      if (this.searchTerm) {
+        return '未找到相关内容'
       }
       
-      // TODO: 发送关注请求到服务器
-      console.log('关注用户:', user.id, user.isFollowing)
+      const titleMap = {
+        artworks: '暂无作品',
+        templates: '暂无模板',
+        challenges: '暂无挑战'
+      }
+      return titleMap[this.pageType] || '暂无内容'
+    },
+    
+    getEmptySubtitle() {
+      if (this.searchTerm) {
+        return '尝试其他关键词'
+      }
       
-      uni.showToast({
-        title: user.isFollowing ? '已关注' : '已取消关注',
-        icon: 'success'
-      })
+      const subtitleMap = {
+        artworks: '快来发布第一个作品吧！',
+        templates: '敬请期待更多模板！',
+        challenges: '敬请期待精彩挑战！'
+      }
+      return subtitleMap[this.pageType] || '敬请期待！'
     },
     
-    goToUserProfile(user) {
-      // 跳转到用户详情页
-      uni.navigateTo({
-        url: `/pages/user-detail/user-detail?id=${user.id}`
-      })
-    },
-    
-    goToUserList() {
-      // TODO: 跳转到用户列表页
+    handleTemplateClick(template) {
+      // TODO: 使用模板创建画布
       uni.showToast({
-        title: '用户列表页开发中',
+        title: '模板功能开发中',
         icon: 'none'
+      })
+    },
+    
+    handleChallengeClick(challenge) {
+      // TODO: 跳转到挑战详情页
+      uni.showToast({
+        title: '挑战详情页开发中',
+        icon: 'none'
+      })
+    },
+    
+    handleChallengeJoin(challenge) {
+      uni.showToast({
+        title: '已参与挑战',
+        icon: 'success'
       })
     }
   }
@@ -397,7 +506,7 @@ export default {
 </script>
 
 <style scoped>
-.community-page {
+.gallery-page {
   height: 100vh;
   display: flex;
   flex-direction: column;
@@ -425,16 +534,27 @@ export default {
   padding: 24rpx 32rpx;
 }
 
+.back-btn {
+  width: 80rpx;
+  height: 80rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-medium);
+  transition: all 0.2s ease;
+}
+
+.back-btn:active {
+  transform: scale(0.95);
+  background-color: var(--color-app-background);
+}
+
 .header-title {
   font-size: 36rpx;
   font-weight: 700;
   color: var(--color-text-primary);
-}
-
-.header-actions {
-  display: flex;
-  align-items: center;
-  gap: 16rpx;
+  flex: 1;
+  text-align: center;
 }
 
 .search-btn {
@@ -504,20 +624,6 @@ export default {
   border-bottom: 1rpx solid var(--border-primary);
 }
 
-/* 主要内容 */
-.main-content {
-  flex: 1;
-  overflow-y: auto;
-  padding-bottom: 200rpx; /* 为底部导航栏预留空间 */
-}
-
-/* 搜索输入框 */
-.search-section {
-  background-color: var(--color-card-background);
-  padding: 0 32rpx 24rpx;
-  border-bottom: 1rpx solid var(--border-primary);
-}
-
 .search-input-wrapper {
   display: flex;
   align-items: center;
@@ -527,6 +633,7 @@ export default {
   padding: 20rpx 24rpx;
   border: 2rpx solid var(--border-primary);
   transition: all 0.2s ease;
+  box-sizing: border-box; /* 修复溢出问题 */
 }
 
 .search-input-wrapper:focus-within {
@@ -566,125 +673,15 @@ export default {
 .main-content {
   flex: 1;
   overflow-y: auto;
-  padding-bottom: 160rpx;
+  padding-bottom: 200rpx; /* 增加底部内边距以避免被底部导航栏遮挡 */
 }
 
-/* 通用区块样式 */
-.section-title {
-  font-size: 32rpx;
-  font-weight: 700;
-  color: var(--color-text-primary);
+/* 内容区域 */
+.content-section {
+  margin: 32rpx;
 }
 
-.section-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 24rpx;
-}
-
-.more-btn {
-  display: flex;
-  align-items: center;
-  gap: 8rpx;
-  padding: 12rpx 16rpx;
-  border-radius: var(--radius-small);
-  transition: all 0.2s ease;
-}
-
-.more-btn:active {
-  background-color: rgba(79, 127, 255, 0.1);
-  transform: scale(0.95);
-}
-
-.more-text {
-  font-size: 26rpx;
-  color: var(--color-brand-primary);
-  font-weight: 500;
-}
-
-/* 推荐用户 */
-.recommended-users {
-  margin: 32rpx 0 48rpx;
-}
-
-.recommended-users .section-header {
-  margin: 0 32rpx 24rpx;
-}
-
-.users-scroll {
-  white-space: nowrap;
-}
-
-.users-list {
-  display: flex;
-  gap: 24rpx;
-  padding: 0 32rpx;
-}
-
-.user-card {
-  flex-shrink: 0;
-  width: 200rpx;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 32rpx 24rpx;
-  background-color: var(--color-card-background);
-  border-radius: var(--radius-medium);
-  box-shadow: var(--shadow-card);
-  transition: all 0.2s ease;
-}
-
-.user-card:active {
-  transform: scale(0.95);
-  box-shadow: var(--shadow-floating);
-}
-
-.user-name {
-  font-size: 26rpx;
-  font-weight: 600;
-  color: var(--color-text-primary);
-  margin: 16rpx 0 8rpx;
-  text-align: center;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  width: 100%;
-}
-
-.user-works {
-  font-size: 22rpx;
-  color: var(--color-text-secondary);
-  margin-bottom: 20rpx;
-}
-
-.follow-btn {
-  padding: 12rpx 24rpx;
-  border-radius: var(--radius-small);
-  background-color: var(--color-brand-primary);
-  transition: all 0.2s ease;
-}
-
-.follow-btn.following {
-  background-color: var(--color-text-secondary);
-}
-
-.follow-btn:active {
-  transform: scale(0.95);
-}
-
-.follow-text {
-  font-size: 24rpx;
-  font-weight: 500;
-  color: #FFFFFF;
-}
-
-/* 作品区域 */
-.artworks-section {
-  margin: 0 32rpx;
-}
-
-.artworks-grid {
+.content-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 24rpx;

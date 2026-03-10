@@ -1,5 +1,5 @@
 <template>
-  <view class="settings-page" :class="{ 'light-theme': themeStore && !themeStore.isDarkMode }">
+  <view class="settings-page">
     <!-- 状态栏占位 -->
     <!-- #ifdef MP-WEIXIN -->
     <view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
@@ -306,7 +306,6 @@
 </template>
 
 <script>
-import { useThemeStore } from '../../store/theme.js'
 import { useUserStore } from '../../store/user.js'
 import { useProjectStore } from '../../store/project.js'
 import { useToast } from '../../composables/useToast.js'
@@ -331,12 +330,10 @@ export default {
   data() {
     const userStore = useUserStore()
     const projectStore = useProjectStore()
-    const themeStore = useThemeStore()
     
     return {
       userStore,
       projectStore,
-      themeStore,
       toast: null,
       cloudProjectCount: 0,
       storageSize: '0 KB',
@@ -357,7 +354,7 @@ export default {
   
   computed: {
     allThemes() {
-      return this.themeStore ? this.themeStore.getAllThemes : []
+      return []
     }
   },
 
@@ -370,9 +367,6 @@ export default {
         this.toast.setToastInstance(this.$refs.toastRef)
       }
     })
-    
-    // 立即应用主题，避免闪烁
-    this.themeStore.applyTheme()
     
     // 计算内容高度（减去状态栏和底部导航栏）
     const systemInfo = uni.getSystemInfoSync()
@@ -397,7 +391,6 @@ export default {
   },
 
   onShow() {
-    this.themeStore.applyTheme()
     this.loadStats()
   },
 
@@ -730,8 +723,8 @@ export default {
     },
 
     handleThemeChange(themeId) {
-      this.themeStore.setTheme(themeId)
-      this.$forceUpdate()
+      // 主题切换已禁用，统一使用浅色主题
+      console.log('主题切换已禁用')
     },
 
     handleClearData() {
@@ -764,8 +757,9 @@ export default {
 }
 
 .content {
-  width: 100%;
-  padding-bottom: 32rpx;
+  width: calc(100% - 96rpx); /* 减去左右内边距 48rpx * 2 = 96rpx */
+  padding: 0 48rpx;
+  padding-bottom: 200rpx; /* 增加底部间距，确保不被导航栏遮挡 */
 }
 
 /* 头部 */
@@ -784,7 +778,7 @@ export default {
 
 /* 设置容器 */
 .settings-container {
-  padding: 100rpx 32rpx 32rpx;
+  padding: 100rpx 0 32rpx; /* 移除左右内边距，只保留上下内边距 */
 }
 
 /* 区块 */

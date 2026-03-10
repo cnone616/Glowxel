@@ -1,36 +1,58 @@
 <template>
-  <view class="custom-tabbar" :class="{ 'light-theme': !isDarkMode }">
+  <view class="custom-tabbar">
+    <!-- 首页 -->
     <view 
       class="tab-item"
       :class="{ 'active': currentPath === '/pages/library/library' }"
       @click="navigateTo('/pages/library/library')"
     >
-      <Icon name="home" :size="48" :color="getIconColor('/pages/library/library')" />
-      <text class="tab-label">画布库</text>
+      <Icon name="home" :size="40" :color="getIconColor('/pages/library/library')" />
+      <text class="tab-label">首页</text>
     </view>
     
-    <view class="tab-center">
-      <view 
-        class="fab-button"
-        @click="navigateTo('/pages/create/create')"
-      >
-        <Icon name="add" :size="64" :color="getFabIconColor()" />
-      </view>
-    </view>
-    
+    <!-- 创作 -->
     <view 
       class="tab-item"
-      :class="{ 'active': currentPath === '/pages/user/user' }"
-      @click="navigateTo('/pages/user/user')"
+      :class="{ 'active': currentPath === '/pages/create/create' }"
+      @click="navigateTo('/pages/create/create')"
     >
-      <Icon name="user" :size="48" :color="getIconColor('/pages/user/user')" />
+      <Icon name="add" :size="40" :color="getIconColor('/pages/create/create')" />
+      <text class="tab-label">创作</text>
+    </view>
+    
+    <!-- 社区 -->
+    <view 
+      class="tab-item"
+      :class="{ 'active': currentPath === '/pages/community/community' }"
+      @click="navigateTo('/pages/community/community')"
+    >
+      <Icon name="browse" :size="40" :color="getIconColor('/pages/community/community')" />
+      <text class="tab-label">社区</text>
+    </view>
+    
+    <!-- 设备 -->
+    <view 
+      class="tab-item"
+      :class="{ 'active': currentPath === '/pages/control/control' }"
+      @click="navigateTo('/pages/control/control')"
+    >
+      <Icon name="link" :size="40" :color="getIconColor('/pages/control/control')" />
+      <text class="tab-label">设备</text>
+    </view>
+    
+    <!-- 我的 -->
+    <view 
+      class="tab-item"
+      :class="{ 'active': currentPath === '/pages/profile/profile' }"
+      @click="navigateTo('/pages/profile/profile')"
+    >
+      <Icon name="user" :size="40" :color="getIconColor('/pages/profile/profile')" />
       <text class="tab-label">我的</text>
     </view>
   </view>
 </template>
 
 <script>
-import { useThemeStore } from '../store/theme.js'
 import Icon from './Icon.vue'
 
 export default {
@@ -40,34 +62,18 @@ export default {
   
   data() {
     return {
-      themeStore: null,
       currentPath: ''
     }
   },
   
-  computed: {
-    isDarkMode() {
-      return this.themeStore?.isDarkMode ?? true
-    }
-  },
-  
   mounted() {
-    this.themeStore = useThemeStore()
     this.updateCurrentPath()
   },
   
   methods: {
     getIconColor(path) {
       const isActive = this.currentPath === path
-      if (this.isDarkMode) {
-        return isActive ? '#00f3ff' : '#666666'
-      } else {
-        return isActive ? '#0099cc' : '#666666'
-      }
-    },
-    
-    getFabIconColor() {
-      return this.isDarkMode ? '#000000' : '#ffffff'
+      return isActive ? '#4F7FFF' : '#666666'
     },
     
     updateCurrentPath() {
@@ -96,7 +102,7 @@ export default {
   bottom: 0;
   left: 0;
   right: 0;
-  height: 128rpx;
+  height: calc(128rpx + env(safe-area-inset-bottom));
   background-color: var(--bg-elevated);
   border-top: 2rpx solid var(--border-primary);
   display: flex;
@@ -104,6 +110,7 @@ export default {
   justify-content: space-around;
   padding-bottom: env(safe-area-inset-bottom);
   z-index: 1000;
+  box-sizing: border-box;
 }
 
 .tab-item {
@@ -112,9 +119,11 @@ export default {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 8rpx;
-  height: 100%;
-  transition: var(--transition-base);
+  gap: 6rpx;
+  height: 128rpx;
+  transition: all 0.2s ease;
+  box-sizing: border-box;
+  padding: 16rpx 8rpx;
 }
 
 .tab-item:active {
@@ -126,63 +135,11 @@ export default {
   font-weight: 500;
   letter-spacing: 0.05em;
   color: var(--text-secondary);
-  transition: var(--transition-base);
+  transition: all 0.2s ease;
 }
 
 .tab-item.active .tab-label {
   color: var(--accent-primary);
-}
-
-/* 浅色主题下选中文字颜色 */
-.light-theme .tab-item.active .tab-label {
-  color: #0099cc;
-}
-
-.tab-center {
-  flex: 0 0 auto;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-  width: 128rpx;
-  height: 128rpx;
-}
-
-.fab-button {
-  position: absolute;
-  top: -48rpx;
-  width: 112rpx;
-  height: 112rpx;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #00f3ff 0%, #0099ff 100%);
-  box-shadow: 0 0 30rpx rgba(0, 243, 255, 0.4);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: var(--transition-base);
-}
-
-.fab-button:active {
-  transform: scale(0.95);
-  box-shadow: 0 0 40rpx rgba(0, 243, 255, 0.6);
-}
-
-/* 浅色主题 */
-.light-theme .custom-tabbar {
-  background-color: #ffffff;
-  border-top-color: #e5e7eb;
-}
-
-.light-theme .tab-label {
-  color: #6b7280;
-}
-
-.light-theme .fab-button {
-  background: linear-gradient(135deg, #0099cc 0%, #0077aa 100%);
-  box-shadow: 0 0 30rpx rgba(0, 153, 204, 0.4);
-}
-
-.light-theme .fab-button:active {
-  box-shadow: 0 0 40rpx rgba(0, 153, 204, 0.6);
+  font-weight: 600;
 }
 </style>

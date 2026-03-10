@@ -1,5 +1,5 @@
 <template>
-  <view class="overview-page" :class="{ 'light-theme': themeStore && !themeStore.isDarkMode }">
+  <view class="overview-page">
     <!-- 状态栏占位 -->
     <!-- #ifdef MP-WEIXIN -->
     <view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
@@ -242,7 +242,6 @@
 </template>
 
 <script>
-import { useThemeStore } from '../../store/theme.js'
 import { useProjectStore } from '../../store/project.js'
 import { useUserStore } from '../../store/user.js'
 import { useToast } from '../../composables/useToast.js'
@@ -263,7 +262,6 @@ export default {
   },
   data() {
     return {
-      themeStore: null,
       projectStore: null,
       toast: null,
       projectId: '',
@@ -334,19 +332,8 @@ export default {
   },
   
   onLoad(options) {
-    this.themeStore = useThemeStore()
     this.projectStore = useProjectStore()
     this.toast = useToast()
-    
-    // 注册自定义 Toast 实例
-    this.$nextTick(() => {
-      if (this.$refs.toastRef) {
-        this.toast.setToastInstance(this.$refs.toastRef)
-      }
-    })
-    
-    // 立即应用主题，避免闪烁
-    this.themeStore.applyTheme()
     
     this.projectId = options.id
     this.project = this.projectStore.getProject(this.projectId)
@@ -370,7 +357,7 @@ export default {
   },
   
   onShow() {
-    this.themeStore.applyTheme()
+    // 页面显示时的处理
   },
   
   methods: {
@@ -1089,7 +1076,7 @@ export default {
   bottom: 0;
   left: 0;
   right: 0;
-  background-color: rgba(0, 0, 0, 0.9);
+  background-color: rgba(0, 0, 0, 0.1);
   backdrop-filter: blur(20rpx);
   padding: 5rpx 16rpx 10rpx;
 }
@@ -1103,7 +1090,7 @@ export default {
 
 .progress-label {
   font-size: 20rpx;
-  color: var(--text-secondary);
+  color: #333333;
 }
 
 .progress-value {
