@@ -139,9 +139,6 @@
       @confirm="handleJsonImport"
       @error="handleJsonImportError"
     />
-    
-    <!-- 自定义底部导航栏 -->
-    <CustomTabBar />
   </view>
 </template>
 
@@ -153,7 +150,6 @@ import Icon from '../../components/Icon.vue'
 import Toast from '../../components/Toast.vue'
 import ConnectModal from '../../components/ConnectModal.vue'
 import JsonImportModal from '../../components/JsonImportModal.vue'
-import CustomTabBar from '../../components/CustomTabBar.vue'
 
 export default {
   mixins: [statusBarMixin],
@@ -161,8 +157,7 @@ export default {
     Icon,
     Toast,
     ConnectModal,
-    JsonImportModal,
-    CustomTabBar
+    JsonImportModal
   },
   data() {
     return {

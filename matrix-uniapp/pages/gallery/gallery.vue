@@ -480,18 +480,16 @@ export default {
     },
     
     handleTemplateClick(template) {
-      // TODO: 使用模板创建画布
-      uni.showToast({
-        title: '模板功能开发中',
-        icon: 'none'
+      // 使用模板创建画布
+      uni.navigateTo({
+        url: `/pages/create/create?templateId=${template.id}`
       })
     },
     
     handleChallengeClick(challenge) {
-      // TODO: 跳转到挑战详情页
-      uni.showToast({
-        title: '挑战详情页开发中',
-        icon: 'none'
+      // 跳转到挑战详情页
+      uni.navigateTo({
+        url: `/pages/challenge-detail/challenge-detail?id=${challenge.id}`
       })
     },
     

@@ -414,9 +414,6 @@
       cancelText="取消"
       @confirm="goToLogin"
     />
-    
-    <!-- 自定义底部导航栏 -->
-    <CustomTabBar v-if="!showWizard" />
   </view>
 </template>
 
@@ -429,7 +426,6 @@ import statusBarMixin from '../../mixins/statusBar.js'
 import Icon from '../../components/Icon.vue'
 import Toast from '../../components/Toast.vue'
 import ConfirmModal from '../../components/ConfirmModal.vue'
-import CustomTabBar from '../../components/CustomTabBar.vue'
 import ProjectCard from '../../components/ProjectCard.vue'
 
 export default {
@@ -438,7 +434,6 @@ export default {
     Icon,
     Toast,
     ConfirmModal,
-    CustomTabBar,
     ProjectCard
   },
   data() {
@@ -455,6 +450,8 @@ export default {
       selectedColors: new Set(ARTKAL_OFFICIAL_SETS.set24.colors),
       step: 0,
       mode: 'blank',
+      templateId: null, // 模板ID
+      challengeId: null, // 挑战ID
       imageFile: null,
       previewUrl: null,
       previewPixels: null, // 预览的像素数据
@@ -589,8 +586,30 @@ export default {
     this.projectStore = useProjectStore()
     this.toast = useToast()
     
+    // 检查是否从模板创建
+    if (options && options.templateId) {
+      this.showWizard = true
+      this.mode = 'template'
+      this.templateId = options.templateId
+      // TODO: 加载模板数据
+      uni.showToast({
+        title: '正在加载模板...',
+        icon: 'loading'
+      })
+    }
+    // 检查是否从挑战创建
+    else if (options && options.challengeId) {
+      this.showWizard = true
+      this.mode = 'challenge'
+      this.challengeId = options.challengeId
+      // TODO: 加载挑战信息
+      uni.showToast({
+        title: '正在加载挑战...',
+        icon: 'loading'
+      })
+    }
     // 检查是否直接进入向导模式
-    if (options && options.mode === 'image') {
+    else if (options && options.mode === 'image') {
       this.showWizard = true
       this.mode = 'image'
     } else if (options && options.wizard === 'true') {
@@ -1477,7 +1496,6 @@ export default {
 .main-content {
   flex: 1;
   overflow-y: auto;
-  padding-bottom: 200rpx; /* 增加底部间距，确保不被导航栏遮挡 */
 }
 
 /* 创建向导容器 */

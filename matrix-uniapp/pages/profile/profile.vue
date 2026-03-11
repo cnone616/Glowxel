@@ -4,7 +4,6 @@
     <!-- #ifdef MP-WEIXIN -->
     <view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
     <!-- #endif -->
-    
     <scroll-view scroll-y class="content">
       <!-- 用户信息卡片 -->
       <view class="user-card">
@@ -20,101 +19,146 @@
         </view>
         
         <view v-else class="user-info">
-          <image 
-            v-if="userStore.avatar" 
-            :src="userStore.avatar" 
-            class="avatar"
-            mode="aspectFill"
-          />
-          <view v-else class="avatar-placeholder">
-            <Icon name="user" :size="80" />
+          <view class="user-avatar">
+            <image 
+              v-if="userStore.avatar" 
+              :src="userStore.avatar" 
+              class="avatar"
+              mode="aspectFill"
+            />
+            <view v-else class="avatar-placeholder">
+              <Icon name="user" :size="80" />
+            </view>
           </view>
           
-          <view class="info-content">
-            <text class="nickname">{{ userStore.nickname }}</text>
-            <text class="openid">ID: {{ userStore.openid.slice(0, 8) }}...</text>
+          <view class="user-details">
+            <view class="user-name-row">
+              <text class="nickname">{{ userStore.nickname || '陈晓明' }}</text>
+              <button class="edit-btn" @click="handleEditProfile">
+                <text>编辑</text>
+              </button>
+            </view>
+            <text class="user-id">@{{ userStore.openid ? userStore.openid.slice(0, 8) : 'alexchen' }}</text>
           </view>
-          
-          <button 
-            v-if="!userStore.userInfo" 
-            class="get-info-btn" 
-            @click="handleGetUserInfo"
-          >
-            完善资料
-          </button>
+        </view>
+        
+        <!-- 统计数据 -->
+        <view v-if="userStore.hasLogin" class="user-stats">
+          <view class="stat-item" @click="goToMyWorks">
+            <text class="stat-number">{{ projectStore.projects.length }}</text>
+            <text class="stat-label">作品</text>
+          </view>
+          <view class="stat-item" @click="goToFollowers">
+            <text class="stat-number">1.2K</text>
+            <text class="stat-label">粉丝</text>
+          </view>
+          <view class="stat-item" @click="goToFollowing">
+            <text class="stat-number">342</text>
+            <text class="stat-label">关注</text>
+          </view>
         </view>
       </view>
 
-      <!-- 云同步设置 -->
-      <view v-if="userStore.hasLogin" class="section">
-        <text class="section-title">云同步</text>
-        
-        <view class="setting-card">
-          <view class="setting-row">
-            <view class="setting-left">
-              <view class="setting-icon">
-                <Icon name="upload" :size="40" />
-              </view>
-              <view class="setting-info">
-                <text class="setting-label">自动同步</text>
-                <text class="setting-desc">自动同步项目到云端</text>
-              </view>
+      <!-- 功能菜单 -->
+      <view class="menu-section">
+        <!-- 我的作品 -->
+        <view class="menu-item" @click="goToMyWorks">
+          <view class="menu-left">
+            <view class="menu-icon">
+              <Icon name="picture" :size="40" color="#4F7FFF" />
             </view>
+            <text class="menu-label">我的作品</text>
+          </view>
+          <view class="menu-right">
+            <text class="menu-count">{{ projectStore.projects.length }}</text>
+            <Icon name="arrow-right" :size="32" color="#AAAAAA" />
+          </view>
+        </view>
+
+        <!-- 我的收藏 -->
+        <view class="menu-item" @click="goToMyFavorites">
+          <view class="menu-left">
+            <view class="menu-icon">
+              <Icon name="bookmark" :size="40" color="#4F7FFF" />
+            </view>
+            <text class="menu-label">我的收藏</text>
+          </view>
+          <view class="menu-right">
+            <text class="menu-count">12</text>
+            <Icon name="arrow-right" :size="32" color="#AAAAAA" />
+          </view>
+        </view>
+
+        <!-- 我的设备 -->
+        <view class="menu-item" @click="goToMyDevices">
+          <view class="menu-left">
+            <view class="menu-icon">
+              <Icon name="link" :size="40" color="#4F7FFF" />
+            </view>
+            <text class="menu-label">我的设备</text>
+          </view>
+          <view class="menu-right">
+            <text class="menu-count">3</text>
+            <Icon name="arrow-right" :size="32" color="#AAAAAA" />
+          </view>
+        </view>
+
+        <!-- 成就 -->
+        <view class="menu-item" @click="goToAchievements">
+          <view class="menu-left">
+            <view class="menu-icon">
+              <Icon name="award" :size="40" color="#4F7FFF" />
+            </view>
+            <text class="menu-label">成就</text>
+          </view>
+          <view class="menu-right">
+            <text class="menu-count">8</text>
+            <Icon name="arrow-right" :size="32" color="#AAAAAA" />
+          </view>
+        </view>
+
+        <!-- 云同步设置 -->
+        <view v-if="userStore.hasLogin" class="menu-item" @click="goToCloudSync">
+          <view class="menu-left">
+            <view class="menu-icon">
+              <Icon name="cloud" :size="40" color="#4F7FFF" />
+            </view>
+            <view class="menu-info">
+              <text class="menu-label">自动同步</text>
+              <text class="menu-desc">自动同步项目到云端</text>
+            </view>
+          </view>
+          <view class="menu-right">
             <switch 
               :checked="userStore.syncEnabled" 
               @change="handleSyncChange"
               color="#4F7FFF"
             />
           </view>
-          
-          <view v-if="userStore.syncEnabled" class="sync-actions">
-            <button class="action-btn" @click="handleSyncNow">
-              <Icon name="refresh" :size="28" />
-              <text>立即同步</text>
-            </button>
-            <button class="action-btn" @click="handlePullFromCloud">
-              <Icon name="download" :size="28" />
-              <text>从云端拉取</text>
-            </button>
+        </view>
+
+        <!-- 设置 -->
+        <view class="menu-item" @click="goToSettings">
+          <view class="menu-left">
+            <view class="menu-icon">
+              <Icon name="settings" :size="40" color="#4F7FFF" />
+            </view>
+            <text class="menu-label">设置</text>
+          </view>
+          <view class="menu-right">
+            <Icon name="arrow-right" :size="32" color="#AAAAAA" />
           </view>
         </view>
       </view>
 
-      <!-- 数据统计 -->
-      <view class="section">
-        <text class="section-title">数据统计</text>
-        
-        <view class="stats-grid">
-          <view class="stat-item">
-            <text class="stat-value">{{ projectStore.projects.length }}</text>
-            <text class="stat-label">本地项目</text>
-          </view>
-          <view class="stat-item">
-            <text class="stat-value">{{ cloudProjectCount }}</text>
-            <text class="stat-label">云端项目</text>
-          </view>
-          <view class="stat-item">
-            <text class="stat-value">{{ storageSize }}</text>
-            <text class="stat-label">存储空间</text>
-          </view>
-        </view>
-      </view>
-
-      <!-- 账号操作 -->
-      <view v-if="userStore.hasLogin" class="section">
-        <text class="section-title">账号</text>
-        
-        <view class="setting-card">
-          <button class="logout-btn" @click="handleLogout">
-            <Icon name="sign-out" :size="32" />
-            <text>退出登录</text>
-          </button>
-        </view>
+      <!-- 退出登录 -->
+      <view v-if="userStore.hasLogin" class="logout-section">
+        <button class="logout-btn" @click="handleLogout">
+          <Icon name="sign-out" :size="32" />
+          <text>退出登录</text>
+        </button>
       </view>
     </scroll-view>
-    
-    <!-- 自定义底部导航栏 -->
-    <CustomTabBar />
     
     <!-- Toast -->
     <Toast ref="toastRef" />
@@ -127,15 +171,19 @@ import { useProjectStore } from '../../store/project.js'
 import { useToast } from '../../composables/useToast.js'
 import statusBarMixin from '../../mixins/statusBar.js'
 import Icon from '../../components/Icon.vue'
-import CustomTabBar from '../../components/CustomTabBar.vue'
 import Toast from '../../components/Toast.vue'
-import projectAPI from '../../api/project.js'
+import { MockAPI } from '../../data/mock/index.js'
+import { 
+  getCurrentUser, 
+  getProfileStats, 
+  getMyFavorites, 
+  getAchievementStats 
+} from '../../data/mock/profile.js'
 
 export default {
   mixins: [statusBarMixin],
   components: {
     Icon,
-    CustomTabBar,
     Toast
   },
   
@@ -147,9 +195,7 @@ export default {
     return {
       userStore,
       projectStore,
-      toast: null,
-      cloudProjectCount: 0,
-      storageSize: '0 KB'
+      toast: null
     }
   },
 
@@ -162,9 +208,6 @@ export default {
         this.toast.setToastInstance(this.$refs.toastRef)
       }
     })
-    
-    // 加载统计数据
-    this.loadStats()
   },
 
   methods: {
@@ -178,21 +221,72 @@ export default {
       
       if (res.success) {
         this.toast.showSuccess('登录成功')
-        this.loadStats()
       } else {
         this.toast.showError(res.error || '登录失败')
       }
     },
 
-    // 获取用户信息
-    async handleGetUserInfo() {
-      const res = await this.userStore.getUserProfile()
-      
-      if (res.success) {
-        this.toast.showSuccess('资料已完善')
-      } else {
-        this.toast.showError(res.error || '获取失败')
-      }
+    // 编辑个人资料
+    handleEditProfile() {
+      uni.navigateTo({
+        url: '/pages/edit-profile/edit-profile'
+      })
+    },
+
+    // 跳转到我的作品
+    goToMyWorks() {
+      uni.navigateTo({
+        url: '/pages/my-works/my-works'
+      })
+    },
+
+    // 跳转到我的收藏
+    goToMyFavorites() {
+      uni.navigateTo({
+        url: '/pages/my-favorites/my-favorites'
+      })
+    },
+
+    // 跳转到我的设备
+    goToMyDevices() {
+      uni.navigateTo({
+        url: '/pages/control/control'
+      })
+    },
+
+    // 跳转到成就页面
+    goToAchievements() {
+      uni.navigateTo({
+        url: '/pages/achievements/achievements'
+      })
+    },
+
+    // 跳转到粉丝页面
+    goToFollowers() {
+      uni.navigateTo({
+        url: '/pages/followers/followers'
+      })
+    },
+
+    // 跳转到关注页面
+    goToFollowing() {
+      uni.navigateTo({
+        url: '/pages/following/following'
+      })
+    },
+
+    // 跳转到云同步设置
+    goToCloudSync() {
+      uni.navigateTo({
+        url: '/pages/cloud-sync/cloud-sync'
+      })
+    },
+
+    // 跳转到设置页面
+    goToSettings() {
+      uni.navigateTo({
+        url: '/pages/settings/settings'
+      })
     },
 
     // 切换同步状态
@@ -206,65 +300,6 @@ export default {
       }
     },
 
-    // 立即同步
-    async handleSyncNow() {
-      if (!this.userStore.hasLogin) {
-        this.toast.showError('请先登录')
-        return
-      }
-      
-      uni.showLoading({ title: '同步中...' })
-      
-      try {
-        const projects = this.projectStore.projects
-        
-        for (const project of projects) {
-          await projectAPI.createProject({
-            ...project,
-            userId: this.userStore.openid
-          })
-        }
-        
-        uni.hideLoading()
-        this.toast.showSuccess('同步完成')
-        this.loadStats()
-      } catch (error) {
-        uni.hideLoading()
-        this.toast.showError('同步失败')
-      }
-    },
-
-    // 从云端拉取
-    async handlePullFromCloud() {
-      if (!this.userStore.hasLogin) {
-        this.toast.showError('请先登录')
-        return
-      }
-      
-      uni.showModal({
-        title: '确认拉取',
-        content: '从云端拉取数据会覆盖本地数据，是否继续？',
-        success: async (res) => {
-          if (res.confirm) {
-            uni.showLoading({ title: '拉取中...' })
-            
-            const result = await projectAPI.getUserProjects()
-            
-            uni.hideLoading()
-            
-            if (result.success) {
-              // 覆盖本地数据
-              this.projectStore.projects = result.data
-              this.projectStore.saveToStorage()
-              this.toast.showSuccess('拉取完成')
-            } else {
-              this.toast.showError('拉取失败')
-            }
-          }
-        }
-      })
-    },
-
     // 退出登录
     handleLogout() {
       uni.showModal({
@@ -274,32 +309,9 @@ export default {
           if (res.confirm) {
             this.userStore.logout()
             this.toast.showSuccess('已退出登录')
-            this.cloudProjectCount = 0
           }
         }
       })
-    },
-
-    // 加载统计数据
-    async loadStats() {
-      // 计算本地存储大小
-      try {
-        const info = uni.getStorageInfoSync()
-        const sizeKB = info.currentSize
-        this.storageSize = sizeKB < 1024 
-          ? `${sizeKB} KB` 
-          : `${(sizeKB / 1024).toFixed(2)} MB`
-      } catch (e) {
-        this.storageSize = '0 KB'
-      }
-      
-      // 获取云端项目数量
-      if (this.userStore.hasLogin) {
-        const res = await projectAPI.getUserProjects()
-        if (res.success) {
-          this.cloudProjectCount = res.data.length
-        }
-      }
     }
   }
 }
@@ -308,23 +320,37 @@ export default {
 <style scoped>
 .profile-page {
   height: 100vh;
-  background-color: var(--bg-secondary);
+  background-color: var(--color-app-background);
   overflow: hidden;
 }
 
+/* 页面标题 */
+.page-header {
+  background-color: var(--color-card-background);
+  padding: 24rpx 32rpx;
+  border-bottom: 2rpx solid var(--border-primary);
+}
+
+.page-title {
+  font-size: 36rpx;
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+
 .content {
+  flex: 1;
+  overflow-y: auto;
+  padding-bottom: 80rpx;
   height: 100%;
-  padding: 32rpx;
-  padding-bottom: calc(160rpx + env(safe-area-inset-bottom));
 }
 
 /* 用户卡片 */
 .user-card {
-  background-color: var(--bg-tertiary);
-  border-radius: 16rpx;
+  background-color: var(--color-card-background);
+  border-radius: 24rpx;
   padding: 32rpx;
-  border: 2rpx solid var(--border-primary);
-  margin-bottom: 32rpx;
+  margin: 32rpx 20rpx;
+  box-shadow: var(--shadow-md);
 }
 
 .login-prompt {
@@ -338,29 +364,31 @@ export default {
   width: 120rpx;
   height: 120rpx;
   border-radius: 60rpx;
-  background-color: var(--bg-secondary);
+  background-color: var(--color-app-background);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
 }
 
 .prompt-text {
-  font-size: 24rpx;
-  color: var(--text-secondary);
+  font-size: 28rpx;
+  color: var(--color-text-secondary);
+  text-align: center;
 }
 
 .login-btn {
   display: flex;
   align-items: center;
   gap: 12rpx;
-  padding: 20rpx 40rpx;
-  background: linear-gradient(135deg, #00f3ff 0%, #00a8ff 100%);
-  color: #000;
+  padding: 24rpx 48rpx;
+  background: linear-gradient(135deg, #4F7FFF 0%, #00f3ff 100%);
+  color: #FFFFFF;
   border: none;
-  border-radius: 12rpx;
+  border-radius: 16rpx;
   font-size: 28rpx;
-  font-weight: 500;
+  font-weight: 600;
+  box-shadow: var(--shadow-md);
 }
 
 .login-btn::after {
@@ -369,177 +397,189 @@ export default {
 
 .user-info {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 24rpx;
+  margin-bottom: 32rpx;
 }
 
-.avatar {
+.user-avatar .avatar {
   width: 120rpx;
   height: 120rpx;
   border-radius: 60rpx;
 }
 
-.info-content {
+.user-details {
   flex: 1;
+}
+
+.user-name-row {
   display: flex;
-  flex-direction: column;
-  gap: 8rpx;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8rpx;
 }
 
 .nickname {
-  font-size: 32rpx;
-  font-weight: 600;
-  color: var(--text-primary);
+  font-size: 36rpx;
+  font-weight: 700;
+  color: var(--color-text-primary);
 }
 
-.openid {
-  font-size: 22rpx;
-  color: var(--text-secondary);
+.edit-btn {
+  padding: 12rpx 24rpx;
+  background-color: transparent;
+  border: 2rpx solid var(--border-primary);
+  border-radius: 12rpx;
+  font-size: 24rpx;
+  color: var(--color-text-secondary);
+}
+
+.edit-btn::after {
+  border: none;
+}
+
+.user-id {
+  font-size: 24rpx;
+  color: var(--color-text-secondary);
   font-family: monospace;
 }
 
-.get-info-btn {
-  padding: 16rpx 24rpx;
-  background-color: var(--accent-primary);
-  color: #000;
-  border: none;
-  border-radius: 8rpx;
+/* 统计数据 */
+.user-stats {
+  display: flex;
+  justify-content: space-around;
+  padding-top: 24rpx;
+  border-top: 2rpx solid var(--border-primary);
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8rpx;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.stat-item:active {
+  transform: scale(0.95);
+}
+
+.stat-number {
+  font-size: 32rpx;
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+
+.stat-label {
   font-size: 24rpx;
+  color: var(--color-text-secondary);
 }
 
-.get-info-btn::after {
-  border: none;
+/* 功能菜单 */
+.menu-section {
+  background-color: var(--color-card-background);
+  border-radius: 24rpx;
+  margin: 32rpx 20rpx;
+  overflow: hidden;
+  box-shadow: var(--shadow-md);
 }
 
-/* 区块 */
-.section {
-  margin-bottom: 32rpx;
-}
-
-.section-title {
-  font-size: 22rpx;
-  font-weight: 600;
-  color: var(--accent-primary);
-  text-transform: uppercase;
-  letter-spacing: 2rpx;
-  margin-bottom: 16rpx;
-  display: block;
-}
-
-/* 设置卡片 */
-.setting-card {
-  background-color: var(--bg-tertiary);
-  border-radius: 16rpx;
-  padding: 24rpx;
-  border: 2rpx solid var(--border-primary);
-}
-
-.setting-row {
+.menu-item {
   display: flex;
+  align-items: center;
   justify-content: space-between;
-  align-items: center;
+  padding: 32rpx;
+  border-bottom: 2rpx solid var(--border-primary);
+  transition: all 0.2s ease;
 }
 
-.setting-left {
+.menu-item:last-child {
+  border-bottom: none;
+}
+
+.menu-item:active {
+  background-color: var(--color-app-background);
+}
+
+.menu-left {
   display: flex;
   align-items: center;
-  gap: 16rpx;
+  gap: 24rpx;
+  flex: 1;
 }
 
-.setting-icon {
-  color: var(--accent-primary);
+.menu-icon {
+  width: 80rpx;
+  height: 80rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(79, 127, 255, 0.1);
+  border-radius: 16rpx;
 }
 
-.setting-info {
+.menu-info {
   display: flex;
   flex-direction: column;
   gap: 4rpx;
 }
 
-.setting-label {
-  font-size: 26rpx;
+.menu-label {
+  font-size: 28rpx;
   font-weight: 500;
-  color: var(--text-primary);
+  color: var(--color-text-primary);
 }
 
-.setting-desc {
+.menu-desc {
   font-size: 22rpx;
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
 }
 
-.sync-actions {
-  display: flex;
-  gap: 16rpx;
-  margin-top: 24rpx;
-  padding-top: 24rpx;
-  border-top: 2rpx solid var(--border-primary);
-}
-
-.action-btn {
-  flex: 1;
+.menu-right {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 8rpx;
-  padding: 20rpx;
-  background-color: var(--bg-secondary);
-  border: 2rpx solid var(--border-secondary);
-  border-radius: 12rpx;
+  gap: 16rpx;
+}
+
+.menu-count {
   font-size: 24rpx;
-  color: var(--text-primary);
+  font-weight: 600;
+  color: var(--color-brand-primary);
+  background-color: rgba(79, 127, 255, 0.1);
+  padding: 8rpx 16rpx;
+  border-radius: 20rpx;
+  min-width: 40rpx;
+  text-align: center;
 }
 
-.action-btn::after {
-  border: none;
+/* 退出登录 */
+.logout-section {
+  margin: 32rpx 20rpx;
 }
 
-/* 统计网格 */
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 16rpx;
-}
-
-.stat-item {
-  background-color: var(--bg-tertiary);
-  border-radius: 12rpx;
-  padding: 24rpx;
-  border: 2rpx solid var(--border-primary);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8rpx;
-}
-
-.stat-value {
-  font-size: 36rpx;
-  font-weight: bold;
-  color: var(--accent-primary);
-  font-family: monospace;
-}
-
-.stat-label {
-  font-size: 20rpx;
-  color: var(--text-secondary);
-}
-
-/* 退出按钮 */
 .logout-btn {
   width: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 12rpx;
-  padding: 20rpx;
-  background-color: rgba(239, 68, 68, 0.1);
+  gap: 16rpx;
+  padding: 32rpx;
+  background-color: var(--color-card-background);
   border: 2rpx solid rgba(239, 68, 68, 0.3);
-  border-radius: 12rpx;
-  color: var(--error-color);
-  font-size: 26rpx;
-  font-weight: 500;
+  border-radius: 24rpx;
+  color: #EF4444;
+  font-size: 28rpx;
+  font-weight: 600;
+  transition: all 0.2s ease;
 }
 
 .logout-btn::after {
   border: none;
+}
+
+.logout-btn:active {
+  background-color: rgba(239, 68, 68, 0.05);
+  transform: scale(0.98);
 }
 </style>

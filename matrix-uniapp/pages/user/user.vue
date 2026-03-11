@@ -195,9 +195,6 @@
       </view>
     </scroll-view>
     
-    <!-- 自定义底部导航栏 -->
-    <CustomTabBar />
-    
     <!-- 自定义 Toast 组件 -->
     <Toast ref="toastRef" />
     
@@ -312,7 +309,6 @@ import { useToast } from '../../composables/useToast.js'
 import statusBarMixin from '../../mixins/statusBar.js'
 import Icon from '../../components/Icon.vue'
 import Logo from '../../components/Logo.vue'
-import CustomTabBar from '../../components/CustomTabBar.vue'
 import Toast from '../../components/Toast.vue'
 import ConfirmModal from '../../components/ConfirmModal.vue'
 import projectAPI from '../../api/project.js'
@@ -323,7 +319,6 @@ export default {
   components: {
     Icon,
     Logo,
-    CustomTabBar,
     Toast,
     ConfirmModal
   },
@@ -759,7 +754,6 @@ export default {
 .content {
   width: calc(100% - 96rpx); /* 减去左右内边距 48rpx * 2 = 96rpx */
   padding: 0 48rpx;
-  padding-bottom: 200rpx; /* 增加底部间距，确保不被导航栏遮挡 */
 }
 
 /* 头部 */

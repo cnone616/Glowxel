@@ -120,9 +120,6 @@
         />
       </view>
     </scroll-view>
-    
-    <!-- 自定义底部导航栏 -->
-    <CustomTabBar />
   </view>
 </template>
 
@@ -134,7 +131,6 @@ import ArtworkCard from '../../components/ArtworkCard.vue'
 import TemplateCard from '../../components/TemplateCard.vue'
 import ChallengeCard from '../../components/ChallengeCard.vue'
 import Icon from '../../components/Icon.vue'
-import CustomTabBar from '../../components/CustomTabBar.vue'
 
 export default {
   mixins: [statusBarMixin],
@@ -143,8 +139,7 @@ export default {
     ArtworkCard,
     TemplateCard,
     ChallengeCard,
-    Icon,
-    CustomTabBar
+    Icon
   },
   
   data() {
@@ -310,18 +305,16 @@ export default {
     },
     
     handleTemplateClick(template) {
-      // TODO: 使用模板创建画布
-      uni.showToast({
-        title: '模板功能开发中',
-        icon: 'none'
+      // 使用模板创建画布
+      uni.navigateTo({
+        url: `/pages/create/create?templateId=${template.id}`
       })
     },
     
     handleChallengeClick(challenge) {
-      // TODO: 跳转到挑战详情页
-      uni.showToast({
-        title: '挑战详情页开发中',
-        icon: 'none'
+      // 跳转到挑战详情页
+      uni.navigateTo({
+        url: `/pages/challenge-detail/challenge-detail?id=${challenge.id}`
       })
     },
     
@@ -441,7 +434,6 @@ export default {
 .main-content {
   flex: 1;
   overflow-y: auto;
-  padding-bottom: 200rpx; /* 增加底部间距，确保不被导航栏遮挡 */
 }
 
 /* 横幅轮播 */

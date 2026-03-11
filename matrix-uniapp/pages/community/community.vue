@@ -136,9 +136,6 @@
         </view>
       </view>
     </scroll-view>
-    
-    <!-- 自定义底部导航栏 -->
-    <CustomTabBar />
   </view>
 </template>
 
@@ -148,15 +145,13 @@ import statusBarMixin from '../../mixins/statusBar.js'
 import ArtworkCard from '../../components/ArtworkCard.vue'
 import Avatar from '../../components/Avatar.vue'
 import Icon from '../../components/Icon.vue'
-import CustomTabBar from '../../components/CustomTabBar.vue'
 
 export default {
   mixins: [statusBarMixin],
   components: {
     ArtworkCard,
     Avatar,
-    Icon,
-    CustomTabBar
+    Icon
   },
   
   data() {
@@ -508,7 +503,6 @@ export default {
 .main-content {
   flex: 1;
   overflow-y: auto;
-  padding-bottom: 200rpx; /* 为底部导航栏预留空间 */
 }
 
 /* 搜索输入框 */
