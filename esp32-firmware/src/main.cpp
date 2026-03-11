@@ -517,7 +517,11 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventTyp
       response["width"] = PANEL_RES_X;
       response["height"] = PANEL_RES_Y;
       response["brightness"] = currentBrightness;
-      response["mode"] = (currentMode == MODE_CLOCK) ? "clock" : "canvas";
+      if (currentMode == MODE_CLOCK) {
+        response["mode"] = "clock";
+      } else if (currentMode == MODE_CANVAS) {
+        response["mode"] = "canvas";
+      }
     }
     else if (cmd == "set_mode") {
       String mode = doc["mode"].as<String>();
@@ -1227,7 +1231,8 @@ void loop() {
   }
 
   // 在闹钟模式下，每分钟更新一次时钟（而不是每秒）
-  if (currentMode == MODE_CLOCK) {
+  // 但在配置模式下不执行，避免覆盖热点信息显示
+  if (currentMode == MODE_CLOCK && !config_mode) {
     static unsigned long lastClockUpdate = 0;
     static int lastMinute = -1;
     
@@ -1247,33 +1252,7 @@ void loop() {
       }
     }
   }
-
-  static unsigned long lastPrint = 0;
-  if (millis() - lastPrint > 5000) {
-    lastPrint = millis();
-
-    if (config_mode) {
-      Serial.println("--- AP模式状态 ---");
-      Serial.print("AP IP: ");
-      Serial.println(WiFi.softAPIP());
-      Serial.print("连接设备数: ");
-      Serial.println(WiFi.softAPgetStationNum());
-    } else {
-      Serial.println("--- STA模式状态 ---");
-      Serial.print("WiFi状态: ");
-      Serial.println(WiFi.status() == WL_CONNECTED ? "已连接" : "未连接");
-      Serial.print("IP: ");
-      Serial.println(WiFi.localIP());
-      Serial.print("客户端连接: ");
-      Serial.println(clientConnected ? "是" : "否");
-      if (imagePixelCount > 0) {
-        Serial.print("像素数据: ");
-        Serial.print(imagePixelCount);
-        Serial.println(" 个像素");
-      }
-    }
-  }
-
+  
   // 清理WebSocket，防止内存泄漏
   ws.cleanupClients();
   
