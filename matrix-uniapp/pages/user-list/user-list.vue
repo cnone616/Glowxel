@@ -9,7 +9,7 @@
     <view class="header">
       <view class="header-content">
         <view class="back-btn" @click="handleBack">
-          <Icon name="fanhui" :size="40" color="#1F1F1F" />
+          <Icon name="direction-left" :size="40" color="#1F1F1F" />
         </view>
         <text class="header-title">{{ pageTitle }}</text>
         <view class="search-btn" @click="toggleSearch">

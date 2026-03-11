@@ -53,6 +53,9 @@
         
             <Icon name="download" :size="36" />
           </view>
+          <view class="icon-btn" @click="handlePublish">
+            <Icon name="upload" :size="36" />
+          </view>
           <view class="icon-btn" @click="isHelpOpen = true">
             <Icon name="help" :size="36" />
           </view>
@@ -320,6 +323,7 @@ import ColorPalette from '../../components/ColorPalette.vue'
 import HelpModal from '../../components/HelpModal.vue'
 import Toast from '../../components/Toast.vue'
 import Icon from "../../components/Icon.vue"
+import PublishButton from '../../components/PublishButton.vue'
 import { exportCanvasAsImage, saveImageToAlbum } from '../../utils/exportCanvas.js'
 
 
@@ -344,7 +348,8 @@ export default {
     ColorPalette,
     HelpModal,
     Toast,
-    Icon
+    Icon,
+    PublishButton
   },
   
   data() {
@@ -1077,6 +1082,84 @@ export default {
     
     handleToastHide() {
       this.toastVisible = false
+    },
+    
+    // 处理发布按钮点击
+    handlePublish() {
+      // 检查画布是否为空
+      if (this.pixels.size === 0) {
+        this.toast.showError('画布为空，无法发布')
+        return
+      }
+      
+      // 检查是否有未保存的修改
+      if (this.hasUnsavedChanges) {
+        uni.showModal({
+          title: '有未保存的修改',
+          content: '检测到您有未保存的修改，是否先保存再发布？',
+          confirmText: '保存并发布',
+          cancelText: '直接发布',
+          success: (res) => {
+            if (res.confirm) {
+              // 保存并发布
+              this.saveAndPublish()
+            } else if (res.cancel) {
+              // 直接发布
+              this.navigateToPublish()
+            }
+          }
+        })
+      } else {
+        // 直接发布
+        this.navigateToPublish()
+      }
+    },
+    
+    // 保存并发布
+    async saveAndPublish() {
+      try {
+        // 保存像素数据
+        this.projectStore.saveProjectPixels(this.projectId, this.pixels)
+        this.savedPixelsSnapshot = JSON.stringify(Array.from(this.pixels.entries()))
+        this.hasUnsavedChanges = false
+        
+        // 生成并保存缩略图
+        await this.generateAndSaveThumbnail()
+        
+        this.toast.showSuccess('已保存')
+        
+        // 跳转到发布页面
+        setTimeout(() => {
+          this.navigateToPublish()
+        }, 500)
+      } catch (error) {
+        console.error('保存失败:', error)
+        this.toast.showError('保存失败，请重试')
+      }
+    },
+    
+    // 跳转到发布页面
+    navigateToPublish() {
+      // 传递当前画布数据到发布页面
+      const canvasData = {
+        projectId: this.projectId,
+        boardId: this.boardId,
+        pixels: Array.from(this.displayPixels.entries()),
+        width: this.boardOffset.w,
+        height: this.boardOffset.h,
+        colors: this.paletteColors.map(c => c.code),
+        projectName: this.project?.name || '未命名画布'
+      }
+      
+      // 将数据存储到临时存储中
+      uni.setStorageSync('temp_publish_data', canvasData)
+      
+      // 添加页面切换动画
+      uni.navigateTo({
+        url: '/pages/publish-project/publish-project',
+        animationType: 'slide-in-right',
+        animationDuration: 300
+      })
     }
   }
 }

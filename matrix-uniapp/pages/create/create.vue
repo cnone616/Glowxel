@@ -13,7 +13,7 @@
     <view class="header">
       <text class="header-title">{{ showWizard ? '新建画布' : '创作中心' }}</text>
       <view v-if="showWizard" class="back-btn" @click="handleBack">
-        <text class="back-icon">‹</text>
+        <Icon name="direction-left" :size="40" color="var(--color-text-primary)" />
       </view>
     </view>
     
@@ -1276,86 +1276,79 @@ export default {
     },
     
     async handleCreate() {
+      // 导入画布草稿存储
+      const canvasStore = (await import('../../store/canvas.js')).default
+      
       if (this.mode === 'image' && this.previewPixels) {
-        // 使用预览数据直接创建
+        // 使用预览数据创建画布草稿
         this.isProcessing = true
         
         try {
-          const projectId = this.projectStore.addProject(
-            this.name,
-            this.customWidth,
-            this.customHeight,
-            this.selectedColors.size,
-            Array.from(this.selectedColors),
-            this.paddedWidth,
-            this.paddedHeight
-          )
-          
-          // 保存像素数据
-          const pixelsData = JSON.stringify(Array.from(this.previewPixels.entries()))
-          
-          // 检查数据大小
-          // #ifdef H5
-          const dataSizeKB = new Blob([pixelsData]).size / 1024
-          console.log(`像素数据大小: ${dataSizeKB.toFixed(2)} KB`)
-          
-          if (dataSizeKB > 5000) {
-            this.toast.showError('图片过大，建议使用较小的尺寸')
-            this.projectStore.deleteProject(projectId)
-            this.isProcessing = false
-            return
-          }
-          // #endif
-          
-          // #ifdef MP-WEIXIN
-          const dataSizeKB = pixelsData.length / 1024
-          console.log(`像素数据大小: ${dataSizeKB.toFixed(2)} KB`)
-          
-          if (dataSizeKB > 5000) {
-            this.toast.showError('图片过大，建议使用较小的尺寸')
-            this.projectStore.deleteProject(projectId)
-            this.isProcessing = false
-            return
-          }
-          // #endif
-          
-          uni.setStorageSync(`pixels-${projectId}`, pixelsData)
-          
-          // 生成并保存缩略图，完成后再跳转
-          this.saveThumbnailForProject(projectId, this.previewPixels, () => {
-            this.toast.showSuccess('画布创建成功！')
-            this.isProcessing = false
-            
-            // 回到创作中心主界面
-            this.showWizard = false
-            this.resetForm()
+          // 创建画布草稿而非直接发布作品
+          const draft = canvasStore.actions.createDraft({
+            name: this.name,
+            width: this.customWidth,
+            height: this.customHeight,
+            colors: Array.from(this.selectedColors)
           })
-        } catch (error) {
-          console.error('保存失败:', error)
-          this.toast.showError('保存失败，请重试')
+          
+          if (!draft) {
+            this.toast.showError('创建画布草稿失败')
+            this.isProcessing = false
+            return
+          }
+          
+          // 将预览像素数据保存到草稿
+          this.previewPixels.forEach((color, position) => {
+            const [x, y] = position.split(',').map(Number)
+            canvasStore.actions.updatePixel(x, y, color)
+          })
+          
+          // 保存草稿
+          const success = canvasStore.actions.saveCurrentDraft()
+          if (!success) {
+            this.toast.showError('保存画布草稿失败')
+            this.isProcessing = false
+            return
+          }
+          
+          this.toast.showSuccess('画布草稿创建成功！')
           this.isProcessing = false
-        }
-      } else if (this.mode === 'blank') {
-        // 空白画布直接创建
-        const projectId = this.projectStore.addProject(
-          this.name,
-          this.customWidth,
-          this.customHeight,
-          this.selectedColors.size,
-          Array.from(this.selectedColors),
-          this.paddedWidth,
-          this.paddedHeight
-        )
-        
-        console.log('空白画布创建，projectId:', projectId)
-        
-        // 空白画布生成一个空缩略图，完成后再跳转
-        this.saveThumbnailForProject(projectId, new Map(), () => {
-          this.toast.showSuccess('画布创建成功！')
+          
           // 回到创作中心主界面
           this.showWizard = false
           this.resetForm()
-        })
+          
+        } catch (error) {
+          console.error('创建画布草稿失败:', error)
+          this.toast.showError('创建画布草稿失败，请重试')
+          this.isProcessing = false
+        }
+      } else if (this.mode === 'blank') {
+        // 空白画布创建草稿
+        try {
+          const draft = canvasStore.actions.createDraft({
+            name: this.name,
+            width: this.customWidth,
+            height: this.customHeight,
+            colors: Array.from(this.selectedColors)
+          })
+          
+          if (!draft) {
+            this.toast.showError('创建画布草稿失败')
+            return
+          }
+          
+          this.toast.showSuccess('画布草稿创建成功！')
+          
+          // 回到创作中心主界面
+          this.showWizard = false
+          this.resetForm()
+          
+        } catch (error) {
+          console.error('创建画布草稿失败:', error)
+          this.toast.showError('创建画布草稿失败，请重试')
+        }
       }
     },
     

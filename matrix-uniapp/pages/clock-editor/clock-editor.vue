@@ -9,7 +9,7 @@
     <view class="header">
       <view class="header-left">
         <view class="back-btn" @click="goBack">
-          <text class="icon">‹</text>
+          <Icon name="direction-left" :size="40" color="var(--color-text-primary)" />
         </view>
         <view class="header-info">
           <text class="header-title">闹钟编辑器</text>

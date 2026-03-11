@@ -9,7 +9,7 @@
     <view class="header">
       <view class="header-left">
         <view class="back-btn" @click="goBack">
-          <text class="back-icon">‹</text>
+          <Icon name="direction-left" :size="40" color="var(--color-text-primary)" />
         </view>
         <view class="header-info">
           <text class="header-title">画布总览</text>
@@ -510,7 +510,7 @@ export default {
     
     goBack() {
       uni.reLaunch({
-        url: '/pages/library/library'
+        url: '/pages/create/create'
       })
     },
     

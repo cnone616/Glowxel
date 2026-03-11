@@ -560,7 +560,6 @@ export default {
 .main-content {
   flex: 1;
   overflow-y: auto;
-  padding-bottom: 160rpx;
 }
 
 /* 通用区块样式 */

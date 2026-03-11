@@ -9,7 +9,7 @@
     <view class="header">
       <view class="header-content">
         <view class="back-btn" @click="handleBack">
-          <Icon name="arrow-left" :size="40" color="#1F1F1F" />
+          <Icon name="direction-left" :size="40" color="#1F1F1F" />
         </view>
         <text class="header-title">{{ pageTitle }}</text>
         <view class="search-btn" @click="toggleSearch">
@@ -671,7 +671,7 @@ export default {
 .main-content {
   flex: 1;
   overflow-y: auto;
-  padding-bottom: 200rpx; /* 增加底部内边距以避免被底部导航栏遮挡 */
+  padding-bottom: 80rpx; /* 增加底部内边距以避免被底部导航栏遮挡 */
 }
 
 /* 内容区域 */

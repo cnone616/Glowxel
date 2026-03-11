@@ -1,12 +1,12 @@
 <template>
-  <view class="followers-page">
+  <view class="page-container">
     <!-- 状态栏占位 -->
     <!-- #ifdef MP-WEIXIN -->
-    <view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
+    <view class="status-bar" :style="getStatusBarStyle()"></view>
     <!-- #endif -->
     
     <!-- 导航栏 -->
-    <view class="navbar">
+    <view class="navbar" :style="getNavBarStyle()">
       <view class="nav-left" @click="goBack">
         <Icon name="direction-left" :size="32" color="var(--color-text-primary)" />
       </view>
@@ -26,7 +26,7 @@
           placeholder="搜索粉丝昵称..."
           focus
         />
-        <view v-if="searchQuery" class="clear-btn" @click="searchQuery = ''">
+        <view v-if="searchQuery" class="clear-btn" @click="clearSearch">
           <Icon name="close" :size="24" />
         </view>
       </view>
@@ -34,103 +34,123 @@
     
     <!-- 统计信息 -->
     <view class="stats-section">
-      <view class="stat-item">
-        <text class="stat-number">{{ totalFollowers }}</text>
-        <text class="stat-label">粉丝</text>
-      </view>
-      <view class="stat-divider"></view>
-      <view class="stat-item">
-        <text class="stat-number">{{ mutualFollows }}</text>
-        <text class="stat-label">互相关注</text>
-      </view>
-      <view class="stat-divider"></view>
-      <view class="stat-item">
-        <text class="stat-number">{{ recentFollows }}</text>
-        <text class="stat-label">本周新增</text>
+      <view class="stats-container">
+        <view class="stat-item">
+          <text class="stat-number">{{ totalFollowers }}</text>
+          <text class="stat-label">粉丝</text>
+        </view>
+        <view class="stat-divider"></view>
+        <view class="stat-item">
+          <text class="stat-number">{{ mutualFollows }}</text>
+          <text class="stat-label">互相关注</text>
+        </view>
+        <view class="stat-divider"></view>
+        <view class="stat-item">
+          <text class="stat-number">{{ recentFollows }}</text>
+          <text class="stat-label">本周新增</text>
+        </view>
       </view>
     </view>
     
-    <!-- 粉丝列表 -->
-    <scroll-view scroll-y class="content" @scrolltolower="loadMore">
-      <view v-if="filteredFollowers.length === 0" class="empty-state">
-        <Icon name="users" :size="120" color="var(--color-text-disabled)" />
-        <text class="empty-title">{{ searchQuery ? '未找到相关粉丝' : '暂无粉丝' }}</text>
-        <text class="empty-desc">{{ searchQuery ? '试试其他关键词' : '分享你的作品来获得更多粉丝吧' }}</text>
-      </view>
-      
-      <view v-else class="followers-list">
-        <view 
-          v-for="follower in filteredFollowers"
-          :key="follower.id"
-          class="follower-item"
-          @click="goToUserProfile(follower)"
-        >
-          <!-- 头像 -->
-          <view class="follower-avatar">
-            <image 
-              v-if="follower.avatar"
-              :src="follower.avatar"
-              class="avatar-image"
-              mode="aspectFill"
-            />
-            <view v-else class="avatar-placeholder">
-              <Icon name="user" :size="60" color="var(--color-text-disabled)" />
+    <!-- 主内容区域 -->
+    <view class="page-content" :style="getContentStyle()">
+      <scroll-view 
+        scroll-y 
+        class="scroll-view"
+        :style="getScrollViewStyle()"
+        @scrolltolower="loadMore"
+        :enhanced="true"
+        :show-scrollbar="false"
+      >
+        <!-- 空状态 -->
+        <view v-if="filteredFollowers.length === 0" class="empty-state">
+          <view class="empty-icon">
+            <Icon name="users" :size="120" color="var(--color-text-disabled)" />
+          </view>
+          <text class="empty-title">{{ searchQuery ? '未找到相关粉丝' : '暂无粉丝' }}</text>
+          <text class="empty-desc">{{ searchQuery ? '试试其他关键词' : '分享你的作品来获得更多粉丝吧' }}</text>
+        </view>
+        
+        <!-- 粉丝列表 -->
+        <view v-else class="list-container">
+          <view 
+            v-for="(follower, index) in filteredFollowers"
+            :key="follower.id"
+            class="card-item follower-item"
+            :class="{ 'list-item-enter': index < 10 }"
+            @click="goToUserProfile(follower)"
+          >
+            <!-- 头像 -->
+            <view class="follower-avatar">
+              <image 
+                v-if="follower.avatar"
+                :src="follower.avatar"
+                class="avatar-image"
+                mode="aspectFill"
+                :lazy-load="true"
+              />
+              <view v-else class="avatar-placeholder">
+                <Icon name="user" :size="60" color="var(--color-text-disabled)" />
+              </view>
+              
+              <!-- 在线状态 -->
+              <view v-if="follower.isOnline" class="online-indicator"></view>
             </view>
             
-            <!-- 在线状态 -->
-            <view v-if="follower.isOnline" class="online-indicator"></view>
-          </view>
-          
-          <!-- 用户信息 -->
-          <view class="follower-info">
-            <view class="user-name-row">
-              <text class="follower-name">{{ follower.nickname }}</text>
-              <view v-if="follower.isMutual" class="mutual-badge">
-                <Icon name="heart" :size="20" />
-                <text class="mutual-text">互关</text>
+            <!-- 用户信息 -->
+            <view class="follower-info">
+              <view class="user-name-row">
+                <text class="follower-name">{{ follower.nickname }}</text>
+                <view v-if="follower.isMutual" class="mutual-badge">
+                  <Icon name="heart" :size="20" />
+                  <text class="mutual-text">互关</text>
+                </view>
+              </view>
+              
+              <text class="follower-bio">{{ follower.bio || '这个人很懒，什么都没写' }}</text>
+              
+              <view class="follower-meta">
+                <text class="follow-time">{{ formatFollowTime(follower.followTime) }}</text>
+                <text class="works-count">{{ follower.worksCount }} 作品</text>
               </view>
             </view>
             
-            <text class="follower-bio">{{ follower.bio || '这个人很懒，什么都没写' }}</text>
-            
-            <view class="follower-meta">
-              <text class="follow-time">{{ formatFollowTime(follower.followTime) }}</text>
-              <text class="works-count">{{ follower.worksCount }} 作品</text>
+            <!-- 操作按钮 -->
+            <view class="follower-actions">
+              <button 
+                v-if="!follower.isFollowing"
+                class="btn btn-primary follow-btn"
+                @click.stop="followUser(follower)"
+              >
+                <Icon name="plus" :size="24" />
+                <text>关注</text>
+              </button>
+              
+              <button 
+                v-else
+                class="btn btn-secondary following-btn"
+                @click.stop="unfollowUser(follower)"
+              >
+                <Icon name="check" :size="24" />
+                <text>已关注</text>
+              </button>
             </view>
           </view>
-          
-          <!-- 操作按钮 -->
-          <view class="follower-actions">
-            <button 
-              v-if="!follower.isFollowing"
-              class="follow-btn"
-              @click.stop="followUser(follower)"
-            >
-              <Icon name="plus" :size="24" />
-              <text>关注</text>
-            </button>
-            
-            <button 
-              v-else
-              class="following-btn"
-              @click.stop="unfollowUser(follower)"
-            >
-              <Icon name="check" :size="24" />
-              <text>已关注</text>
-            </button>
-          </view>
         </view>
-      </view>
-      
-      <!-- 加载更多 -->
-      <view v-if="hasMore && !isLoading" class="load-more" @click="loadMore">
-        <text class="load-text">点击加载更多</text>
-      </view>
-      
-      <view v-if="isLoading" class="loading">
-        <text class="loading-text">加载中...</text>
-      </view>
-    </scroll-view>
+        
+        <!-- 加载更多 -->
+        <view v-if="hasMore && !isLoading" class="load-more" @click="loadMore">
+          <text>点击加载更多</text>
+        </view>
+        
+        <view v-if="isLoading" class="loading-container">
+          <text class="loading-text">加载中...</text>
+        </view>
+        
+        <!-- 底部安全区域 -->
+        <view class="safe-area-bottom" :style="getSafeAreaBottomStyle()"></view>
+      </scroll-view>
+    </view>
     
     <!-- Toast -->
     <Toast ref="toastRef" />
@@ -139,12 +159,12 @@
 
 <script>
 import { useToast } from '../../composables/useToast.js'
-import statusBarMixin from '../../mixins/statusBar.js'
+import pageLayoutMixin from '../../mixins/pageLayout.js'
 import Icon from '../../components/Icon.vue'
 import Toast from '../../components/Toast.vue'
 
 export default {
-  mixins: [statusBarMixin],
+  mixins: [pageLayoutMixin],
   components: {
     Icon,
     Toast
@@ -262,6 +282,11 @@ export default {
       uni.navigateBack()
     },
     
+    clearSearch() {
+      this.searchQuery = ''
+      this.vibrate('light')
+    },
+    
     goToUserProfile(user) {
       uni.navigateTo({
         url: `/pages/user-detail/user-detail?id=${user.id}`
@@ -270,16 +295,15 @@ export default {
     
     async followUser(user) {
       try {
+        this.vibrate('light')
+        
         // 模拟关注API调用
         await new Promise(resolve => setTimeout(resolve, 500))
         
         user.isFollowing = true
-        this.toast.showSuccess(`已关注 ${user.nickname}`)
-        
-        // 触觉反馈
-        uni.vibrateShort()
+        this.showSuccess(`已关注 ${user.nickname}`)
       } catch (error) {
-        this.toast.showError('关注失败，请重试')
+        this.showError('关注失败，请重试')
       }
     },
     
@@ -290,6 +314,8 @@ export default {
         success: async (res) => {
           if (res.confirm) {
             try {
+              this.vibrate('light')
+              
               // 模拟取消关注API调用
               await new Promise(resolve => setTimeout(resolve, 500))
               
@@ -297,14 +323,12 @@ export default {
               user.isMutual = false
               this.toast.showInfo(`已取消关注 ${user.nickname}`)
             } catch (error) {
-              this.toast.showError('操作失败，请重试')
+              this.showError('操作失败，请重试')
             }
           }
         }
       })
     },
-    
-
     
     async loadMore() {
       if (this.isLoading || !this.hasMore) return
@@ -315,14 +339,11 @@ export default {
         // 模拟加载更多数据
         await new Promise(resolve => setTimeout(resolve, 1000))
         
-        // 这里应该是实际的API调用
-        // const newFollowers = await api.getFollowers(this.currentPage + 1)
-        
         // 模拟没有更多数据
         this.hasMore = false
         this.toast.showInfo('已加载全部粉丝')
       } catch (error) {
-        this.toast.showError('加载失败，请重试')
+        this.showError('加载失败，请重试')
       } finally {
         this.isLoading = false
       }
@@ -345,157 +366,11 @@ export default {
 </script>
 
 <style scoped>
-.followers-page {
-  height: 100vh;
-  background-color: var(--color-app-background);
-  display: flex;
-  flex-direction: column;
-}
-
-.navbar {
-  height: 88rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0 32rpx;
-  background-color: var(--color-card-background);
-  border-bottom: 2rpx solid var(--border-primary);
-  position: relative;
-}
-
-.nav-left {
-  position: absolute;
-  left: 32rpx;
-  width: 80rpx;
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-}
-
-.nav-right {
-  position: absolute;
-  right: 32rpx;
-  width: 80rpx;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-}
-
-.nav-title {
-  font-size: 32rpx;
-  font-weight: 600;
-  color: var(--color-text-primary);
-}
-
-.search-section {
-  background-color: var(--color-card-background);
-  padding: 24rpx 32rpx;
-  border-bottom: 2rpx solid var(--border-primary);
-}
-
-.search-bar {
-  display: flex;
-  align-items: center;
-  gap: 16rpx;
-  background-color: var(--color-app-background);
-  border: 2rpx solid var(--border-primary);
-  border-radius: 12rpx;
-  padding: 16rpx 24rpx;
-}
-
-.search-input {
-  flex: 1;
-  font-size: 28rpx;
-  color: var(--color-text-primary);
-}
-
-.clear-btn {
-  padding: 8rpx;
-  border-radius: 50%;
-  background-color: var(--color-text-disabled);
-  color: #FFFFFF;
-}
-
-.stats-section {
-  display: flex;
-  align-items: center;
-  background-color: var(--color-card-background);
-  padding: 32rpx;
-  border-bottom: 2rpx solid var(--border-primary);
-}
-
-.stat-item {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8rpx;
-}
-
-.stat-number {
-  font-size: 36rpx;
-  font-weight: 700;
-  color: var(--color-text-primary);
-}
-
-.stat-label {
-  font-size: 24rpx;
-  color: var(--color-text-secondary);
-}
-
-.stat-divider {
-  width: 2rpx;
-  height: 60rpx;
-  background-color: var(--border-primary);
-  margin: 0 32rpx;
-}
-
-.content {
-  flex: 1;
-  padding: 32rpx;
-}
-
-.empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  height: 60vh;
-  gap: 24rpx;
-}
-
-.empty-title {
-  font-size: 32rpx;
-  font-weight: 600;
-  color: var(--color-text-secondary);
-}
-
-.empty-desc {
-  font-size: 24rpx;
-  color: var(--color-text-disabled);
-  text-align: center;
-}
-
-.followers-list {
-  display: flex;
-  flex-direction: column;
-  gap: 24rpx;
-}
-
+/* 粉丝项目特定样式 */
 .follower-item {
   display: flex;
   align-items: center;
   gap: 24rpx;
-  background-color: var(--color-card-background);
-  border-radius: 16rpx;
-  padding: 32rpx;
-  box-shadow: var(--shadow-card);
-  transition: all 0.2s ease;
-}
-
-.follower-item:active {
-  transform: scale(0.98);
-  box-shadow: var(--shadow-floating);
 }
 
 .follower-avatar {
@@ -537,6 +412,7 @@ export default {
   display: flex;
   flex-direction: column;
   gap: 8rpx;
+  min-width: 0; /* 防止文本溢出 */
 }
 
 .user-name-row {
@@ -573,6 +449,7 @@ export default {
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  line-height: 1.4;
 }
 
 .follower-meta {
@@ -590,6 +467,7 @@ export default {
   flex-direction: column;
   gap: 12rpx;
   align-items: center;
+  flex-shrink: 0;
 }
 
 .follow-btn, .following-btn {
@@ -601,47 +479,21 @@ export default {
   border-radius: 12rpx;
   font-size: 24rpx;
   font-weight: 500;
-  transition: all 0.2s ease;
+  min-width: 120rpx;
+  justify-content: center;
 }
-
-.follow-btn {
-  background-color: var(--color-brand-primary);
-  color: #FFFFFF;
-}
-
-.following-btn {
-  background-color: var(--color-app-background);
-  color: var(--color-text-secondary);
-  border: 2rpx solid var(--border-primary);
-}
-
-
 
 .follow-btn::after, .following-btn::after {
   border: none;
 }
 
-.follow-btn:active {
-  background-color: var(--accent-hover);
-  transform: scale(0.95);
-}
-
-.following-btn:active {
-  background-color: var(--border-primary);
-  transform: scale(0.95);
-}
-
-.load-more, .loading {
-  text-align: center;
-  padding: 32rpx;
-}
-
-.load-text, .loading-text {
-  font-size: 24rpx;
-  color: var(--color-text-disabled);
-}
-
-.load-more:active {
-  opacity: 0.7;
+.clear-btn {
+  padding: 8rpx;
+  border-radius: 50%;
+  background-color: var(--color-text-disabled);
+  color: #FFFFFF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 </style>

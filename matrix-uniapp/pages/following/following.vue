@@ -8,7 +8,7 @@
     <!-- 导航栏 -->
     <view class="navbar">
       <view class="nav-left" @click="goBack">
-        <Icon name="arrow-left" :size="32" />
+        <Icon name="direction-left" :size="32" color="var(--color-text-primary)" />
       </view>
       <text class="nav-title">关注</text>
       <view class="nav-right" @click="showSearchBar = !showSearchBar">
@@ -118,10 +118,6 @@
           <view class="user-actions">
             <button class="unfollow-btn" @click.stop="unfollowUser(user)">
               <text>取消关注</text>
-            </button>
-            
-            <button class="message-btn" @click.stop="sendMessage(user)">
-              <Icon name="message" :size="24" />
             </button>
           </view>
         </view>
@@ -370,9 +366,7 @@ export default {
       })
     },
     
-    sendMessage(user) {
-      this.toast.showInfo('私信功能开发中')
-    },
+
     
     async loadMore() {
       if (this.isLoading || !this.hasMore) return
@@ -432,19 +426,28 @@ export default {
   height: 88rpx;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
   padding: 0 32rpx;
   background-color: var(--color-card-background);
   border-bottom: 2rpx solid var(--border-primary);
+  position: relative;
 }
 
-.nav-left, .nav-right {
+.nav-left {
+  position: absolute;
+  left: 32rpx;
   width: 80rpx;
   display: flex;
   align-items: center;
+  justify-content: flex-start;
 }
 
 .nav-right {
+  position: absolute;
+  right: 32rpx;
+  width: 80rpx;
+  display: flex;
+  align-items: center;
   justify-content: flex-end;
 }
 
@@ -759,20 +762,13 @@ export default {
   border: 2rpx solid var(--border-primary);
 }
 
-.message-btn {
-  background-color: var(--color-app-background);
-  color: var(--color-text-secondary);
-  border: 2rpx solid var(--border-primary);
-  padding: 12rpx;
-  min-width: 64rpx;
-  justify-content: center;
-}
 
-.unfollow-btn::after, .message-btn::after {
+
+.unfollow-btn::after {
   border: none;
 }
 
-.unfollow-btn:active, .message-btn:active {
+.unfollow-btn:active {
   background-color: var(--border-primary);
   transform: scale(0.95);
 }

@@ -8,7 +8,7 @@
     <!-- 导航栏 -->
     <view class="navbar">
       <view class="nav-left" @click="goBack">
-        <Icon name="arrow-left" :size="32" />
+        <Icon name="direction-left" :size="32" color="var(--color-text-primary)" />
       </view>
       <text class="nav-title">我的收藏</text>
       <view class="nav-right" @click="toggleEditMode">
@@ -374,19 +374,29 @@ export default {
   height: 88rpx;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
   padding: 0 32rpx;
   background-color: var(--color-card-background);
   border-bottom: 2rpx solid var(--border-primary);
+  position: relative;
+  width: calc(100% * 64rpx)
 }
 
-.nav-left, .nav-right {
+.nav-left {
+  position: absolute;
+  left: 32rpx;
   width: 120rpx;
   display: flex;
   align-items: center;
+  justify-content: flex-start;
 }
 
 .nav-right {
+  position: absolute;
+  right: 32rpx;
+  width: 120rpx;
+  display: flex;
+  align-items: center;
   justify-content: flex-end;
 }
 
@@ -448,6 +458,7 @@ export default {
 .content {
   flex: 1;
   padding: 32rpx;
+  width: calc(100% - 64rpx)
 }
 
 .empty-state {

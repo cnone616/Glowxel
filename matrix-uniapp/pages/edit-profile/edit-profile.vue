@@ -8,12 +8,10 @@
     <!-- 导航栏 -->
     <view class="navbar">
       <view class="nav-left" @click="goBack">
-        <Icon name="arrow-left" :size="32" />
+        <Icon name="direction-left" :size="32" color="var(--color-text-primary)" />
       </view>
       <text class="nav-title">编辑资料</text>
-      <view class="nav-right" @click="handleSave">
-        <text class="save-btn">保存</text>
-      </view>
+      <view class="nav-right"></view>
     </view>
     
     <scroll-view scroll-y class="content">
@@ -126,6 +124,13 @@
         </view>
       </view>
     </scroll-view>
+    
+    <!-- 底部保存按钮 -->
+    <view class="footer-actions">
+      <view class="save-button" @click="handleSave">
+        <text class="save-button-text">保存</text>
+      </view>
+    </view>
     
     <!-- Toast -->
     <Toast ref="toastRef" />
@@ -262,19 +267,28 @@ export default {
   height: 88rpx;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
   padding: 0 32rpx;
   background-color: var(--color-card-background);
   border-bottom: 2rpx solid var(--border-primary);
+  position: relative;
 }
 
-.nav-left, .nav-right {
+.nav-left {
+  position: absolute;
+  left: 32rpx;
   width: 120rpx;
   display: flex;
   align-items: center;
+  justify-content: flex-start;
 }
 
 .nav-right {
+  position: absolute;
+  right: 32rpx;
+  width: 120rpx;
+  display: flex;
+  align-items: center;
   justify-content: flex-end;
 }
 
@@ -292,7 +306,8 @@ export default {
 
 .content {
   flex: 1;
-  padding: 32rpx 32rpx 80rpx;
+  padding: 32rpx 32rpx 160rpx;
+  overflow-y: scroll;
 }
 
 .avatar-section {
@@ -496,4 +511,42 @@ export default {
   color: var(--color-text-secondary);
   margin-top: 4rpx;
 }
+
+/* 底部操作栏 */
+.footer-actions {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 24rpx 32rpx;
+  padding-bottom: calc(24rpx + env(safe-area-inset-bottom));
+  background-color: var(--color-card-background);
+  border-top: 2rpx solid var(--border-primary);
+  box-shadow: 0 -4rpx 16rpx rgba(0, 0, 0, 0.05);
+  z-index: 100;
+}
+
+.save-button {
+  width: 100%;
+  height: 88rpx;
+  background: linear-gradient(135deg, var(--color-brand-primary), var(--color-brand-accent));
+  border-radius: 16rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8rpx 24rpx rgba(79, 127, 255, 0.3);
+  transition: all 0.2s ease;
+}
+
+.save-button:active {
+  transform: scale(0.98);
+  box-shadow: 0 4rpx 12rpx rgba(79, 127, 255, 0.2);
+}
+
+.save-button-text {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #FFFFFF;
+}
+
 </style>

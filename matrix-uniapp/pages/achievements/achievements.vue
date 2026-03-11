@@ -8,7 +8,7 @@
     <!-- 导航栏 -->
     <view class="navbar">
       <view class="nav-left" @click="goBack">
-        <Icon name="arrow-left" :size="32" />
+        <Icon name="direction-left" :size="32" color="var(--color-text-primary)" />
       </view>
       <text class="nav-title">成就</text>
       <view class="nav-right" @click="shareAchievements">
@@ -457,19 +457,28 @@ export default {
   height: 88rpx;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
   padding: 0 32rpx;
   background-color: var(--color-card-background);
   border-bottom: 2rpx solid var(--border-primary);
+  position: relative;
 }
 
-.nav-left, .nav-right {
+.nav-left {
+  position: absolute;
+  left: 32rpx;
   width: 80rpx;
   display: flex;
   align-items: center;
+  justify-content: flex-start;
 }
 
 .nav-right {
+  position: absolute;
+  right: 32rpx;
+  width: 80rpx;
+  display: flex;
+  align-items: center;
   justify-content: flex-end;
 }
 
@@ -589,15 +598,19 @@ export default {
 .content {
   flex: 1;
   padding: 32rpx;
+  overflow-y: auto;
+  width: calc(100% - 64rpx)
 }
 
 .achievements-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  display: flex;
+  flex-wrap: wrap;
   gap: 24rpx;
+  justify-content: space-between;
 }
 
 .achievement-card {
+  width: calc(50% - 12rpx);
   background-color: var(--color-card-background);
   border-radius: 16rpx;
   padding: 32rpx;
@@ -605,6 +618,7 @@ export default {
   transition: all 0.2s ease;
   position: relative;
   overflow: hidden;
+  box-sizing: border-box;
 }
 
 .achievement-card:active {
@@ -664,6 +678,9 @@ export default {
 
 .achievement-info {
   text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
 .achievement-title {
@@ -672,6 +689,8 @@ export default {
   color: var(--color-text-primary);
   margin-bottom: 8rpx;
   display: block;
+  word-break: break-word;
+  width: 100%;
 }
 
 .achievement-desc {
@@ -680,10 +699,13 @@ export default {
   margin-bottom: 16rpx;
   display: block;
   line-height: 1.4;
+  word-break: break-word;
+  width: 100%;
 }
 
 .achievement-progress {
   margin-bottom: 16rpx;
+  width: 100%;
 }
 
 .progress-info {
@@ -691,6 +713,7 @@ export default {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 8rpx;
+  width: 100%;
 }
 
 .progress-text, .progress-percent {
@@ -703,6 +726,7 @@ export default {
   background-color: var(--color-app-background);
   border-radius: 4rpx;
   overflow: hidden;
+  width: 100%;
 }
 
 .progress-fill-small {

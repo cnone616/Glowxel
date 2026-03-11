@@ -55,4 +55,3 @@ Desktop.ini
 
 # 排除重要的 logo
 !static/matrix-logo.png
-!image.png

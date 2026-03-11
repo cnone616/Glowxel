@@ -8,7 +8,7 @@
     <!-- 导航栏 -->
     <view class="navbar">
       <view class="nav-left" @click="goBack">
-        <Icon name="arrow-left" :size="32" />
+        <Icon name="direction-left" :size="32" color="var(--color-text-primary)" />
       </view>
       <text class="nav-title">设置</text>
       <view class="nav-right"></view>
@@ -52,126 +52,6 @@
         </view>
       </view>
       
-      <!-- 应用设置 -->
-      <view class="settings-section">
-        <view class="section-header">
-          <text class="section-title">应用设置</text>
-        </view>
-        
-        <view class="setting-item switch-item">
-          <view class="setting-left">
-            <view class="setting-icon">
-              <Icon name="palette" :size="40" color="var(--color-brand-primary)" />
-            </view>
-            <view class="setting-info">
-              <text class="setting-label">深色模式</text>
-              <text class="setting-desc">切换应用主题外观</text>
-            </view>
-          </view>
-          <view class="setting-right">
-            <switch 
-              :checked="settings.darkMode" 
-              @change="toggleDarkMode"
-              color="var(--color-brand-primary)"
-            />
-          </view>
-        </view>
-        
-        <view class="setting-item switch-item">
-          <view class="setting-left">
-            <view class="setting-icon">
-              <Icon name="vibrate" :size="40" color="var(--color-brand-primary)" />
-            </view>
-            <view class="setting-info">
-              <text class="setting-label">触觉反馈</text>
-              <text class="setting-desc">操作时的震动反馈</text>
-            </view>
-          </view>
-          <view class="setting-right">
-            <switch 
-              :checked="settings.hapticFeedback" 
-              @change="toggleHapticFeedback"
-              color="var(--color-brand-primary)"
-            />
-          </view>
-        </view>
-        
-        <view class="setting-item" @click="showLanguageModal = true">
-          <view class="setting-left">
-            <view class="setting-icon">
-              <Icon name="globe" :size="40" color="var(--color-brand-primary)" />
-            </view>
-            <view class="setting-info">
-              <text class="setting-label">语言</text>
-              <text class="setting-desc">{{ getCurrentLanguageLabel() }}</text>
-            </view>
-          </view>
-          <view class="setting-right">
-            <Icon name="arrow-right" :size="32" color="var(--color-text-disabled)" />
-          </view>
-        </view>
-      </view>
-      
-      <!-- 数据设置 -->
-      <view class="settings-section">
-        <view class="section-header">
-          <text class="section-title">数据设置</text>
-        </view>
-        
-        <view class="setting-item switch-item">
-          <view class="setting-left">
-            <view class="setting-icon">
-              <Icon name="cloud" :size="40" color="var(--color-brand-primary)" />
-            </view>
-            <view class="setting-info">
-              <text class="setting-label">自动备份</text>
-              <text class="setting-desc">自动备份作品到云端</text>
-            </view>
-          </view>
-          <view class="setting-right">
-            <switch 
-              :checked="settings.autoBackup" 
-              @change="toggleAutoBackup"
-              color="var(--color-brand-primary)"
-            />
-          </view>
-        </view>
-        
-        <view class="setting-item switch-item">
-          <view class="setting-left">
-            <view class="setting-icon">
-              <Icon name="wifi" :size="40" color="var(--color-brand-primary)" />
-            </view>
-            <view class="setting-info">
-              <text class="setting-label">仅WiFi同步</text>
-              <text class="setting-desc">只在WiFi环境下同步数据</text>
-            </view>
-          </view>
-          <view class="setting-right">
-            <switch 
-              :checked="settings.wifiOnlySync" 
-              @change="toggleWifiOnlySync"
-              color="var(--color-brand-primary)"
-            />
-          </view>
-        </view>
-        
-        <view class="setting-item" @click="showStorageInfo">
-          <view class="setting-left">
-            <view class="setting-icon">
-              <Icon name="storage" :size="40" color="var(--color-brand-primary)" />
-            </view>
-            <view class="setting-info">
-              <text class="setting-label">存储空间</text>
-              <text class="setting-desc">查看应用存储使用情况</text>
-            </view>
-          </view>
-          <view class="setting-right">
-            <text class="storage-size">{{ storageInfo.used }}</text>
-            <Icon name="arrow-right" :size="32" color="var(--color-text-disabled)" />
-          </view>
-        </view>
-      </view>
       
       <!-- 通知设置 -->
       <view class="settings-section">
@@ -485,16 +365,29 @@ export default {
   height: 88rpx;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
   padding: 0 32rpx;
   background-color: var(--color-card-background);
   border-bottom: 2rpx solid var(--border-primary);
+  position: relative;
 }
 
-.nav-left, .nav-right {
+.nav-left {
+  position: absolute;
+  left: 32rpx;
   width: 80rpx;
   display: flex;
   align-items: center;
+  justify-content: flex-start;
+}
+
+.nav-right {
+  position: absolute;
+  right: 32rpx;
+  width: 80rpx;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
 }
 
 .nav-title {
@@ -506,6 +399,8 @@ export default {
 .content {
   flex: 1;
   padding: 32rpx 32rpx 80rpx;
+  overflow-y: scroll;
+  width: calc(100% - 64rpx)
 }
 
 .settings-section {
