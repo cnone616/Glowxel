@@ -8,12 +8,8 @@
     <!-- 头部 -->
     <view class="header">
       <view class="header-left">
-        <view class="back-btn" @click="goBack">
-          <text class="icon">‹</text>
-        </view>
         <view class="header-info">
-          <text class="header-title">设备连接</text>
-          <text class="header-subtitle">ESP32 矩阵控制器</text>
+          <text class="header-title">设备控制</text>
         </view>
       </view>
     </view>
@@ -332,7 +328,7 @@ export default {
         
         if (mode === 'clock') {
           this.toast.showSuccess('已切换到闹钟模式')
-        } else {
+        } else if (mode === 'canvas') {
           this.toast.showSuccess('已切换到画板模式')
         }
       } catch (err) {

@@ -9,11 +9,11 @@
     <view class="header">
       <view class="header-content">
         <view class="back-btn" @click="handleBack">
-          <Icon name="fanhui" :size="40" color="#FFFFFF" />
+          <Icon name="direction-left" :size="40" color="#FFFFFF" />
         </view>
         <text class="header-title">作品详情</text>
         <view class="more-btn" @click="showMoreActions">
-          <Icon name="gengduo" :size="40" color="#FFFFFF" />
+          <Icon name="more-horizontal" :size="40" color="#FFFFFF" />
         </view>
       </view>
     </view>

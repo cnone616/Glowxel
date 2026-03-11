@@ -51,7 +51,7 @@ export default {
 }
 
 .text-content {
-  color: #00f3ff;
+  color: #4F7FFF;
   font-family: monospace;
   font-weight: bold;
   letter-spacing: 0.15em;

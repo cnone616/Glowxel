@@ -8,7 +8,7 @@
     <!-- 顶部导航 -->
     <view class="header">
       <view class="back-btn" @click="handleBack">
-        <Icon name="arrow-left" :size="40" color="#FFFFFF" />
+        <Icon name="direction-left" :size="40" color="#FFFFFF" />
       </view>
       <view class="header-actions">
         <view class="action-btn" @click="handleShare">

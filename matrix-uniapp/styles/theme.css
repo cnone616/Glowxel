@@ -3,6 +3,9 @@
 /* 引入浅色主题文件 */
 @import './themes/light.css';
 
+/* 引入布局系统 */
+@import './layout.css';
+
 /* ========== 通用样式 ========== */
 .container {
   background-color: var(--color-app-background);

@@ -89,19 +89,7 @@
           </view>
         </view>
 
-        <!-- 我的设备 -->
-        <view class="menu-item" @click="goToMyDevices">
-          <view class="menu-left">
-            <view class="menu-icon">
-              <Icon name="link" :size="40" color="#4F7FFF" />
-            </view>
-            <text class="menu-label">我的设备</text>
-          </view>
-          <view class="menu-right">
-            <text class="menu-count">3</text>
-            <Icon name="arrow-right" :size="32" color="#AAAAAA" />
-          </view>
-        </view>
+
 
         <!-- 成就 -->
         <view class="menu-item" @click="goToAchievements">
@@ -247,12 +235,7 @@ export default {
       })
     },
 
-    // 跳转到我的设备
-    goToMyDevices() {
-      uni.navigateTo({
-        url: '/pages/control/control'
-      })
-    },
+
 
     // 跳转到成就页面
     goToAchievements() {

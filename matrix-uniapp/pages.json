@@ -212,6 +212,15 @@
 				"backgroundColor": "#1a1a1a",
 				"enablePullDownRefresh": false
 			}
+		},
+		{
+			"path": "pages/publish-project/publish-project",
+			"style": {
+				"navigationStyle": "custom",
+				"navigationBarTextStyle": "white",
+				"backgroundColor": "#1a1a1a",
+				"enablePullDownRefresh": false
+			}
 		}
 	],
 	"globalStyle": {
@@ -242,16 +251,16 @@
 				"text": "首页"
 			},
 			{
-				"pagePath": "pages/create/create",
-				"iconPath": "static/tabbar/create.png",
-				"selectedIconPath": "static/tabbar/create-active.png",
-				"text": "创作"
-			},
-			{
 				"pagePath": "pages/community/community",
 				"iconPath": "static/tabbar/community.png",
 				"selectedIconPath": "static/tabbar/community-active.png",
 				"text": "社区"
+			},
+			{
+				"pagePath": "pages/create/create",
+				"iconPath": "static/tabbar/create.png",
+				"selectedIconPath": "static/tabbar/create-active.png",
+				"text": "创作"
 			},
 			{
 				"pagePath": "pages/control/control",
