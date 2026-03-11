@@ -347,7 +347,6 @@ export default {
   align-items: center;
   justify-content: center;
   gap: 12rpx;
-  width: 100%;
   padding: 16rpx 24rpx;
   border-radius: var(--radius-small);
   transition: all 0.2s ease;
