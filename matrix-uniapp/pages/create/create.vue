@@ -5,15 +5,12 @@
     <view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
     <!-- #endif -->
     
-    <!-- 背景装饰 -->
-    <view class="bg-decoration bg-decoration-1"></view>
-    <view class="bg-decoration bg-decoration-2"></view>
-    
     <!-- 顶部栏 -->
     <view class="header">
-      <text class="header-title">{{ showWizard ? '新建画布' : '创作中心' }}</text>
-      <view v-if="showWizard" class="back-btn" @click="handleBack">
-        <Icon name="direction-left" :size="40" color="var(--color-text-primary)" />
+      <view class="header-content">
+        <text class="header-title">创作中心</text>
+        <view class="header-actions">
+        </view>
       </view>
     </view>
     
@@ -21,7 +18,6 @@
     <scroll-view v-if="!showWizard" scroll-y class="main-content">
       <!-- 快速开始 -->
       <view class="quick-actions">
-        <text class="section-title">快速开始</text>
         <view class="action-grid">
           <view class="action-card" @click="startBlankCanvas">
             <view class="action-icon">
@@ -1643,55 +1639,11 @@ export default {
   color: #FFFFFF;
 }
 
-/* 背景装饰 */
-.bg-decoration {
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(120rpx);
-  opacity: 0.1;
-  pointer-events: none;
-  z-index: 0;
-}
-
 /* 状态栏占位 */
 .status-bar {
   background-color: var(--color-app-background);
   flex-shrink: 0;
 }
-
-.bg-decoration-1 {
-  top: 0;
-  right: 0;
-  width: 400rpx;
-  height: 400rpx;
-  background-color: var(--color-brand-primary);
-}
-
-.bg-decoration-2 {
-  bottom: 0;
-  left: 0;
-  width: 400rpx;
-  height: 400rpx;
-  background-color: var(--color-brand-accent);
-}
-
-.header {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-  padding: 32rpx;
-  z-index: 10;
-  flex-shrink: 0;
-  box-sizing: border-box;
-}
-
-/* 小程序需要额外的顶部padding */
-/* #ifdef MP-WEIXIN */
-.header {
-  padding-top: 16rpx;
-}
-/* #endif */
 
 .back-btn {
   position: absolute;
@@ -1710,10 +1662,24 @@ export default {
   line-height: 1;
 }
 
+/* 顶部导航 */
+.header {
+  background-color: var(--color-card-background);
+  border-bottom: 1rpx solid var(--border-primary);
+  flex-shrink: 0;
+}
+
+.header-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24rpx 32rpx;
+}
+
 .header-title {
-  font-size: 40rpx;
-  font-weight: 300;
-  color: var(--color-text-primary);
+font-size: 36rpx;
+font-weight: 700;
+color: var(--color-text-primary);
 }
 
 .content-area {

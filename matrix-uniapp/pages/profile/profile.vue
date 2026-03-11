@@ -79,7 +79,7 @@
         <view class="menu-item" @click="goToMyFavorites">
           <view class="menu-left">
             <view class="menu-icon">
-              <Icon name="bookmark" :size="40" color="#4F7FFF" />
+              <Icon name="favorite" :size="40" color="#4F7FFF" />
             </view>
             <text class="menu-label">我的收藏</text>
           </view>
@@ -95,7 +95,7 @@
         <view class="menu-item" @click="goToAchievements">
           <view class="menu-left">
             <view class="menu-icon">
-              <Icon name="award" :size="40" color="#4F7FFF" />
+              <Icon name="task" :size="40" color="#4F7FFF" />
             </view>
             <text class="menu-label">成就</text>
           </view>
@@ -109,7 +109,7 @@
         <view v-if="userStore.hasLogin" class="menu-item" @click="goToCloudSync">
           <view class="menu-left">
             <view class="menu-icon">
-              <Icon name="cloud" :size="40" color="#4F7FFF" />
+              <Icon name="switch" :size="40" color="#4F7FFF" />
             </view>
             <view class="menu-info">
               <text class="menu-label">自动同步</text>
@@ -129,7 +129,7 @@
         <view class="menu-item" @click="goToSettings">
           <view class="menu-left">
             <view class="menu-icon">
-              <Icon name="settings" :size="40" color="#4F7FFF" />
+              <Icon name="setting" :size="40" color="#4F7FFF" />
             </view>
             <text class="menu-label">设置</text>
           </view>

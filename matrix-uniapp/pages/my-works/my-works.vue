@@ -12,7 +12,6 @@
       </view>
       <text class="nav-title">我的作品</text>
       <view class="nav-right" @click="showSortModal = true">
-        <Icon name="filter" :size="32" />
       </view>
     </view>
     
