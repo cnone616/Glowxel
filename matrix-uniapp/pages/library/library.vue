@@ -10,27 +10,6 @@
       <view class="header-content">
         <Logo :size="80" :show-text="true" />
         <view class="header-actions">
-          <view class="search-btn" @click="toggleSearch">
-            <Icon name="search" :size="40" color="#4F7FFF" />
-          </view>
-        </view>
-      </view>
-    </view>
-    
-    <!-- 搜索栏（可展开） -->
-    <view v-if="showSearch" class="search-section">
-      <view class="search-input-wrapper">
-        <Icon name="search" :size="32" color="#666666" />
-        <input 
-          v-model="searchTerm"
-          type="text"
-          class="search-input"
-          placeholder="搜索画布、作品、模板..."
-          @blur="handleSearchBlur"
-          :focus="showSearch"
-        />
-        <view v-if="searchTerm" class="clear-btn" @click="clearSearch">
-          <Icon name="close" :size="28" color="#AAAAAA" />
         </view>
       </view>
     </view>

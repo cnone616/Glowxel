@@ -34,7 +34,7 @@
     <!-- 收藏列表 -->
     <scroll-view scroll-y class="content">
       <view v-if="filteredFavorites.length === 0" class="empty-state">
-        <Icon name="bookmark" :size="120" color="var(--color-text-disabled)" />
+        <Icon name="favorite" :size="120" color="var(--color-text-disabled)" />
         <text class="empty-title">暂无收藏</text>
         <text class="empty-desc">去社区发现更多精彩作品吧</text>
         <button class="explore-btn" @click="goToExplore">

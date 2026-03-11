@@ -7,10 +7,8 @@
     
     <!-- 头部 -->
     <view class="header">
-      <view class="header-left">
-        <view class="header-info">
-          <text class="header-title">设备控制</text>
-        </view>
+      <view class="header-content">
+        <text class="header-title">设备控制</text>
       </view>
     </view>
 
@@ -573,6 +571,12 @@ export default {
   background-color: var(--bg-elevated);
 }
 
+.header-title {
+  font-size: 36rpx;
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+
 .header-left {
   display: flex;
   align-items: center;
@@ -603,12 +607,6 @@ export default {
   display: flex;
   flex-direction: column;
   gap: 4rpx;
-}
-
-.header-title {
-  font-size: 32rpx;
-  font-weight: 300;
-  color: var(--text-primary);
 }
 
 .header-subtitle {

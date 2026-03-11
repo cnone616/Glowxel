@@ -27,9 +27,6 @@
           <view v-else class="avatar-placeholder">
             <Icon name="user" :size="80" color="#AAAAAA" />
           </view>
-          <view class="avatar-overlay">
-            <Icon name="camera" :size="40" color="#FFFFFF" />
-          </view>
         </view>
         <text class="avatar-tip">点击更换头像</text>
       </view>
@@ -306,8 +303,9 @@ export default {
 
 .content {
   flex: 1;
-  padding: 32rpx 32rpx 160rpx;
+  padding: 32rpx 32rpx 210rpx;
   overflow-y: scroll;
+  width: calc(100% - 64rpx)
 }
 
 .avatar-section {
@@ -324,6 +322,9 @@ export default {
   border-radius: 80rpx;
   overflow: hidden;
   margin-bottom: 16rpx;
+  border-radius: 50%;
+  border: 1px solid #4F7FFF;
+
 }
 
 .avatar-image {

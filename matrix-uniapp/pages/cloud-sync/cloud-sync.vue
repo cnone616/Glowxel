@@ -55,13 +55,13 @@
           </view>
           
           <view class="stat-item">
-            <Icon name="bookmark" :size="40" color="var(--color-brand-primary)" />
+            <Icon name="favorite" :size="40" color="var(--color-brand-primary)" />
             <text class="stat-number">{{ syncStats.favorites }}</text>
             <text class="stat-label">收藏</text>
           </view>
           
           <view class="stat-item">
-            <Icon name="settings" :size="40" color="var(--color-brand-primary)" />
+            <Icon name="setting" :size="40" color="var(--color-brand-primary)" />
             <text class="stat-number">{{ syncStats.settings }}</text>
             <text class="stat-label">设置</text>
           </view>

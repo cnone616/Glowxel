@@ -15,7 +15,7 @@
             </view>
             <text class="prompt-text">登录后可同步数据到云端</text>
             <button class="login-btn" @click="showLoginModal = true">
-              <Icon name="wechat" :size="32" />
+              <Icon name="user" :size="32" />
               <text>微信登录</text>
             </button>
           </view>
@@ -72,7 +72,7 @@
             <view class="setting-row">
               <view class="setting-left">
                 <view class="setting-icon">
-                  <Icon name="cloud" :size="40" />
+                  <Icon name="switch" :size="40" />
                 </view>
                 <view class="setting-info">
                   <text class="setting-label">自动同步</text>

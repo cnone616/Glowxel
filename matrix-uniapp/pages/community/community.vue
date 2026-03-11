@@ -10,9 +10,6 @@
       <view class="header-content">
         <text class="header-title">社区</text>
         <view class="header-actions">
-          <view class="search-btn" @click="toggleSearch">
-            <Icon name="search" :size="40" color="#4F7FFF" />
-          </view>
         </view>
       </view>
       
@@ -33,25 +30,6 @@
         </scroll-view>
       </view>
     </view>
-    
-    <!-- 搜索栏（可展开） -->
-    <view v-if="showSearch" class="search-section">
-      <view class="search-input-wrapper">
-        <Icon name="search" :size="32" color="#666666" />
-        <input 
-          v-model="searchTerm"
-          type="text"
-          class="search-input"
-          placeholder="搜索作品、用户、标签..."
-          @blur="handleSearchBlur"
-          :focus="showSearch"
-        />
-        <view v-if="searchTerm" class="clear-btn" @click="clearSearch">
-          <Icon name="close" :size="28" color="#AAAAAA" />
-        </view>
-      </view>
-    </view>
-    
     <!-- 主要内容 -->
     <scroll-view 
       scroll-y 

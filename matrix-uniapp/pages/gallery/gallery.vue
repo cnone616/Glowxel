@@ -12,13 +12,14 @@
           <Icon name="direction-left" :size="40" color="#1F1F1F" />
         </view>
         <text class="header-title">{{ pageTitle }}</text>
-        <view class="search-btn" @click="toggleSearch">
-          <Icon name="search" :size="40" color="#4F7FFF" />
-        </view>
+        <view class="header-placeholder"></view>
       </view>
       
       <!-- 分类标签 -->
       <view class="category-tabs">
+        <view class="search-btn" @click="toggleSearch">
+          <Icon name="search" :size="40" color="#4F7FFF" />
+        </view>
         <scroll-view scroll-x class="tabs-scroll">
           <view class="tabs-container">
             <view 
@@ -555,9 +556,23 @@ export default {
   text-align: center;
 }
 
+.header-placeholder {
+  width: 80rpx;
+  height: 80rpx;
+}
+
+/* 分类标签 */
+.category-tabs {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  padding: 0 32rpx 24rpx;
+}
+
 .search-btn {
   width: 80rpx;
   height: 80rpx;
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -571,12 +586,8 @@ export default {
   background-color: rgba(79, 127, 255, 0.1);
 }
 
-/* 分类标签 */
-.category-tabs {
-  padding: 0 32rpx 24rpx;
-}
-
 .tabs-scroll {
+  flex: 1;
   white-space: nowrap;
 }
 
