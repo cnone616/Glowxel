@@ -266,8 +266,8 @@ class WebSocket {
     // 先清屏
     await this.send({ cmd: 'clear' })
     
-    // 统计非空像素
-    let nonZeroCount = 0
+    // 只收集非空白的像素数据（包括黑色，但排除空白）
+    // 需要从原始的 localPixels 判断哪些位置有数据
     const sparseData = []
     let idx = 0
     
@@ -277,22 +277,73 @@ class WebSocket {
         const g = pixels[idx++]
         const b = pixels[idx++]
         
-        if (r > 0 || g > 0 || b > 0) {
-          sparseData.push(x + offsetX, y + offsetY, r, g, b)
-          nonZeroCount++
-        }
+        // 发送所有像素数据（包括处理后的黑色/暗色）
+        // 注意：这里的 pixels 数组已经包含了亮度调整
+        sparseData.push(x + offsetX, y + offsetY, r, g, b)
       }
     }
     
-    if (nonZeroCount === 0) return
+    if (sparseData.length === 0) return
     
     // 使用二进制传输：每个像素5字节 (x, y, r, g, b)
     // 分批发送，每批64个像素
     const batchSize = 64
     const pixelsPerBatch = batchSize * 5
     
+    console.log(`发送完整画布数据: ${width}x${height}, 总像素: ${sparseData.length / 5}`)
+    
     for (let i = 0; i < sparseData.length; i += pixelsPerBatch) {
       const batch = sparseData.slice(i, Math.min(i + pixelsPerBatch, sparseData.length))
+      const buffer = new Uint8Array(batch)
+      
+      await new Promise((resolve, reject) => {
+        this.socket.send({
+          data: buffer.buffer,
+          success: resolve,
+          fail: reject
+        })
+      })
+      
+      // 每批之间等待200ms
+      await new Promise(resolve => setTimeout(resolve, 200))
+    }
+  }
+
+  /**
+   * 发送稀疏像素数据（只发送有颜色的像素，包括黑色）
+   * @param {Array} sparsePixels - 稀疏像素数据 [x, y, r, g, b, x, y, r, g, b, ...]
+   */
+  async showSparseImage(sparsePixels) {
+    if (sparsePixels.length === 0) return
+    
+    // 计算居中偏移（板子是64x64，数据是52x52）
+    const offsetX = Math.floor((64 - 52) / 2)
+    const offsetY = Math.floor((64 - 52) / 2)
+    
+    // 先清屏
+    await this.send({ cmd: 'clear' })
+    
+    // 添加偏移
+    const offsetData = []
+    for (let i = 0; i < sparsePixels.length; i += 5) {
+      offsetData.push(
+        sparsePixels[i] + offsetX,     // x
+        sparsePixels[i + 1] + offsetY, // y
+        sparsePixels[i + 2],           // r
+        sparsePixels[i + 3],           // g
+        sparsePixels[i + 4]            // b
+      )
+    }
+    
+    // 使用二进制传输：每个像素5字节 (x, y, r, g, b)
+    // 分批发送，每批64个像素
+    const batchSize = 64
+    const pixelsPerBatch = batchSize * 5
+    
+    console.log(`发送稀疏像素数据: ${offsetData.length / 5} 个像素`)
+    
+    for (let i = 0; i < offsetData.length; i += pixelsPerBatch) {
+      const batch = offsetData.slice(i, Math.min(i + pixelsPerBatch, offsetData.length))
       const buffer = new Uint8Array(batch)
       
       await new Promise((resolve, reject) => {
