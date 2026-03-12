@@ -94,6 +94,14 @@ int imagePixelCount = 0;
 uint8_t canvasBuffer[64][64][3]; // [y][x][rgb]
 bool canvasInitialized = false;
 
+// 黑色像素坐标存储
+struct BlackPixel {
+  uint8_t x;
+  uint8_t y;
+};
+BlackPixel* blackPixels = nullptr;
+int blackPixelCount = 0;
+
 // 二进制数据接收状态
 unsigned long lastBinaryReceiveTime = 0;
 bool binaryDataPending = false;
@@ -346,6 +354,15 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventTyp
     // 每次连接都强制回到闹钟模式
     currentMode = MODE_CLOCK;
     canvasInitialized = false; // 重置画布初始化标志
+    
+    // 清空画布相关数据
+    if (blackPixels != nullptr) {
+      free(blackPixels);
+      blackPixels = nullptr;
+    }
+    blackPixelCount = 0;
+    Serial.println("✓ WebSocket连接时已清空黑色像素数据");
+    
     displayClock();
     
     // 发送连接成功消息，始终返回 clock 模式
@@ -359,6 +376,15 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventTyp
     // 断开连接后，回到闹钟模式
     currentMode = MODE_CLOCK;
     canvasInitialized = false; // 重置画布初始化标志
+    
+    // 清空画布相关数据
+    if (blackPixels != nullptr) {
+      free(blackPixels);
+      blackPixels = nullptr;
+    }
+    blackPixelCount = 0;
+    Serial.println("✓ WebSocket断开时已清空黑色像素数据");
+    
     displayClock();
   }
   else if (type == WS_EVT_DATA) {
@@ -371,6 +397,22 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventTyp
       Serial.printf("收到二进制像素数据: %d bytes, %d 个像素, 当前模式: %s\n", 
         len, pixelCount, (currentMode == MODE_CLOCK) ? "clock" : "canvas");
       
+      // 打印前10个像素的原始数据用于调试
+      Serial.println("=== 前10个像素的原始数据 ===");
+      for (int i = 0; i < min(10, pixelCount); i++) {
+        int idx = i * 5;
+        if (idx + 4 < len) {
+          uint8_t x = data[idx];
+          uint8_t y = data[idx + 1];
+          uint8_t r = data[idx + 2];
+          uint8_t g = data[idx + 3];
+          uint8_t b = data[idx + 4];
+          Serial.printf("像素#%d: x=%d, y=%d, r=%d, g=%d, b=%d %s\n", 
+            i, x, y, r, g, b, (r == 0 && g == 0 && b == 0) ? "[黑色]" : "");
+        }
+      }
+      Serial.println("=== 原始数据结束 ===");
+      
       if (pixelCount > 0) {
         // 画板模式：保存到 canvasBuffer（64x64完整画布）
         if (currentMode == MODE_CANVAS) {
@@ -381,6 +423,40 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventTyp
             Serial.println("初始化画布缓冲区");
             memset(canvasBuffer, 0, sizeof(canvasBuffer));
             canvasInitialized = true;
+            
+            // 清空之前的黑色像素记录
+            if (blackPixels != nullptr) {
+              free(blackPixels);
+              blackPixels = nullptr;
+            }
+            blackPixelCount = 0;
+          }
+          
+          // 先统计本批有效的黑色像素数量（在范围内的）
+          int newBlackCount = 0;
+          for (size_t i = 0; i + 4 < len; i += 5) {
+            uint8_t x = data[i];
+            uint8_t y = data[i + 1];
+            uint8_t r = data[i + 2];
+            uint8_t g = data[i + 3];
+            uint8_t b = data[i + 4];
+            if (x < PANEL_RES_X && y < PANEL_RES_Y && r == 0 && g == 0 && b == 0) {
+              newBlackCount++;
+            }
+          }
+          
+          Serial.printf("本批发现 %d 个有效黑色像素\n", newBlackCount);
+          
+          // 扩展黑色像素数组（累加，不是替换）
+          if (newBlackCount > 0) {
+            BlackPixel* newBuffer = (BlackPixel*)realloc(blackPixels, sizeof(BlackPixel) * (blackPixelCount + newBlackCount));
+            if (newBuffer == nullptr) {
+              Serial.println("✗ 黑色像素数组内存扩展失败！");
+              return;
+            }
+            blackPixels = newBuffer;
+            Serial.printf("✓ 扩展黑色像素数组: 原有 %d 个，新增 %d 个，总计 %d 个\n", 
+              blackPixelCount, newBlackCount, blackPixelCount + newBlackCount);
           }
           
           int validPixels = 0;
@@ -392,11 +468,18 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventTyp
             uint8_t b = data[i + 4];
             
             if (x < PANEL_RES_X && y < PANEL_RES_Y) {
-              // 直接覆盖对应位置的像素
+              // 存储到画布缓冲区
               canvasBuffer[y][x][0] = r;
               canvasBuffer[y][x][1] = g;
               canvasBuffer[y][x][2] = b;
               validPixels++;
+              
+              // 如果是黑色，记录坐标
+              if (r == 0 && g == 0 && b == 0 && blackPixels != nullptr) {
+                blackPixels[blackPixelCount].x = x;
+                blackPixels[blackPixelCount].y = y;
+                blackPixelCount++;
+              }
               
               // 立即绘制
               dma_display->drawPixelRGB888(x, y, r, g, b);
@@ -405,7 +488,7 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventTyp
             if (i % 500 == 0) yield();
           }
           
-          Serial.printf("画板模式 - 更新了 %d 个像素\n", validPixels);
+          Serial.printf("画板模式 - 更新了 %d 个像素，累计记录了 %d 个黑色像素\n", validPixels, blackPixelCount);
           
           return;
         }
@@ -725,38 +808,57 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventTyp
           highlightG = color["g"] | 0;
           highlightB = color["b"] | 0;
           Serial.printf("高亮颜色: RGB(%d, %d, %d)\n", highlightR, highlightG, highlightB);
-        } else {
-          Serial.println("取消高亮，恢复所有颜色");
-        }
-        
-        // 遍历画布缓冲区，调整亮度
-        for (int y = 0; y < PANEL_RES_Y; y++) {
-          for (int x = 0; x < PANEL_RES_X; x++) {
-            uint8_t r = canvasBuffer[y][x][0];
-            uint8_t g = canvasBuffer[y][x][1];
-            uint8_t b = canvasBuffer[y][x][2];
+          
+          // 如果是黑色，用存储的坐标亮白灯
+          if (highlightR == 0 && highlightG == 0 && highlightB == 0) {
+            Serial.printf("高亮黑色像素，blackPixelCount=%d\n", blackPixelCount);
+            // 先清空屏幕
+            dma_display->clearScreen();
+            // 然后让黑色像素位置亮白灯
+            for (int i = 0; i < blackPixelCount; i++) {
+              Serial.printf("点亮黑色像素 #%d: (%d, %d)\n", i+1, blackPixels[i].x, blackPixels[i].y);
+              dma_display->drawPixelRGB888(blackPixels[i].x, blackPixels[i].y, 255, 255, 255);
+            }
+            Serial.printf("✓ 共点亮了 %d 个黑色像素位置\n", blackPixelCount);
+          } else {
+            // 处理其他颜色：匹配的亮白灯，不匹配的不亮
+            dma_display->clearScreen(); // 先清空屏幕
             
-            if (r > 0 || g > 0 || b > 0) {
-              uint8_t displayR = r, displayG = g, displayB = b;
-              
-              if (hasHighlight) {
-                // 判断是否是高亮颜色（允许一定误差）
-                bool isHighlight = (abs(r - highlightR) <= 2 && 
-                                   abs(g - highlightG) <= 2 && 
-                                   abs(b - highlightB) <= 2);
+            for (int y = 0; y < PANEL_RES_Y; y++) {
+              for (int x = 0; x < PANEL_RES_X; x++) {
+                uint8_t r = canvasBuffer[y][x][0];
+                uint8_t g = canvasBuffer[y][x][1];
+                uint8_t b = canvasBuffer[y][x][2];
                 
-                if (!isHighlight) {
-                  // 不是高亮颜色，降低亮度到20%
-                  displayR = r * 0.2;
-                  displayG = g * 0.2;
-                  displayB = b * 0.2;
+                if (r > 0 || g > 0 || b > 0) {
+                  // 判断是否是高亮颜色（允许一定误差）
+                  bool isHighlight = (abs(r - highlightR) <= 2 && 
+                                     abs(g - highlightG) <= 2 && 
+                                     abs(b - highlightB) <= 2);
+                  
+                  if (isHighlight) {
+                    // 匹配的颜色，亮白灯
+                    dma_display->drawPixelRGB888(x, y, 255, 255, 255);
+                  }
+                  // 不匹配的颜色不亮（保持黑色）
                 }
               }
-              
-              dma_display->drawPixelRGB888(x, y, displayR, displayG, displayB);
+              if (y % 8 == 0) yield();
             }
           }
-          if (y % 8 == 0) yield();
+        } else {
+          Serial.println("取消高亮，恢复所有颜色");
+          
+          // 恢复显示完整的彩色像素图
+          for (int y = 0; y < PANEL_RES_Y; y++) {
+            for (int x = 0; x < PANEL_RES_X; x++) {
+              uint8_t r = canvasBuffer[y][x][0];
+              uint8_t g = canvasBuffer[y][x][1];
+              uint8_t b = canvasBuffer[y][x][2];
+              dma_display->drawPixelRGB888(x, y, r, g, b);
+            }
+            if (y % 8 == 0) yield();
+          }
         }
         
         response["message"] = hasHighlight ? "color highlighted" : "highlight cleared";

@@ -60,7 +60,7 @@
       </view>
       
       <!-- 模式切换 -->
-      <view class="mode-switch">
+      <!-- <view class="mode-switch">
         <view 
           class="mode-btn"
           :class="{ 'active': assistMode === 'color' }"
@@ -78,6 +78,7 @@
           <text class="mode-label">逐行</text>
         </view>
       </view>
+      -->
     </view>
 
     <!-- 当前信息提示 -->
@@ -85,11 +86,12 @@
       <text class="info-text">行 {{ currentRow + 1 }} / 52</text>
     </view>
     
+    <!--  
     <view v-if="assistMode === 'color' && highlightColor" class="info-banner">
       <view class="color-dot" :style="{ backgroundColor: highlightColor }"></view>
       <text class="info-text">{{ getColorCode(highlightColor) }} ({{ boardColors.get(highlightColor) }})</text>
     </view>
-
+    -->
     <!-- Canvas 画布 -->
     <view class="canvas-container" v-if="!isHelpOpen && !isRowListOpen && !showConnectModal">
       <PixelCanvas
@@ -119,7 +121,10 @@
       <view class="color-section">
         <view class="section-header">
           <text class="section-title">{{ assistMode === 'row' ? '行颜色' : '全部颜色' }} ({{ displayedColors.size }})</text>
-          
+          <view v-if="assistMode === 'color' && highlightColor" style="display:flex;justify-content: space-between;align-items: center;">
+            <view class="cont-color-dot" :style="{ backgroundColor: highlightColor }"></view>
+            <text class="info-text">{{ getColorCode(highlightColor) }} ({{ boardColors.get(highlightColor) }})</text>
+          </view>
           <!-- 操作按钮 -->
           <view class="header-actions">
             <view 
@@ -684,7 +689,6 @@ export default {
       
       try {
         console.log('开始同步画布到设备，模式:', this.assistMode)
-        const pixels = []
         
         // hex 转 RGB 的辅助函数
         const hexToRgb = (hex) => {
@@ -696,47 +700,42 @@ export default {
           } : { r: 0, g: 0, b: 0 }
         }
         
-        // 使用 localPixels（已经是相对坐标0-51）
-        for (let y = 0; y < 52; y++) {
-          for (let x = 0; x < 52; x++) {
-            const key = `${x},${y}`
-            const hexColor = this.localPixels.get(key)
-            
-            if (hexColor) {
-              // 用 hex 查找颜色对象
-              const colorObj = ARTKAL_COLORS_FULL.find(c => c.hex.toLowerCase() === hexColor.toLowerCase())
-              
-              if (colorObj) {
-                // 将 hex 转换为 RGB
-                const rgb = hexToRgb(colorObj.hex)
-                let r = rgb.r
-                let g = rgb.g
-                let b = rgb.b
-                
-                // 逐行模式：当前行高亮，其他行降低亮度
-                if (this.assistMode === 'row' && y !== this.currentRow) {
-                  r = Math.floor(r * 0.2)
-                  g = Math.floor(g * 0.2)
-                  b = Math.floor(b * 0.2)
-                }
-                // 颜色模式：如果有高亮颜色，非高亮颜色降低亮度
-                else if (this.assistMode === 'color' && this.highlightColor && hexColor.toLowerCase() !== this.highlightColor.toLowerCase()) {
-                  r = Math.floor(r * 0.2)
-                  g = Math.floor(g * 0.2)
-                  b = Math.floor(b * 0.2)
-                }
-                
-                pixels.push(r, g, b)
-              } else {
-                pixels.push(0, 0, 0)
-              }
-            } else {
-              pixels.push(0, 0, 0)
-            }
-          }
-        }
+        // 只发送 localPixels 中有的像素（稀疏格式）
+        const sparsePixels = []
         
-        await this.deviceStore.sendImage(pixels, 52, 52)
+        this.localPixels.forEach((hexColor, key) => {
+          const [x, y] = key.split(',').map(Number)
+          
+          // 用 hex 查找颜色对象
+          const colorObj = ARTKAL_COLORS_FULL.find(c => c.hex.toLowerCase() === hexColor.toLowerCase())
+          
+          if (colorObj) {
+            // 将 hex 转换为 RGB
+            const rgb = hexToRgb(colorObj.hex)
+            let r = rgb.r
+            let g = rgb.g
+            let b = rgb.b
+            
+            // 逐行模式：当前行高亮，其他行降低亮度
+            if (this.assistMode === 'row' && y !== this.currentRow) {
+              r = Math.floor(r * 0.2)
+              g = Math.floor(g * 0.2)
+              b = Math.floor(b * 0.2)
+            }
+            // 颜色模式：如果有高亮颜色，非高亮颜色降低亮度
+            else if (this.assistMode === 'color' && this.highlightColor && hexColor.toLowerCase() !== this.highlightColor.toLowerCase()) {
+              r = Math.floor(r * 0.2)
+              g = Math.floor(g * 0.2)
+              b = Math.floor(b * 0.2)
+            }
+            
+            sparsePixels.push(x, y, r, g, b)
+          }
+        })
+        
+        console.log(`准备发送 ${sparsePixels.length / 5} 个有效像素（稀疏格式）`)
+        
+        await this.deviceStore.sendSparseImage(sparsePixels)
         console.log('画布同步成功')
       } catch (err) {
         console.error('同步到设备失败:', err)
@@ -1422,6 +1421,16 @@ export default {
   border-radius: 50%;
   border: 2rpx solid var(--accent-primary);
   box-shadow: 0 0 8rpx rgba(0, 243, 255, 0.3);
+}
+
+.cont-color-dot{
+  width: 28rpx;
+  height: 28rpx;
+  border-radius: 50%;
+  border: 2rpx solid var(--accent-primary);
+  box-shadow: 0 0 8rpx rgba(0, 243, 255, 0.3);
+  background-color: #00f3ff;
+  margin-right: 20rpx;
 }
 
 .info-text {

@@ -244,6 +244,23 @@ export const useDeviceStore = defineStore('device', {
       }
     },
     
+    // 发送稀疏像素数据到设备（画板模式，只发送有颜色的像素）
+    async sendSparseImage(sparsePixels) {
+      if (!this.connected || !this.webSocket) {
+        throw new Error('设备未连接')
+      }
+      
+      try {
+        // 发送画布数据前必须先切换到画板模式
+        await this.webSocket.setMode('canvas')
+        await this.webSocket.showSparseImage(sparsePixels)
+        return { success: true }
+      } catch (err) {
+        console.error('发送稀疏图片失败:', err)
+        return { success: false, error: err }
+      }
+    },
+    
     // 发送部分更新（仅更新指定像素，画板模式）
     async sendPartialUpdate(pixelData) {
       if (!this.connected || !this.webSocket) {
