@@ -394,33 +394,13 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventTyp
     if (info->opcode == WS_BINARY) {
       // 二进制格式：每5字节一个像素 (x, y, r, g, b)
       int pixelCount = len / 5;
-      Serial.printf("收到二进制像素数据: %d bytes, %d 个像素, 当前模式: %s\n", 
-        len, pixelCount, (currentMode == MODE_CLOCK) ? "clock" : "canvas");
-      
-      // 打印前10个像素的原始数据用于调试
-      Serial.println("=== 前10个像素的原始数据 ===");
-      for (int i = 0; i < min(10, pixelCount); i++) {
-        int idx = i * 5;
-        if (idx + 4 < len) {
-          uint8_t x = data[idx];
-          uint8_t y = data[idx + 1];
-          uint8_t r = data[idx + 2];
-          uint8_t g = data[idx + 3];
-          uint8_t b = data[idx + 4];
-          Serial.printf("像素#%d: x=%d, y=%d, r=%d, g=%d, b=%d %s\n", 
-            i, x, y, r, g, b, (r == 0 && g == 0 && b == 0) ? "[黑色]" : "");
-        }
-      }
-      Serial.println("=== 原始数据结束 ===");
       
       if (pixelCount > 0) {
         // 画板模式：保存到 canvasBuffer（64x64完整画布）
         if (currentMode == MODE_CANVAS) {
-          Serial.println("画板模式：更新画布缓冲区");
           
           // 第一次接收时初始化画布（清空）
           if (!canvasInitialized) {
-            Serial.println("初始化画布缓冲区");
             memset(canvasBuffer, 0, sizeof(canvasBuffer));
             canvasInitialized = true;
             
@@ -445,18 +425,13 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventTyp
             }
           }
           
-          Serial.printf("本批发现 %d 个有效黑色像素\n", newBlackCount);
-          
           // 扩展黑色像素数组（累加，不是替换）
           if (newBlackCount > 0) {
             BlackPixel* newBuffer = (BlackPixel*)realloc(blackPixels, sizeof(BlackPixel) * (blackPixelCount + newBlackCount));
             if (newBuffer == nullptr) {
-              Serial.println("✗ 黑色像素数组内存扩展失败！");
               return;
             }
             blackPixels = newBuffer;
-            Serial.printf("✓ 扩展黑色像素数组: 原有 %d 个，新增 %d 个，总计 %d 个\n", 
-              blackPixelCount, newBlackCount, blackPixelCount + newBlackCount);
           }
           
           int validPixels = 0;
@@ -488,29 +463,17 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventTyp
             if (i % 500 == 0) yield();
           }
           
-          Serial.printf("画板模式 - 更新了 %d 个像素，累计记录了 %d 个黑色像素\n", validPixels, blackPixelCount);
-          
           return;
         }
         
         // 闹钟模式：保存到 imagePixels（背景图）
         // 如果是新的一批数据（距离上次超过1秒），清空旧数据重新开始
         if (millis() - lastBinaryReceiveTime > 1000) {
-          Serial.println("=== 开始接收新的像素数据，清空旧数据 ===");
           if (imagePixels != nullptr) {
             free(imagePixels);
             imagePixels = nullptr;
           }
           imagePixelCount = 0;
-        }
-        
-        // 打印前3个像素的原始数据
-        if (imagePixelCount == 0 && len >= 15) {
-          Serial.println("前3个像素的原始字节:");
-          for (int i = 0; i < 15; i++) {
-            Serial.printf("%d ", data[i]);
-          }
-          Serial.println();
         }
         
         // 追加数据
@@ -532,12 +495,6 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventTyp
             uint8_t g = data[i + 3];
             uint8_t b = data[i + 4];
             
-            // 打印前3个像素
-            if (imagePixelCount < 3) {
-              Serial.printf("像素 #%d: x=%d, y=%d, r=%d, g=%d, b=%d\n", 
-                imagePixelCount, x, y, r, g, b);
-            }
-            
             if (x < PANEL_RES_X && y < PANEL_RES_Y) {
               // 保存到内存
               imagePixels[imagePixelCount].x = x;
@@ -557,8 +514,6 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventTyp
               yield();
             }
           }
-          
-          Serial.printf("闹钟模式 - 本批有效像素: %d, 累计: %d\n", validPixels, imagePixelCount);
           
           // 更新接收时间，标记有待保存的数据
           lastBinaryReceiveTime = millis();
@@ -807,19 +762,15 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventTyp
           highlightR = color["r"] | 0;
           highlightG = color["g"] | 0;
           highlightB = color["b"] | 0;
-          Serial.printf("高亮颜色: RGB(%d, %d, %d)\n", highlightR, highlightG, highlightB);
           
           // 如果是黑色，用存储的坐标亮白灯
           if (highlightR == 0 && highlightG == 0 && highlightB == 0) {
-            Serial.printf("高亮黑色像素，blackPixelCount=%d\n", blackPixelCount);
             // 先清空屏幕
             dma_display->clearScreen();
             // 然后让黑色像素位置亮白灯
             for (int i = 0; i < blackPixelCount; i++) {
-              Serial.printf("点亮黑色像素 #%d: (%d, %d)\n", i+1, blackPixels[i].x, blackPixels[i].y);
               dma_display->drawPixelRGB888(blackPixels[i].x, blackPixels[i].y, 255, 255, 255);
             }
-            Serial.printf("✓ 共点亮了 %d 个黑色像素位置\n", blackPixelCount);
           } else {
             // 处理其他颜色：匹配的亮白灯，不匹配的不亮
             dma_display->clearScreen(); // 先清空屏幕
@@ -847,8 +798,6 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventTyp
             }
           }
         } else {
-          Serial.println("取消高亮，恢复所有颜色");
-          
           // 恢复显示完整的彩色像素图
           for (int y = 0; y < PANEL_RES_Y; y++) {
             for (int x = 0; x < PANEL_RES_X; x++) {
@@ -872,12 +821,6 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventTyp
       // 如果 row 为 -1 或 null，则恢复所有行的原亮度
       if (currentMode == MODE_CANVAS && canvasInitialized) {
         int highlightRow = doc["row"] | -1;
-        
-        if (highlightRow >= 0 && highlightRow < PANEL_RES_Y) {
-          Serial.printf("高亮行: %d\n", highlightRow);
-        } else {
-          Serial.println("取消行高亮，恢复所有行");
-        }
         
         // 遍历画布缓冲区，调整亮度
         for (int y = 0; y < PANEL_RES_Y; y++) {
@@ -1046,30 +989,43 @@ void setupServer() {
   
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
     Serial.println("收到根路径请求");
-    String html = "<!DOCTYPE html><html><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>LED Setup</title>";
-    html += "<style>body{font-family:Arial;padding:20px;max-width:400px;margin:0 auto;background:#f5f5f5}";
-    html += ".card{background:white;padding:20px;border-radius:10px;box-shadow:0 2px 10px rgba(0,0,0,0.1);margin-bottom:20px}";
-    html += "h2{color:#333;margin-top:0}input{width:100%;padding:10px;margin:10px 0;border:1px solid #ddd;border-radius:5px;box-sizing:border-box}";
-    html += "button{width:100%;padding:12px;background:#1890ff;color:white;border:none;border-radius:5px;cursor:pointer;font-size:16px;margin:5px 0}";
-    html += "button:hover{background:#0070dd}button.danger{background:#dc3545}button.danger:hover{background:#c82333}";
-    html += ".status{padding:10px;border-radius:5px;margin:10px 0}";
-    html += ".success{background:#d4edda;color:#155724}.error{background:#f8d7da;color:#721c24}</style></head><body>";
-    html += "<div class='card'><h2>LED Matrix WiFi Setup</h2><div id='status'></div>";
-    html += "<label>WiFi Name (SSID):</label><input type='text' id='ssid' placeholder='Enter WiFi name'>";
-    html += "<label>Password:</label><input type='password' id='password' placeholder='Enter password'>";
-    html += "<button onclick='saveWiFi()'>Save & Connect</button>";
-    html += "<button class='danger' onclick='clearWiFi()'>Clear WiFi Config</button></div>";
-    html += "<script>";
-    html += "async function saveWiFi(){const ssid=document.getElementById('ssid').value;";
-    html += "const pwd=document.getElementById('password').value;if(!ssid||!pwd){alert('Please fill all fields');return;}";
-    html += "try{const formData=new FormData();formData.append('ssid',ssid);formData.append('password',pwd);";
-    html += "const res=await fetch('/save',{method:'POST',body:formData});const data=await res.json();";
-    html += "document.getElementById('status').innerHTML='<div class=\"success\">'+data.message+'</div>';}catch(e){";
-    html += "document.getElementById('status').innerHTML='<div class=\"error\">Save failed: '+e.message+'</div>';}}";
-    html += "async function clearWiFi(){if(!confirm('Clear WiFi config?'))return;try{await fetch('/clear-wifi');";
-    html += "document.getElementById('status').innerHTML='<div class=\"success\">WiFi config cleared</div>';}catch(e){";
-    html += "document.getElementById('status').innerHTML='<div class=\"error\">Clear failed: '+e.message+'</div>';}}";
-    html += "</script></body></html>";
+    String html = "<!DOCTYPE html><html><head><meta charset='UTF-8'>";
+    html += "<meta name='viewport' content='width=device-width,initial-scale=1'>";
+    html += "<title>LED 矩阵配置</title>";
+    html += "<style>body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;padding:20px;max-width:400px;margin:0 auto;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);min-height:100vh}";
+    html += ".card{background:white;padding:24px;border-radius:16px;box-shadow:0 8px 32px rgba(0,0,0,0.2)}";
+    html += "h2{color:#333;margin-top:0;text-align:center;font-size:24px}";
+    html += ".subtitle{color:#666;text-align:center;font-size:14px;margin-bottom:20px}";
+    html += "label{display:block;color:#555;font-size:14px;margin-bottom:8px;font-weight:500}";
+    html += "input{width:100%;padding:12px;margin-bottom:16px;border:2px solid #e0e0e0;border-radius:8px;box-sizing:border-box;font-size:15px}";
+    html += "input:focus{outline:none;border-color:#667eea}";
+    html += "button{width:100%;padding:14px;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:white;border:none;border-radius:8px;cursor:pointer;font-size:16px;font-weight:600}";
+    html += "button:active{transform:scale(0.98)}";
+    html += ".status{padding:12px;border-radius:8px;margin-bottom:16px;text-align:center;font-size:14px}";
+    html += ".success{background:#d4edda;color:#155724;border:1px solid #c3e6cb}";
+    html += ".error{background:#f8d7da;color:#721c24;border:1px solid #f5c6cb}";
+    html += ".info{background:#d1ecf1;color:#0c5460;border:1px solid #bee5eb}";
+    html += "</style></head><body>";
+    html += "<div class='card'><h2>LED 矩阵配置</h2>";
+    html += "<div class='subtitle'>连接到您的 WiFi 网络</div>";
+    html += "<div id='status'></div>";
+    html += "<label>WiFi 名称 (SSID)：</label>";
+    html += "<input type='text' id='ssid' placeholder='请输入 WiFi 名称'>";
+    html += "<label>WiFi 密码：</label>";
+    html += "<input type='password' id='password' placeholder='请输入 WiFi 密码'>";
+    html += "<button onclick='saveWiFi()'>连接</button></div>";
+    html += "<script>async function saveWiFi(){";
+    html += "const ssid=document.getElementById('ssid').value;";
+    html += "const pwd=document.getElementById('password').value;";
+    html += "if(!ssid||!pwd){showStatus('请填写完整的 WiFi 信息','error');return;}";
+    html += "showStatus('正在连接 '+ssid+'...','info');";
+    html += "const formData=new FormData();formData.append('ssid',ssid);formData.append('password',pwd);";
+    html += "try{const res=await fetch('/save',{method:'POST',body:formData});";
+    html += "const data=await res.json();showStatus('配置已保存！设备重启中...','success');";
+    html += "setTimeout(()=>{showStatus('设备已重启，请关闭此页面并连接到您的 WiFi','success');},3000);";
+    html += "}catch(e){showStatus('连接失败，请检查密码是否正确','error');}}";
+    html += "function showStatus(msg,type){document.getElementById('status').innerHTML='<div class=\"'+type+'\">'+msg+'</div>';}</script>";
+    html += "</body></html>";
     request->send(200, "text/html", html);
   });
   
@@ -1101,7 +1057,10 @@ void setupServer() {
     preferences.begin("wifi", false);
     preferences.clear();
     preferences.end();
-    request->send(200, "application/json", "{\"status\":\"ok\",\"message\":\"WiFi配置已清除\"}");
+    request->send(200, "application/json", "{\"status\":\"ok\",\"message\":\"WiFi配置已清除，3秒后重启\"}");
+    Serial.println("3秒后重启...");
+    delay(3000);
+    ESP.restart();
   });
   
   server.on("/status", HTTP_GET, [](AsyncWebServerRequest *request){
