@@ -45,7 +45,7 @@
         <!-- 统计数据 -->
         <view v-if="userStore.hasLogin" class="user-stats">
           <view class="stat-item" @click="goToMyWorks">
-            <text class="stat-number">{{ projectStore.projects.length }}</text>
+            <text class="stat-number">{{ publishedCount }}</text>
             <text class="stat-label">作品</text>
           </view>
           <view class="stat-item" @click="goToFollowers">
@@ -70,7 +70,7 @@
             <text class="menu-label">我的作品</text>
           </view>
           <view class="menu-right">
-            <text class="menu-count">{{ projectStore.projects.length }}</text>
+            <text class="menu-count">{{ publishedCount }}</text>
             <Icon name="arrow-right" :size="32" color="#AAAAAA" />
           </view>
         </view>
@@ -184,6 +184,13 @@ export default {
       userStore,
       projectStore,
       toast: null
+    }
+  },
+
+  computed: {
+    publishedCount() {
+      if (!this.projectStore || !this.projectStore.projects) return 0
+      return this.projectStore.projects.filter(p => p.status === 'published').length
     }
   },
 

@@ -237,7 +237,7 @@ export default {
     },
     
     goToCreate() {
-      uni.switchTab({
+      uni.navigateTo({
         url: '/pages/create/create'
       })
     },

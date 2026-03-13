@@ -15,23 +15,23 @@
           <text class="header-title">闹钟编辑器</text>
           <text class="header-subtitle">自定义时钟样式</text>
         </view>
-      </view>
-      <view class="header-actions">
-        <view class="action-btn" @click="saveConfig">
-          <Icon name="save" :size="40" />
-        </view>
-        <view class="action-btn primary" @click="sendToDevice">
-          <Icon name="send" :size="40" />
+        <view class="header-actions-inline">
+          <view class="action-btn-sm" @click="saveConfig">
+            <Icon name="save" :size="36" color="var(--color-text-primary)" />
+          </view>
+          <view class="action-btn-sm primary" :class="{ 'disabled': isSending }" @click="sendToDevice">
+            <Icon name="link" :size="36" color="#fff" />
+          </view>
         </view>
       </view>
     </view>
 
     <!-- Canvas 预览区域 -->
-    <view class="canvas-section">
+    <view class="canvas-section" v-show="!canvasHidden">
       <view class="canvas-wrapper">
-        <canvas 
+        <canvas
           type="2d"
-          canvas-id="clockCanvas" 
+          canvas-id="clockCanvas"
           id="clockCanvas"
           class="clock-canvas"
           @touchstart="handleTouchStart"
@@ -116,21 +116,21 @@
                 <view 
                   class="align-btn"
                   :class="{ 'active': config.time.align === 'left' }"
-                  @click="updateConfigAndRedraw('time', 'align', 'left')"
+                  @click="setAlignment('time', 'left')"
                 >
                   <text class="align-text">左对齐</text>
                 </view>
                 <view 
                   class="align-btn"
                   :class="{ 'active': config.time.align === 'center' }"
-                  @click="updateConfigAndRedraw('time', 'align', 'center')"
+                  @click="setAlignment('time', 'center')"
                 >
                   <text class="align-text">居中</text>
                 </view>
                 <view 
                   class="align-btn"
                   :class="{ 'active': config.time.align === 'right' }"
-                  @click="updateConfigAndRedraw('time', 'align', 'right')"
+                  @click="setAlignment('time', 'right')"
                 >
                   <text class="align-text">右对齐</text>
                 </view>
@@ -211,21 +211,21 @@
                 <view 
                   class="align-btn"
                   :class="{ 'active': config.date.align === 'left' }"
-                  @click="updateConfigAndRedraw('date', 'align', 'left')"
+                  @click="setAlignment('date', 'left')"
                 >
                   <text class="align-text">左对齐</text>
                 </view>
                 <view 
                   class="align-btn"
                   :class="{ 'active': config.date.align === 'center' }"
-                  @click="updateConfigAndRedraw('date', 'align', 'center')"
+                  @click="setAlignment('date', 'center')"
                 >
                   <text class="align-text">居中</text>
                 </view>
                 <view 
                   class="align-btn"
                   :class="{ 'active': config.date.align === 'right' }"
-                  @click="updateConfigAndRedraw('date', 'align', 'right')"
+                  @click="setAlignment('date', 'right')"
                 >
                   <text class="align-text">右对齐</text>
                 </view>
@@ -293,21 +293,21 @@
                 <view 
                   class="align-btn"
                   :class="{ 'active': config.week.align === 'left' }"
-                  @click="updateConfigAndRedraw('week', 'align', 'left')"
+                  @click="setAlignment('week', 'left')"
                 >
                   <text class="align-text">左对齐</text>
                 </view>
                 <view 
                   class="align-btn"
                   :class="{ 'active': config.week.align === 'center' }"
-                  @click="updateConfigAndRedraw('week', 'align', 'center')"
+                  @click="setAlignment('week', 'center')"
                 >
                   <text class="align-text">居中</text>
                 </view>
                 <view 
                   class="align-btn"
                   :class="{ 'active': config.week.align === 'right' }"
-                  @click="updateConfigAndRedraw('week', 'align', 'right')"
+                  @click="setAlignment('week', 'right')"
                 >
                   <text class="align-text">右对齐</text>
                 </view>
@@ -331,11 +331,14 @@
           <view class="image-upload">
             <view v-if="!config.image.data" class="upload-placeholder" @click="chooseImage">
               <Icon name="add" :size="64" />
-              <text class="upload-text">点击上传图片</text>
-              <text class="upload-hint">建议尺寸 52x52 像素</text>
+              <text class="upload-text">{{ clockMode === 'animation' ? '点击上传图片/GIF' : '点击上传背景图片' }}</text>
+              <text class="upload-hint">{{ clockMode === 'animation' ? '支持静态图片和 GIF 动画，建议 64x64 以内' : '支持静态图片，建议 64x64 以内' }}</text>
             </view>
             <view v-else class="image-preview">
               <image :src="config.image.data" class="preview-image" mode="aspectFit" />
+              <view v-if="gifAnimationData" class="gif-badge">
+                <text class="gif-badge-text">GIF {{gifAnimationData.frameCount}}帧</text>
+              </view>
               <view class="image-actions">
                 <view class="image-action-btn" @click="chooseImage">
                   <Icon name="refresh" :size="28" />
@@ -366,27 +369,27 @@
                 <view class="control-btn" @click="adjustImageValue('width', -1)">
                   <text class="control-icon">-</text>
                 </view>
-                <text class="setting-value-large" :class="{ 'warning-color': config.image.width > 64 }">{{ config.image.width }}</text>
+                <text class="setting-value-large" :class="{ 'info-color': config.image.width > 64 }">{{ config.image.width }}</text>
                 <view class="control-btn" @click="adjustImageValue('width', 1)">
                   <text class="control-icon">+</text>
                 </view>
               </view>
             </view>
-            <text v-if="config.image.width > 64" class="warning-text">⚠️ 宽度超过64可能显示不完整</text>
-            
+            <text v-if="config.image.width > 64" class="info-text">💡 宽度超过64，超出部分不会显示</text>
+
             <view class="setting-item-row">
               <text class="setting-label">高度</text>
               <view class="setting-control-buttons">
                 <view class="control-btn" @click="adjustImageValue('height', -1)">
                   <text class="control-icon">-</text>
                 </view>
-                <text class="setting-value-large" :class="{ 'warning-color': config.image.height > 64 }">{{ config.image.height }}</text>
+                <text class="setting-value-large" :class="{ 'info-color': config.image.height > 64 }">{{ config.image.height }}</text>
                 <view class="control-btn" @click="adjustImageValue('height', 1)">
                   <text class="control-icon">+</text>
                 </view>
               </view>
             </view>
-            <text v-if="config.image.height > 64" class="warning-text">⚠️ 高度超过64可能显示不完整</text>
+            <text v-if="config.image.height > 64" class="info-text">💡 高度超过64，超出部分不会显示</text>
             
             <view class="setting-item-row">
               <text class="setting-label">X 位置</text>
@@ -520,7 +523,16 @@
       </view>
     </view>
     
-    <Toast ref="toastRef" />
+    <!-- 传输遮罩弹窗 -->
+    <view v-if="isSending" class="sending-overlay" @touchmove.stop.prevent>
+      <view class="sending-modal">
+        <view class="sending-spinner"></view>
+        <text class="sending-title">正在传输数据...</text>
+        <text class="sending-tip">请勿切换网络或关闭程序</text>
+      </view>
+    </view>
+
+    <Toast ref="toastRef" @show="canvasHidden = true" @hide="onToastHide" />
   </view>
 </template>
 
@@ -530,16 +542,18 @@ import { useToast } from '../../composables/useToast.js'
 import statusBarMixin from '../../mixins/statusBar.js'
 import Icon from '../../components/Icon.vue'
 import Toast from '../../components/Toast.vue'
-import { 
-  font5x7, 
-  hexToRgb, 
-  drawCharToPixels, 
+import {
+  font5x7,
+  hexToRgb,
+  drawCharToPixels,
   drawTextToPixels,
+  getTextWidth,
   getCurrentTimeText,
   getCurrentDateText,
   getCurrentWeekText
 } from '../../utils/clockCanvas.js'
 import { COLOR_PALETTE_221, COMMON_COLORS } from '../../utils/colorPalette.js'
+import { GIFParser } from '../../utils/gifParser.js'
 
 export default {
   mixins: [statusBarMixin],
@@ -552,10 +566,18 @@ export default {
       deviceStore: null,
       toast: null,
       isReady: false,
+      clockMode: 'clock', // clock=静态时钟, animation=动态时钟
+      gifAnimationData: null, // GIF 动画数据 { frameCount, frames }
+      gifRenderedFrameMaps: null, // GIF 所有帧的像素 Map 数组
+      gifFrameIndex: 0, // 当前播放帧索引
+      gifTimer: null, // GIF 动画定时器
+      isSending: false, // 传输锁，防止传输过程中操作
+      _gifParser: null, // GIF 解析器实例，改宽高时重新生成数据
       
       contentHeight: 'calc(100vh - 112rpx - 120rpx - 80rpx)',
       
       // Canvas 相关
+      canvasHidden: false, // 弹窗显示时隐藏 canvas（微信小程序原生组件层级问题）
       canvasNode: null,
       canvasCtx: null,
       canvasPixels: new Map(), // 用户手绘的像素数据
@@ -601,8 +623,8 @@ export default {
           show: false,
           x: 6,
           y: 6,
-          width: 52,
-          height: 52,
+          width: 64,
+          height: 64,
           data: null
         }
       },
@@ -631,13 +653,31 @@ export default {
     }
   },
 
+  watch: {
+    canvasHidden(newVal) {
+      // canvas 从隐藏恢复显示时重绘
+      if (!newVal && this.canvasCtx) {
+        this.$nextTick(() => {
+          this.drawCanvas()
+        })
+      }
+    }
+  },
+
   computed: {
     accentColor() {
       return '#4F7FFF'
     }
   },
 
-  onLoad() {
+  onUnload() {
+    this.stopGifAnimation()
+  },
+
+  onLoad(options) {
+    // 接收模式参数：clock=静态时钟, animation=动态时钟
+    this.clockMode = options.mode || 'clock'
+
     // 先加载配置，确保 config 有值
     this.loadConfig()
     
@@ -740,13 +780,40 @@ export default {
       })
     },
     
+    getClockExcludeRegions() {
+      const regions = []
+      const c = this.config
+      // 每个字符(含冒号) 5x7 像素，间隔 1px，fontSize 倍数缩放
+      // "HH:MM" = 5字符, 宽 = 5*6-1 = 29 * fontSize, 高 = 7 * fontSize
+      const fs = c.time.fontSize || 1
+      regions.push({ x: c.time.x, y: c.time.y, w: (5 * 6 - 1) * fs, h: 7 * fs })
+      // 日期 "MM-DD" = 5字符
+      if (c.date.show) {
+        const dfs = c.date.fontSize || 1
+        regions.push({ x: c.date.x, y: c.date.y, w: (5 * 6 - 1) * dfs, h: 7 * dfs })
+      }
+      // 星期 "Wed" = 3字符
+      if (c.week.show) {
+        const wfs = c.week.fontSize || 1
+        regions.push({ x: c.week.x, y: c.week.y, w: (3 * 6 - 1) * wfs, h: 7 * wfs })
+      }
+      return regions
+    },
+
     getAllPixels() {
       const allPixels = new Map()
       
-      // 1. 背景图片像素（只要有 imagePixels 就显示，不需要 image.data）
+      // 1. 背景图片像素（使用相对坐标，动态应用偏移）
       if (this.imagePixels && this.imagePixels.size > 0) {
+        const offsetX = this.config.image.x || 0
+        const offsetY = this.config.image.y || 0
         this.imagePixels.forEach((color, key) => {
-          allPixels.set(key, color)
+          const [rx, ry] = key.split(',').map(Number)
+          const finalX = rx + offsetX
+          const finalY = ry + offsetY
+          if (finalX >= 0 && finalX < 64 && finalY >= 0 && finalY < 64) {
+            allPixels.set(`${finalX},${finalY}`, color)
+          }
         })
       }
       
@@ -835,6 +902,13 @@ export default {
     handleTouchEnd(e) {
       // 触摸结束
     },
+
+    onToastHide() {
+      // 传输中不恢复 canvas，避免遮挡传输弹窗
+      if (!this.isSending) {
+        this.canvasHidden = false
+      }
+    },
     
     handleDraw(e) {
       const touch = e.touches[0]
@@ -894,34 +968,53 @@ export default {
     
     adjustImageValue(key, delta) {
       const limits = {
-        width: { min: 8, max: 128 },
-        height: { min: 8, max: 128 },
-        x: { min: -32, max: 64 },
-        y: { min: -32, max: 64 }
+        width: { min: 1, max: 256 },
+        height: { min: 1, max: 256 },
+        x: { min: -128, max: 128 },
+        y: { min: -128, max: 128 }
       }
-      
+
       const { min, max } = limits[key]
       const currentValue = this.config.image[key]
       const newValue = Math.max(min, Math.min(max, currentValue + delta))
-      
+
       if (newValue !== currentValue) {
         this.config.image[key] = newValue
-        
+
         // 如果改变了尺寸，需要重新转换图片
         if ((key === 'width' || key === 'height') && this.config.image.data) {
-          this.convertImageToPixels(this.config.image.data)
-        } else {
-          // 如果只是改变位置，重新计算像素位置
-          if ((key === 'x' || key === 'y') && this.config.image.data) {
-            this.convertImageToPixels(this.config.image.data)
+          if (this.gifAnimationData && this._gifParser) {
+            // GIF：重新生成 ESP32 数据和预览帧
+            const targetW = this.config.image.width || 64
+            const targetH = this.config.image.height || 64
+            this.gifAnimationData = this._gifParser.generateESP32Data(targetW, targetH, 20, this.getClockExcludeRegions())
+            const renderedFrames = this._gifParser.renderFrames(targetW, targetH)
+            this.gifRenderedFrameMaps = renderedFrames.map(frame => {
+              const pixelMap = new Map()
+              for (let y = 0; y < targetH; y++) {
+                for (let x = 0; x < targetW; x++) {
+                  const idx = (y * targetW + x) * 4
+                  const r = frame.rgba[idx], g = frame.rgba[idx+1], b = frame.rgba[idx+2]
+                  if (r > 0 || g > 0 || b > 0) {
+                    const hex = '#' + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)
+                    pixelMap.set(`${x},${y}`, hex)
+                  }
+                }
+              }
+              return { pixels: pixelMap, delay: frame.delay || 100 }
+            })
+            console.log(`GIF 尺寸更新: ${targetW}x${targetH}, ${this.gifAnimationData.frameCount} 帧`)
           } else {
-            this.drawCanvas()
+            this.convertImageToPixels(this.config.image.data)
           }
+        } else {
+          // 位置改变时直接重绘（像素存储相对坐标，偏移在绘制时动态应用）
+          this.drawCanvas()
         }
-        
-        // 显示警告
+
+        // 显示提示（不再是警告）
         if ((key === 'width' || key === 'height') && newValue > 64) {
-          this.toast.showWarning(`${key === 'width' ? '宽度' : '高度'}超过64，可能显示不完整`)
+          this.toast.showInfo(`${key === 'width' ? '宽度' : '高度'}为 ${newValue}，超出部分不会显示`)
         }
       }
     },
@@ -944,6 +1037,19 @@ export default {
     
     updateConfigAndRedraw(section, key, value) {
       this.config[section][key] = value
+      this.drawCanvas()
+    },
+
+    setAlignment(section, align) {
+      this.config[section].align = align
+      // 自动校正 x 坐标到对齐参考点
+      if (align === 'left') {
+        this.config[section].x = 0
+      } else if (align === 'center') {
+        this.config[section].x = 32
+      } else if (align === 'right') {
+        this.config[section].x = 63
+      }
       this.drawCanvas()
     },
     
@@ -986,34 +1092,139 @@ export default {
     },
     
     chooseImage() {
+      // 使用 chooseMessageFile 支持选择 GIF 文件
+      uni.chooseMessageFile({
+        count: 1,
+        type: 'image',
+        success: (res) => {
+          const file = res.tempFiles[0]
+          const tempFilePath = file.path || file.tempFilePath
+          const fileName = (file.name || tempFilePath || '').toLowerCase()
+          const isGif = fileName.endsWith('.gif')
+
+          console.log('选择文件:', fileName, '是否GIF:', isGif, '模式:', this.clockMode)
+
+          if (isGif && this.clockMode === 'animation') {
+            // 动态模式下才解析 GIF 动画
+            this._handleGifFile(tempFilePath)
+          } else {
+            // 静态模式或非 GIF：当静态图片处理
+            if (isGif && this.clockMode === 'clock') {
+              this.toast.showInfo('静态时钟模式下 GIF 将作为静态图片使用')
+            }
+            this._handleStaticImage(tempFilePath)
+          }
+        },
+        fail: (err) => {
+          console.error('选择文件失败:', err)
+          // 降级到 chooseImage
+          this._fallbackChooseImage()
+        }
+      })
+    },
+
+    _fallbackChooseImage() {
       uni.chooseImage({
         count: 1,
         sizeType: ['compressed'],
         sourceType: ['album', 'camera'],
         success: (res) => {
-          const tempFilePath = res.tempFilePaths[0]
-          
-          uni.getFileSystemManager().readFile({
-            filePath: tempFilePath,
-            encoding: 'base64',
-            success: (fileRes) => {
-              const imageData = 'data:image/png;base64,' + fileRes.data
-              this.config.image.data = imageData
-              this.config.image.show = true
-              
-              // 立即转换图片为像素数据
-              this.convertImageToPixels(imageData)
-              
-              this.toast.showSuccess('图片已上传')
-            },
-            fail: (err) => {
-              console.error('读取图片失败:', err)
-              this.toast.showError('图片读取失败')
-            }
-          })
+          this._handleStaticImage(res.tempFilePaths[0])
         },
         fail: (err) => {
           console.error('选择图片失败:', err)
+        }
+      })
+    },
+
+    _handleStaticImage(tempFilePath) {
+      this.stopGifAnimation()
+      this.gifAnimationData = null // 清除 GIF 数据
+      this.gifRenderedFrameMaps = null
+      this.gifFrameIndex = 0
+      uni.getFileSystemManager().readFile({
+        filePath: tempFilePath,
+        encoding: 'base64',
+        success: (fileRes) => {
+          const imageData = 'data:image/png;base64,' + fileRes.data
+          this.config.image.data = imageData
+          this.config.image.show = true
+          this.convertImageToPixels(imageData)
+          this.toast.showSuccess('图片已上传')
+        },
+        fail: (err) => {
+          console.error('读取图片失败:', err)
+          this.toast.showError('图片读取失败')
+        }
+      })
+    },
+
+    _handleGifFile(tempFilePath) {
+      uni.getFileSystemManager().readFile({
+        filePath: tempFilePath,
+        success: (fileRes) => {
+          try {
+            const parser = new GIFParser()
+            const gifInfo = parser.parse(fileRes.data)
+            console.log('GIF 解析成功:', gifInfo)
+            this._gifParser = parser  // 保存 parser 实例，改宽高时重新生成数据
+
+            // 生成 ESP32 动画数据
+            const targetW = this.config.image.width || 64
+            const targetH = this.config.image.height || 64
+            const esp32Data = parser.generateESP32Data(targetW, targetH, 20, this.getClockExcludeRegions())
+            this.gifAnimationData = esp32Data
+            console.log(`ESP32 动画数据: ${esp32Data.frameCount} 帧`)
+
+            // 渲染所有帧为像素 Map，用于画布动画预览
+            const renderedFrames = parser.renderFrames(targetW, targetH)
+            const frameMaps = renderedFrames.map(frame => {
+              const pixelMap = new Map()
+              for (let y = 0; y < targetH; y++) {
+                for (let x = 0; x < targetW; x++) {
+                  const idx = (y * targetW + x) * 4
+                  const r = frame.rgba[idx]
+                  const g = frame.rgba[idx + 1]
+                  const b = frame.rgba[idx + 2]
+                  const a = frame.rgba[idx + 3]
+                  if (a > 10 && (r > 0 || g > 0 || b > 0)) {
+                    const hex = `#${[r, g, b].map(v => v.toString(16).padStart(2, '0')).join('')}`
+                    pixelMap.set(`${x},${y}`, hex)
+                  }
+                }
+              }
+              return { pixels: pixelMap, delay: frame.delay || 100 }
+            })
+            this.gifRenderedFrameMaps = frameMaps
+            console.log('GIF 帧像素 Map 已生成:', frameMaps.length, '帧')
+
+            // 设置第一帧并启动动画
+            if (frameMaps.length > 0) {
+              this.imagePixels = frameMaps[0].pixels
+              this.startGifAnimation()
+            }
+
+            // 读取 base64 用于缩略图预览
+            uni.getFileSystemManager().readFile({
+              filePath: tempFilePath,
+              encoding: 'base64',
+              success: (b64Res) => {
+                this.config.image.data = 'data:image/gif;base64,' + b64Res.data
+                this.config.image.show = true
+                this.drawCanvas()
+                this.toast.showSuccess(`GIF 已解析！${esp32Data.frameCount} 帧`)
+              }
+            })
+          } catch (err) {
+            console.error('GIF 解析失败:', err)
+            this.toast.showError('GIF 解析失败: ' + err.message)
+            // 降级为静态图片
+            this._handleStaticImage(tempFilePath)
+          }
+        },
+        fail: (err) => {
+          console.error('读取 GIF 失败:', err)
+          this.toast.showError('GIF 文件读取失败')
         }
       })
     },
@@ -1066,7 +1277,7 @@ export default {
               const dpr = uni.getSystemInfoSync().pixelRatio || 1
               ctx.scale(dpr, dpr)
               
-              // 转换为像素 Map
+              // 转换为像素 Map（存储相对坐标，偏移在绘制时动态应用）
               const pixelMap = new Map()
               for (let y = 0; y < targetHeight; y++) {
                 for (let x = 0; x < targetWidth; x++) {
@@ -1075,17 +1286,11 @@ export default {
                   const g = pixels[idx + 1]
                   const b = pixels[idx + 2]
                   const a = pixels[idx + 3]
-                  
+
                   // 跳过完全透明的像素
                   if (a > 10) {
-                    const finalX = this.config.image.x + x
-                    const finalY = this.config.image.y + y
-                    
-                    // 只保存在有效范围内的像素
-                    if (finalX >= 0 && finalX < 64 && finalY >= 0 && finalY < 64) {
-                      const hex = `#${[r, g, b].map(v => v.toString(16).padStart(2, '0')).join('')}`
-                      pixelMap.set(`${finalX},${finalY}`, hex)
-                    }
+                    const hex = `#${[r, g, b].map(v => v.toString(16).padStart(2, '0')).join('')}`
+                    pixelMap.set(`${x},${y}`, hex)
                   }
                 }
               }
@@ -1145,7 +1350,7 @@ export default {
           // 恢复状态
           ctx.restore()
           
-          // 转换为像素 Map
+          // 转换为像素 Map（存储相对坐标）
           const pixelMap = new Map()
           for (let y = 0; y < targetHeight; y++) {
             for (let x = 0; x < targetWidth; x++) {
@@ -1154,17 +1359,11 @@ export default {
               const g = pixels[idx + 1]
               const b = pixels[idx + 2]
               const a = pixels[idx + 3]
-              
+
               // 跳过透明像素
               if (a > 128) {
-                const finalX = this.config.image.x + x
-                const finalY = this.config.image.y + y
-                
-                // 只保存在有效范围内的像素
-                if (finalX >= 0 && finalX < 64 && finalY >= 0 && finalY < 64) {
-                  const hex = `#${[r, g, b].map(v => v.toString(16).padStart(2, '0')).join('')}`
-                  pixelMap.set(`${finalX},${finalY}`, hex)
-                }
+                const hex = `#${[r, g, b].map(v => v.toString(16).padStart(2, '0')).join('')}`
+                pixelMap.set(`${x},${y}`, hex)
               }
             }
           }
@@ -1231,7 +1430,7 @@ export default {
               // 恢复状态
               ctx.restore()
               
-              // 转换为像素 Map 并保存
+              // 转换为像素 Map（存储相对坐标）
               const pixelMap = new Map()
               for (let y = 0; y < targetHeight; y++) {
                 for (let x = 0; x < targetWidth; x++) {
@@ -1240,17 +1439,11 @@ export default {
                   const g = pixels[idx + 1]
                   const b = pixels[idx + 2]
                   const a = pixels[idx + 3]
-                  
+
                   // 跳过透明像素
                   if (a > 128) {
-                    const finalX = this.config.image.x + x
-                    const finalY = this.config.image.y + y
-                    
-                    // 只保存在有效范围内的像素
-                    if (finalX >= 0 && finalX < 64 && finalY >= 0 && finalY < 64) {
-                      const hex = `#${[r, g, b].map(v => v.toString(16).padStart(2, '0')).join('')}`
-                      pixelMap.set(`${finalX},${finalY}`, hex)
-                    }
+                    const hex = `#${[r, g, b].map(v => v.toString(16).padStart(2, '0')).join('')}`
+                    pixelMap.set(`${x},${y}`, hex)
                   }
                 }
               }
@@ -1275,10 +1468,43 @@ export default {
         })
     },
     
+    // ========== GIF 动画播放 ==========
+    startGifAnimation() {
+      this.stopGifAnimation()
+      if (!this.gifRenderedFrameMaps || this.gifRenderedFrameMaps.length <= 1) return
+
+      this.gifFrameIndex = 0
+      const playNextFrame = () => {
+        if (!this.gifRenderedFrameMaps) return
+
+        this.gifFrameIndex = (this.gifFrameIndex + 1) % this.gifRenderedFrameMaps.length
+        const frameData = this.gifRenderedFrameMaps[this.gifFrameIndex]
+        this.imagePixels = frameData.pixels
+        this.drawCanvas()
+
+        // 用当前帧的 delay 设置下一帧定时
+        this.gifTimer = setTimeout(playNextFrame, frameData.delay || 100)
+      }
+
+      const firstDelay = this.gifRenderedFrameMaps[0].delay || 100
+      this.gifTimer = setTimeout(playNextFrame, firstDelay)
+    },
+
+    stopGifAnimation() {
+      if (this.gifTimer) {
+        clearTimeout(this.gifTimer)
+        this.gifTimer = null
+      }
+    },
+
     removeImage() {
+      this.stopGifAnimation()
       this.config.image.data = null
       this.config.image.show = false
       this.imagePixels = null
+      this.gifAnimationData = null
+      this.gifRenderedFrameMaps = null
+      this.gifFrameIndex = 0
       this.toast.showInfo('图片已删除')
       this.drawCanvas()
     },
@@ -1286,9 +1512,29 @@ export default {
     saveConfig() {
       // 创建配置副本，不保存图片的 base64 数据（太大）
       const configToSave = {
-        time: this.config.time,
-        date: this.config.date,
-        week: this.config.week,
+        time: {
+          show: this.config.time.show,
+          fontSize: this.config.time.fontSize,
+          x: this.config.time.x,
+          y: this.config.time.y,
+          color: this.config.time.color,
+          align: this.config.time.align
+        },
+        date: {
+          show: this.config.date.show,
+          fontSize: this.config.date.fontSize,
+          x: this.config.date.x,
+          y: this.config.date.y,
+          color: this.config.date.color,
+          align: this.config.date.align
+        },
+        week: {
+          show: this.config.week.show,
+          x: this.config.week.x,
+          y: this.config.week.y,
+          color: this.config.week.color,
+          align: this.config.week.align
+        },
         image: {
           show: this.config.image.show,
           x: this.config.image.x,
@@ -1298,21 +1544,20 @@ export default {
           data: null // 不保存图片数据
         }
       }
-      
+
       const saveData = {
         config: configToSave,
         pixels: Array.from(this.canvasPixels.entries()),
         imagePixels: this.imagePixels ? Array.from(this.imagePixels.entries()) : null // 保存图片像素数据
       }
-      
+
       console.log('保存配置:', {
         手绘像素数量: this.canvasPixels.size,
         图片像素数量: this.imagePixels ? this.imagePixels.size : 0,
         配置: configToSave
       })
-      
+
       uni.setStorageSync('clock_config', JSON.stringify(saveData))
-      this.toast.showSuccess('配置已保存')
     },
 
     loadConfig() {
@@ -1358,34 +1603,107 @@ export default {
         this.toast.showError('设备未连接')
         return
       }
-      
+      if (this.isSending) {
+        this.toast.showInfo('正在传输中，请等待完成')
+        return
+      }
+
+      this.isSending = true
+      this.canvasHidden = true  // 隐藏 canvas，避免原生组件层级遮挡弹窗
       try {
         const ws = this.deviceStore.getWebSocket()
-        
-        // 1. 先切换到闹钟模式
-        await ws.setMode('clock')
-        
-        // 2. 发送闹钟配置
-        await ws.send({ 
+
+        // 统一的发送并等待回复方法，确保 ESP32 处理完一条再发下一条
+        const sendAndWait = (data, timeoutMs = 10000) => {
+          return new Promise((resolve, reject) => {
+            let resolved = false
+            const handler = (msg) => {
+              if (resolved) return
+              resolved = true
+              ws.offMessage(handler)
+              clearTimeout(timer)
+              // 检查 ESP32 返回的错误响应
+              try {
+                const resp = typeof msg === 'string' ? JSON.parse(msg) : (msg.data ? JSON.parse(msg.data) : msg)
+                if (resp.error) {
+                  reject(new Error(`ESP32 错误: ${resp.error}${resp.details ? ' - ' + resp.details : ''}`))
+                  return
+                }
+                resolve(resp)
+              } catch (e) {
+                // 非 JSON 响应，直接 resolve
+                resolve(msg)
+              }
+            }
+            ws.onMessage(handler)
+            const timer = setTimeout(() => {
+              if (!resolved) {
+                resolved = true
+                ws.offMessage(handler)
+                reject(new Error('ESP32 响应超时'))
+              }
+            }, timeoutMs)
+            ws.send(data).catch(err => {
+              if (!resolved) {
+                resolved = true
+                ws.offMessage(handler)
+                clearTimeout(timer)
+                reject(err)
+              }
+            })
+          })
+        }
+
+        // 1. 先切换到闹钟模式（等待回复）
+        await sendAndWait({ cmd: 'set_mode', mode: 'clock' })
+        console.log('模式切换成功')
+
+        // 2. 根据对齐方式校正 x 坐标（与 drawTextToPixels 保持一致）
+        const timeAlign = this.config.time.align || 'left'
+        let timeX = this.config.time.x
+        if (timeAlign === 'center') {
+          timeX = timeX - Math.floor(getTextWidth(getCurrentTimeText(), this.config.time.fontSize) / 2)
+        } else if (timeAlign === 'right') {
+          timeX = timeX - getTextWidth(getCurrentTimeText(), this.config.time.fontSize)
+        }
+
+        const dateAlign = this.config.date.align || 'left'
+        let dateX = this.config.date.x
+        if (dateAlign === 'center') {
+          dateX = dateX - Math.floor(getTextWidth(getCurrentDateText(), this.config.date.fontSize) / 2)
+        } else if (dateAlign === 'right') {
+          dateX = dateX - getTextWidth(getCurrentDateText(), this.config.date.fontSize)
+        }
+
+        const weekAlign = this.config.week.align || 'left'
+        let weekX = this.config.week.x
+        if (weekAlign === 'center') {
+          weekX = weekX - Math.floor(getTextWidth(getCurrentWeekText(), 1) / 2)
+        } else if (weekAlign === 'right') {
+          weekX = weekX - getTextWidth(getCurrentWeekText(), 1)
+        }
+
+        // 发送闹钟配置（x 坐标已根据对齐方式校正，等待回复）
+        await sendAndWait({
           cmd: 'set_clock_config',
           config: {
             time: {
               show: this.config.time.show,
               fontSize: this.config.time.fontSize,
-              x: this.config.time.x,
+              x: timeX,
               y: this.config.time.y,
               color: this.hexToRgb(this.config.time.color)
             },
             date: {
               show: this.config.date.show,
               fontSize: this.config.date.fontSize,
-              x: this.config.date.x,
+              x: dateX,
               y: this.config.date.y,
               color: this.hexToRgb(this.config.date.color)
             },
             week: {
               show: this.config.week.show,
-              x: this.config.week.x,
+              x: weekX,
               y: this.config.week.y,
               color: this.hexToRgb(this.config.week.color)
             },
@@ -1398,52 +1716,147 @@ export default {
             }
           }
         })
-        
+
         console.log('闹钟配置发送成功')
-        
-        // 3. 如果有像素数据（手绘 + 图片），使用二进制方式发送
-        const allPixels = new Map()
-        
-        // 合并手绘像素和图片像素
-        if (this.canvasPixels) {
-          this.canvasPixels.forEach((color, key) => {
-            allPixels.set(key, color)
-          })
-        }
-        
-        if (this.imagePixels) {
-          this.imagePixels.forEach((color, key) => {
-            allPixels.set(key, color)
-          })
-        }
-        
-        if (allPixels.size > 0) {
-          console.log('准备发送像素数据，总数:', allPixels.size)
-          
-          // 转换为像素数组
-          const pixelArray = []
-          allPixels.forEach((color, key) => {
-            const [x, y] = key.split(',').map(Number)
-            const rgb = this.hexToRgb(color)
-            pixelArray.push({
-              x: x,
-              y: y,
-              r: rgb.r,
-              g: rgb.g,
-              b: rgb.b
-            })
-          })
-          
-          // 使用二进制方式发送
-          await this.sendImagePixelsBinary(pixelArray)
-          
-          this.toast.showSuccess(`已发送到设备！包含 ${pixelArray.length} 个像素点`)
+
+        // 3. 检查是否有 GIF 动画数据
+        if (this.gifAnimationData && this.gifAnimationData.frameCount > 0) {
+          console.log(`发送 GIF 动画: ${this.gifAnimationData.frameCount} 帧`)
+
+          // 不要提前切换到动画模式——animation_end 会自动切换并播放
+          // 如果提前切换，ESP32 发现没有已加载的动画会直接清屏导致黑屏
+
+          // 逐帧发送——每条命令发送后等待 ESP32 回复确认再发下一条
+          const { frameCount, frames } = this.gifAnimationData
+
+          let resp = await sendAndWait({ cmd: 'animation_begin', frameCount })
+          console.log('animation_begin 回复:', JSON.stringify(resp))
+
+          const CHUNK_SIZE = 200  // 二进制每批200像素 = 1000字节，很轻松
+          const ws = this.deviceStore.getWebSocket()
+          for (let i = 0; i < frames.length; i++) {
+            const frame = frames[i]  // [type, delay, count, pixels]
+            const type = frame[0]
+            const delay = frame[1]
+            const pixels = frame[3]
+            const totalPixels = pixels.length
+
+            // 所有帧都走 frame_begin + 二进制 chunk
+            resp = await sendAndWait({ cmd: 'frame_begin', index: i, type, delay, totalPixels })
+            console.log(`帧 ${i + 1}/${frameCount} 开始二进制传输 (${totalPixels} 像素):`, resp.status)
+            if (resp.status === 'error') {
+              this.toast.showError(`帧 ${i} 初始化失败: ${resp.message}`)
+              return
+            }
+
+            // 二进制分片发送像素数据
+            for (let offset = 0; offset < totalPixels; offset += CHUNK_SIZE) {
+              const chunk = pixels.slice(offset, offset + CHUNK_SIZE)
+              const binaryData = new Uint8Array(chunk.length * 5)
+              for (let j = 0; j < chunk.length; j++) {
+                const p = chunk[j]  // [x, y, r, g, b]
+                binaryData[j * 5] = p[0]
+                binaryData[j * 5 + 1] = p[1]
+                binaryData[j * 5 + 2] = p[2]
+                binaryData[j * 5 + 3] = p[3]
+                binaryData[j * 5 + 4] = p[4]
+              }
+
+              // 发送二进制并等待ESP32文本回复确认
+              resp = await new Promise((resolve, reject) => {
+                let resolved = false
+                const timeout = setTimeout(() => {
+                  if (!resolved) {
+                    resolved = true
+                    ws.offMessage(handler)
+                    reject(new Error('binary chunk timeout'))
+                  }
+                }, 5000)
+                const handler = (msg) => {
+                  if (resolved) return
+                  resolved = true
+                  clearTimeout(timeout)
+                  ws.offMessage(handler)
+                  resolve(msg)  // ws.onMessage 已经 JSON.parse 过了
+                }
+                ws.onMessage(handler)
+                ws.socket.send({
+                  data: binaryData.buffer,
+                  fail: (err) => {
+                    if (!resolved) {
+                      resolved = true
+                      ws.offMessage(handler)
+                      clearTimeout(timeout)
+                      reject(err)
+                    }
+                  }
+                })
+              })
+              console.log(`  chunk ${Math.floor(offset / CHUNK_SIZE) + 1}: ${chunk.length} 像素, ${resp.status}`)
+              if (resp.status === 'error') {
+                this.toast.showError(`帧 ${i} chunk 发送失败: ${resp.message}`)
+                return
+              }
+            }
+
+            if (resp.status === 'error') {
+              console.error(`帧 ${i} 发送失败:`, resp.message)
+              this.toast.showError(`帧 ${i} 发送失败: ${resp.message}`)
+              return
+            }
+          }
+
+          resp = await sendAndWait({ cmd: 'animation_end' })
+          console.log('animation_end 回复:', JSON.stringify(resp))
+          this.toast.showSuccess(`GIF 动画已发送！${frameCount} 帧`)
         } else {
-          this.toast.showSuccess('已发送到设备')
+          // 4. 如果有像素数据（手绘 + 图片），使用二进制方式发送
+          const allPixels = new Map()
+
+          if (this.canvasPixels) {
+            this.canvasPixels.forEach((color, key) => {
+              allPixels.set(key, color)
+            })
+          }
+
+          if (this.imagePixels) {
+            const offsetX = this.config.image.x || 0
+            const offsetY = this.config.image.y || 0
+            this.imagePixels.forEach((color, key) => {
+              const [rx, ry] = key.split(',').map(Number)
+              const finalX = rx + offsetX
+              const finalY = ry + offsetY
+              if (finalX >= 0 && finalX < 64 && finalY >= 0 && finalY < 64) {
+                allPixels.set(`${finalX},${finalY}`, color)
+              }
+            })
+          }
+
+          if (allPixels.size > 0) {
+            console.log('准备发送像素数据，总数:', allPixels.size)
+
+            const pixelArray = []
+            allPixels.forEach((color, key) => {
+              const [x, y] = key.split(',').map(Number)
+              const rgb = this.hexToRgb(color)
+              pixelArray.push({ x, y, r: rgb.r, g: rgb.g, b: rgb.b })
+            })
+
+            await this.sendImagePixelsBinary(pixelArray)
+            this.toast.showSuccess(`已发送到设备并保存！包含 ${pixelArray.length} 个像素点`)
+          } else {
+            this.toast.showSuccess('已发送到设备并保存')
+          }
         }
+
+        // 传输全部成功后才保存到本地
+        this.saveConfig()
       } catch (err) {
         console.error('发送失败:', err)
         this.toast.showError('发送失败: ' + err.message)
+      } finally {
+        this.isSending = false
+        this.canvasHidden = false  // 恢复 canvas 显示
       }
     },
     
@@ -1532,7 +1945,8 @@ export default {
 .header-left {
   display: flex;
   align-items: center;
-  gap: 32rpx;
+  gap: 16rpx;
+  flex: 1;
 }
 
 .back-btn {
@@ -1559,6 +1973,7 @@ export default {
   display: flex;
   flex-direction: column;
   gap: 4rpx;
+  margin-right: 20rpx;
 }
 
 .header-title {
@@ -1570,6 +1985,33 @@ export default {
 .header-subtitle {
   font-size: 22rpx;
   color: var(--text-secondary);
+}
+
+.header-actions-inline {
+  display: flex;
+  gap: 12rpx;
+  margin-right: 16rpx;
+}
+
+.action-btn-sm {
+  width: 56rpx;
+  height: 56rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 14rpx;
+  border: 2rpx solid var(--border-primary);
+  background-color: var(--bg-tertiary);
+  transition: var(--transition-base);
+}
+
+.action-btn-sm:active {
+  transform: scale(0.95);
+}
+
+.action-btn-sm.primary {
+  background-color: var(--accent-primary);
+  border-color: var(--accent-primary);
 }
 
 .header-actions {
@@ -1867,6 +2309,18 @@ export default {
   display: flex;
   align-items: center;
   gap: 4rpx;
+}
+
+.info-color {
+  color: #4F7FFF !important;
+}
+
+.info-text {
+  font-size: 20rpx;
+  color: #4F7FFF;
+  margin-top: 8rpx;
+  display: flex;
+  align-items: center;
 }
 
 
@@ -2180,6 +2634,22 @@ export default {
   flex-direction: column;
   align-items: center;
   gap: 16rpx;
+  position: relative;
+}
+
+.gif-badge {
+  position: absolute;
+  top: 12rpx;
+  right: 12rpx;
+  background: rgba(139, 92, 246, 0.9);
+  border-radius: 8rpx;
+  padding: 4rpx 12rpx;
+}
+
+.gif-badge-text {
+  color: #fff;
+  font-size: 22rpx;
+  font-weight: 600;
 }
 
 .preview-image {
@@ -2222,5 +2692,64 @@ export default {
 
 .image-action-btn.danger:active {
   background-color: rgba(239, 68, 68, 0.1);
+}
+
+/* 传输遮罩弹窗 */
+.sending-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.sending-modal {
+  background: var(--color-bg-secondary, #fff);
+  border-radius: 24rpx;
+  padding: 60rpx 50rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24rpx;
+  min-width: 400rpx;
+}
+
+.sending-spinner {
+  width: 60rpx;
+  height: 60rpx;
+  border: 6rpx solid rgba(99, 102, 241, 0.2);
+  border-top-color: #6366f1;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.sending-title {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: var(--color-text-primary, #333);
+}
+
+.sending-tip {
+  font-size: 24rpx;
+  color: var(--color-text-secondary, #999);
+}
+
+.sending-text {
+  font-size: 24rpx;
+  color: #fff;
+}
+
+.action-btn.disabled {
+  opacity: 0.5;
+  pointer-events: none;
 }
 </style>

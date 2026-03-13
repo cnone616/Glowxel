@@ -7,7 +7,7 @@
       
       <!-- 缩略图 -->
       <view class="thumbnail-wrapper">
-        <image 
+        <image
           v-if="project.thumbnail && project.thumbnail.startsWith('data:image')"
           :src="project.thumbnail"
           class="thumbnail-image"
@@ -25,15 +25,20 @@
       </view>
       -->
       
+      <!-- 状态徽章 -->
+      <view :class="['status-badge', 'status-' + (project.status || 'draft')]">
+        <text class="status-text">{{ statusLabel }}</text>
+      </view>
+
       <!-- 进度条 -->
       <view class="progress-bar">
-        <view 
-          class="progress-fill" 
+        <view
+          class="progress-fill"
           :style="{ width: project.progress + '%' }"
         ></view>
       </view>
     </view>
-    
+
     <!-- 信息区域 -->
     <view class="info-area" @click="handleClick">
       <text class="project-name">{{ project.name }}</text>
@@ -48,6 +53,10 @@
         <view class="meta-item">
           <text class="meta-text">{{ formatDate(project.lastEdited) }}</text>
         </view>
+      </view>
+      <!-- 退回原因提示 -->
+      <view v-if="project.status === 'rejected' && project.rejectReason" class="reject-reason">
+        <text class="reject-text">退回原因：{{ project.rejectReason }}</text>
       </view>
     </view>
   </view>
@@ -68,8 +77,26 @@ export default {
     }
   },
   
+  computed: {
+    statusLabel() {
+      const statusMap = {
+        'draft': '草稿',
+        'reviewing': '审核中',
+        'published': '已发布',
+        'rejected': '已退回'
+      }
+      return statusMap[this.project.status] || '草稿'
+    }
+  },
+
   methods: {
     handleClick() {
+      const status = this.project.status || 'draft'
+      if (status === 'reviewing') {
+        uni.showToast({ title: '审核中，暂不可编辑', icon: 'none' })
+        return
+      }
+      // 所有项目都先进入看板总览
       uni.navigateTo({
         url: `/pages/overview/overview?id=${this.project.id}`
       })
@@ -198,6 +225,54 @@ export default {
   height: 100%;
   background: linear-gradient(90deg, var(--accent-primary), var(--accent-secondary));
   transition: width 0.3s ease;
+}
+
+/* 状态徽章 */
+.status-badge {
+  position: absolute;
+  top: 12rpx;
+  right: 12rpx;
+  padding: 4rpx 16rpx;
+  border-radius: 8rpx;
+  z-index: 2;
+}
+
+.status-text {
+  font-size: 20rpx;
+  font-weight: 500;
+  color: #FFFFFF;
+}
+
+.status-draft {
+  background-color: rgba(255, 170, 0, 0.85);
+}
+
+.status-reviewing {
+  background-color: rgba(0, 150, 255, 0.85);
+}
+
+.status-published {
+  background-color: rgba(0, 200, 100, 0.85);
+}
+
+.status-rejected {
+  background-color: rgba(255, 60, 60, 0.85);
+}
+
+/* 退回原因 */
+.reject-reason {
+  margin-top: 8rpx;
+  padding: 8rpx 12rpx;
+  background-color: rgba(255, 60, 60, 0.1);
+  border-radius: 8rpx;
+  border-left: 4rpx solid rgba(255, 60, 60, 0.6);
+}
+
+.reject-text {
+  font-size: 22rpx;
+  color: #ff3c3c;
+  display: block;
+  word-break: break-all;
 }
 
 /* 信息区域 */

@@ -16,6 +16,15 @@
 			}
 		},
 		{
+			"path": "pages/workspace/workspace",
+			"style": {
+				"navigationStyle": "custom",
+				"navigationBarTextStyle": "black",
+				"backgroundColor": "#FFFFFF",
+				"enablePullDownRefresh": false
+			}
+		},
+		{
 			"path": "pages/create/create",
 			"style": {
 				"navigationStyle": "custom",
@@ -71,15 +80,6 @@
 		},
 		{
 			"path": "pages/assist/assist",
-			"style": {
-				"navigationStyle": "custom",
-				"navigationBarTextStyle": "white",
-				"backgroundColor": "#1a1a1a",
-				"enablePullDownRefresh": false
-			}
-		},
-		{
-			"path": "pages/user/user",
 			"style": {
 				"navigationStyle": "custom",
 				"navigationBarTextStyle": "white",
@@ -257,7 +257,7 @@
 				"text": "社区"
 			},
 			{
-				"pagePath": "pages/create/create",
+				"pagePath": "pages/workspace/workspace",
 				"iconPath": "static/tabbar/create.png",
 				"selectedIconPath": "static/tabbar/create-active.png",
 				"text": "创作"

@@ -11,12 +11,12 @@
     </view>
     
     <!-- 创作 -->
-    <view 
+    <view
       class="tab-item"
-      :class="{ 'active': currentPath === '/pages/create/create' }"
-      @click="navigateTo('/pages/create/create')"
+      :class="{ 'active': currentPath === '/pages/workspace/workspace' }"
+      @click="navigateTo('/pages/workspace/workspace')"
     >
-      <Icon name="add" :size="40" :color="getIconColor('/pages/create/create')" />
+      <Icon name="add" :size="40" :color="getIconColor('/pages/workspace/workspace')" />
       <text class="tab-label">创作</text>
     </view>
     
@@ -86,9 +86,9 @@ export default {
     
     navigateTo(path) {
       if (this.currentPath === path) return
-      
-      // 使用 reLaunch 来清空页面栈并跳转
-      uni.reLaunch({
+
+      // tabBar 页面必须用 switchTab
+      uni.switchTab({
         url: path
       })
     }

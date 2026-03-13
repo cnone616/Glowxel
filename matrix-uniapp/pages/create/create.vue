@@ -8,65 +8,15 @@
     <!-- 顶部栏 -->
     <view class="header">
       <view class="header-content">
-        <text class="header-title">创作中心</text>
-        <view class="header-actions">
+        <view class="back-btn" @click="handleBack">
+          <text class="back-icon">‹</text>
         </view>
+        <text class="header-title">新建画布</text>
       </view>
     </view>
-    
-    <!-- 主要内容 -->
-    <scroll-view v-if="!showWizard" scroll-y class="main-content">
-      <!-- 快速开始 -->
-      <view class="quick-actions">
-        <view class="action-grid">
-          <view class="action-card" @click="startBlankCanvas">
-            <view class="action-icon">
-              <Icon name="add" :size="48" color="#4F7FFF" />
-            </view>
-            <text class="action-title">新建画布</text>
-            <text class="action-subtitle">从空白开始创作</text>
-          </view>
-          
-          <view class="action-card" @click="startImageImport">
-            <view class="action-icon">
-              <Icon name="upload" :size="48" color="#2ECC71" />
-            </view>
-            <text class="action-title">导入图片</text>
-            <text class="action-subtitle">转换为像素画</text>
-          </view>
-        </view>
-      </view>
-      
-      <!-- 我的画布 -->
-      <view class="my-projects">
-        <view class="section-header">
-          <text class="section-title">我的画布</text>
-          <text class="project-count">{{ filteredProjects.length }} 个</text>
-        </view>
-        
-        <view v-if="filteredProjects.length === 0" class="empty-state">
-          <view class="empty-icon">
-            <Icon name="picture" :size="80" color="#AAAAAA" />
-          </view>
-          <text class="empty-title">还没有画布</text>
-          <text class="empty-subtitle">开始您的第一个创作吧！</text>
-          <view class="empty-btn" @click="startBlankCanvas">
-            <text class="empty-btn-text">立即创建</text>
-          </view>
-        </view>
-        
-        <view v-else class="projects-grid">
-          <ProjectCard 
-            v-for="project in filteredProjects" 
-            :key="project.id"
-            :project="project"
-          />
-        </view>
-      </view>
-    </scroll-view>
-    
+
     <!-- 创建向导 -->
-    <view v-if="showWizard" class="wizard-container">
+    <view class="wizard-container">
       <!-- 步骤 0: 名称 -->
       <scroll-view 
         v-if="step === 0"
@@ -101,16 +51,16 @@
           </view>
         </view>
       </scroll-view>
-      
-      <!-- 步骤 1: 图片上传（仅导入图片模式） -->
+      <!-- 步骤 1: 尺寸选择（仅新建画布模式） 或 步骤 1:图片上传 尺寸选择（导入图片模式） -->
       <scroll-view 
-        v-if="step === 1 && mode === 'image'"
+        v-if="(step === 1 && mode === 'blank') || (step === 1 && mode === 'image')"
         scroll-y 
         class="content-area"
       >
-        <view 
+      <view 
           class="step-content step-image"
           :class="stepAnimationClass"
+          v-if="step === 1 && mode === 'image'"
         >
           <!-- 图片上传 -->
           <view class="image-upload">
@@ -135,14 +85,6 @@
             </view>
           </view>
         </view>
-      </scroll-view>
-      
-      <!-- 步骤 1: 尺寸选择（仅新建画布模式） 或 步骤 2: 尺寸选择（导入图片模式） -->
-      <scroll-view 
-        v-if="(step === 1 && mode === 'blank') || (step === 2 && mode === 'image')"
-        scroll-y 
-        class="content-area"
-      >
         <view 
           class="step-content step-size"
           :class="stepAnimationClass"
@@ -162,7 +104,7 @@
                   <view v-if="customWidth > 0 && customHeight > 0" class="size-preview-inline">
                     <text class="size-preview-value">{{ customWidth }}×{{ customHeight }}</text>
                   </view>
-                  <text v-else class="size-hint">最大520×520像素</text>
+                  <text v-else class="size-hint">最大640×640像素</text>
                 </view>
                 
                 <view class="custom-size-inputs">
@@ -194,7 +136,7 @@
               <view class="size-column full-width">
                 <view class="size-column-header">
                   <text class="size-label">快捷尺寸 (正方形)</text>
-                  <text class="size-hint">52的倍数标准尺寸</text>
+                  <text class="size-hint">64的倍数标准尺寸</text>
                 </view>
                 
                 <view class="size-options">
@@ -228,7 +170,7 @@
       
       <!-- 步骤 2: 颜色选择（新建画布模式） 或 步骤 3: 颜色选择（导入图片模式） -->
       <scroll-view 
-        v-if="(step === 2 && mode === 'blank') || (step === 3 && mode === 'image')"
+        v-if="(step === 2 && mode === 'blank') || (step === 2 && mode === 'image')"
         scroll-y 
         class="content-area"
       >
@@ -264,9 +206,9 @@
       </view>
     </scroll-view>
     
-    <!-- 步骤 4: 预览确认 (仅图片模式) -->
+    <!-- 步骤 3: 预览确认 (仅图片模式) -->
     <scroll-view 
-      v-if="step === 4 && mode === 'image'"
+      v-if="step === 3 && mode === 'image'"
       scroll-y 
       class="content-area"
     >
@@ -347,10 +289,10 @@
       </view>
     </scroll-view>
     </view>
-    
+
     <!-- 底部按钮 -->
-    <view v-if="showWizard" class="footer">
-      <view 
+    <view class="footer">
+      <view
         class="next-btn"
         :class="{ 'disabled': !canProceed || isProcessing }"
         @click="handleNext"
@@ -394,7 +336,7 @@
       canvas-id="tempProcessCanvas" 
       id="tempProcessCanvas"
       type="2d"
-      style="position: absolute; left: -9999px; top: -9999px; width: 520px; height: 520px; opacity: 0; pointer-events: none;"
+      style="position: absolute; left: -9999px; top: -9999px; width: 640px; height: 640px; opacity: 0; pointer-events: none;"
     />
     <!-- #endif -->
     
@@ -436,12 +378,10 @@ export default {
     return {
       projectStore: null,
       toast: null,
-      
-      showWizard: false, // 控制是否显示创建向导
-      
+
       name: '',
-      customWidth: 52,
-      customHeight: 52,
+      customWidth: 64,
+      customHeight: 64,
       selectedPreset: 'set24',
       selectedColors: new Set(ARTKAL_OFFICIAL_SETS.set24.colors),
       step: 0,
@@ -460,40 +400,40 @@ export default {
       
       presets: ARTKAL_PRESETS,
       sizePresets: [
-        { width: 52, height: 52 },
-        { width: 104, height: 104 },
-        { width: 156, height: 156 },
-        { width: 208, height: 208 },
-        { width: 260, height: 260 },
-        { width: 312, height: 312 },
-        { width: 364, height: 364 },
-        { width: 416, height: 416 },
-        { width: 468, height: 468 },
-        { width: 520, height: 520 }
+        { width: 64, height: 64 },
+        { width: 128, height: 128 },
+        { width: 192, height: 192 },
+        { width: 256, height: 256 },
+        { width: 320, height: 320 },
+        { width: 384, height: 384 },
+        { width: 448, height: 448 },
+        { width: 512, height: 512 },
+        { width: 576, height: 576 },
+        { width: 640, height: 640 }
       ],
       showLoginModal: false // 需要登录弹窗
     }
   },
   
   computed: {
-    // 计算填充后的宽度（向上取整到52的倍数）
+    // 计算填充后的宽度（向上取整到64的倍数）
     paddedWidth() {
-      return Math.ceil(this.customWidth / 52) * 52
+      return Math.ceil(this.customWidth / 64) * 64
     },
-    
-    // 计算填充后的高度（向上取整到52的倍数）
+
+    // 计算填充后的高度（向上取整到64的倍数）
     paddedHeight() {
-      return Math.ceil(this.customHeight / 52) * 52
+      return Math.ceil(this.customHeight / 64) * 64
     },
-    
+
     // 计算横向板子数量
     boardsX() {
-      return Math.ceil(this.customWidth / 52)
+      return Math.ceil(this.customWidth / 64)
     },
-    
+
     // 计算纵向板子数量
     boardsY() {
-      return Math.ceil(this.customHeight / 52)
+      return Math.ceil(this.customHeight / 64)
     },
     
     // 总板子数量
@@ -513,45 +453,41 @@ export default {
       if (this.step === 0) return this.name.trim().length > 0
       if (this.step === 1) {
         if (this.mode === 'image') {
-          // 图片模式第1步：需要上传图片
-          return this.imageFile !== null
+          // 图片模式第1步：需要上传图片和设置尺寸
+          return this.imageFile &&
+                 this.customWidth > 0 &&
+                 this.customHeight > 0 &&
+                 this.paddedWidth <= 640 &&
+                 this.paddedHeight <= 640
         } else {
           // 空白画布第1步：需要设置尺寸
-          return this.customWidth > 0 && 
-                 this.customHeight > 0 && 
-                 this.paddedWidth <= 520 && 
-                 this.paddedHeight <= 520
+          return this.customWidth > 0 &&
+                 this.customHeight > 0 &&
+                 this.paddedWidth <= 640 &&
+                 this.paddedHeight <= 640
         }
       }
       if (this.step === 2) {
-        if (this.mode === 'image') {
-          // 图片模式第2步：需要设置尺寸
-          return this.customWidth > 0 && 
-                 this.customHeight > 0 && 
-                 this.paddedWidth <= 520 && 
-                 this.paddedHeight <= 520
-        } else {
-          // 空白画布第2步：颜色选择，总是可以进行
-          return true
-        }
+        // 两种模式的颜色选择步骤，总是可以进行
+        return true
       }
-      if (this.step === 3) return true // 图片模式的颜色选择
-      if (this.step === 4) return true // 图片模式的预览步骤
+      if (this.step === 3) return true // 图片模式的预览步骤
       return true
     },
-    
+
     buttonText() {
       if (this.step === 0) return '下一步'
       if (this.step === 1) {
         if (this.mode === 'image') {
-          return '选择尺寸'
+          return '选择颜色'
         } else {
           return '选择颜色'
         }
       }
       if (this.step === 2) {
         if (this.mode === 'image') {
-          return '选择颜色'
+          if (this.isProcessing) return '正在生成中...'
+          return '生成预览'
         } else {
           // 空白画布直接创建
           return '创建画布'
@@ -559,18 +495,14 @@ export default {
       }
       if (this.step === 3) {
         if (this.mode === 'image') {
-          if (this.isProcessing) return '正在生成中...'
-          return '生成预览'
+          if (this.isProcessing) return '生成中...'
+          return '确认创建'
         }
-      }
-      if (this.step === 4) {
-        if (this.isProcessing) return '生成中...'
-        return '确认创建'
       }
       return '下一步'
     }
   },
-  
+
   onLoad(options) {
     // 检查登录状态
     const userStore = useUserStore()
@@ -578,13 +510,18 @@ export default {
       this.showLoginModal = true
       return
     }
-    
+
     this.projectStore = useProjectStore()
     this.toast = useToast()
-    
+
+    // 根据 URL 参数自动进入对应模式
+    if (options && options.mode) {
+      this.mode = options.mode
+      this.step = 0
+      this.resetForm()
+    }
     // 检查是否从模板创建
-    if (options && options.templateId) {
-      this.showWizard = true
+    else if (options && options.templateId) {
       this.mode = 'template'
       this.templateId = options.templateId
       // TODO: 加载模板数据
@@ -595,7 +532,6 @@ export default {
     }
     // 检查是否从挑战创建
     else if (options && options.challengeId) {
-      this.showWizard = true
       this.mode = 'challenge'
       this.challengeId = options.challengeId
       // TODO: 加载挑战信息
@@ -604,14 +540,7 @@ export default {
         icon: 'loading'
       })
     }
-    // 检查是否直接进入向导模式
-    else if (options && options.mode === 'image') {
-      this.showWizard = true
-      this.mode = 'image'
-    } else if (options && options.wizard === 'true') {
-      this.showWizard = true
-    }
-    
+
     // 注册自定义 Toast 实例
     this.$nextTick(() => {
       if (this.$refs.toastRef) {
@@ -625,25 +554,10 @@ export default {
   },
   
   methods: {
-    // 新增：快速开始方法
-    startBlankCanvas() {
-      this.showWizard = true
-      this.mode = 'blank'
-      this.step = 0
-      this.resetForm()
-    },
-    
-    startImageImport() {
-      this.showWizard = true
-      this.mode = 'image'
-      this.step = 0
-      this.resetForm()
-    },
-    
     resetForm() {
       this.name = ''
-      this.customWidth = 52
-      this.customHeight = 52
+      this.customWidth = 64
+      this.customHeight = 64
       this.selectedPreset = 'set24'
       this.selectedColors = new Set(ARTKAL_OFFICIAL_SETS.set24.colors)
       this.imageFile = null
@@ -658,8 +572,8 @@ export default {
     
     // 前往登录
     goToLogin() {
-      uni.reLaunch({
-        url: '/pages/user/user'
+      uni.switchTab({
+        url: '/pages/profile/profile'
       })
     },
     
@@ -698,13 +612,13 @@ export default {
       if (this.customHeight < 1) this.customHeight = 1
       
       // 检查是否超过最大限制
-      if (this.paddedWidth > 520) {
-        this.customWidth = 520
-        this.toast.showError('宽度最大为520像素（10块板子）')
+      if (this.paddedWidth > 640) {
+        this.customWidth = 640
+        this.toast.showError('宽度最大为640像素（10块板子）')
       }
-      if (this.paddedHeight > 520) {
-        this.customHeight = 520
-        this.toast.showError('高度最大为520像素（10块板子）')
+      if (this.paddedHeight > 640) {
+        this.customHeight = 640
+        this.toast.showError('高度最大为640像素（10块板子）')
       }
     },
     
@@ -718,10 +632,10 @@ export default {
       if (this.isProcessing) {
         return
       }
-      
+
       if (this.step === 0) {
-        // 在向导第一步，返回到主界面
-        this.showWizard = false
+        // 在向导第一步，返回到 workspace 页面
+        uni.navigateBack()
       } else {
         // 在向导其他步骤，返回上一步
         this.stepAnimationClass = 'step-exit-reverse'
@@ -1108,7 +1022,7 @@ export default {
       this.isProcessing = false
       this.stepAnimationClass = 'step-exit'
       setTimeout(() => {
-        this.step = 4  // 图片模式的预览是第4步
+        this.step = 3  // 图片模式的预览是第4步
         this.stepAnimationClass = 'step-enter'
       }, 150)
     },
@@ -1147,20 +1061,19 @@ export default {
             canvas.width = containerWidth
             canvas.height = containerHeight
             
-            // 清空背景
-            ctx.fillStyle = '#f5f5f5'
-            ctx.fillRect(0, 0, containerWidth, containerHeight)
+            // 清空背景（透明，视觉背景通过CSS容器实现）
+            ctx.clearRect(0, 0, containerWidth, containerHeight)
             
             // 使用最大边作为正方形基准
             const maxDimension = Math.max(this.paddedWidth, this.paddedHeight)
             
             // 根据项目大小选择倍数
             // #ifdef H5
-            const multiplier = (maxDimension > 52) ? 3 : 2
+            const multiplier = (maxDimension > 64) ? 3 : 2
             // #endif
             
             // #ifdef MP-WEIXIN
-            const multiplier = (maxDimension > 52) ? 1.5 : 1
+            const multiplier = (maxDimension > 64) ? 1.5 : 1
             // #endif
             
             let scale = Math.min(
@@ -1240,7 +1153,7 @@ export default {
     
     handleNext() {
       if (!this.canProceed || this.isProcessing) return
-      
+
       if (this.mode === 'blank') {
         // 空白画布流程：名称(0) → 尺寸(1) → 颜色(2) → 创建
         if (this.step === 0 || this.step === 1) {
@@ -1254,17 +1167,17 @@ export default {
           this.handleCreate()
         }
       } else if (this.mode === 'image') {
-        // 图片导入流程：名称(0) → 图片(1) → 尺寸(2) → 颜色(3) → 预览(4) → 创建
-        if (this.step === 0 || this.step === 1 || this.step === 2) {
+        // 图片导入流程：名称(0) → 图片+尺寸(1) → 颜色(2) → 预览(3) → 创建
+        if (this.step === 0 || this.step === 1) {
           this.stepAnimationClass = 'step-exit'
           setTimeout(() => {
             this.step++
             this.stepAnimationClass = 'step-enter'
           }, 150)
-        } else if (this.step === 3) {
+        } else if (this.step === 2) {
           // 生成预览
           this.generatePreview()
-        } else if (this.step === 4) {
+        } else if (this.step === 3) {
           // 确认创建
           this.handleCreate()
         }
@@ -1272,78 +1185,96 @@ export default {
     },
     
     async handleCreate() {
-      // 导入画布草稿存储
-      const canvasStore = (await import('../../store/canvas.js')).default
-      
       if (this.mode === 'image' && this.previewPixels) {
-        // 使用预览数据创建画布草稿
+        // 使用预览数据创建项目
         this.isProcessing = true
-        
+
         try {
-          // 创建画布草稿而非直接发布作品
-          const draft = canvasStore.actions.createDraft({
-            name: this.name,
-            width: this.customWidth,
-            height: this.customHeight,
-            colors: Array.from(this.selectedColors)
-          })
-          
-          if (!draft) {
-            this.toast.showError('创建画布草稿失败')
+          // 将临时文件转为base64，避免临时文件被系统清理
+          let thumbnailBase64 = null
+          const tempPath = this.previewImageUrl || this.previewUrl
+          if (tempPath) {
+            try {
+              // #ifdef MP-WEIXIN
+              const fs = uni.getFileSystemManager()
+              const base64Data = fs.readFileSync(tempPath, 'base64')
+              thumbnailBase64 = 'data:image/png;base64,' + base64Data
+              // #endif
+              // #ifdef H5
+              thumbnailBase64 = tempPath
+              // #endif
+            } catch (e) {
+              console.error('缩略图转base64失败:', e)
+            }
+          }
+
+          // 创建项目（未发布状态）
+          const palette = Array.from(this.selectedColors)
+          const projectId = this.projectStore.addProject(
+            this.name,
+            this.customWidth,
+            this.customHeight,
+            palette.length,
+            palette,
+            this.customWidth,
+            this.customHeight,
+            thumbnailBase64
+          )
+
+          if (!projectId) {
+            this.toast.showError('创建项目失败')
             this.isProcessing = false
             return
           }
-          
-          // 将预览像素数据保存到草稿
-          this.previewPixels.forEach((color, position) => {
-            const [x, y] = position.split(',').map(Number)
-            canvasStore.actions.updatePixel(x, y, color)
-          })
-          
-          // 保存草稿
-          const success = canvasStore.actions.saveCurrentDraft()
-          if (!success) {
-            this.toast.showError('保存画布草稿失败')
-            this.isProcessing = false
-            return
+
+          // 将预览像素数据保存到本地存储
+          if (this.previewPixels) {
+            this.projectStore.saveProjectPixels(projectId, this.previewPixels)
           }
-          
-          this.toast.showSuccess('画布草稿创建成功！')
+
+          this.toast.showSuccess('项目创建成功！')
           this.isProcessing = false
-          
-          // 回到创作中心主界面
-          this.showWizard = false
-          this.resetForm()
-          
+
+          // 返回 workspace 页面
+          setTimeout(() => {
+            uni.navigateBack()
+          }, 500)
+
         } catch (error) {
-          console.error('创建画布草稿失败:', error)
-          this.toast.showError('创建画布草稿失败，请重试')
+          console.error('创建项目失败:', error)
+          this.toast.showError('创建项目失败，请重试')
           this.isProcessing = false
         }
       } else if (this.mode === 'blank') {
-        // 空白画布创建草稿
+        // 空白画布创建项目（未发布状态）
         try {
-          const draft = canvasStore.actions.createDraft({
-            name: this.name,
-            width: this.customWidth,
-            height: this.customHeight,
-            colors: Array.from(this.selectedColors)
-          })
-          
-          if (!draft) {
-            this.toast.showError('创建画布草稿失败')
+          const palette = Array.from(this.selectedColors)
+          const projectId = this.projectStore.addProject(
+            this.name,
+            this.customWidth,
+            this.customHeight,
+            palette.length,
+            palette,
+            this.customWidth,
+            this.customHeight,
+            null
+          )
+
+          if (!projectId) {
+            this.toast.showError('创建项目失败')
             return
           }
-          
-          this.toast.showSuccess('画布草稿创建成功！')
-          
-          // 回到创作中心主界面
-          this.showWizard = false
-          this.resetForm()
-          
+
+          this.toast.showSuccess('项目创建成功！')
+
+          // 返回 workspace 页面
+          setTimeout(() => {
+            uni.navigateBack()
+          }, 500)
+
         } catch (error) {
-          console.error('创建画布草稿失败:', error)
-          this.toast.showError('创建画布草稿失败，请重试')
+          console.error('创建项目失败:', error)
+          this.toast.showError('创建项目失败，请重试')
         }
       }
     },
@@ -1646,40 +1577,35 @@ export default {
 }
 
 .back-btn {
-  position: absolute;
-  left: 32rpx;
   width: 64rpx;
-  height: 64rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
 }
 
 .back-icon {
-  font-size: 64rpx;
+  font-size: 36rpx;
   color: var(--color-text-primary);
   line-height: 1;
 }
 
 /* 顶部导航 */
 .header {
-  background-color: var(--color-card-background);
-  border-bottom: 1rpx solid var(--border-primary);
   flex-shrink: 0;
+  height: 112rpx;
+  display: flex;
+  align-items: center;
+  padding: 0 48rpx;
+  border-bottom: 2rpx solid var(--border-primary);
+  background-color: var(--bg-elevated);
 }
 
 .header-content {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 24rpx 32rpx;
 }
 
 .header-title {
-font-size: 36rpx;
-font-weight: 700;
-color: var(--color-text-primary);
+  font-size: 36rpx;
+  font-weight: 700;
+  color: var(--color-text-primary);
 }
 
 .content-area {
@@ -1714,6 +1640,7 @@ color: var(--color-text-primary);
   display: flex;
   flex-direction: column;
   gap: 48rpx;
+  margin-top: 20rpx;
 }
 
 /* 步骤切换动画 */
@@ -1881,6 +1808,7 @@ color: var(--color-text-primary);
 /* 图片上传 */
 .image-upload {
   min-height: 400rpx;
+  margin: 20rpx 0;
 }
 
 .upload-area {
@@ -1893,6 +1821,7 @@ color: var(--color-text-primary);
   border: 4rpx dashed var(--border-color);
   border-radius: 24rpx;
   padding: 48rpx;
+  margin: 20rpx 0;
 }
 
 .upload-icon-wrapper {
@@ -1926,7 +1855,6 @@ color: var(--color-text-primary);
   position: relative;
   border-radius: 24rpx;
   overflow: hidden;
-  background-color: var(--bg-tertiary);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -2140,7 +2068,7 @@ color: var(--color-text-primary);
 }
 
 .size-option.active .size-option-text {
-  color: #00f3ff;
+  color: var(--accent-primary);
   font-weight: bold;
 }
 

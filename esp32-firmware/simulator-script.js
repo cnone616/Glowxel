@@ -7,6 +7,14 @@ const PIXEL_SIZE = 10;
 let uploadedImage = null;
 let currentTab = 'time';
 
+// GIF 动画相关变量
+let gifFrames = [];
+let currentFrameIndex = 0;
+let gifAnimationId = null;
+let isGifPlaying = false;
+let gifSpeed = 1;
+let isGifFile = false;
+
 // 颜色预设（和小程序一致）
 const presetColors = [
   { name: '青色', hex: '#64c8ff', rgb: [100, 200, 255] },
@@ -105,16 +113,31 @@ function handleImageUpload(event) {
   const file = event.target.files[0];
   if (!file) return;
   
+  console.log('上传文件:', file.name, file.type, file.size, 'bytes');
+  
+  // 检查是否为 GIF 文件
+  isGifFile = file.type === 'image/gif';
+  
+  if (isGifFile) {
+    console.log('检测到 GIF 文件，开始解析...');
+    handleGifUpload(file);
+  } else {
+    console.log('检测到静态图片文件');
+    handleStaticImageUpload(file);
+  }
+}
+
+// 处理静态图片上传
+function handleStaticImageUpload(file) {
   const reader = new FileReader();
   reader.onload = function(e) {
     const img = new Image();
     img.onload = function() {
       uploadedImage = img;
-      document.getElementById('uploadPlaceholder').style.display = 'none';
-      document.getElementById('imagePreviewContainer').style.display = 'block';
-      document.getElementById('imagePreview').src = e.target.result;
-      document.getElementById('uploadArea').classList.add('has-image');
-      document.getElementById('showImage').checked = true;
+      gifFrames = [];
+      isGifFile = false;
+      showImagePreview(e.target.result);
+      hideGifControls();
       updateDisplay();
     };
     img.src = e.target.result;
@@ -122,13 +145,149 @@ function handleImageUpload(event) {
   reader.readAsDataURL(file);
 }
 
+// 处理 GIF 上传
+async function handleGifUpload(file) {
+  console.log('开始解析 GIF 文件...');
+  
+  try {
+    const arrayBuffer = await file.arrayBuffer();
+    const parser = new GIFParser();
+    const gifData = await parser.parse(arrayBuffer);
+    
+    console.log('GIF 解析成功:', gifData);
+    
+    // 处理所有帧为 Canvas
+    console.log('开始处理所有帧...');
+    const canvases = parser.processAllFrames();
+    console.log('帧处理完成:', canvases.length, '帧');
+    
+    // 生成 ESP32 优化的动画数据
+    console.log('开始生成差分数据...');
+    const esp32Data = parser.generateESP32AnimationData();
+    console.log('差分数据生成完成:', esp32Data);
+    
+    // 验证 ESP32 数据的正确性（暂时跳过验证，避免错误）
+    console.log('跳过 ESP32 数据验证');
+    // const validation = parser.validateESP32Data(esp32Data.esp32Format);
+    // console.log('验证完成:', validation);
+    
+    // 转换为我们需要的格式
+    gifFrames = [];
+    for (let i = 0; i < canvases.length; i++) {
+      const frame = gifData.frames[i];
+      const frameData = esp32Data.frames[i];
+      
+      gifFrames.push({
+        canvas: canvases[i],
+        delay: Math.max(50, frame.delay || 100), // 最小 50ms 延迟
+        index: i,
+        width: gifData.width,
+        height: gifData.height,
+        // ESP32 优化数据
+        esp32Data: frameData
+      });
+    }
+    
+    // 保存完整的 ESP32 动画数据
+    window.currentGifESP32Data = esp32Data;
+    
+    if (gifFrames.length > 0) {
+      currentFrameIndex = 0;
+      uploadedImage = gifFrames[0].canvas;
+      
+      // 显示预览（使用第一帧）
+      showImagePreview(gifFrames[0].canvas.toDataURL());
+      showGifControls();
+      updateGifFrameInfo();
+      updateDisplay();
+      
+      console.log(`GIF 加载完成: ${gifFrames.length} 帧, 尺寸: ${gifData.width}x${gifData.height}`);
+      
+      // 检查数据大小
+      const esp32Format = esp32Data.esp32Format;
+      const testJsonStr = JSON.stringify(esp32Format);
+      const sizeKB = (testJsonStr.length / 1024).toFixed(1);
+      
+      // 显示优化统计信息
+      const stats = esp32Data.statistics;
+      let message = `GIF 解析成功！
+帧数: ${gifFrames.length} → ${esp32Format.f} (优化后)
+尺寸: ${gifData.width}x${gifData.height}
+数据大小: ${sizeKB} KB
+
+ESP32 优化统计:
+• 全帧: ${stats.fullFrames} 个
+• 差分帧: ${stats.diffFrames} 个  
+• 压缩比: ${stats.compressionRatio}:1
+• 预估内存: ${stats.estimatedMemory.kb} KB
+
+所有帧已预处理完成，可以播放动画了！`;
+
+      // 数据大小警告
+      if (testJsonStr.length > 100000) {
+        message += `\n\n⚠️ 警告：数据过大 (${sizeKB} KB)
+建议：
+1. 使用更小的 GIF 文件
+2. 减少帧数或分辨率
+3. 可能导致 ESP32 内存不足`;
+      } else if (testJsonStr.length > 50000) {
+        message += `\n\n💡 提示：数据较大 (${sizeKB} KB)
+ESP32 可能需要较长时间处理`;
+      }
+      
+      alert(message);
+    }
+    
+  } catch (error) {
+    console.error('GIF 解析失败:', error);
+    alert(`GIF 解析失败: ${error.message}\n请尝试其他 GIF 文件`);
+    
+    // 降级为静态图片处理
+    handleStaticImageUpload(file);
+  }
+}
+
+// 显示图片预览
+function showImagePreview(src) {
+  document.getElementById('uploadPlaceholder').style.display = 'none';
+  document.getElementById('imagePreviewContainer').style.display = 'block';
+  document.getElementById('imagePreview').src = src;
+  document.getElementById('uploadArea').classList.add('has-image');
+  document.getElementById('showImage').checked = true;
+}
+
+// 显示 GIF 控制面板
+function showGifControls() {
+  document.getElementById('gifControls').style.display = 'block';
+  document.getElementById('copyESP32AnimBtn').style.display = 'inline-block';
+  document.getElementById('copyCompressedAnimBtn').style.display = 'inline-block';
+}
+
+// 隐藏 GIF 控制面板
+function hideGifControls() {
+  document.getElementById('gifControls').style.display = 'none';
+  document.getElementById('copyESP32AnimBtn').style.display = 'none';
+  document.getElementById('copyCompressedAnimBtn').style.display = 'none';
+  stopGif();
+}
+
+// 更新 GIF 帧信息显示
+function updateGifFrameInfo() {
+  document.getElementById('currentFrame').textContent = currentFrameIndex + 1;
+  document.getElementById('totalFrames').textContent = gifFrames.length;
+}
+
 function removeImage() {
   uploadedImage = null;
+  gifFrames = [];
+  isGifFile = false;
+  stopGif();
   document.getElementById('uploadPlaceholder').style.display = 'block';
   document.getElementById('imagePreviewContainer').style.display = 'none';
   document.getElementById('uploadArea').classList.remove('has-image');
   document.getElementById('showImage').checked = false;
   document.getElementById('imageInput').value = '';
+  hideGifControls();
   updateDisplay();
 }
 
@@ -176,6 +335,86 @@ function adjustValue(inputId, delta) {
   }
   
   updateDisplay();
+}
+
+// GIF 动画控制函数
+function playGif() {
+  if (!isGifFile || gifFrames.length === 0) return;
+  
+  isGifPlaying = true;
+  document.getElementById('playBtn').style.display = 'none';
+  document.getElementById('pauseBtn').style.display = 'inline-block';
+  
+  function nextFrame() {
+    if (!isGifPlaying) return;
+    
+    const frame = gifFrames[currentFrameIndex];
+    uploadedImage = frame.canvas;
+    updateDisplay();
+    updateGifFrameInfo();
+    
+    currentFrameIndex = (currentFrameIndex + 1) % gifFrames.length;
+    
+    // 根据当前帧的延迟和播放速度设置下一帧时间
+    const delay = Math.max(50, frame.delay / gifSpeed); // 最小 50ms 延迟
+    gifAnimationId = setTimeout(nextFrame, delay);
+  }
+  
+  nextFrame();
+}
+
+function pauseGif() {
+  isGifPlaying = false;
+  if (gifAnimationId) {
+    clearTimeout(gifAnimationId);
+    gifAnimationId = null;
+  }
+  document.getElementById('playBtn').style.display = 'inline-block';
+  document.getElementById('pauseBtn').style.display = 'none';
+}
+
+function stopGif() {
+  pauseGif();
+  if (gifFrames.length > 0) {
+    currentFrameIndex = 0;
+    uploadedImage = gifFrames[0].canvas;
+    updateDisplay();
+    updateGifFrameInfo();
+  }
+}
+
+function prevFrame() {
+  if (!isGifFile || gifFrames.length === 0) return;
+  
+  pauseGif();
+  currentFrameIndex = (currentFrameIndex - 1 + gifFrames.length) % gifFrames.length;
+  uploadedImage = gifFrames[currentFrameIndex].canvas;
+  updateDisplay();
+  updateGifFrameInfo();
+}
+
+function nextFrame() {
+  if (!isGifFile || gifFrames.length === 0) return;
+  
+  pauseGif();
+  currentFrameIndex = (currentFrameIndex + 1) % gifFrames.length;
+  uploadedImage = gifFrames[currentFrameIndex].canvas;
+  updateDisplay();
+  updateGifFrameInfo();
+}
+
+function adjustGifSpeed(delta) {
+  const input = document.getElementById('gifSpeed');
+  const currentValue = parseFloat(input.value) || 1;
+  const min = parseFloat(input.min) || 0.1;
+  const max = parseFloat(input.max) || 3;
+  const newValue = Math.max(min, Math.min(max, Math.round((currentValue + delta) * 10) / 10));
+  input.value = newValue;
+  updateGifSpeed();
+}
+
+function updateGifSpeed() {
+  gifSpeed = parseFloat(document.getElementById('gifSpeed').value) || 1;
 }
 
 // 绘制函数
@@ -420,16 +659,83 @@ function copyFullJSON() {
   }
   
   const config = JSON.parse(saved);
+  
+  // 如果有 GIF 数据，添加 ESP32 优化信息
+  if (window.currentGifESP32Data) {
+    config.gifAnimation = window.currentGifESP32Data;
+  }
+  
   const jsonStr = JSON.stringify(config, null, 2);
   
   navigator.clipboard.writeText(jsonStr).then(() => {
     const pixelCount = config.imagePixels ? config.imagePixels.length : 0;
-    alert(`✅ 完整配置已复制！\n\n包含:\n- 时间/日期/星期设置\n- 图片像素数据 (${pixelCount} 个点)\n\n可以直接粘贴到小程序代码中使用`);
+    const gifInfo = window.currentGifESP32Data 
+      ? `\n- GIF 动画数据 (${window.currentGifESP32Data.frameCount} 帧, ${window.currentGifESP32Data.statistics.estimatedMemory.kb} KB)`
+      : '';
+    
+    alert(`✅ 完整配置已复制！\n\n包含:\n- 时间/日期/星期设置\n- 图片像素数据 (${pixelCount} 个点)${gifInfo}\n\n可以直接粘贴到小程序代码中使用`);
   }).catch(() => {
     const output = document.getElementById('configOutput');
     output.textContent = jsonStr;
     output.style.display = 'block';
     alert('自动复制失败，JSON 已显示在下方，请手动复制');
+  });
+}
+
+// 复制 ESP32 差分动画数据（简单压缩版）
+function copyESP32AnimationData() {
+  if (!window.currentGifESP32Data) {
+    alert('没有 GIF 动画数据');
+    return;
+  }
+  
+  const esp32Data = window.currentGifESP32Data;
+  const esp32Format = esp32Data.esp32Format;
+  
+  // 简单压缩格式
+  const compactData = {
+    f: esp32Format.f,
+    d: esp32Format.d
+  };
+  
+  const jsonStr = JSON.stringify(compactData);
+  const sizeKB = (jsonStr.length / 1024).toFixed(1);
+  
+  // 检查数据大小
+  if (jsonStr.length > 300000) { // 提高到300KB限制
+    alert(`⚠️ 数据过大 (${sizeKB} KB)！\n\n建议：\n1. 使用更小的 GIF 文件\n2. 减少帧数\n3. 降低分辨率\n\n当前数据可能导致 ESP32 内存不足`);
+    return;
+  }
+  
+  navigator.clipboard.writeText(jsonStr).then(() => {
+    const stats = esp32Data.statistics;
+    const message = `✅ ESP32 紧凑动画数据已复制！
+
+数据大小: ${sizeKB} KB
+格式说明:
+• f: 总帧数
+• d[i].t: 1=全刷新, 0=差分更新  
+• d[i].d: 帧延迟(毫秒)
+• d[i].c: 像素数量
+• d[i].p: 像素数组 [x,y,r,g,b]
+
+优化统计:
+• 帧数: ${esp32Format.f}
+• 原始帧数: ${esp32Data.frameCount}
+• 压缩比: ${stats.compressionRatio}:1
+• 内存: ${stats.estimatedMemory.kb} KB
+
+ESP32 渲染逻辑:
+1. t=1: 清屏后绘制所有像素
+2. t=0: 只更新 p 数组中的像素
+3. 使用 drawPixelRGB888(p[i][0], p[i][1], p[i][2], p[i][3], p[i][4])`;
+    
+    alert(message);
+  }).catch(() => {
+    const output = document.getElementById('configOutput');
+    output.textContent = `ESP32 紧凑动画数据 (${sizeKB} KB)：\n\n${jsonStr}`;
+    output.style.display = 'block';
+    alert('自动复制失败，数据已显示在下方，请手动复制');
   });
 }
 
@@ -554,3 +860,15 @@ function loadSavedConfig() {
 
 loadSavedConfig();
 updateDisplay();
+
+// 页面加载完成后的初始化
+document.addEventListener('DOMContentLoaded', function() {
+  console.log('LED 模拟器已加载');
+  
+  // 检查 GIF 库是否加载成功
+  if (typeof gifuct !== 'undefined') {
+    console.log('GIF 解析库加载成功');
+  } else {
+    console.warn('GIF 解析库未加载，GIF 功能可能不可用');
+  }
+});

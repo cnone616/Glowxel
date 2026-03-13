@@ -159,14 +159,14 @@ export default {
     drawCanvas(containerWidth, containerHeight) {
       this.ctx.clearRect(0, 0, containerWidth, containerHeight)
       
-      const maxDimension = Math.max(this.width || 52, this.height || 52)
-      
+      const maxDimension = Math.max(this.width || 64, this.height || 64)
+
       // #ifdef H5
-      const multiplier = (maxDimension > 52) ? 3 : 2
+      const multiplier = (maxDimension > 64) ? 3 : 2
       // #endif
-      
+
       // #ifdef MP-WEIXIN
-      const multiplier = (maxDimension > 52) ? 1 : 1
+      const multiplier = (maxDimension > 64) ? 1 : 1
       console.log('123')
       // #endif
       
@@ -184,8 +184,8 @@ export default {
         scale = Math.round(scale * 100) / 100
       }
       
-      const centerOffsetX = (maxDimension - (this.width || 52)) / 2
-      const centerOffsetY = (maxDimension - (this.height || 52)) / 2
+      const centerOffsetX = (maxDimension - (this.width || 64)) / 2
+      const centerOffsetY = (maxDimension - (this.height || 64)) / 2
       
       this.pixels.forEach((color, key) => {
         const [x, y] = key.split(',').map(Number)
@@ -203,8 +203,8 @@ export default {
       // 暂时不保存缩略图
       return
       
-      const thumbWidth = 520
-      const thumbHeight = 520
+      const thumbWidth = 640
+      const thumbHeight = 640
       
       // 创建一个新的离屏 canvas（如果支持）
       let offscreenCanvas = canvas
@@ -219,7 +219,7 @@ export default {
       
       // 使用最大边作为正方形基准
       const maxDimension = Math.max(this.width, this.height)
-      const pixelSize = 3 / (maxDimension / 52)
+      const pixelSize = 3 / (maxDimension / 64)
       
       // 计算居中偏移量
       const centerOffsetX = (maxDimension - this.width) / 2
