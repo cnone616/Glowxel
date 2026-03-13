@@ -286,14 +286,14 @@ export default {
   computed: {
     cols() {
       // 使用填充后的宽度计算板子数量
-      const paddedWidth = this.project?.paddedWidth || this.project?.width || 52
-      return Math.ceil(paddedWidth / 52)
+      const paddedWidth = this.project?.paddedWidth || this.project?.width || 64
+      return Math.ceil(paddedWidth / 64)
     },
-    
+
     rows() {
       // 使用填充后的高度计算板子数量
-      const paddedHeight = this.project?.paddedHeight || this.project?.height || 52
-      return Math.ceil(paddedHeight / 52)
+      const paddedHeight = this.project?.paddedHeight || this.project?.height || 64
+      return Math.ceil(paddedHeight / 64)
     },
     
     rowLabels() {
@@ -341,8 +341,8 @@ export default {
     if (!this.project) {
       this.toast.showError('项目不存在')
       setTimeout(() => {
-        uni.reLaunch({
-          url: '/pages/library/library'
+        uni.switchTab({
+          url: '/pages/workspace/workspace'
         })
       }, 1000)
       return
@@ -428,12 +428,12 @@ export default {
     
     getBoardPixels(boardX, boardY) {
       const local = new Map()
-      const startX = boardX * 52
-      const startY = boardY * 52
-      
+      const startX = boardX * 64
+      const startY = boardY * 64
+
       this.pixels.forEach((color, key) => {
         const [px, py] = key.split(',').map(Number)
-        if (px >= startX && px < startX + 52 && py >= startY && py < startY + 52) {
+        if (px >= startX && px < startX + 64 && py >= startY && py < startY + 64) {
           local.set(`${px - startX},${py - startY}`, color)
         }
       })
@@ -445,8 +445,8 @@ export default {
       // 计算整个项目有多少个看板
       const paddedWidth = this.project.paddedWidth || this.project.width
       const paddedHeight = this.project.paddedHeight || this.project.height
-      const boardsX = Math.ceil(paddedWidth / 52)
-      const boardsY = Math.ceil(paddedHeight / 52)
+      const boardsX = Math.ceil(paddedWidth / 64)
+      const boardsY = Math.ceil(paddedHeight / 64)
       
       // 容器尺寸（需要通过CSS变量或固定值）
       // 假设容器是正方形，宽高相等，这里用百分比计算
@@ -509,9 +509,7 @@ export default {
     },
     
     goBack() {
-      uni.reLaunch({
-        url: '/pages/create/create'
-      })
+      uni.navigateBack()
     },
     
     goToFullEditor() {
@@ -555,8 +553,8 @@ export default {
         
         const tempFilePath = await exportCanvasAsImage({
           pixels: boardPixels,
-          width: 52,
-          height: 52,
+          width: 64,
+          height: 64,
           projectName: `${this.project?.name || '未命名'} - ${board.id}`,
           palette: this.project?.palette,
           cellSize: 30,
@@ -672,8 +670,8 @@ export default {
     deleteProjectLocal() {
       this.projectStore.deleteProject(this.project.id)
       this.toast.showSuccess('本地画布已删除')
-      uni.reLaunch({
-        url: '/pages/library/library'
+      uni.switchTab({
+        url: '/pages/workspace/workspace'
       })
     },
     
@@ -697,8 +695,8 @@ export default {
         
         uni.hideLoading()
         this.toast.showSuccess('本地和云端画布已删除')
-        uni.reLaunch({
-          url: '/pages/library/library'
+        uni.switchTab({
+          url: '/pages/workspace/workspace'
         })
       } catch (error) {
         uni.hideLoading()
@@ -708,8 +706,8 @@ export default {
         // 即使云端删除失败，也删除本地
         this.projectStore.deleteProject(this.project.id)
         setTimeout(() => {
-          uni.reLaunch({
-            url: '/pages/library/library'
+          uni.switchTab({
+            url: '/pages/workspace/workspace'
           })
         }, 1500)
       }

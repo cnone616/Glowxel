@@ -184,20 +184,20 @@ export default {
   
   data() {
     return {
-      projectStore: useProjectStore(),
-      projectsStore: null, // 正式作品存储
-      canvasStore: null,   // 画布草稿存储
+      projectStore: null,
       toast: null,
       searchQuery: '',
-      currentFilter: 'published',
+      currentFilter: 'all',
       currentSort: 'updated',
       showSortModal: false,
       selectedWork: null,
       hasMore: false,
       filterOptions: [
+        { value: 'all', label: '全部', count: 0 },
         { value: 'published', label: '已发布', count: 0 },
-        { value: 'drafts', label: '草稿', count: 0 },
-        { value: 'all', label: '全部', count: 0 }
+        { value: 'reviewing', label: '审核中', count: 0 },
+        { value: 'rejected', label: '已退回', count: 0 },
+        { value: 'drafts', label: '草稿', count: 0 }
       ],
       sortOptions: [
         { value: 'updated', label: '最近更新' },
@@ -207,55 +207,58 @@ export default {
       ]
     }
   },
-  
+
   computed: {
-    // 获取正式发布的作品
+    // 获取已发布的项目
     publishedWorks() {
-      return this.projectsStore ? this.projectsStore.state.myProjects : []
+      if (!this.projectStore) return []
+      return (this.projectStore.projects || []).filter(p => p.status === 'published')
     },
-    
-    // 获取画布草稿
+
+    // 获取未发布的草稿项目
     draftWorks() {
-      return this.canvasStore ? this.canvasStore.state.draftList : []
+      if (!this.projectStore) return []
+      return (this.projectStore.projects || []).filter(p => p.status === 'draft')
     },
-    
+
+    // 获取审核中的项目
+    reviewingWorks() {
+      if (!this.projectStore) return []
+      return (this.projectStore.projects || []).filter(p => p.status === 'reviewing')
+    },
+
+    // 获取已退回的项目
+    rejectedWorks() {
+      if (!this.projectStore) return []
+      return (this.projectStore.projects || []).filter(p => p.status === 'rejected')
+    },
+
     // 根据当前筛选获取作品列表
     allWorks() {
+      const formatList = (list, type) => list.map(work => ({
+        ...work,
+        type: type,
+        updatedAt: new Date(work.updatedAt || work.createdAt),
+        createdAt: new Date(work.createdAt),
+        progress: work.progress || 0
+      }))
+
       switch (this.currentFilter) {
         case 'published':
-          return this.publishedWorks.map(work => ({
-            ...work,
-            type: 'published',
-            name: work.title,
-            updatedAt: new Date(work.createdAt),
-            createdAt: new Date(work.createdAt),
-            progress: 100 // 发布的作品都是完成的
-          }))
+          return formatList(this.publishedWorks, 'published')
         case 'drafts':
-          return this.draftWorks.map(work => ({
-            ...work,
-            type: 'draft',
-            updatedAt: new Date(work.updatedAt),
-            createdAt: new Date(work.createdAt),
-            progress: work.isPublished ? 100 : 50 // 草稿进度
-          }))
+          return formatList(this.draftWorks, 'draft')
+        case 'reviewing':
+          return formatList(this.reviewingWorks, 'reviewing')
+        case 'rejected':
+          return formatList(this.rejectedWorks, 'rejected')
         case 'all':
-          const published = this.publishedWorks.map(work => ({
-            ...work,
-            type: 'published',
-            name: work.title,
-            updatedAt: new Date(work.createdAt),
-            createdAt: new Date(work.createdAt),
-            progress: 100
-          }))
-          const drafts = this.draftWorks.map(work => ({
-            ...work,
-            type: 'draft',
-            updatedAt: new Date(work.updatedAt),
-            createdAt: new Date(work.createdAt),
-            progress: work.isPublished ? 100 : 50
-          }))
-          return [...published, ...drafts]
+          return [
+            ...formatList(this.publishedWorks, 'published'),
+            ...formatList(this.reviewingWorks, 'reviewing'),
+            ...formatList(this.rejectedWorks, 'rejected'),
+            ...formatList(this.draftWorks, 'draft')
+          ]
         default:
           return []
       }
@@ -293,32 +296,27 @@ export default {
     }
   },
   
-  async onLoad() {
+  onLoad() {
+    this.projectStore = useProjectStore()
     this.toast = useToast()
-    
-    // 初始化存储
-    try {
-      const projectsModule = await import('../../store/projects.js')
-      const canvasModule = await import('../../store/canvas.js')
-      
-      this.projectsStore = projectsModule.default
-      this.canvasStore = canvasModule.default
-      
-      // 加载数据
-      await this.projectsStore.actions.loadMyProjects()
-      await this.canvasStore.actions.loadDraftList()
-      
-      this.updateFilterCounts()
-    } catch (error) {
-      console.error('初始化存储失败:', error)
-      this.toast.showError('加载数据失败')
-    }
-    
+
+    // 加载项目数据
+    this.projectStore.loadProjects()
+    this.updateFilterCounts()
+
     this.$nextTick(() => {
       if (this.$refs.toastRef) {
         this.toast.setToastInstance(this.$refs.toastRef)
       }
     })
+  },
+
+  onShow() {
+    // 页面显示时刷新数据
+    if (this.projectStore) {
+      this.projectStore.loadProjects()
+      this.updateFilterCounts()
+    }
   },
   
   methods: {
@@ -333,12 +331,17 @@ export default {
     },
     
     updateFilterCounts() {
-      const publishedCount = this.projectsStore ? this.projectsStore.state.myProjects.length : 0
-      const draftCount = this.canvasStore ? this.canvasStore.state.draftList.length : 0
-      
-      this.filterOptions[0].count = publishedCount  // 已发布
-      this.filterOptions[1].count = draftCount      // 草稿
-      this.filterOptions[2].count = publishedCount + draftCount // 全部
+      const publishedCount = this.publishedWorks.length
+      const draftCount = this.draftWorks.length
+      const reviewingCount = this.reviewingWorks.length
+      const rejectedCount = this.rejectedWorks.length
+      const totalCount = publishedCount + draftCount + reviewingCount + rejectedCount
+
+      this.filterOptions[0].count = totalCount        // 全部
+      this.filterOptions[1].count = publishedCount    // 已发布
+      this.filterOptions[2].count = reviewingCount    // 审核中
+      this.filterOptions[3].count = rejectedCount     // 已退回
+      this.filterOptions[4].count = draftCount        // 草稿
     },
     
     selectSort(value) {
@@ -367,9 +370,9 @@ export default {
     },
     
     editDraft(work) {
-      // 编辑草稿 - 这里需要根据实际的编辑器页面路径调整
+      // 编辑草稿 - 先进入看板总览
       uni.navigateTo({
-        url: `/pages/editor/editor?draftId=${work.id}`
+        url: `/pages/overview/overview?id=${work.id}`
       })
     },
     
@@ -410,32 +413,18 @@ export default {
     
     deleteWork() {
       if (!this.selectedWork) return
-      
+
       const workName = this.selectedWork.name || this.selectedWork.title
-      
+      const typeLabel = this.selectedWork.type === 'published' ? '作品' : '草稿'
+
       uni.showModal({
         title: '确认删除',
-        content: `确定要删除${this.selectedWork.type === 'published' ? '作品' : '草稿'}"${workName}"吗？`,
-        success: async (res) => {
+        content: `确定要删除${typeLabel}"${workName}"吗？`,
+        success: (res) => {
           if (res.confirm) {
             try {
-              if (this.selectedWork.type === 'published') {
-                // 删除已发布的作品
-                const success = await this.projectsStore.actions.deleteProject(this.selectedWork.id)
-                if (success) {
-                  this.toast.showSuccess('作品已删除')
-                } else {
-                  this.toast.showError('删除失败')
-                }
-              } else {
-                // 删除草稿
-                const success = await this.canvasStore.actions.deleteDraft(this.selectedWork.id)
-                if (success) {
-                  this.toast.showSuccess('草稿已删除')
-                } else {
-                  this.toast.showError('删除失败')
-                }
-              }
+              this.projectStore.deleteProject(this.selectedWork.id)
+              this.toast.showSuccess(`${typeLabel}已删除`)
               this.updateFilterCounts()
             } catch (error) {
               console.error('删除失败:', error)

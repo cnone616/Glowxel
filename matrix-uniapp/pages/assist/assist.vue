@@ -18,7 +18,7 @@
         <scroll-view scroll-y class="row-grid-scroll">
           <view class="row-grid">
             <view
-              v-for="i in 52"
+              v-for="i in 64"
               :key="i - 1"
               class="row-grid-item"
               :class="{
@@ -83,7 +83,7 @@
 
     <!-- 当前信息提示 -->
     <view v-if="assistMode === 'row'" class="info-banner">
-      <text class="info-text">行 {{ currentRow + 1 }} / 52</text>
+      <text class="info-text">行 {{ currentRow + 1 }} / 64</text>
     </view>
     
     <!--  
@@ -96,8 +96,8 @@
     <view class="canvas-container" v-if="!isHelpOpen && !isRowListOpen && !showConnectModal">
       <PixelCanvas
         v-if="canvasReady"
-        :width="52"
-        :height="52"
+        :width="64"
+        :height="64"
         :pixels="isCalculated ? localPixels : new Map()"
         :zoom="zoom"
         :offset-x="pan.x"
@@ -281,7 +281,7 @@
           
           <view class="row-info">
             <text class="row-number">{{ currentRow + 1 }}</text>
-            <text class="row-total">/ 52</text>
+            <text class="row-total">/ 64</text>
           </view>
           
           <view 
@@ -424,12 +424,12 @@ export default {
     
     boardX() {
       const colIndex = parseInt(this.boardId.slice(1)) - 1
-      return colIndex * 52
+      return colIndex * 64
     },
-    
+
     boardY() {
       const rowIndex = this.boardId.charCodeAt(0) - 65
-      return rowIndex * 52
+      return rowIndex * 64
     },
     
     rowColorsMap() {
@@ -543,8 +543,8 @@ export default {
     if (!this.project) {
       this.toast.showError('项目不存在')
       setTimeout(() => {
-        uni.reLaunch({
-          url: '/pages/library/library'
+        uni.switchTab({
+          url: '/pages/workspace/workspace'
         })
       }, 1000)
       return
@@ -574,12 +574,12 @@ export default {
           this.canvasWidth = data.width
           this.canvasHeight = data.height
           
-          const fitZoomW = (data.width * 0.9) / 52
-          const fitZoomH = (data.height * 0.9) / 52
+          const fitZoomW = (data.width * 0.9) / 64
+          const fitZoomH = (data.height * 0.9) / 64
           const fitZoom = Math.min(fitZoomW, fitZoomH, 50)
-          
-          const boardPixelWidth = 52 * fitZoom
-          const boardPixelHeight = 52 * fitZoom
+
+          const boardPixelWidth = 64 * fitZoom
+          const boardPixelHeight = 64 * fitZoom
           
           this.zoom = fitZoom
           this.pan = {
@@ -859,14 +859,14 @@ export default {
         const maxW = this.canvasWidth - 26
         const maxH = this.canvasHeight - 26
         
-        const zoomW = maxW / 52
-        const zoomH = maxH / 52
-        
+        const zoomW = maxW / 64
+        const zoomH = maxH / 64
+
         const newZoom = Math.max(1, Math.min(zoomW, zoomH, 10))
         this.zoom = newZoom
-        
-        const contentW = 52 * newZoom
-        const contentH = 52 * newZoom
+
+        const contentW = 64 * newZoom
+        const contentH = 64 * newZoom
         this.pan = {
           x: (this.canvasWidth - contentW) / 2,
           y: (this.canvasHeight - contentH) / 2
@@ -881,8 +881,8 @@ export default {
       const local = new Map()
       this.pixels.forEach((color, key) => {
         const [px, py] = key.split(',').map(Number)
-        if (px >= this.boardX && px < this.boardX + 52 && 
-            py >= this.boardY && py < this.boardY + 52) {
+        if (px >= this.boardX && px < this.boardX + 64 &&
+            py >= this.boardY && py < this.boardY + 64) {
           local.set(`${px - this.boardX},${py - this.boardY}`, color)
         }
       })
@@ -902,7 +902,7 @@ export default {
 
     saveProgress() {
       const pixelProgress = this.calculatePixelProgress()
-      const rowProgress = this.completedRows.size / 52
+      const rowProgress = this.completedRows.size / 64
       const completion = Math.max(pixelProgress, rowProgress)
       
       const progress = {

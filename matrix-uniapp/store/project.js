@@ -17,20 +17,30 @@ export const useProjectStore = defineStore('project', {
         return new Date(b.updateTime || b.lastEdited) - new Date(a.updateTime || a.lastEdited)
       })
     },
-    
-    // 获取进行中的项目
-    inProgressProjects: (state) => {
-      return state.projects.filter(p => p.status === 'in_progress')
-    },
-    
-    // 获取已完成的项目
-    completedProjects: (state) => {
-      return state.projects.filter(p => p.status === 'completed')
-    },
-    
-    // 获取草稿项目
+
+    // 获取草稿项目（未发布、可编辑）
     draftProjects: (state) => {
       return state.projects.filter(p => p.status === 'draft')
+    },
+
+    // 获取审核中的项目
+    reviewingProjects: (state) => {
+      return state.projects.filter(p => p.status === 'reviewing')
+    },
+
+    // 获取已发布的项目
+    publishedProjects: (state) => {
+      return state.projects.filter(p => p.status === 'published')
+    },
+
+    // 获取已退回的项目（审核未通过）
+    rejectedProjects: (state) => {
+      return state.projects.filter(p => p.status === 'rejected')
+    },
+
+    // 未发布的项目（草稿 + 已退回，可编辑的）
+    editableProjects: (state) => {
+      return state.projects.filter(p => p.status === 'draft' || p.status === 'rejected')
     }
   },
   
@@ -40,13 +50,13 @@ export const useProjectStore = defineStore('project', {
       await this.loadProjects()
     },
     
-    // 加载项目列表 - 使用Mock数据
+    // 加载项目列表
     async loadProjects() {
       this.isLoading = true
       this.error = null
-      
+
       try {
-        // 首先尝试从本地存储加载
+        // 从本地存储加载
         const localData = uni.getStorageSync('projects')
         if (localData) {
           this.projects = JSON.parse(localData).map(p => ({
@@ -54,39 +64,13 @@ export const useProjectStore = defineStore('project', {
             lastEdited: new Date(p.lastEdited || p.updateTime)
           }))
         } else {
-          // 如果本地没有数据，使用Mock数据初始化
-          const mockProjects = MockAPI.projects.getAll()
-          this.projects = mockProjects.map(p => ({
-            ...p,
-            lastEdited: new Date(p.updateTime),
-            // 转换Mock数据格式到本地格式
-            width: parseInt(p.size.split('x')[0]),
-            height: parseInt(p.size.split('x')[1]),
-            paddedWidth: parseInt(p.size.split('x')[0]),
-            paddedHeight: parseInt(p.size.split('x')[1]),
-            paletteSize: p.colorCount,
-            palette: [],
-            thumbnail: p.thumbnail
-          }))
-          // 保存到本地存储
-          this.saveToStorage()
+          // 本地没有数据，初始化为空数组
+          this.projects = []
         }
       } catch (e) {
         console.error('加载项目失败:', e)
         this.error = '加载项目失败'
-        // 使用Mock数据作为备选
-        const mockProjects = MockAPI.projects.getAll()
-        this.projects = mockProjects.map(p => ({
-          ...p,
-          lastEdited: new Date(p.updateTime),
-          width: parseInt(p.size.split('x')[0]),
-          height: parseInt(p.size.split('x')[1]),
-          paddedWidth: parseInt(p.size.split('x')[0]),
-          paddedHeight: parseInt(p.size.split('x')[1]),
-          paletteSize: p.colorCount,
-          palette: [],
-          thumbnail: p.thumbnail
-        }))
+        this.projects = []
       } finally {
         this.isLoading = false
       }
@@ -107,7 +91,7 @@ export const useProjectStore = defineStore('project', {
     },
     
     // 添加项目
-    addProject(name, width, height, paletteSize, palette, paddedWidth, paddedHeight) {
+    addProject(name, width, height, paletteSize, palette, paddedWidth, paddedHeight, thumbnail) {
       const newProject = {
         id: generateId(),
         name,
@@ -121,10 +105,11 @@ export const useProjectStore = defineStore('project', {
         createTime: new Date().toISOString().split('T')[0],
         paletteSize,
         palette: palette || [],
-        thumbnail: '',
+        thumbnail: thumbnail || '',
         size: `${width}x${height}`,
         colorCount: paletteSize,
         status: 'draft',
+        rejectReason: '',
         description: '',
         icon: 'picture'
       }
@@ -242,8 +227,8 @@ export const useProjectStore = defineStore('project', {
       const paddedWidth = proj.paddedWidth || proj.width
       const paddedHeight = proj.paddedHeight || proj.height
       
-      const boardsX = Math.ceil(paddedWidth / 52)
-      const boardsY = Math.ceil(paddedHeight / 52)
+      const boardsX = Math.ceil(paddedWidth / 64)
+      const boardsY = Math.ceil(paddedHeight / 64)
       const totalBoards = boardsX * boardsY
 
       let sumCompletion = 0
@@ -264,18 +249,16 @@ export const useProjectStore = defineStore('project', {
       const progressPercent = Math.round((sumCompletion / totalBoards) * 100)
       
       if (progressPercent !== proj.progress) {
-        // 根据进度更新状态
-        let status = 'draft'
-        if (progressPercent > 0 && progressPercent < 100) {
-          status = 'in_progress'
-        } else if (progressPercent === 100) {
-          status = 'completed'
+        // 只更新进度，不覆盖发布相关状态（published/reviewing/rejected）
+        const updateData = { progress: progressPercent }
+
+        // 仅对草稿状态的项目，根据进度更新子状态提示
+        // 已发布/审核中/已退回的项目不修改status
+        if (proj.status === 'draft' || !proj.status) {
+          updateData.status = 'draft'
         }
-        
-        this.updateProject(projectId, { 
-          progress: progressPercent,
-          status: status
-        })
+
+        this.updateProject(projectId, updateData)
       }
     },
     

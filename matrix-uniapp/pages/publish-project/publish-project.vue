@@ -202,6 +202,7 @@
 </template>
 
 <script>
+import { useProjectStore } from '../../store/project.js'
 import { useToast } from '../../composables/useToast.js'
 import statusBarMixin from '../../mixins/statusBar.js'
 import Icon from '../../components/Icon.vue'
@@ -216,6 +217,7 @@ export default {
   
   data() {
     return {
+      projectStore: null,
       toast: null,
       
       // 画布数据
@@ -276,6 +278,7 @@ export default {
   },
   
   onLoad() {
+    this.projectStore = useProjectStore()
     this.toast = useToast()
     
     // 从临时存储中获取画布数据
@@ -478,48 +481,40 @@ export default {
       this.isPublishing = true
       
       try {
-        // 导入作品存储
-        const projectsStore = (await import('../../store/projects.js')).default
-        
         // 生成缩略图
         const thumbnail = await this.generateThumbnail()
-        
-        // 构建作品数据
-        const projectData = {
-          title: this.form.title.trim(),
-          description: this.form.description.trim(),
-          tags: [...this.form.tags],
-          pixels: new Map(this.canvasData.pixels),
-          width: this.canvasData.width,
-          height: this.canvasData.height,
-          colors: this.canvasData.colors,
-          thumbnail: thumbnail,
-          isPublic: this.form.isPublic,
-          authorId: 'current_user' // 实际应该从用户状态获取
+
+        // 直接使用 projectStore 更新项目状态为已发布
+        if (!this.canvasData.projectId || !this.projectStore) {
+          throw new Error('项目数据不完整')
         }
-        
-        // 发布作品
-        const publishedProject = projectsStore.actions.publishProject(projectData)
-        
-        if (publishedProject) {
-          // 标记原草稿为已发布（如果有的话）
-          if (this.canvasData.projectId) {
-            const canvasStore = (await import('../../store/canvas.js')).default
-            canvasStore.actions.markAsPublished(this.canvasData.projectId, publishedProject.id)
-          }
-          
-          // 显示成功动画和提示
-          this.showSuccessAnimation()
-          
-          // 延迟跳转到我的作品页面
-          setTimeout(() => {
-            uni.reLaunch({
-              url: '/pages/my-works/my-works'
-            })
-          }, 2000)
-        } else {
-          throw new Error('发布失败')
+
+        const project = this.projectStore.projects.find(p => p.id === this.canvasData.projectId)
+        if (!project) {
+          throw new Error('项目不存在')
         }
+
+        // 更新项目信息
+        project.status = 'published'
+        project.name = this.form.title.trim()
+        project.description = this.form.description.trim()
+        project.tags = [...this.form.tags]
+        project.isPublic = this.form.isPublic
+        if (thumbnail) {
+          project.thumbnail = thumbnail
+        }
+        project.publishedAt = Date.now()
+        this.projectStore.saveToStorage()
+
+        // 显示成功动画和提示
+        this.showSuccessAnimation()
+
+        // 延迟跳转到我的作品页面
+        setTimeout(() => {
+          uni.reLaunch({
+            url: '/pages/my-works/my-works'
+          })
+        }, 2000)
         
       } catch (error) {
         console.error('发布作品失败:', error)

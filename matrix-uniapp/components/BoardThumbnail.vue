@@ -92,10 +92,10 @@ export default {
           // 清空
           this.ctx.clearRect(0, 0, size, size)
           
-          // 画布总览：固定 52x52，乘2后是 104x104 的坐标系统
-          const boardSize = 52
+          // 画布总览：固定 64x64，乘2后是 128x128 的坐标系统
+          const boardSize = 64
           const multiplier = 3
-          const coordinateSize = boardSize * multiplier // 104
+          const coordinateSize = boardSize * multiplier // 192
           
           // 计算缩放比例
           let scale = size / coordinateSize

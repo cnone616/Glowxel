@@ -389,3 +389,51 @@ hr {
   background: #00f3ff;
   color: #000;
 }
+
+/* GIF 动画控制样式 */
+.gif-control-buttons {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.gif-control-buttons button {
+  flex: 1;
+  padding: 8px;
+  margin: 0;
+  font-size: 12px;
+}
+
+.frame-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #1a1a1a;
+  padding: 8px 12px;
+  border-radius: 4px;
+  margin-top: 8px;
+}
+
+.frame-controls {
+  display: flex;
+  gap: 4px;
+}
+
+.frame-controls button {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  margin: 0;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#gifControls {
+  border: 1px solid #444;
+  border-radius: 8px;
+  padding: 15px;
+  margin-top: 10px;
+  background: rgba(0, 243, 255, 0.05);
+}

@@ -272,16 +272,16 @@ export default {
         }
         ctx.stroke()
         
-        // 粗网格线（52x52板子边界）
+        // 粗网格线（64x64板子边界）
         ctx.lineWidth = 0.15
         ctx.strokeStyle = gridColor
         ctx.globalAlpha = this.isDarkMode ? 0.2 : 0.3
         ctx.beginPath()
-        for (let x = 0; x <= this.width; x += 52) {
+        for (let x = 0; x <= this.width; x += 64) {
           ctx.moveTo(x, 0)
           ctx.lineTo(x, this.height)
         }
-        for (let y = 0; y <= this.height; y += 52) {
+        for (let y = 0; y <= this.height; y += 64) {
           ctx.moveTo(0, y)
           ctx.lineTo(this.width, y)
         }

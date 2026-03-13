@@ -43,32 +43,42 @@
         <view class="mode-switch-card">
           <view class="card-title-section">
             <text class="card-title">设备模式</text>
-            <text class="card-subtitle">切换闹钟或画板模式</text>
+            <text class="card-subtitle">切换时钟或画板模式</text>
           </view>
-          
-          <view class="mode-switch-buttons">
-            <view 
+
+          <view class="mode-switch-buttons three-col">
+            <view
               class="mode-btn"
               :class="{ 'active': deviceMode === 'clock' }"
               @click="switchMode('clock')"
             >
-              <Icon name="time" :size="40" />
-              <text class="mode-label">闹钟模式</text>
-              <text class="mode-desc">显示时间日期</text>
+              <Icon name="time" :size="36" />
+              <text class="mode-label">静态时钟</text>
+              <text class="mode-desc">静态背景</text>
             </view>
-            
-            <view 
+
+            <view
+              class="mode-btn"
+              :class="{ 'active': deviceMode === 'animation' }"
+              @click="switchMode('animation')"
+            >
+              <Icon name="play" :size="36" />
+              <text class="mode-label">动态时钟</text>
+              <text class="mode-desc">动画背景</text>
+            </view>
+
+            <view
               class="mode-btn"
               :class="{ 'active': deviceMode === 'canvas' }"
               @click="switchMode('canvas')"
             >
-              <Icon name="picture" :size="40" />
+              <Icon name="picture" :size="36" />
               <text class="mode-label">画板模式</text>
-              <text class="mode-desc">显示拼豆图案</text>
+              <text class="mode-desc">拼豆图案</text>
             </view>
           </view>
-          
-          <view v-if="deviceMode === 'clock'" class="clock-actions">
+
+          <view v-if="deviceMode === 'clock' || deviceMode === 'animation'" class="clock-actions">
             <view class="clock-edit-btn" @click="editClock">
               <Icon name="edit" :size="32" />
               <text class="btn-text">自定义闹钟样式</text>
@@ -112,7 +122,7 @@
     
     <!-- 连接弹窗 -->
     <ConnectModal
-      :visible.sync="showConnectModal"
+      :visible="showConnectModal"
       title="连接设备"
       description="请输入 LED 矩阵板的 IP 地址"
       :placeholder="deviceIp || '192.168.31.84'"
@@ -121,17 +131,20 @@
       @confirm="handleConnectConfirm"
       @cancel="handleConnectCancel"
       @timeout="handleConnectTimeout"
+      @update:visible="val => showConnectModal = val"
     />
     
     <!-- JSON 导入弹窗 -->
     <JsonImportModal
-      :visible.sync="showJsonImportModal"
+      :visible="showJsonImportModal"
       :sending="jsonImportSending"
       title="导入 JSON 配置"
       description="从 LED 模拟器复制的完整配置数据"
       placeholder="粘贴 JSON 数据..."
       @confirm="handleJsonImport"
       @error="handleJsonImportError"
+      @update:visible="val => showJsonImportModal = val"
+      @cancel="showJsonImportModal = false"
     />
   </view>
 </template>
@@ -163,7 +176,7 @@ export default {
       deviceIp: '',
       
       // 设备模式
-      deviceMode: 'clock', // clock, canvas
+      deviceMode: 'clock', // clock, animation, canvas
       
       // 设置
       brightness: 50,
@@ -253,23 +266,25 @@ export default {
         if (result.success) {
           this.connectionStatus = 'connected'
           
-          // 连接成功后，ESP32 肯定是闹钟模式（断开连接后会回到闹钟模式）
-          // 重置前端的模式状态为闹钟模式
-          this.deviceMode = 'clock'
-          uni.setStorageSync('device_mode', 'clock')
-          
-          // 获取设备状态（包括亮度）
+          // 获取设备实际状态（模式、亮度等）
           try {
             const ws = this.deviceStore.getWebSocket()
             const status = await ws.getStatus()
-            
-            if (status && status.brightness !== undefined) {
-              // 将板子的亮度值（0-178）映射回前端显示（0-100）
-              const maxBrightness = 178 // 255 * 0.7
-              this.brightness = Math.round(status.brightness * 100 / maxBrightness)
-              // 保存到缓存
-              uni.setStorageSync('device_brightness', this.brightness)
-              console.log('同步板子亮度:', status.brightness, '→', this.brightness + '%')
+
+            if (status) {
+              // 同步设备模式
+              const mode = status.mode || 'canvas'
+              this.deviceMode = mode
+              uni.setStorageSync('device_mode', mode)
+              console.log('同步设备模式:', mode)
+
+              if (status.brightness !== undefined) {
+                // 将板子的亮度值（0-178）映射回前端显示（0-100）
+                const maxBrightness = 178 // 255 * 0.7
+                this.brightness = Math.round(status.brightness * 100 / maxBrightness)
+                uni.setStorageSync('device_brightness', this.brightness)
+                console.log('同步板子亮度:', status.brightness, '→', this.brightness + '%')
+              }
             }
           } catch (err) {
             console.error('获取设备状态失败:', err)
@@ -315,17 +330,22 @@ export default {
     
     async switchMode(mode) {
       if (this.deviceMode === mode) return
-      
+
       try {
         const ws = this.deviceStore.getWebSocket()
-        await ws.setMode(mode)
+        // animation 和 clock 在 ESP32 端都通过 set_mode('clock') 处理
+        // ESP32 会根据是否有动画自动判断
+        const espMode = mode === 'animation' ? 'clock' : mode
+        await ws.setMode(espMode)
         this.deviceMode = mode
-        
+
         // 保存到缓存
         uni.setStorageSync('device_mode', mode)
-        
+
         if (mode === 'clock') {
-          this.toast.showSuccess('已切换到闹钟模式')
+          this.toast.showSuccess('已切换到静态时钟')
+        } else if (mode === 'animation') {
+          this.toast.showSuccess('已切换到动态时钟')
         } else if (mode === 'canvas') {
           this.toast.showSuccess('已切换到画板模式')
         }
@@ -337,7 +357,7 @@ export default {
 
     editClock() {
       uni.navigateTo({
-        url: '/pages/clock-editor/clock-editor'
+        url: `/pages/clock-editor/clock-editor?mode=${this.deviceMode}`
       })
     },
     
@@ -356,6 +376,76 @@ export default {
         // 开始传输，禁止关闭弹窗
         this.jsonImportSending = true
         
+        // 检查设备是否连接
+        if (!this.deviceStore.connected) {
+          this.jsonImportSending = false
+          this.showJsonImportModal = false
+          this.toast.showError('设备未连接')
+          return
+        }
+        
+        const ws = this.deviceStore.getWebSocket()
+        
+        // 检查是否为动画数据（包含 f 和 d 字段的紧凑格式）
+        if (jsonData.f !== undefined && jsonData.d !== undefined && Array.isArray(jsonData.d)) {
+          console.log('检测到动画数据，逐帧发送到 ESP32')
+
+          try {
+            const frameCount = jsonData.f
+            const frames = jsonData.d
+
+            // 1. 发送 animation_begin
+            await ws.send({ cmd: 'animation_begin', frameCount: frameCount })
+            console.log(`动画初始化完成，准备发送 ${frameCount} 帧`)
+
+            // 2. 逐帧发送（大帧自动拆分 chunk）
+            const CHUNK_SIZE = 500  // 每个 chunk 最多 500 像素
+            for (let i = 0; i < frames.length && i < frameCount; i++) {
+              const frame = frames[i]  // [type, delay, count, pixels]
+              const type = frame[0]
+              const delay = frame[1]
+              const pixels = frame[3]
+              const totalPixels = pixels.length
+
+              if (totalPixels <= CHUNK_SIZE) {
+                // 小帧直接发送
+                await ws.send({ cmd: 'animation_frame', index: i, frame: frame })
+                console.log(`帧 ${i + 1}/${frameCount} 直接发送 (${totalPixels} 像素)`)
+              } else {
+                // 大帧拆分发送
+                await ws.send({ cmd: 'frame_begin', index: i, type, delay, totalPixels })
+                console.log(`帧 ${i + 1}/${frameCount} 开始分片 (${totalPixels} 像素)`)
+
+                for (let offset = 0; offset < totalPixels; offset += CHUNK_SIZE) {
+                  const chunk = pixels.slice(offset, offset + CHUNK_SIZE)
+                  await ws.send({ cmd: 'frame_chunk', index: i, pixels: chunk })
+                  console.log(`  chunk ${Math.floor(offset / CHUNK_SIZE) + 1}: ${chunk.length} 像素`)
+                  await new Promise(resolve => setTimeout(resolve, 50))
+                }
+              }
+
+              // 每帧间隔 100ms，让 ESP32 处理
+              if (i < frameCount - 1) {
+                await new Promise(resolve => setTimeout(resolve, 100))
+              }
+            }
+
+            // 3. 发送 animation_end
+            await ws.send({ cmd: 'animation_end' })
+
+            this.toast.showSuccess(`动画已发送！${frameCount} 帧`)
+
+          } catch (err) {
+            console.error('发送动画数据失败:', err)
+            this.toast.showError('发送动画数据失败：' + err.message)
+          }
+
+          this.jsonImportSending = false
+          this.showJsonImportModal = false
+          return
+        }
+        
+        // 原有的闹钟配置处理逻辑
         // 保存配置到本地存储
         uni.setStorageSync('clock_config', JSON.stringify(jsonData))
         
@@ -364,18 +454,8 @@ export default {
           uni.setStorageSync('clock_image_pixels', JSON.stringify(jsonData.imagePixels))
         }
         
-        // 检查设备是否连接
-        if (!this.deviceStore.connected) {
-          this.jsonImportSending = false
-          this.showJsonImportModal = false
-          this.toast.showError('设备未连接，配置已保存到本地')
-          return
-        }
-        
         // 直接发送到设备
         try {
-          const ws = this.deviceStore.getWebSocket()
-          
           // 转换配置格式
           const configData = {
             time: {
@@ -769,7 +849,11 @@ export default {
 
 .mode-switch-buttons {
   display: flex;
-  gap: 24rpx;
+  gap: 16rpx;
+}
+
+.mode-switch-buttons.three-col .mode-btn {
+  padding: 30rpx 12rpx;
 }
 
 .mode-btn {

@@ -407,6 +407,13 @@ export default {
   },
   
   computed: {
+    // 是否可编辑（草稿和已退回可编辑，已发布和审核中不可编辑）
+    isEditable() {
+      if (!this.project) return false
+      const status = this.project.status || 'draft'
+      return status === 'draft' || status === 'rejected'
+    },
+
     deviceConnected() {
       return this.deviceStore?.connected || false
     },
@@ -414,8 +421,8 @@ export default {
     boardOffset() {
       if (!this.boardId || !this.project) {
         // 全画布模式：使用填充后的尺寸
-        const paddedWidth = this.project?.paddedWidth || this.project?.width || 52
-        const paddedHeight = this.project?.paddedHeight || this.project?.height || 52
+        const paddedWidth = this.project?.paddedWidth || this.project?.width || 64
+        const paddedHeight = this.project?.paddedHeight || this.project?.height || 64
         return { 
           x: 0, 
           y: 0, 
@@ -423,14 +430,14 @@ export default {
           h: paddedHeight
         }
       }
-      // 单板模式：使用52x52
+      // 单板模式：使用64x64
       const row = (this.boardId.charCodeAt(0) || 65) - 65
       const col = parseInt(this.boardId.slice(1) || '1') - 1
-      return { 
-        x: col * 52, 
-        y: row * 52, 
-        w: 52, 
-        h: 52
+      return {
+        x: col * 64,
+        y: row * 64,
+        w: 64,
+        h: 64
       }
     },
     
@@ -503,16 +510,25 @@ export default {
     if (!this.project) {
       this.toast.showError('项目不存在')
       setTimeout(() => {
-        uni.reLaunch({
-          url: '/pages/library/library'
+        uni.switchTab({
+          url: '/pages/workspace/workspace'
         })
       }, 1000)
       return
     }
     
+    // 已发布/审核中项目提示只读
+    if (this.project.status === 'published' || this.project.status === 'reviewing') {
+      uni.showToast({
+        title: '已发布作品仅可查看和拼豆',
+        icon: 'none',
+        duration: 2000
+      })
+    }
+
     this.loadPalette()
     this.loadPixels()
-    
+
     // 首次使用帮助
     const hasSeenHelp = uni.getStorageSync('hasSeenEditorHelp')
     if (!hasSeenHelp) {
@@ -522,7 +538,10 @@ export default {
   },
 
   onShow() {
-    // 页面显示时的处理
+    // 隐藏 tabBar
+    uni.hideTabBar({
+      animation: false
+    })
   },
   
   onReady() {
@@ -672,6 +691,10 @@ export default {
     },
 
     handlePixelClick(x, y) {
+      if (!this.isEditable) {
+        uni.showToast({ title: '已发布作品不可编辑', icon: 'none' })
+        return
+      }
       if (this.tool === 'move') return
 
       const globalX = x + this.boardOffset.x
@@ -704,6 +727,7 @@ export default {
     },
 
     handleUndo() {
+      if (!this.isEditable) return
       if (this.historyIndex > 0) {
         this.historyIndex--
         this.pixels = new Map(this.history[this.historyIndex])
@@ -716,6 +740,7 @@ export default {
     },
 
     handleRedo() {
+      if (!this.isEditable) return
       if (this.historyIndex < this.history.length - 1) {
         this.historyIndex++
         this.pixels = new Map(this.history[this.historyIndex])
@@ -787,10 +812,18 @@ export default {
     },
 
     handleSave() {
+      if (!this.isEditable) {
+        uni.showToast({ title: '已发布作品不可编辑', icon: 'none' })
+        return
+      }
       this.showSaveConfirm = true
     },
-    
+
     handleRename() {
+      if (!this.isEditable) {
+        uni.showToast({ title: '已发布作品不可重命名', icon: 'none' })
+        return
+      }
       if (!this.newProjectName.trim()) {
         this.toast.showError('名称不能为空')
         return
@@ -810,6 +843,10 @@ export default {
     },
 
     async confirmSave() {
+      if (!this.isEditable) {
+        uni.showToast({ title: '已发布作品不可编辑', icon: 'none' })
+        return
+      }
       // 保存像素数据
       this.projectStore.saveProjectPixels(this.projectId, this.pixels)
       this.savedPixelsSnapshot = JSON.stringify(Array.from(this.pixels.entries()))
@@ -826,20 +863,20 @@ export default {
       if (this.hasUnsavedChanges) {
         this.showLeaveConfirm = true
       } else {
-        uni.navigateTo({
-          url: `/pages/overview/overview?id=${this.projectId}`
-        })
+        uni.navigateBack()
       }
     },
 
     confirmLeave() {
       this.showLeaveConfirm = false
-      uni.navigateTo({
-        url: `/pages/overview/overview?id=${this.projectId}`
-      })
+      uni.navigateBack()
     },
 
     async saveAndLeave() {
+      if (!this.isEditable) {
+        uni.navigateBack()
+        return
+      }
       // 保存像素数据
       this.projectStore.saveProjectPixels(this.projectId, this.pixels)
       
@@ -849,9 +886,7 @@ export default {
       this.toast.showSuccess('已保存')
       this.showLeaveConfirm = false
       setTimeout(() => {
-        uni.navigateTo({
-          url: `/pages/overview/overview?id=${this.projectId}`
-        })
+        uni.navigateBack()
       }, 500)
     },
 
@@ -1044,8 +1079,8 @@ export default {
             // 清空背景
             ctx.clearRect(0, 0, thumbnailSize, thumbnailSize)
             
-            // 看板固定 52x52，计算缩放
-            const scale = thumbnailSize / 52
+            // 看板固定 64x64，计算缩放
+            const scale = thumbnailSize / 64
             
             // 绘制当前看板的像素
             this.displayPixels.forEach((color, key) => {
@@ -1117,6 +1152,10 @@ export default {
     
     // 保存并发布
     async saveAndPublish() {
+      if (!this.isEditable) {
+        uni.showToast({ title: '已发布作品不可重复发布', icon: 'none' })
+        return
+      }
       try {
         // 保存像素数据
         this.projectStore.saveProjectPixels(this.projectId, this.pixels)
