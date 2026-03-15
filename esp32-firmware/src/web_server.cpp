@@ -3,6 +3,7 @@
 #include "wifi_manager.h"
 #include "display_manager.h"
 #include "config_manager.h"
+#include "ota_manager.h"
 
 // 静态成员初始化
 AsyncWebServer WebServer::server(80);
@@ -198,6 +199,8 @@ void WebServer::setupAPIRoutes() {
     StaticJsonDocument<300> doc;
     doc["status"] = "ok";
     doc["ip"] = WiFiManager::getDeviceIP();
+    doc["firmware_version"] = FIRMWARE_VERSION;
+    doc["device_type"] = DEVICE_TYPE;
     doc["width"] = DisplayManager::PANEL_RES_X;
     doc["height"] = DisplayManager::PANEL_RES_Y;
     doc["brightness"] = DisplayManager::currentBrightness;

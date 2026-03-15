@@ -98,6 +98,46 @@
         </view>
       </view>
       
+      <!-- 设备管理 -->
+      <view class="settings-section">
+        <view class="section-header">
+          <text class="section-title">设备管理</text>
+        </view>
+
+        <view class="setting-item" @click="checkFirmwareUpdate">
+          <view class="setting-left">
+            <view class="setting-icon">
+              <Icon name="refresh" :size="40" color="var(--color-brand-primary)" />
+            </view>
+            <view class="setting-info">
+              <text class="setting-label">固件更新</text>
+              <text class="setting-desc">当前版本: {{ firmwareVersion || '未连接' }}</text>
+            </view>
+          </view>
+          <view class="setting-right">
+            <view v-if="hasUpdate" class="update-badge">
+              <text class="update-badge-text">新版本</text>
+            </view>
+            <Icon name="arrow-right" :size="32" color="var(--color-text-disabled)" />
+          </view>
+        </view>
+
+        <view class="setting-item" @click="goToBleConfig">
+          <view class="setting-left">
+            <view class="setting-icon">
+              <Icon name="link" :size="40" color="var(--color-brand-primary)" />
+            </view>
+            <view class="setting-info">
+              <text class="setting-label">蓝牙配网</text>
+              <text class="setting-desc">配置设备 WiFi 网络</text>
+            </view>
+          </view>
+          <view class="setting-right">
+            <Icon name="arrow-right" :size="32" color="var(--color-text-disabled)" />
+          </view>
+        </view>
+      </view>
+
       <!-- 其他设置 -->
       <view class="settings-section">
         <view class="section-header">
@@ -201,6 +241,9 @@ export default {
       toast: null,
       showLanguageModal: false,
       appVersion: '1.0.0',
+      firmwareVersion: '',
+      hasUpdate: false,
+      latestFirmware: null,
       settings: {
         darkMode: false,
         hapticFeedback: true,
@@ -271,6 +314,90 @@ export default {
     
     goToAbout() {
       this.toast.showInfo('关于页面功能开发中')
+    },
+
+    goToBleConfig() {
+      uni.navigateTo({ url: '/pages/ble-config/ble-config' })
+    },
+
+    checkFirmwareUpdate() {
+      const deviceStore = this.getDeviceStore()
+      if (!deviceStore || !deviceStore.connected) {
+        this.toast.showInfo('请先连接设备')
+        return
+      }
+
+      uni.showLoading({ title: '检查更新中...' })
+      const ws = deviceStore.getWebSocket()
+
+      // 发送检查更新命令
+      ws.send({ cmd: 'ota_check' }).then(res => {
+        uni.hideLoading()
+        this.firmwareVersion = res.firmware_version || ''
+        this.hasUpdate = res.has_update || false
+
+        if (this.hasUpdate) {
+          this.latestFirmware = {
+            version: res.latest_version,
+            changelog: res.changelog,
+            isForce: res.is_force
+          }
+          this.showUpdateDialog()
+        } else {
+          this.toast.showSuccess('已是最新版本 v' + this.firmwareVersion)
+        }
+      }).catch(() => {
+        uni.hideLoading()
+        this.toast.showError('检查更新失败')
+      })
+    },
+
+    showUpdateDialog() {
+      if (!this.latestFirmware) return
+      uni.showModal({
+        title: '发现新版本 v' + this.latestFirmware.version,
+        content: this.latestFirmware.changelog || '修复已知问题，提升稳定性',
+        confirmText: '立即更新',
+        cancelText: this.latestFirmware.isForce ? '' : '稍后',
+        showCancel: !this.latestFirmware.isForce,
+        success: (res) => {
+          if (res.confirm) {
+            this.startFirmwareUpdate()
+          }
+        }
+      })
+    },
+
+    startFirmwareUpdate() {
+      const deviceStore = this.getDeviceStore()
+      if (!deviceStore || !deviceStore.connected) return
+
+      uni.showLoading({ title: '正在更新固件...', mask: true })
+      const ws = deviceStore.getWebSocket()
+
+      ws.send({ cmd: 'ota_update' }).then(() => {
+        // 设备会重启，连接会断开
+        setTimeout(() => {
+          uni.hideLoading()
+          uni.showModal({
+            title: '更新中',
+            content: '设备正在更新固件并重启，请稍等约30秒后重新连接设备',
+            showCancel: false
+          })
+        }, 3000)
+      }).catch(() => {
+        uni.hideLoading()
+        this.toast.showError('更新失败')
+      })
+    },
+
+    getDeviceStore() {
+      try {
+        const { useDeviceStore } = require('../../store/device')
+        return useDeviceStore()
+      } catch (e) {
+        return null
+      }
     },
     
     toggleDarkMode(e) {
@@ -488,6 +615,17 @@ export default {
 .storage-size, .version-text {
   font-size: 24rpx;
   color: var(--color-text-disabled);
+}
+
+.update-badge {
+  background: var(--color-error);
+  border-radius: 16rpx;
+  padding: 4rpx 14rpx;
+  margin-right: 8rpx;
+}
+.update-badge-text {
+  font-size: 20rpx;
+  color: #fff;
 }
 
 .switch-item .setting-right {

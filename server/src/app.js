@@ -3,7 +3,12 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 
+const { rateLimit } = require('./middleware/auth');
+
 const app = express();
+
+// 全局限流：每个 IP 每分钟最多 120 次请求
+app.use(rateLimit(120, 60000));
 
 // 中间件
 app.use(cors());
@@ -21,6 +26,7 @@ app.use('/api/collect', require('./routes/collect'));
 app.use('/api/comment', require('./routes/comment'));
 app.use('/api/template', require('./routes/template'));
 app.use('/api/challenge', require('./routes/challenge'));
+app.use('/api/firmware', require('./routes/firmware'));
 
 // 健康检查
 app.get('/api/health', (req, res) => {
@@ -35,7 +41,7 @@ app.use((err, req, res, next) => {
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Matrix 后端服务运行在 http://0.0.0.0:${PORT}`);
+  console.log(`Glowxel 后端服务运行在 http://0.0.0.0:${PORT}`);
 });
 
 module.exports = app;

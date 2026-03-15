@@ -71,7 +71,7 @@
 ## 📦 项目结构
 
 ```
-matrix-uniapp/
+uniapp/
 ├── components/          # 组件
 │   ├── CustomTabBar.vue # 自定义底部导航栏
 │   ├── ColorPalette.vue # 颜色选择器

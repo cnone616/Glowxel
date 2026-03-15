@@ -37,7 +37,7 @@ npm run preview
 ## 项目结构
 
 ```
-pixel-matrix-website/
+website/
 ├── public/              # 静态资源
 ├── src/
 │   ├── api/            # API 接口

@@ -15,31 +15,27 @@
     <scroll-view scroll-y class="content" :show-scrollbar="true">
       <!-- 设备连接卡片 -->
       <view class="connection-card">
-        <view class="card-title-section">
-          <text class="card-title">连接设备</text>
-          <text class="card-subtitle">通过 Wi-Fi 连接到 Glowxel 设备</text>
-        </view>
-
-        <view class="connection-btn-wrapper">
-          <view 
-            class="connection-btn"
-            :class="{ 'disabled': connectionStatus === 'connected' }"
-            @click="handleConnect"
-          >
-            <Icon name="link" :size="48" />
-            <text class="connection-label">{{ connectionStatus === 'connected' ? '已连接' : '连接设备' }}</text>
+        <view v-if="connectionStatus === 'connected'" class="connection-btn-wrapper">
+          <view class="connection-btn connected" @click="handleConnect">
+            <Icon name="success-filling" :size="40" color="#22c55e" />
+            <text class="connection-label connected-text">已连接</text>
+            <text class="connection-ip">{{ deviceIp }}</text>
           </view>
         </view>
-        
-        <view v-if="connectionStatus === 'connected' && deviceIp" class="device-info">
-          <text class="info-label">设备地址</text>
-          <text class="info-value">{{ deviceIp }}</text>
-        </view>
-
-        <view v-if="connectionStatus !== 'connected'" class="ble-config-entry" @click="goToBleConfig">
-          <Icon name="link" :size="28" />
-          <text class="ble-config-text">首次使用？蓝牙配网</text>
-        </view>
+        <template v-else>
+          <view class="connection-btn-wrapper" @click="handleConnect">
+            <view class="connection-btn">
+              <Icon name="scanning" :size="40" color="var(--accent-primary)" />
+              <text class="connection-label">WiFi 连接</text>
+            </view>
+          </view>
+          <view class="connection-btn-wrapper" @click="goToBleConfig">
+            <view class="connection-btn ble">
+              <Icon name="mobile-phone" :size="40" color="var(--accent-primary)" />
+              <text class="connection-label">蓝牙配网</text>
+            </view>
+          </view>
+        </template>
       </view>
       
       <!-- 设备模式和功能 -->
@@ -759,12 +755,9 @@ export default {
 
 /* 连接卡片 */
 .connection-card {
-  background-color: var(--bg-tertiary);
-  border: 2rpx solid var(--border-primary);
-  border-radius: 32rpx;
   padding: 48rpx;
   margin-bottom: 32rpx;
-  box-shadow: var(--shadow-md);
+  display: flex;
 }
 
 .card-title-section {

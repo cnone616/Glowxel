@@ -3,6 +3,7 @@
 #include "config_manager.h"
 #include "animation_manager.h"
 #include "wifi_manager.h"
+#include "ota_manager.h"
 
 // 静态成员初始化
 AsyncWebSocket WebSocketHandler::ws("/ws");
@@ -818,6 +819,52 @@ void WebSocketHandler::handleJsonCommand(AsyncWebSocketClient *client, JsonDocum
     response["message"] = "chunk displayed";
     response["chunk"] = chunk;
     response["total"] = total;
+  }
+  else if (cmd == "ota_check") {
+    OTAManager::checkUpdate();
+    response["firmware_version"] = FIRMWARE_VERSION;
+    response["has_update"] = OTAManager::hasNewVersion();
+    if (OTAManager::hasNewVersion()) {
+      response["latest_version"] = OTAManager::getLatestVersion();
+      response["changelog"] = OTAManager::getChangelog();
+      response["is_force"] = OTAManager::isForce;
+    }
+  }
+  else if (cmd == "ota_update") {
+    if (OTAManager::hasNewVersion()) {
+      response["message"] = "starting update";
+      String responseStr;
+      serializeJson(response, responseStr);
+      client->text(responseStr);
+      delay(500);
+      OTAManager::startUpdate();
+      return; // startUpdate 会重启，不会到这里
+    } else {
+      response["status"] = "error";
+      response["message"] = "no update available";
+    }
+  }
+  else if (cmd == "ota_set_server") {
+    String url = doc["url"].as<String>();
+    if (url.length() > 0) {
+      OTAManager::serverUrl = url;
+      ConfigManager::preferences.begin("ota", false);
+      ConfigManager::preferences.putString("server", url);
+      ConfigManager::preferences.end();
+      response["message"] = "OTA server set";
+      response["server"] = url;
+    } else {
+      response["status"] = "error";
+      response["message"] = "missing url";
+    }
+  }
+  else if (cmd == "get_info") {
+    response["firmware_version"] = FIRMWARE_VERSION;
+    response["device_type"] = DEVICE_TYPE;
+    response["ip"] = WiFiManager::getDeviceIP();
+    response["free_heap"] = ESP.getFreeHeap();
+    response["uptime"] = millis() / 1000;
+    response["has_update"] = OTAManager::hasNewVersion();
   }
   else {
     response["status"] = "error";

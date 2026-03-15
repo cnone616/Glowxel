@@ -1,5 +1,5 @@
 import { getColorByCode } from '@/data/artkal-colors'
-import logoUrl from '@/assets/images/matrix-logo.png'
+import logoUrl from '@/assets/images/glowxel-logo.png'
 
 /**
  * 导出图案为图纸
