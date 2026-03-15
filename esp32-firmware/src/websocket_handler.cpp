@@ -28,7 +28,7 @@ void WebSocketHandler::onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *c
     if (DisplayManager::currentMode == MODE_ANIMATION) {
       modeStr = "animation";
     }
-    String response = "{\"status\":\"connected\",\"device\":\"LED-Matrix\",\"mode\":\"" + modeStr + "\"}";
+    String response = "{\"status\":\"connected\",\"device\":\"Glowxel\",\"mode\":\"" + modeStr + "\"}";
     client->text(response);
   }
   else if (type == WS_EVT_DISCONNECT) {
@@ -316,15 +316,13 @@ void WebSocketHandler::handleJsonCommand(AsyncWebSocketClient *client, JsonDocum
   else if (cmd == "set_mode") {
     String mode = doc["mode"].as<String>();
     if (mode == "clock") {
-      // 如果有动画在播放，保持动画模式，时钟会叠加在动画上
-      if (AnimationManager::currentGIF != nullptr && AnimationManager::currentGIF->isPlaying) {
-        DisplayManager::currentMode = MODE_ANIMATION;
-        response["message"] = "animation playing, clock overlay active";
-      } else {
-        DisplayManager::currentMode = MODE_CANVAS;
-        DisplayManager::displayClock();
-        response["message"] = "switched to canvas mode";
+      // 静态时钟模式：切到 canvas，停止动画播放
+      if (AnimationManager::currentGIF != nullptr) {
+        AnimationManager::currentGIF->isPlaying = false;
       }
+      DisplayManager::currentMode = MODE_CANVAS;
+      DisplayManager::displayClock();
+      response["message"] = "switched to static clock mode";
     } else if (mode == "canvas") {
       DisplayManager::currentMode = MODE_CANVAS;
       
