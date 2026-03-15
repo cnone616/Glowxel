@@ -6,6 +6,7 @@
 #include "animation_manager.h"
 #include "websocket_handler.h"
 #include "web_server.h"
+#include "ota_manager.h"
 
 void setup() {
   Serial.begin(115200);
@@ -33,6 +34,10 @@ void setup() {
   if (!WiFiManager::isConfigMode()) {
     WebSocketHandler::init();
     WebServer::init();
+
+    // OTA 检查更新
+    OTAManager::init();
+    OTAManager::checkUpdate();
   }
   
   Serial.println("\n=================================");

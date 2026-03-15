@@ -1,10 +1,10 @@
-## MATRIX 项目导览（仓库级）
+## Glowxel 项目导览（仓库级）
 
 本仓库是一个面向“拼豆/LED 点阵像素画”的创作工具集合，包含：
 
-- **移动端/多端创作工具**：`matrix-uniapp/`（uni-app + Vue3 + Pinia）
+- **移动端/多端创作工具**：`uniapp/`（uni-app + Vue3 + Pinia）
 - **ESP32 固件**：`esp32-firmware/`（Arduino + PlatformIO，驱动 HUB75 64×64）
-- **官网/在线设计站点**：`pixel-matrix-website/`（Vue3 + Vite）
+- **官网/在线设计站点**：`website/`（Vue3 + Vite）
 
 根目录的`项目说明.md`是产品与技术背景文档；本 README 更偏向“如何跑起来 + 模块在哪里 + 三端如何交互”。
 
@@ -13,10 +13,10 @@
 ## 目录结构
 
 ```
-matrix/
+Glowxel/
 ├── esp32-firmware/          # ESP32 固件 + 本地LED模拟器
-├── matrix-uniapp/           # uni-app 多端应用（小程序/H5/App）
-├── pixel-matrix-website/    # 官网/在线设计站点（Vite）
+├── uniapp/           # uni-app 多端应用（小程序/H5/App）
+├── website/    # 官网/在线设计站点（Vite）
 └── 项目说明.md              # 整体技术与规划说明
 ```
 
@@ -24,10 +24,10 @@ matrix/
 
 ## 快速上手
 
-### 1) `pixel-matrix-website/`（官网 / 在线编辑）
+### 1) `website/`（官网 / 在线编辑）
 
 ```bash
-cd pixel-matrix-website
+cd website
 npm install
 npm run dev
 ```
@@ -37,26 +37,26 @@ npm run dev
 
 ---
 
-### 2) `matrix-uniapp/`（小程序 / H5 / App）
+### 2) `uniapp/`（小程序 / H5 / App）
 
 推荐方式（官方工作流）：
-- 使用 **HBuilderX** 导入 `matrix-uniapp/` 运行到微信开发者工具 / 浏览器 / 模拟器。
+- 使用 **HBuilderX** 导入 `uniapp/` 运行到微信开发者工具 / 浏览器 / 模拟器。
 
 也提供 npm scripts（依赖于 uni-app CLI 环境）：
 
 ```bash
-cd matrix-uniapp
+cd uniapp
 npm install
 npm run dev:h5
 # 或：npm run dev:mp-weixin
 ```
 
 关键实现入口：
-- **像素画布**：`matrix-uniapp/components/PixelCanvas.vue`
-- **设备控制页**：`matrix-uniapp/pages/control/control.vue`
-- **闹钟编辑器**：`matrix-uniapp/pages/clock-editor/clock-editor.vue`
-- **设备连接状态（Pinia）**：`matrix-uniapp/store/device.js`
-- **与 ESP32 的 WebSocket 通信封装**：`matrix-uniapp/utils/webSocket.js`
+- **像素画布**：`uniapp/components/PixelCanvas.vue`
+- **设备控制页**：`uniapp/pages/control/control.vue`
+- **闹钟编辑器**：`uniapp/pages/clock-editor/clock-editor.vue`
+- **设备连接状态（Pinia）**：`uniapp/store/device.js`
+- **与 ESP32 的 WebSocket 通信封装**：`uniapp/utils/webSocket.js`
 
 ---
 
@@ -79,7 +79,7 @@ python3 -m platformio run --target upload
 
 - **优先 STA 模式**：若曾保存 WiFi（`Preferences` 命名空间 `"wifi"`），则尝试连接并通过 NTP 同步时间。
 - **否则 AP 配网模式**：
-  - **热点名（SSID）**：`LED-Matrix-Setup`
+  - **热点名（SSID）**：`Glowxel-Setup`
   - **热点密码**：`12345678`
   - **配置页**：连接热点后访问 `http://192.168.4.1/`
   - **DNS 劫持**：固件会启动 DNS 服务将任意域名解析到配网页（便于手机系统弹出“需要登录”式页面）。
@@ -110,7 +110,7 @@ python3 -m platformio run --target upload
 - `ws://<设备IP>/ws`
 
 连接后，固件会发送一条文本消息，包含当前模式：
-- `{"status":"connected","device":"LED-Matrix","mode":"clock|canvas"}`
+- `{"status":"connected","device":"Glowxel","mode":"clock|canvas"}`
 
 #### 1) JSON 命令（文本帧）
 
@@ -141,8 +141,8 @@ python3 -m platformio run --target upload
 - 一帧可携带多个像素，固件按 5 字节步进解析
 
 uni-app 侧的实现参考：
-- `matrix-uniapp/utils/webSocket.js` 的 `showImage()` / `sendPartialUpdate()`
-- `matrix-uniapp/pages/control/control.vue` 中的“发送像素并等待确认”逻辑
+- `uniapp/utils/webSocket.js` 的 `showImage()` / `sendPartialUpdate()`
+- `uniapp/pages/control/control.vue` 中的“发送像素并等待确认”逻辑
 
 固件确认机制（闹钟模式背景图场景）：
 - 若接收像素后超过约 500ms 没再继续接收，会将像素数据保存到 `Preferences`，并广播：

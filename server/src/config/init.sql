@@ -1,4 +1,4 @@
--- Matrix 数据库初始化脚本
+-- Glowxel 数据库初始化脚本
 CREATE DATABASE IF NOT EXISTS matrix DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE matrix;
 
@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS users (
   works_count   INT DEFAULT 0,
   total_likes   INT DEFAULT 0,
   status        ENUM('active','banned') DEFAULT 'active',
+  role          ENUM('user','admin') DEFAULT 'user',
   settings      JSON,
   created_at    DATETIME DEFAULT NOW(),
   updated_at    DATETIME DEFAULT NOW() ON UPDATE NOW()
@@ -172,4 +173,19 @@ CREATE TABLE IF NOT EXISTS user_devices (
   firmware_ver  VARCHAR(20),
   created_at    DATETIME DEFAULT NOW(),
   INDEX idx_user (user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 固件版本表（OTA升级）
+CREATE TABLE IF NOT EXISTS firmware_versions (
+  id            BIGINT PRIMARY KEY AUTO_INCREMENT,
+  version       VARCHAR(20) NOT NULL UNIQUE,
+  device_type   VARCHAR(30) DEFAULT 'glowxel-64',
+  file_url      VARCHAR(500) NOT NULL,
+  file_size     INT DEFAULT 0,
+  md5_hash      VARCHAR(32),
+  changelog     TEXT,
+  is_force      TINYINT(1) DEFAULT 0,
+  is_active     TINYINT(1) DEFAULT 1,
+  created_at    DATETIME DEFAULT NOW(),
+  INDEX idx_device_active (device_type, is_active)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

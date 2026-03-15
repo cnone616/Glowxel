@@ -115,7 +115,7 @@ src/
 
 ### 开发环境
 ```bash
-cd matrix-website
+cd website
 npm install
 npm run dev
 ```

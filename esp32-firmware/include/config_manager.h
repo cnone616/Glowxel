@@ -5,6 +5,8 @@
 #include <Preferences.h>
 #include <ArduinoJson.h>
 
+#define CONFIG_VERSION 2  // 改默认配置时递增此版本号
+
 // 闹钟配置结构
 struct ClockConfig {
   struct {

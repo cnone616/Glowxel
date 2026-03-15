@@ -3,7 +3,7 @@
 // 静态成员初始化
 Preferences ConfigManager::preferences;
 ClockConfig ConfigManager::clockConfig = {
-  .time = {1, 17, 5, 100, 200, 255},
+  .time = {1, 17, 5, 255, 255, 255},
   .date = {false, 1, 14, 55, 120, 120, 120},
   .week = {false, 23, 44, 100, 100, 100},
   .image = {false, 0, 0, 64, 64}
@@ -13,8 +13,23 @@ int ConfigManager::imagePixelCount = 0;
 
 void ConfigManager::init() {
   Serial.println("2. 加载闹钟配置...");
-  loadClockConfig();
-  loadImagePixels();
+
+  // 检查配置版本，版本不匹配说明固件更新了默认配置，清除旧的
+  preferences.begin("clock", true);
+  int savedVersion = preferences.getInt("cfgVer", 0);
+  preferences.end();
+
+  if (savedVersion != CONFIG_VERSION) {
+    Serial.println("配置版本不匹配，清除旧配置");
+    resetToDefault();
+    // 保存新版本号
+    preferences.begin("clock", false);
+    preferences.putInt("cfgVer", CONFIG_VERSION);
+    preferences.end();
+  } else {
+    loadClockConfig();
+    loadImagePixels();
+  }
 }
 
 void ConfigManager::loadClockConfig() {
@@ -114,7 +129,7 @@ void ConfigManager::resetToDefault() {
 
   // 恢复默认闹钟配置
   clockConfig = {
-    .time = {1, 17, 5, 100, 200, 255},
+    .time = {1, 17, 5, 255, 255, 255},
     .date = {false, 1, 14, 55, 120, 120, 120},
     .week = {false, 23, 44, 100, 100, 100},
     .image = {false, 0, 0, 64, 64}
