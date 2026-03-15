@@ -33,29 +33,44 @@ void DisplayManager::setupMatrix() {
   dma_display->clearScreen();
   
   Serial.println("显示开机Logo...");
-  
-  uint16_t red = dma_display->color565(255, 100, 100);
-  uint16_t orange = dma_display->color565(255, 165, 0);
-  uint16_t yellow = dma_display->color565(255, 220, 0);
-  uint16_t green = dma_display->color565(100, 255, 100);
-  uint16_t blue = dma_display->color565(100, 150, 255);
-  
-  int blockSize = 8;
-  int gridSize = 12;
-  int startPos = 4;  // 往下2，往右2
-  
-  for(int row = 0; row < 5; row++) {
-    dma_display->fillRect(startPos, startPos + row * gridSize, blockSize, blockSize, red);
+
+  // Glowxel logo 颜色
+  uint16_t orange = dma_display->color565(249, 115, 22);   // #F97316
+  uint16_t blue   = dma_display->color565(59, 130, 246);    // #3B82F6
+  uint16_t pink   = dma_display->color565(236, 72, 153);    // #EC4899
+
+  // 3x3 方块网格 logo，每块 8x8，间距 2px
+  // 居中：总宽 = 8*3 + 2*2 = 28，起始x = (64-28)/2 = 18
+  // 上半部分：起始y = 10
+  int bs = 8;   // block size
+  int gap = 2;  // gap between blocks
+  int sx = 18;  // start x
+  int sy = 10;  // start y
+  int step = bs + gap; // 10
+
+  // 3x3 网格颜色映射 (行优先)
+  // [橙, 橙, 蓝]
+  // [橙, 蓝, 粉]
+  // [橙, 橙, 蓝]
+  uint16_t grid[3][3] = {
+    { orange, orange, blue },
+    { orange, blue,   pink },
+    { orange, orange, blue }
+  };
+
+  for (int row = 0; row < 3; row++) {
+    for (int col = 0; col < 3; col++) {
+      dma_display->fillRect(sx + col * step, sy + row * step, bs, bs, grid[row][col]);
+    }
   }
-  
-  dma_display->fillRect(startPos + gridSize, startPos + gridSize, blockSize, blockSize, orange);
-  dma_display->fillRect(startPos + gridSize * 2, startPos + gridSize * 2, blockSize, blockSize, yellow);
-  dma_display->fillRect(startPos + gridSize * 3, startPos + gridSize, blockSize, blockSize, green);
-  
-  for(int row = 0; row < 5; row++) {
-    dma_display->fillRect(startPos + gridSize * 4, startPos + row * gridSize, blockSize, blockSize, blue);
-  }
-  
+
+  // "Glowxel" 文字居中显示在下半部分
+  // 内置字体每字符 6px 宽，7 个字符 = 42px，起始x = (64-42)/2 = 11
+  dma_display->setTextSize(1);
+  dma_display->setTextColor(dma_display->color565(220, 220, 220)); // 浅白色
+  dma_display->setCursor(11, 46);
+  dma_display->print("Glowxel");
+
   delay(2000);
   Serial.println("LED灯板初始化完成");
 }
