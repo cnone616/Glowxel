@@ -2,6 +2,29 @@
 #include "config_manager.h"
 #include "display_manager.h"
 #include <time.h>
+#include <math.h>
+
+// 画WiFi扇形图标 (cx,cy)=底部圆点中心, r=最大弧半径
+static void drawWifiIcon(int cx, int cy, int r, uint16_t color) {
+  auto* d = DisplayManager::dma_display;
+
+  // 底部小圆点 (2x2)
+  d->fillRect(cx - 1, cy - 1, 3, 3, color);
+
+  // 3层弧线，从内到外
+  for (int arc = 0; arc < 3; arc++) {
+    int radius = 4 + arc * 4;
+    if (radius > r) break;
+    // 画上半圆弧 (约 -60° 到 -120°，即上方扇形)
+    for (float angle = -2.35; angle <= -0.78; angle += 0.04) {
+      int px = cx + (int)(radius * cos(angle));
+      int py = cy + (int)(radius * sin(angle));
+      if (px >= 0 && px < 64 && py >= 0 && py < 64) {
+        d->drawPixel(px, py, color);
+      }
+    }
+  }
+}
 
 // 静态成员初始化
 const char* WiFiManager::ap_ssid = "Glowxel-Setup";
@@ -49,15 +72,22 @@ void WiFiManager::setupWiFi() {
       configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
       Serial.println("正在同步网络时间...");
       
-      // 在LED上显示连接成功和IP
+      // 在LED上显示WiFi图标 + 连接成功
       DisplayManager::dma_display->clearScreen();
+      drawWifiIcon(32, 18, 14, DisplayManager::dma_display->color565(59, 130, 246));
+
       DisplayManager::dma_display->setTextSize(1);
-      DisplayManager::dma_display->setCursor(2, 2);
-      DisplayManager::dma_display->setTextColor(DisplayManager::dma_display->color565(0, 255, 0));
-      DisplayManager::dma_display->println("WiFi OK");
-      DisplayManager::dma_display->setCursor(2, 12);
-      DisplayManager::dma_display->setTextColor(DisplayManager::dma_display->color565(255, 255, 255));
-      DisplayManager::dma_display->println(WiFi.localIP().toString());
+      DisplayManager::dma_display->setTextColor(DisplayManager::dma_display->color565(100, 255, 100));
+      // "WiFi OK" 居中: 7字符*6px=42, (64-42)/2=11
+      DisplayManager::dma_display->setCursor(11, 38);
+      DisplayManager::dma_display->print("WiFi OK");
+
+      // IP 居中
+      String ip = WiFi.localIP().toString();
+      int ipWidth = ip.length() * 6;
+      DisplayManager::dma_display->setTextColor(DisplayManager::dma_display->color565(200, 200, 200));
+      DisplayManager::dma_display->setCursor((64 - ipWidth) / 2, 50);
+      DisplayManager::dma_display->print(ip);
       
       delay(2000);
       
@@ -95,19 +125,31 @@ void WiFiManager::setupWiFi() {
   Serial.println("=================================");
   
   DisplayManager::dma_display->clearScreen();
+
+  // 蓝色WiFi扇形图标居中显示在上方
+  drawWifiIcon(32, 14, 12, DisplayManager::dma_display->color565(59, 130, 246));
+
   DisplayManager::dma_display->setTextSize(1);
-  
-  DisplayManager::dma_display->setCursor(2, 10);
-  DisplayManager::dma_display->setTextColor(DisplayManager::dma_display->color565(0, 255, 255));
-  DisplayManager::dma_display->print("WiFi:");
-  DisplayManager::dma_display->setTextColor(DisplayManager::dma_display->color565(255, 255, 255));
-  DisplayManager::dma_display->println(ap_ssid);
-  
-  DisplayManager::dma_display->setCursor(2, 40);
-  DisplayManager::dma_display->setTextColor(DisplayManager::dma_display->color565(0, 255, 255));
-  DisplayManager::dma_display->print("Pass:");
-  DisplayManager::dma_display->setTextColor(DisplayManager::dma_display->color565(255, 255, 255));
-  DisplayManager::dma_display->println(ap_password);
+
+  // SSID 居中
+  int ssidLen = strlen(ap_ssid);
+  DisplayManager::dma_display->setTextColor(DisplayManager::dma_display->color565(200, 200, 200));
+  DisplayManager::dma_display->setCursor((64 - ssidLen * 6) / 2, 32);
+  DisplayManager::dma_display->print(ap_ssid);
+
+  // "Pass:" + 密码 居中
+  String passStr = String("P:") + ap_password;
+  int passWidth = passStr.length() * 6;
+  DisplayManager::dma_display->setTextColor(DisplayManager::dma_display->color565(150, 150, 150));
+  DisplayManager::dma_display->setCursor((64 - passWidth) / 2, 44);
+  DisplayManager::dma_display->print(passStr);
+
+  // "192.168.4.1" 居中
+  String apIp = WiFi.softAPIP().toString();
+  int apIpWidth = apIp.length() * 6;
+  DisplayManager::dma_display->setTextColor(DisplayManager::dma_display->color565(100, 100, 100));
+  DisplayManager::dma_display->setCursor((64 - apIpWidth) / 2, 55);
+  DisplayManager::dma_display->print(apIp);
 }
 
 bool WiFiManager::isConfigMode() {
