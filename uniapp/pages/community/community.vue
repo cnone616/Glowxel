@@ -118,7 +118,7 @@
 </template>
 
 <script>
-import { MockAPI } from '../../data/mock/index.js'
+import { artworkAPI, userAPI } from '../../api/index.js'
 import statusBarMixin from '../../mixins/statusBar.js'
 import ArtworkCard from '../../components/ArtworkCard.vue'
 import Avatar from '../../components/Avatar.vue'
@@ -188,7 +188,8 @@ export default {
       
       try {
         // 加载推荐用户
-        this.recommendedUsers = MockAPI.users.getRecommended().slice(0, 8)
+        const recRes = await userAPI.getRecommendedUsers(8)
+        this.recommendedUsers = recRes.success ? (recRes.data || []).slice(0, 8) : []
         
         // 加载作品
         await this.loadArtworks(true)
@@ -215,17 +216,21 @@ export default {
         
         switch (this.activeCategory) {
           case 'recommended':
-            newArtworks = MockAPI.artworks.getPopular()
+            const popRes = await artworkAPI.getPopularArtworks(1, 20)
+            newArtworks = popRes.success ? (popRes.data?.list || []) : []
             break
           case 'latest':
-            newArtworks = MockAPI.artworks.getLatest()
+            const latRes = await artworkAPI.getLatestArtworks(1, 20)
+            newArtworks = latRes.success ? (latRes.data?.list || []) : []
             break
           case 'popular':
-            newArtworks = MockAPI.artworks.getPopular()
+            const folRes = await artworkAPI.getFollowingArtworks(1, 20)
+            newArtworks = folRes.success ? (folRes.data?.list || []) : []
             break
           default:
             // 按标签搜索
-            newArtworks = MockAPI.artworks.searchByTag(this.activeCategory)
+            const tagRes = await artworkAPI.searchByTag(this.activeCategory)
+            newArtworks = tagRes.success ? (tagRes.data?.list || tagRes.data || []) : []
             break
         }
         
@@ -256,7 +261,8 @@ export default {
         
         // 刷新推荐用户
         if (this.activeCategory === 'recommended') {
-          this.recommendedUsers = MockAPI.users.getRecommended().slice(0, 8)
+          const recRes2 = await userAPI.getRecommendedUsers(8)
+          this.recommendedUsers = recRes2.success ? (recRes2.data || []).slice(0, 8) : []
         }
       } catch (error) {
         console.error('刷新失败:', error)

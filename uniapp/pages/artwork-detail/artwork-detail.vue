@@ -204,7 +204,7 @@
 </template>
 
 <script>
-import { MockAPI } from '../../data/mock/index.js'
+import { artworkAPI, commentAPI, likeAPI, collectionAPI, followAPI } from '../../api/index.js'
 import { useProjectStore } from '../../store/project.js'
 import statusBarMixin from '../../mixins/statusBar.js'
 import Icon from '../../components/Icon.vue'
@@ -260,19 +260,18 @@ export default {
     async loadArtworkDetail() {
       try {
         this.isLoading = true
-        
-        // 获取作品详情
-        this.artwork = await MockAPI.artworks.getById(this.artworkId)
-        
-        // 获取评论列表
-        this.comments = await MockAPI.comments.getByArtworkId(this.artworkId)
-        
-        // 获取相关推荐
-        this.relatedArtworks = await MockAPI.artworks.getRelated(this.artworkId)
-        
-        // 获取用户交互状态
-        this.isLiked = await MockAPI.likes.isLiked(this.artworkId)
-        this.isCollected = await MockAPI.collections.isCollected(this.artworkId)
+
+        const artRes = await artworkAPI.getArtworkById(this.artworkId)
+        if (artRes.success) this.artwork = artRes.data
+
+        const cmtRes = await commentAPI.getComments(this.artworkId)
+        if (cmtRes.success) this.comments = cmtRes.data?.list || []
+
+        const relRes = await artworkAPI.getRelatedArtworks(this.artworkId)
+        if (relRes.success) this.relatedArtworks = relRes.data?.list || relRes.data || []
+
+        this.isLiked = await likeAPI.isLiked(this.artworkId)
+        this.isCollected = await collectionAPI.isCollected(this.artworkId)
         
       } catch (error) {
         console.error('加载作品详情失败:', error)
@@ -308,9 +307,9 @@ export default {
         
         // 调用关注API
         if (isFollowing) {
-          await MockAPI.follows.follow(this.artwork.author.id)
+          await followAPI.followUser(this.artwork.author.id)
         } else {
-          await MockAPI.follows.unfollow(this.artwork.author.id)
+          await followAPI.unfollowUser(this.artwork.author.id)
         }
         
         this.artwork.author.isFollowing = isFollowing
@@ -334,10 +333,10 @@ export default {
         
         // 调用点赞API
         if (liked) {
-          await MockAPI.likes.like(this.artworkId)
+          await likeAPI.likeArtwork(this.artworkId)
           this.artwork.likes = (this.artwork.likes || 0) + 1
         } else {
-          await MockAPI.likes.unlike(this.artworkId)
+          await likeAPI.unlikeArtwork(this.artworkId)
           this.artwork.likes = Math.max(0, (this.artwork.likes || 0) - 1)
         }
         
@@ -358,13 +357,13 @@ export default {
 
         // 调用收藏API
         if (collected) {
-          await MockAPI.collections.collect(this.artworkId)
+          await collectionAPI.collectArtwork(this.artworkId)
           this.artwork.collects = (this.artwork.collects || 0) + 1
 
           // 收藏时创建只读本地项目
           this._addCollectedProject()
         } else {
-          await MockAPI.collections.uncollect(this.artworkId)
+          await collectionAPI.uncollectArtwork(this.artworkId)
           this.artwork.collects = Math.max(0, (this.artwork.collects || 0) - 1)
 
           // 取消收藏时删除本地项目
@@ -432,10 +431,12 @@ export default {
       if (!this.commentText.trim()) return
       
       try {
-        const newComment = await MockAPI.comments.add({
-          artworkId: this.artworkId,
-          content: this.commentText.trim()
-        })
+        const cmtRes = await commentAPI.addComment(
+          this.artworkId,
+          this.commentText.trim()
+        )
+        const newComment = cmtRes.success ? cmtRes.data : null
+        if (!newComment) throw new Error('评论失败')
         
         this.comments.unshift(newComment)
         this.artwork.comments = (this.artwork.comments || 0) + 1
@@ -465,10 +466,10 @@ export default {
         const liked = !comment.isLiked
         
         if (liked) {
-          await MockAPI.comments.like(comment.id)
+          await commentAPI.likeComment(comment.id)
           comment.likes = (comment.likes || 0) + 1
         } else {
-          await MockAPI.comments.unlike(comment.id)
+          await commentAPI.likeComment(comment.id)
           comment.likes = Math.max(0, (comment.likes || 0) - 1)
         }
         
@@ -480,7 +481,7 @@ export default {
     
     async handleCommentDelete(comment) {
       try {
-        await MockAPI.comments.delete(comment.id)
+        await commentAPI.deleteComment(comment.id)
         
         const index = this.comments.findIndex(c => c.id === comment.id)
         if (index > -1) {

@@ -160,7 +160,7 @@
 </template>
 
 <script>
-import { MockAPI } from '../../data/mock/index.js'
+import { userAPI, artworkAPI, followAPI } from '../../api/index.js'
 import statusBarMixin from '../../mixins/statusBar.js'
 import Icon from '../../components/Icon.vue'
 import Avatar from '../../components/Avatar.vue'
@@ -235,10 +235,12 @@ export default {
         this.isLoading = true
         
         // 获取用户详情
-        this.userInfo = await MockAPI.users.getById(this.userId)
+        const uRes = await userAPI.getUserById(this.userId)
+        if (uRes.success) this.userInfo = uRes.data
         
         // 检查是否是当前用户
-        const currentUser = await MockAPI.users.getCurrent()
+        const pRes = await userAPI.getProfile()
+        const currentUser = pRes.success ? pRes.data : null
         this.isCurrentUser = currentUser && currentUser.id == this.userId
         
         // 获取用户作品
@@ -267,7 +269,8 @@ export default {
         }
         
         // 获取用户作品列表
-        const works = await MockAPI.artworks.getByUserId(this.userId, this.currentPage, this.pageSize)
+        const wRes = await artworkAPI.getArtworks({ page: this.currentPage, limit: this.pageSize })
+        const works = wRes.success ? (wRes.data?.list || []) : []
         
         if (reset) {
           this.userWorks = works
@@ -346,10 +349,10 @@ export default {
         
         // 调用关注API
         if (isFollowing) {
-          await MockAPI.follows.follow(this.userId)
+          await followAPI.followUser(this.userId)
           this.userInfo.followersCount = (this.userInfo.followersCount || 0) + 1
         } else {
-          await MockAPI.follows.unfollow(this.userId)
+          await followAPI.unfollowUser(this.userId)
           this.userInfo.followersCount = Math.max(0, (this.userInfo.followersCount || 0) - 1)
         }
         

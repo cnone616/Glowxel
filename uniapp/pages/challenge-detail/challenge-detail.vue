@@ -155,7 +155,7 @@
 
 <script>
 import Icon from '@/components/Icon.vue'
-import { getChallengeById } from '@/data/mock/challenges.js'
+import { challengeAPI } from '@/api/index.js'
 
 export default {
   name: 'ChallengeDetail',
@@ -218,8 +218,9 @@ export default {
   },
   
   methods: {
-    loadChallengeData() {
-      this.challenge = getChallengeById(this.challengeId)
+    async loadChallengeData() {
+      const res = await challengeAPI.getChallengeById(this.challengeId)
+      this.challenge = res.success ? res.data : null
       
       if (!this.challenge) {
         uni.showToast({

@@ -160,13 +160,7 @@ import { useToast } from '../../composables/useToast.js'
 import statusBarMixin from '../../mixins/statusBar.js'
 import Icon from '../../components/Icon.vue'
 import Toast from '../../components/Toast.vue'
-import { MockAPI } from '../../data/mock/index.js'
-import { 
-  getCurrentUser, 
-  getProfileStats, 
-  getMyFavorites, 
-  getAchievementStats 
-} from '../../data/mock/profile.js'
+import { userAPI, artworkAPI, collectionAPI } from '../../api/index.js'
 
 export default {
   mixins: [statusBarMixin],
