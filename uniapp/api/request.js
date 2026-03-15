@@ -1,9 +1,7 @@
 /**
  * 统一 HTTP 请求基础层
- * 当前降级到 MockAPI，后端就绪后切换 BASE_URL 即可
  */
 
-// 后端 API 地址，空字符串表示使用 Mock 模式
 const BASE_URL = 'http://175.178.153.146:3000'
 
 // 获取本地存储的 token
@@ -22,11 +20,6 @@ function getToken() {
  */
 export async function request(url, options = {}) {
   const { method = 'GET', data = {}, auth = true } = options
-
-  // Mock 模式：直接返回 null，由调用方降级到 MockAPI
-  if (!BASE_URL) {
-    return { success: false, data: null, message: 'mock_mode' }
-  }
 
   const header = {
     'Content-Type': 'application/json'
@@ -93,11 +86,3 @@ export const put = (url, data, options = {}) =>
 
 export const del = (url, data, options = {}) =>
   request(url, { ...options, method: 'DELETE', data })
-
-/**
- * 判断当前是否为 Mock 模式
- */
-export function isMockMode() {
-  return !BASE_URL
-}
-

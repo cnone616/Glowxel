@@ -103,7 +103,7 @@
 </template>
 
 <script>
-import { MockAPI } from '../../data/mock/index.js'
+import { artworkAPI, templateAPI, challengeAPI } from '../../api/index.js'
 import statusBarMixin from '../../mixins/statusBar.js'
 import Logo from '../../components/Logo.vue'
 import ArtworkCard from '../../components/ArtworkCard.vue'
@@ -172,15 +172,17 @@ export default {
   methods: {
     async loadRecommendedContent() {
       try {
-        // 加载推荐作品
-        this.recommendedArtworks = MockAPI.artworks.getPopular().slice(0, 6)
-        
-        // 加载官方模板
-        this.officialTemplates = MockAPI.templates.getPopular().slice(0, 4)
-        
-        // 加载每周挑战
-        const challenges = MockAPI.challenges.getActive()
-        this.weeklyChallenge = challenges.find(c => c.type === 'weekly') || challenges[0]
+        const artRes = await artworkAPI.getPopularArtworks(1, 6)
+        if (artRes.success) this.recommendedArtworks = artRes.data?.list || []
+
+        const tplRes = await templateAPI.getPopularTemplates(4)
+        if (tplRes.success) this.officialTemplates = tplRes.data || []
+
+        const chRes = await challengeAPI.getActiveChallenges()
+        if (chRes.success) {
+          const challenges = chRes.data?.list || chRes.data || []
+          this.weeklyChallenge = challenges.find(c => c.type === 'weekly') || challenges[0]
+        }
       } catch (error) {
         console.error('加载推荐内容失败:', error)
       }

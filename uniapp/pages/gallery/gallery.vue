@@ -125,7 +125,7 @@
 </template>
 
 <script>
-import { MockAPI } from '../../data/mock/index.js'
+import { artworkAPI, templateAPI, challengeAPI } from '../../api/index.js'
 import statusBarMixin from '../../mixins/statusBar.js'
 import ArtworkCard from '../../components/ArtworkCard.vue'
 import TemplateCard from '../../components/TemplateCard.vue'
@@ -318,25 +318,18 @@ export default {
       }
     },
     
-    getArtworkData() {
-      switch (this.activeCategory) {
-        case 'popular':
-          return MockAPI.artworks.getPopular()
-        case 'latest':
-          return MockAPI.artworks.getLatest()
-        case 'following':
-          // TODO: 获取关注用户的作品
-          return MockAPI.artworks.getPopular().slice(0, 10)
-        default:
-          return MockAPI.artworks.getAll()
-      }
+    async getArtworkData() {
+      const sort = this.activeCategory === 'popular' ? 'popular' : this.activeCategory === 'latest' ? 'latest' : 'latest'
+      const res = this.activeCategory === 'following'
+        ? await artworkAPI.getFollowingArtworks(1, 20)
+        : await artworkAPI.getArtworks({ page: 1, limit: 20, sort })
+      return res.success ? (res.data?.list || []) : []
     },
-    
-    getTemplateData() {
-      // 分类key到分类名称的映射
+
+    async getTemplateData() {
       const categoryNameMap = {
         'game': '游戏角色',
-        'anime': '动漫角色', 
+        'anime': '动漫角色',
         'symbol': '图案符号',
         'fantasy': '奇幻生物',
         'nature': '自然植物',
@@ -344,31 +337,15 @@ export default {
         'food': '美食',
         'building': '建筑'
       }
-      
-      switch (this.activeCategory) {
-        case 'all':
-          return MockAPI.templates.getAll()
-        default:
-          // 根据分类获取模板
-          const categoryName = categoryNameMap[this.activeCategory]
-          if (categoryName) {
-            return MockAPI.templates.getByCategory(categoryName)
-          }
-          return MockAPI.templates.getAll()
-      }
+      const category = this.activeCategory === 'all' ? undefined : categoryNameMap[this.activeCategory]
+      const res = await templateAPI.getTemplates({ category, page: 1, limit: 20 })
+      return res.success ? (res.data?.list || []) : []
     },
-    
-    getChallengeData() {
-      switch (this.activeCategory) {
-        case 'active':
-          return MockAPI.challenges.getActive()
-        case 'upcoming':
-          return MockAPI.challenges.getUpcoming()
-        case 'ended':
-          return MockAPI.challenges.getChallengesByStatus('ended')
-        default:
-          return MockAPI.challenges.getAll()
-      }
+
+    async getChallengeData() {
+      const status = this.activeCategory === 'all' ? undefined : this.activeCategory
+      const res = await challengeAPI.getChallenges({ status, page: 1, limit: 20 })
+      return res.success ? (res.data?.list || []) : []
     },
     
     async handleRefresh() {

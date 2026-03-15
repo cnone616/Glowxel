@@ -97,7 +97,7 @@
 </template>
 
 <script>
-import { MockAPI } from '../../data/mock/index.js'
+import { userAPI, followAPI } from '../../api/index.js'
 import statusBarMixin from '../../mixins/statusBar.js'
 import Icon from '../../components/Icon.vue'
 import Avatar from '../../components/Avatar.vue'
@@ -189,19 +189,24 @@ export default {
       
       try {
         let newUsers = []
-        
+        let res
+
         switch (this.listType) {
           case 'followers':
-            newUsers = await MockAPI.users.getFollowers(this.userId, this.currentPage, this.pageSize)
+            res = await followAPI.getFollowers(this.userId, this.currentPage, this.pageSize)
+            newUsers = res.success ? (res.data?.list || []) : []
             break
           case 'following':
-            newUsers = await MockAPI.users.getFollowing(this.userId, this.currentPage, this.pageSize)
+            res = await followAPI.getFollowing(this.userId, this.currentPage, this.pageSize)
+            newUsers = res.success ? (res.data?.list || []) : []
             break
           case 'recommended':
-            newUsers = await MockAPI.users.getRecommended(this.pageSize)
+            res = await userAPI.getRecommendedUsers(this.pageSize)
+            newUsers = res.success ? (res.data || []) : []
             break
           default:
-            newUsers = await MockAPI.users.getPopular(this.pageSize)
+            res = await userAPI.getRecommendedUsers(this.pageSize)
+            newUsers = res.success ? (res.data || []) : []
             break
         }
         
@@ -270,7 +275,7 @@ export default {
     
     async toggleFollow(user) {
       try {
-        const result = await MockAPI.users.toggleFollow(user.id)
+        const result = await followAPI.toggleFollow(user.id)
         
         if (result.success) {
           user.isFollowing = result.isFollowing
