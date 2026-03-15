@@ -1,5 +1,5 @@
 <template>
-  <view class="challenge-card" @click="handleClick">
+  <view class="challenge-card" @click="handleClick" v-if="challenge && typeof challenge === 'object'">
     <!-- 挑战横幅图片 -->
     <view class="challenge-banner">
       <image 

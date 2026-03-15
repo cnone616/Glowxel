@@ -28,14 +28,17 @@ void setup() {
   ConfigManager::init();
   WiFiManager::init();
   AnimationManager::init();
-  WebSocketHandler::init();
-  WebServer::init();
+
+  // 只有 WiFi 连接成功才启动 HTTP/WebSocket 服务
+  if (!WiFiManager::isConfigMode()) {
+    WebSocketHandler::init();
+    WebServer::init();
+  }
   
   Serial.println("\n=================================");
   Serial.println("系统就绪！");
   if (WiFiManager::isConfigMode()) {
-    Serial.print("AP模式访问地址: http://");
-    Serial.println(WiFiManager::getDeviceIP());
+    Serial.println("BLE 配网模式，等待蓝牙配置...");
   } else {
     Serial.print("STA模式访问地址: http://");
     Serial.println(WiFiManager::getDeviceIP());
@@ -45,29 +48,31 @@ void setup() {
 }
 
 void loop() {
+  // 配网模式下只等待 BLE 配网，不做其他事
   if (WiFiManager::isConfigMode()) {
-    WiFiManager::dnsServer.processNextRequest();
+    delay(100);
+    return;
   }
 
   // 检查是否有待保存的二进制像素数据
   if (WebSocketHandler::binaryDataPending && millis() - WebSocketHandler::lastBinaryReceiveTime > 500) {
     WebSocketHandler::binaryDataPending = false;
-    
+
     if (ConfigManager::imagePixels != nullptr && ConfigManager::imagePixelCount > 0) {
       Serial.printf("=== 开始保存像素数据到 Preferences: %d 个像素 ===\n", ConfigManager::imagePixelCount);
-      
+
       ConfigManager::saveImagePixels();
-      
+
       // 发送确认消息给客户端
       StaticJsonDocument<128> confirmDoc;
       confirmDoc["status"] = "ok";
       confirmDoc["message"] = "pixels_received";
       confirmDoc["count"] = ConfigManager::imagePixelCount;
-      
+
       String confirmMsg;
       serializeJson(confirmDoc, confirmMsg);
       WebSocketHandler::ws.textAll(confirmMsg);
-      
+
       // 保存完成后，如果是画布模式，刷新显示
       if (DisplayManager::currentMode == MODE_CANVAS) {
         DisplayManager::displayClock();
@@ -76,11 +81,11 @@ void loop() {
   }
 
   // 根据当前模式执行不同的逻辑
-  if (DisplayManager::currentMode == MODE_CANVAS && !WiFiManager::isConfigMode()) {
+  if (DisplayManager::currentMode == MODE_CANVAS) {
     // 画布模式：每分钟更新一次时钟
     static unsigned long lastClockUpdate = 0;
     static int lastMinute = -1;
-    
+
     // 获取当前时间
     struct tm timeinfo;
     if (getLocalTime(&timeinfo)) {
@@ -96,14 +101,13 @@ void loop() {
         DisplayManager::displayClock();
       }
     }
-  } else if (DisplayManager::currentMode == MODE_ANIMATION && !WiFiManager::isConfigMode()) {
+  } else if (DisplayManager::currentMode == MODE_ANIMATION) {
     // 动画模式：持续更新 GIF 动画
     AnimationManager::updateGIFAnimation();
   }
-  // 画板模式不需要主动更新，由 WebSocket 命令驱动
-  
+
   // 清理WebSocket，防止内存泄漏
   WebSocketHandler::ws.cleanupClients();
-  
+
   yield();
 }

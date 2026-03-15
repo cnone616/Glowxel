@@ -43,6 +43,15 @@
 			}
 		},
 		{
+			"path": "pages/ble-config/ble-config",
+			"style": {
+				"navigationStyle": "custom",
+				"navigationBarTextStyle": "black",
+				"backgroundColor": "#FFFFFF",
+				"enablePullDownRefresh": false
+			}
+		},
+		{
 			"path": "pages/control/control",
 			"style": {
 				"navigationStyle": "custom",

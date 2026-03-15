@@ -60,6 +60,7 @@ public:
   static void saveClockConfig();
   static void loadImagePixels();
   static void saveImagePixels();
+  static void resetToDefault();  // 清除所有配置，恢复默认
   
   static ClockConfig clockConfig;
   static PixelData* imagePixels;
