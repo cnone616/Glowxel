@@ -1,5 +1,5 @@
 <template>
-  <view class="artwork-card" @click="handleClick">
+  <view class="artwork-card" @click="handleClick" v-if="artwork && typeof artwork === 'object'">
     <!-- 作品图片 -->
     <view class="artwork-image-container">
       <image 

@@ -1,5 +1,5 @@
 <template>
-  <view class="template-card" @click="handleClick">
+  <view class="template-card" @click="handleClick" v-if="template && typeof template === 'object'">
     <!-- 模板预览图 -->
     <view class="template-image-container">
       <image 
@@ -87,6 +87,7 @@ export default {
     },
     
     formatUsageCount(count) {
+      if (count === undefined || count === null) return '0'
       if (count >= 10000) {
         return (count / 10000).toFixed(1) + '万'
       } else if (count >= 1000) {

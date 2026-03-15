@@ -35,6 +35,11 @@
           <text class="info-label">设备地址</text>
           <text class="info-value">{{ deviceIp }}</text>
         </view>
+
+        <view v-if="connectionStatus !== 'connected'" class="ble-config-entry" @click="goToBleConfig">
+          <Icon name="link" :size="28" />
+          <text class="ble-config-text">首次使用？蓝牙配网</text>
+        </view>
       </view>
       
       <!-- 设备模式和功能 -->
@@ -102,7 +107,7 @@
               </view>
               <text class="setting-value accent-primary">{{ brightness }}%</text>
             </view>
-            <slider 
+            <slider
               :value="brightness"
               @change="handleBrightnessChange"
               min="0"
@@ -112,6 +117,17 @@
               block-size="20"
               class="setting-slider"
             />
+          </view>
+        </view>
+
+        <!-- 重置网络 -->
+        <view class="reset-wifi-card">
+          <view class="reset-wifi-btn" @click="handleResetWifi">
+            <Icon name="close" :size="32" />
+            <view class="reset-wifi-info">
+              <text class="reset-wifi-label">重置网络</text>
+              <text class="reset-wifi-desc">清除 WiFi 配置并重启设备进入配网模式</text>
+            </view>
           </view>
         </view>
       </view>
@@ -229,6 +245,12 @@ export default {
   computed: {
     isDeviceConnected() {
       return this.deviceStore?.connected || false
+    }
+  },
+
+  watch: {
+    isDeviceConnected(val) {
+      this.connectionStatus = val ? 'connected' : 'disconnected'
     }
   },
 
@@ -609,6 +631,35 @@ export default {
       })
     },
     
+    handleResetWifi() {
+      uni.showModal({
+        title: '重置网络',
+        content: '确定要清除 WiFi 配置吗？设备将重启并进入配网模式。',
+        confirmText: '确定重置',
+        confirmColor: '#ff4d4f',
+        success: async (res) => {
+          if (!res.confirm) return
+          try {
+            const url = `http://${this.deviceIp}/clear-wifi`
+            uni.request({
+              url,
+              method: 'GET',
+              success: () => {
+                this.toast.showSuccess('网络已重置，设备重启中...')
+                this.deviceStore.disconnect()
+                this.connectionStatus = 'disconnected'
+              },
+              fail: () => {
+                this.toast.showError('重置失败，请检查设备连接')
+              }
+            })
+          } catch (err) {
+            this.toast.showError('重置失败：' + err.message)
+          }
+        }
+      })
+    },
+
     handleJsonImportError(message) {
       this.toast.showError(message)
       // 错误时不关闭弹窗，让用户可以修改
@@ -621,6 +672,10 @@ export default {
         g: parseInt(result[2], 16),
         b: parseInt(result[3], 16)
       } : { r: 255, g: 255, b: 255 }
+    },
+
+    goToBleConfig() {
+      uni.navigateTo({ url: '/pages/ble-config/ble-config' })
     },
 
     goBack() {
@@ -989,6 +1044,62 @@ export default {
 
 .setting-slider {
   width: 100%;
+}
+
+/* 重置网络卡片 */
+.reset-wifi-card {
+  background-color: var(--bg-tertiary);
+  border: 2rpx solid var(--border-primary);
+  border-radius: 32rpx;
+  padding: 36rpx 48rpx;
+  box-shadow: var(--shadow-md);
+}
+
+.reset-wifi-btn {
+  display: flex;
+  align-items: center;
+  gap: 24rpx;
+}
+
+.reset-wifi-btn:active {
+  opacity: 0.7;
+}
+
+.reset-wifi-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4rpx;
+}
+
+.reset-wifi-label {
+  font-size: 26rpx;
+  color: #ff4d4f;
+  font-weight: 500;
+}
+
+.reset-wifi-desc {
+  font-size: 20rpx;
+  color: var(--text-secondary);
+}
+
+/* 蓝牙配网入口 */
+.ble-config-entry {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12rpx;
+  padding: 20rpx;
+  margin-top: 24rpx;
+  border-top: 2rpx solid var(--border-secondary);
+}
+
+.ble-config-entry:active {
+  opacity: 0.7;
+}
+
+.ble-config-text {
+  font-size: 24rpx;
+  color: #4F7FFF;
 }
 
 </style>

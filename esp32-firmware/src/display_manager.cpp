@@ -26,53 +26,42 @@ void DisplayManager::setupMatrix() {
   HUB75_I2S_CFG mxconfig(PANEL_RES_X, PANEL_RES_Y, PANEL_CHAIN);
   mxconfig.gpio.e = 18;
   mxconfig.clkphase = false;
-  
+
   dma_display = new MatrixPanel_I2S_DMA(mxconfig);
   dma_display->begin();
-  dma_display->setBrightness8(51); // 默认亮度约20% (51/255)
+  dma_display->setBrightness8(51);
   dma_display->clearScreen();
-  
+
   Serial.println("显示开机Logo...");
+  drawLogo(false);  // 开机 logo 在上半部分
+  // 开机 logo 额外显示品牌名
+  dma_display->setTextSize(1);
+  dma_display->setTextColor(dma_display->color565(220, 220, 220));
+  dma_display->setCursor(11, 46);
+  dma_display->print("Glowxel");
+  delay(2000);
+  Serial.println("LED灯板初始化完成");
+}
 
-  // Glowxel logo 颜色
-  uint16_t orange = dma_display->color565(249, 115, 22);   // #F97316
-  uint16_t blue   = dma_display->color565(59, 130, 246);    // #3B82F6
-  uint16_t pink   = dma_display->color565(236, 72, 153);    // #EC4899
+void DisplayManager::drawLogo(bool centered) {
+  uint16_t orange = dma_display->color565(249, 115, 22);
+  uint16_t blue   = dma_display->color565(59, 130, 246);
+  uint16_t pink   = dma_display->color565(236, 72, 153);
 
-  // 3x3 方块网格 logo，每块 8x8，间距 2px
-  // 居中：总宽 = 8*3 + 2*2 = 28，起始x = (64-28)/2 = 18
-  // 上半部分：起始y = 10
-  int bs = 8;   // block size
-  int gap = 2;  // gap between blocks
-  int sx = 18;  // start x
-  int sy = 10;  // start y
-  int step = bs + gap; // 10
+  int bs = 11, gap = 3, step = bs + gap;
+  int totalW = bs * 3 + gap * 2;
+  int sx = (64 - totalW) / 2;
+  int sy = centered ? 18 : 10;  // 闹钟背景=18, 开机=10
 
-  // 3x3 网格颜色映射 (行优先)
-  // [橙, 橙, 蓝]
-  // [橙, 蓝, 粉]
-  // [橙, 橙, 蓝]
   uint16_t grid[3][3] = {
     { orange, orange, blue },
     { orange, blue,   pink },
     { orange, orange, blue }
   };
 
-  for (int row = 0; row < 3; row++) {
-    for (int col = 0; col < 3; col++) {
+  for (int row = 0; row < 3; row++)
+    for (int col = 0; col < 3; col++)
       dma_display->fillRect(sx + col * step, sy + row * step, bs, bs, grid[row][col]);
-    }
-  }
-
-  // "Glowxel" 文字居中显示在下半部分
-  // 内置字体每字符 6px 宽，7 个字符 = 42px，起始x = (64-42)/2 = 11
-  dma_display->setTextSize(1);
-  dma_display->setTextColor(dma_display->color565(220, 220, 220)); // 浅白色
-  dma_display->setCursor(11, 46);
-  dma_display->print("Glowxel");
-
-  delay(2000);
-  Serial.println("LED灯板初始化完成");
 }
 
 void DisplayManager::displayClock() {
@@ -106,7 +95,8 @@ void DisplayManager::displayClock() {
     }
     Serial.println("像素绘制完成");
   } else {
-    Serial.println("不绘制像素画");
+    // 没有背景图，画默认 logo 作为背景
+    drawLogo();
   }
   
   // 显示时间 HH:MM
@@ -220,4 +210,53 @@ void DisplayManager::setBrightness(int brightness) {
     currentBrightness = brightness;
     dma_display->setBrightness8(brightness);
   }
+}
+
+// 3x5 微型字体 (每字符5行，每行3bit: bit2=左, bit1=中, bit0=右)
+static const uint8_t FONT3X5[][5] = {
+  // 0-9 (index 0-9)
+  {7,5,5,5,7},{2,6,2,2,7},{7,1,7,4,7},{7,1,7,1,7},{5,5,7,1,1},
+  {7,4,7,1,7},{7,4,7,5,7},{7,1,1,1,1},{7,5,7,5,7},{7,5,7,1,7},
+  // . (10), : (11), - (12), space (13)
+  {0,0,0,0,2},{0,2,0,2,0},{0,0,7,0,0},{0,0,0,0,0},
+  // A-Z (index 14-39)
+  {2,5,7,5,5},{6,5,6,5,6},{7,4,4,4,7},{6,5,5,5,6},{7,4,7,4,7},
+  {7,4,7,4,4},{7,4,5,5,7},{5,5,7,5,5},{7,2,2,2,7},{3,1,1,5,7},
+  {5,6,4,6,5},{4,4,4,4,7},{5,7,5,5,5},{5,7,7,5,5},{7,5,5,5,7},
+  {7,5,7,4,4},{7,5,5,7,1},{7,5,7,6,5},{7,4,7,1,7},{7,2,2,2,2},
+  {5,5,5,5,7},{5,5,5,2,2},{5,5,5,7,5},{5,5,2,5,5},{5,5,2,2,2},{7,1,2,4,7},
+};
+
+static int fontIndex(char c) {
+  if (c >= '0' && c <= '9') return c - '0';
+  if (c == '.') return 10;
+  if (c == ':') return 11;
+  if (c == '-') return 12;
+  if (c == ' ') return 13;
+  if (c >= 'A' && c <= 'Z') return 14 + (c - 'A');
+  if (c >= 'a' && c <= 'z') return 14 + (c - 'a');
+  return 13;
+}
+
+void DisplayManager::drawTinyText(const char* text, int x, int y, uint16_t color) {
+  int cx = x;
+  for (int i = 0; text[i]; i++) {
+    int idx = fontIndex(text[i]);
+    const uint8_t* glyph = FONT3X5[idx];
+    for (int row = 0; row < 5; row++) {
+      uint8_t bits = glyph[row];
+      if (bits & 4) dma_display->drawPixel(cx,     y + row, color);
+      if (bits & 2) dma_display->drawPixel(cx + 1, y + row, color);
+      if (bits & 1) dma_display->drawPixel(cx + 2, y + row, color);
+    }
+    cx += 4;
+  }
+}
+
+void DisplayManager::drawTinyTextCentered(const char* text, int y, uint16_t color) {
+  int len = strlen(text);
+  int width = len * 4 - 1;
+  int x = (64 - width) / 2;
+  if (x < 0) x = 0;
+  drawTinyText(text, x, y, color);
 }

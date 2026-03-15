@@ -176,12 +176,17 @@ export default {
         if (artRes.success) this.recommendedArtworks = artRes.data?.list || []
 
         const tplRes = await templateAPI.getPopularTemplates(4)
-        if (tplRes.success) this.officialTemplates = tplRes.data || []
+        if (tplRes.success) {
+          const list = tplRes.data?.list || tplRes.data || []
+          this.officialTemplates = Array.isArray(list) ? list : []
+        }
 
         const chRes = await challengeAPI.getActiveChallenges()
         if (chRes.success) {
           const challenges = chRes.data?.list || chRes.data || []
-          this.weeklyChallenge = challenges.find(c => c.type === 'weekly') || challenges[0]
+          if (Array.isArray(challenges) && challenges.length > 0) {
+            this.weeklyChallenge = challenges.find(c => c.type === 'weekly') || challenges[0]
+          }
         }
       } catch (error) {
         console.error('加载推荐内容失败:', error)

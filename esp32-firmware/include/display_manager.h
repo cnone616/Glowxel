@@ -17,10 +17,15 @@ public:
   static void setupMatrix();
   static void displayClock();
   static void drawClockOverlay();  // 不清屏，只叠加时钟文字
+  static void drawLogo(bool centered = true);  // 画九宫格 logo
   static void displayImage(uint8_t* data, size_t len, int width, int height);
   static void clearScreen();
   static void setBrightness(int brightness);
-  
+
+  // 3x5 微型字体渲染
+  static void drawTinyText(const char* text, int x, int y, uint16_t color);
+  static void drawTinyTextCentered(const char* text, int y, uint16_t color);
+
   static MatrixPanel_I2S_DMA* dma_display;
   static DeviceMode currentMode;
   static int currentBrightness;
