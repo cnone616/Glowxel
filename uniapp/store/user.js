@@ -1,6 +1,6 @@
-// 用户状态管理 - 使用Mock数据
+// 用户状态管理
 import { defineStore } from 'pinia'
-import { MockAPI } from '../data/mock/index.js'
+import { userAPI, followAPI } from '../api/index.js'
 
 export const useUserStore = defineStore('user', {
   state: () => ({
@@ -74,7 +74,7 @@ export const useUserStore = defineStore('user', {
           this.isLoggedIn = true
           this.userInfo = userInfo || { nickName: '微信用户', avatarUrl: '' }
           this.syncEnabled = syncEnabled || false
-          this.openid = 'mock_user_999'
+          this.openid = uni.getStorageSync('openid') || ''
         } else {
           // 已过期，清除登录状态
           this.logout()
@@ -85,24 +85,21 @@ export const useUserStore = defineStore('user', {
     // 加载当前用户完整信息
     async loadCurrentUser() {
       if (!this.isLoggedIn) return
-      
+
       this.isLoading = true
       this.error = null
-      
+
       try {
-        // 使用Mock数据获取当前用户信息
-        this.currentUser = MockAPI.users.getCurrent()
-        
-        // 更新基础用户信息
-        this.userInfo = {
-          nickName: this.currentUser.name,
-          avatarUrl: this.currentUser.avatar
+        const res = await userAPI.getProfile()
+        if (res.success) {
+          this.currentUser = res.data
+          this.userInfo = {
+            nickName: this.currentUser.name || this.currentUser.nickname,
+            avatarUrl: this.currentUser.avatar
+          }
+          uni.setStorageSync('userInfo', this.userInfo)
+          uni.setStorageSync('currentUser', this.currentUser)
         }
-        
-        // 保存到本地存储
-        uni.setStorageSync('userInfo', this.userInfo)
-        uni.setStorageSync('currentUser', this.currentUser)
-        
       } catch (e) {
         console.error('加载用户信息失败:', e)
         this.error = '加载用户信息失败'
@@ -111,58 +108,51 @@ export const useUserStore = defineStore('user', {
       }
     },
 
-    // 微信登录（使用Mock数据）
+    // 微信登录
     async login() {
       try {
         // #ifdef MP-WEIXIN
-        
-        // 调用 wx.login 获取 code
         const loginRes = await new Promise((resolve, reject) => {
           uni.login({
             provider: 'weixin',
-            success: (res) => {
-              resolve(res)
-            },
-            fail: (err) => {
-              reject(err)
-            }
+            success: (res) => resolve(res),
+            fail: (err) => reject(err)
           })
         })
-        
-        // 模拟登录成功，使用Mock用户数据
-        this.isLoggedIn = true
-        this.openid = 'mock_user_999'
-        
-        // 加载Mock用户数据
-        await this.loadCurrentUser()
-        
-        // 保存到本地，包含登录时间戳
-        const loginTime = Date.now()
-        uni.setStorageSync('isLoggedIn', true)
-        uni.setStorageSync('openid', this.openid)
-        uni.setStorageSync('loginTime', loginTime)
-        
-        return {
-          success: true,
-          message: '登录成功'
+
+        const res = await userAPI.login(loginRes.code)
+        if (res.success) {
+          this.isLoggedIn = true
+          this.openid = res.data.openid || ''
+          uni.setStorageSync('auth_token', res.data.token)
+          await this.loadCurrentUser()
+
+          const loginTime = Date.now()
+          uni.setStorageSync('isLoggedIn', true)
+          uni.setStorageSync('openid', this.openid)
+          uni.setStorageSync('loginTime', loginTime)
+
+          return { success: true, message: '登录成功' }
         }
+        return { success: false, error: res.message || '登录失败' }
         // #endif
-        
+
         // #ifndef MP-WEIXIN
-        // 非微信环境，直接使用Mock数据登录
-        this.isLoggedIn = true
-        this.openid = 'mock_user_999'
-        await this.loadCurrentUser()
-        
-        const loginTime = Date.now()
-        uni.setStorageSync('isLoggedIn', true)
-        uni.setStorageSync('openid', this.openid)
-        uni.setStorageSync('loginTime', loginTime)
-        
-        return {
-          success: true,
-          message: '登录成功'
+        const res2 = await userAPI.login('h5_dev')
+        if (res2.success) {
+          this.isLoggedIn = true
+          this.openid = res2.data.openid || ''
+          uni.setStorageSync('auth_token', res2.data.token)
+          await this.loadCurrentUser()
+
+          const loginTime = Date.now()
+          uni.setStorageSync('isLoggedIn', true)
+          uni.setStorageSync('openid', this.openid)
+          uni.setStorageSync('loginTime', loginTime)
+
+          return { success: true, message: '登录成功' }
         }
+        return { success: false, error: res2.message || '登录失败' }
         // #endif
       } catch (error) {
         return {
@@ -222,7 +212,8 @@ export const useUserStore = defineStore('user', {
       }
       
       try {
-        const result = MockAPI.users.toggleFollow(userId)
+        const res = await followAPI.toggleFollow(userId)
+        const result = res.success ? res.data : { success: false }
         
         // 更新当前用户的关注数
         if (result.success && this.currentUser) {

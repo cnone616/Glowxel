@@ -1,6 +1,5 @@
 import { defineStore } from 'pinia'
 import { generateId } from '../utils/index.js'
-import { MockAPI } from '../data/mock/index.js'
 
 export const useProjectStore = defineStore('project', {
   state: () => ({
