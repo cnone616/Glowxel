@@ -44,24 +44,50 @@
 # SSH 连接服务器
 ssh ubuntu@175.178.153.146
 
-# 找项目路径
-find /home -name "package.json" -path "*/server/*" 2>/dev/null
+# 更新代码并重启（最常用）
+cd ~/glowxel-repo && git pull && cd ~/glowxel-server && pm2 restart glowxel-server
 
-# 初始化数据库（在 server 目录下执行）
-node src/config/seed.js
-
-# 启动后端服务
-npm start
+# 初始化数据库
+cd ~/glowxel-server && node src/config/seed.js
 
 # 查看服务状态
-pm2 status    # 如果用 pm2
-systemctl status glowxel  # 如果用 systemd
+pm2 status
+pm2 logs glowxel-server
+
+# 重启服务
+pm2 restart glowxel-server
+
+# 停止服务
+pm2 stop glowxel-server
 
 # ESP32 固件编译
 cd esp32-firmware && pio run
 
 # ESP32 烧录
 pio run --target upload
+```
+
+## 服务器目录结构
+
+```
+/home/ubuntu/
+├── glowxel-repo/       # git 仓库（完整项目）
+└── glowxel-server -> glowxel-repo/server/  # 软链接到 server 目录
+```
+
+## 本地推送流程
+
+```bash
+# 1. 本地提交
+cd /Users/aflylong/Desktop/project/matrix
+git add -A && git commit -m "描述改动"
+
+# 2. 推送到 GitHub
+git push
+
+# 3. SSH 到服务器更新
+ssh ubuntu@175.178.153.146
+cd ~/glowxel-repo && git pull && cd ~/glowxel-server && pm2 restart glowxel-server
 ```
 
 ## API 地址
