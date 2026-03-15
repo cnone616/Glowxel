@@ -4,7 +4,7 @@
 #include <time.h>
 
 // 静态成员初始化
-const char* WiFiManager::ap_ssid = "LED-Matrix-Setup";
+const char* WiFiManager::ap_ssid = "Glowxel-Setup";
 const char* WiFiManager::ap_password = "12345678";
 bool WiFiManager::config_mode = false;
 String WiFiManager::saved_ssid = "";
