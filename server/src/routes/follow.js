@@ -106,4 +106,24 @@ router.get('/:userId/followers', async (req, res) => {
   }
 });
 
+// 切换关注（toggle）
+router.post('/:userId/toggle', auth, async (req, res) => {
+  try {
+    const targetId = parseInt(req.params.userId);
+    if (targetId === req.user.id) return res.json({ code: 400, message: '不能关注自己' });
+    const [rows] = await db.query('SELECT 1 FROM follows WHERE follower_id = ? AND following_id = ?', [req.user.id, targetId]);
+    if (rows.length > 0) {
+      await db.query('DELETE FROM follows WHERE follower_id = ? AND following_id = ?', [req.user.id, targetId]);
+      await db.query('UPDATE users SET following_count = GREATEST(following_count-1,0) WHERE id = ?', [req.user.id]);
+      await db.query('UPDATE users SET followers_count = GREATEST(followers_count-1,0) WHERE id = ?', [targetId]);
+      res.json({ code: 0, data: { followed: false } });
+    } else {
+      await db.query('INSERT IGNORE INTO follows (follower_id, following_id) VALUES (?, ?)', [req.user.id, targetId]);
+      await db.query('UPDATE users SET following_count = following_count+1 WHERE id = ?', [req.user.id]);
+      await db.query('UPDATE users SET followers_count = followers_count+1 WHERE id = ?', [targetId]);
+      res.json({ code: 0, data: { followed: true } });
+    }
+  } catch (err) { res.json({ code: 500, message: '操作失败' }); }
+});
+
 module.exports = router;
