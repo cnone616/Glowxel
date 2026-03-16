@@ -1,4 +1,4 @@
-import { getColorByCode } from '@/data/artkal-colors'
+import { getColorByCode } from '@/data/artkal-colors.js'
 import logoUrl from '@/assets/images/glowxel-logo.png'
 
 /**
@@ -199,7 +199,7 @@ export async function exportPattern(pixels, width, height, projectName = '图案
   ctx.fillStyle = '#999999'
   ctx.font = '14px Arial'
   ctx.textAlign = 'left'
-  ctx.fillText('MATRIX 像素矩阵', 40, canvasHeight - 40)
+  ctx.fillText('Glowxel', 40, canvasHeight - 40)
   ctx.fillText(new Date().toLocaleDateString('zh-CN'), 40, canvasHeight - 20)
   
   return canvas.toDataURL('image/png')

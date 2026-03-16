@@ -1,6 +1,7 @@
 import jsPDF from 'jspdf'
 import html2canvas from 'html2canvas'
-import { getColorByCode } from '@/data/artkal-colors'
+import { getColorByCode } from '@/data/artkal-colors.js'
+import logoUrl from '@/assets/images/glowxel-logo.png'
 
 /**
  * 导出拼豆图纸为 PDF
@@ -77,6 +78,18 @@ export async function exportToPDF(pixels, width, height, options = {}) {
     addColorStatsTable(pdf, usedColors, colors, gridY + gridHeight + 10)
   }
 
+  // 底部 logo + 公司名
+  const pageWidth = pdf.internal.pageSize.getWidth()
+  const pageHeight = pdf.internal.pageSize.getHeight()
+  pdf.setFontSize(9)
+  pdf.setTextColor(150, 150, 150)
+  pdf.text('Glowxel', 20, pageHeight - 8)
+  pdf.text(new Date().toLocaleDateString('zh-CN'), 20, pageHeight - 4)
+  try {
+    const logoImg = await loadLogoBase64()
+    if (logoImg) pdf.addImage(logoImg, 'PNG', pageWidth - 35, pageHeight - 14, 25, 8)
+  } catch {}
+
   // 保存 PDF
   const filename = `pindou_pattern_${width}x${height}_${Date.now()}.pdf`
   pdf.save(filename)
@@ -137,6 +150,20 @@ export async function exportToPNG(pixels, width, height, options = {}) {
   if (showStats && usedColors.size > 0) {
     drawColorStatsCanvas(ctx, usedColors, colors, gridY + height * (cellSize + gridSpacing) + 20)
   }
+
+  // 绘制 logo 和公司名（底部）
+  try {
+    const logo = await loadImage(logoUrl)
+    const lh = 28
+    const lw = logo.width * (lh / logo.height)
+    ctx.drawImage(logo, canvas.width - lw - 20, canvas.height - lh - 10, lw, lh)
+  } catch {}
+  ctx.fillStyle = '#999'
+  ctx.font = '13px Arial'
+  ctx.textAlign = 'left'
+  ctx.textBaseline = 'alphabetic'
+  ctx.fillText('Glowxel', 20, canvas.height - 12)
+  ctx.fillText(new Date().toLocaleDateString('zh-CN'), 20, canvas.height - 28)
 
   // 转换为 blob 并下载
   return new Promise((resolve) => {
@@ -374,6 +401,26 @@ function getTotalBeads(usedColors) {
   usedColors.forEach(count => {
     total += count
   })
+}
+
+function loadImage(src) {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    img.onload = () => resolve(img)
+    img.onerror = reject
+    img.src = src
+  })
+}
+
+async function loadLogoBase64() {
+  try {
+    const img = await loadImage(logoUrl)
+    const c = document.createElement('canvas')
+    c.width = img.width; c.height = img.height
+    c.getContext('2d').drawImage(img, 0, 0)
+    return c.toDataURL('image/png')
+  } catch { return null }
+}
   return total
 }
 
