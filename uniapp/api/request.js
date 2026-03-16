@@ -2,7 +2,7 @@
  * 统一 HTTP 请求基础层
  */
 
-const BASE_URL = 'http://175.178.153.146:3000'
+const BASE_URL = 'https://glowxel.com'
 
 // 获取本地存储的 token
 function getToken() {
