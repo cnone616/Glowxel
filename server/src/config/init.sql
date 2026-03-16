@@ -136,21 +136,26 @@ CREATE TABLE IF NOT EXISTS templates (
 
 -- 挑战表
 CREATE TABLE IF NOT EXISTS challenges (
-  id            BIGINT PRIMARY KEY AUTO_INCREMENT,
-  title         VARCHAR(100),
-  banner_url    VARCHAR(500),
-  description   TEXT,
-  start_date    DATE,
-  end_date      DATE,
-  status        ENUM('active','upcoming','ended') DEFAULT 'upcoming',
-  participants  INT DEFAULT 0,
-  submissions   INT DEFAULT 0,
-  prize         VARCHAR(200),
-  difficulty    ENUM('简单','中等','困难'),
-  tags          JSON,
-  rules         JSON,
-  judges_criteria JSON,
-  created_at    DATETIME DEFAULT NOW()
+  id              BIGINT PRIMARY KEY AUTO_INCREMENT,
+  title           VARCHAR(100) NOT NULL,
+  cover_url       VARCHAR(500),           -- 列表封面缩略图
+  banner_url      VARCHAR(500),           -- 详情页横幅大图
+  description     TEXT,
+  rules           JSON,                   -- 参赛规则（数组）
+  judges_criteria JSON,                   -- 评分标准
+  start_date      DATE,
+  end_date        DATE,
+  status          ENUM('active','upcoming','ended') DEFAULT 'upcoming',
+  participants    INT DEFAULT 0,
+  submissions     INT DEFAULT 0,
+  max_participants INT DEFAULT 0,         -- 0=不限
+  prize           VARCHAR(200),
+  reward_type     ENUM('实物','虚拟','荣誉') DEFAULT '荣誉',
+  difficulty      ENUM('简单','中等','困难'),
+  tags            JSON,
+  sort_order      INT DEFAULT 0,          -- 排序权重，越大越靠前
+  created_at      DATETIME DEFAULT NOW(),
+  updated_at      DATETIME DEFAULT NOW() ON UPDATE NOW()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- 挑战参与表
@@ -163,7 +168,50 @@ CREATE TABLE IF NOT EXISTS challenge_participants (
   PRIMARY KEY (challenge_id, user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 设备绑定表
+-- 模板表
+CREATE TABLE IF NOT EXISTS templates (
+  id            BIGINT PRIMARY KEY AUTO_INCREMENT,
+  name          VARCHAR(100) NOT NULL,
+  image_url     VARCHAR(500),             -- 主预览图
+  category      VARCHAR(30),
+  size          VARCHAR(10),
+  color_count   INT DEFAULT 0,
+  difficulty    ENUM('简单','中等','困难') DEFAULT '简单',
+  usage_count   INT DEFAULT 0,
+  description   TEXT,
+  tags          JSON,
+  is_featured   TINYINT(1) DEFAULT 0,    -- 是否推荐
+  sort_order    INT DEFAULT 0,           -- 排序权重
+  pixel_data    LONGBLOB,
+  created_at    DATETIME DEFAULT NOW(),
+  updated_at    DATETIME DEFAULT NOW() ON UPDATE NOW()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 活动表（公告/活动/教程）
+CREATE TABLE IF NOT EXISTS activities (
+  id            BIGINT PRIMARY KEY AUTO_INCREMENT,
+  title         VARCHAR(200) NOT NULL,   -- 标题
+  subtitle      VARCHAR(300),            -- 副标题/摘要
+  cover_url     VARCHAR(500),            -- 封面图
+  content       LONGTEXT,               -- 正文（富文本/Markdown）
+  type          ENUM('activity','announcement','tutorial') DEFAULT 'activity',
+                                         -- activity=活动 announcement=公告 tutorial=教程
+  status        ENUM('draft','published','archived') DEFAULT 'draft',
+                                         -- draft=草稿 published=已发布 archived=已归档
+  is_pinned     TINYINT(1) DEFAULT 0,   -- 是否置顶
+  sort_order    INT DEFAULT 0,           -- 排序权重，越大越靠前
+  start_time    DATETIME NULL,           -- 活动开始时间（可选）
+  end_time      DATETIME NULL,           -- 活动结束时间（可选）
+  link_url      VARCHAR(500),            -- 外链（可选，点击跳转）
+  views         INT DEFAULT 0,           -- 浏览次数
+  author_id     BIGINT NULL,             -- 发布人（管理员）
+  created_at    DATETIME DEFAULT NOW(),
+  updated_at    DATETIME DEFAULT NOW() ON UPDATE NOW(),
+  published_at  DATETIME NULL,           -- 发布时间
+  INDEX idx_type_status (type, status),
+  INDEX idx_pinned (is_pinned DESC, sort_order DESC),
+  INDEX idx_published (published_at DESC)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 CREATE TABLE IF NOT EXISTS user_devices (
   id            BIGINT PRIMARY KEY AUTO_INCREMENT,
   user_id       BIGINT NOT NULL,
