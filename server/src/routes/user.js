@@ -128,6 +128,8 @@ router.get('/search', async (req, res) => {
     res.json({ code: 0, data: { list } });
   } catch (err) { res.json({ code: 500, message: '搜索失败' }); }
 });
+// 获取用户详情
+router.get('/:id', async (req, res) => {
   try {
     const [rows] = await db.query('SELECT id, name, avatar, bio, level, followers_count, following_count, works_count, total_likes, created_at FROM users WHERE id = ?', [req.params.id]);
     if (rows.length === 0) return res.json({ code: 404, message: '用户不存在' });

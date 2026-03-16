@@ -69,16 +69,16 @@ if [ "$SKIP_ADMIN" = false ]; then
   cd "$(dirname "$0")/admin"
   npm install --silent
   npm run build
+  tar -czf /tmp/admin-dist.tar.gz -C dist .
+  scp /tmp/admin-dist.tar.gz $SERVER:/tmp/
   ssh $SERVER << 'REMOTE'
 sudo mkdir -p /var/www/glowxel-admin
-REMOTE
-  scp -r dist/* $SERVER:/tmp/admin-dist/
-  ssh $SERVER << 'REMOTE'
-sudo cp -r /tmp/admin-dist/* /var/www/glowxel-admin/
+sudo tar -xzf /tmp/admin-dist.tar.gz -C /var/www/glowxel-admin
 sudo chown -R www-data:www-data /var/www/glowxel-admin
-rm -rf /tmp/admin-dist
+rm -f /tmp/admin-dist.tar.gz
 echo "  ✓ 后台管理已更新"
 REMOTE
+  rm -f /tmp/admin-dist.tar.gz
   cd "$(dirname "$0")"
 else
   echo "[4/5] 跳过后台管理构建"
@@ -87,33 +87,27 @@ fi
 # ── 5. 检查 nginx admin 配置 + reload ────────────────────────
 echo "[5/5] 检查 nginx 配置..."
 ssh $SERVER << 'REMOTE'
-# 如果 admin nginx 配置不存在，自动创建
-if [ ! -f /etc/nginx/sites-enabled/glowxel-admin ]; then
+if [ ! -f /etc/nginx/sites-available/glowxel-admin ]; then
   echo "  创建 admin.glowxel.com nginx 配置..."
   sudo tee /etc/nginx/sites-available/glowxel-admin > /dev/null << 'NGINX'
 server {
+    listen 80;
     server_name admin.glowxel.com;
     root /var/www/glowxel-admin;
     index index.html;
 
-    # SPA 路由支持
     location / {
         try_files $uri $uri/ /index.html;
     }
 
-    # API 代理（和官网共用同一个后端）
     location /api/ {
         proxy_pass http://localhost:3000/api/;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
     }
-
-    listen 80;
 }
 NGINX
   sudo ln -sf /etc/nginx/sites-available/glowxel-admin /etc/nginx/sites-enabled/glowxel-admin
-  echo "  ✓ nginx 配置已创建，请手动执行 certbot 申请 HTTPS："
-  echo "    sudo certbot --nginx -d admin.glowxel.com"
 fi
 sudo nginx -t && sudo nginx -s reload
 echo "  ✓ nginx 已 reload"
@@ -123,66 +117,6 @@ echo ""
 echo "================================"
 echo "✅ 部署完成！"
 echo "   官网:   https://glowxel.com"
-echo "   后台:   http://admin.glowxel.com (首次需申请 HTTPS)"
+echo "   后台:   http://admin.glowxel.com"
 echo "   API:    https://glowxel.com/api/health"
-
-
-# 1. 检查是否已有 git 仓库
-if [ -d "$APP_DIR/.git" ]; then
-  echo "[1/5] 拉取最新代码..."
-  cd "$APP_DIR"
-  git fetch origin
-  git reset --hard origin/$BRANCH
-else
-  echo "[1/5] 首次部署，克隆仓库..."
-  if [ -d "$APP_DIR" ]; then
-    # 备份旧的 .env
-    cp "$APP_DIR/.env" /tmp/glowxel-env-backup 2>/dev/null || true
-    rm -rf "$APP_DIR"
-  fi
-  git clone -b $BRANCH "$REPO_URL" "$APP_DIR"
-  cd "$APP_DIR"
-  # 只保留 server 目录的内容
-  if [ -d "server" ]; then
-    # 仓库包含多个子目录，进入 server
-    APP_DIR="$APP_DIR/server"
-    cd "$APP_DIR"
-  fi
-  # 恢复 .env
-  cp /tmp/glowxel-env-backup "$APP_DIR/.env" 2>/dev/null || true
-fi
-
-echo "[2/5] 安装依赖..."
-cd "$APP_DIR"
-# 如果是 monorepo，进入 server 目录
-if [ -f "server/package.json" ]; then
-  cd server
-fi
-npm install --production 2>&1 | tail -3
-
-echo "[3/5] 初始化数据库..."
-node src/config/seed.js 2>&1 || echo "  ! seed 有警告，继续部署"
-
-echo "[4/5] 重启服务..."
-# 检查 pm2 是否安装
-if command -v pm2 &> /dev/null; then
-  pm2 restart glowxel-server 2>/dev/null || pm2 start src/app.js --name glowxel-server
-  pm2 save
-  echo "  ✓ pm2 已重启"
-else
-  echo "  安装 pm2..."
-  sudo npm install -g pm2
-  pm2 start src/app.js --name glowxel-server
-  pm2 save
-  pm2 startup | tail -1 | bash 2>/dev/null || true
-  echo "  ✓ pm2 已启动"
-fi
-
-echo "[5/5] 检查服务状态..."
-sleep 2
-curl -s http://localhost:3000/api/health | head -1 && echo "" || echo "  ! 服务可能未启动"
-pm2 status
-
-echo ""
-echo "=== 部署完成 ==="
 
