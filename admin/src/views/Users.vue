@@ -6,7 +6,7 @@
     <a-table :columns="columns" :data-source="list" :loading="loading" :pagination="pagination" @change="handleTableChange" row-key="id">
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'avatar'">
-          <a-avatar>{{ (record.nickname || '?')[0] }}</a-avatar>
+          <a-avatar>{{ (record.name || '?')[0] }}</a-avatar>
         </template>
         <template v-if="column.key === 'status'">
           <a-tag :color="record.status === 'active' ? 'green' : 'red'">{{ record.status === 'active' ? '正常' : '禁用' }}</a-tag>
@@ -31,10 +31,10 @@ const pagination = ref({ current: 1, pageSize: 10, total: 0 })
 
 const columns = [
   { title: '头像', key: 'avatar', width: 60 },
-  { title: '昵称', dataIndex: 'nickname', key: 'nickname' },
-  { title: '手机号', dataIndex: 'phone', key: 'phone' },
-  { title: '作品数', dataIndex: 'artworkCount', key: 'artworkCount' },
-  { title: '注册时间', dataIndex: 'createdAt', key: 'createdAt' },
+  { title: '昵称', dataIndex: 'name', key: 'name' },
+  { title: '作品数', dataIndex: 'works_count', key: 'works_count', width: 90 },
+  { title: '粉丝数', dataIndex: 'followers_count', key: 'followers_count', width: 90 },
+  { title: '注册时间', dataIndex: 'created_at', key: 'created_at' },
   { title: '状态', key: 'status', width: 80 },
   { title: '操作', key: 'action', width: 80 }
 ]
@@ -53,7 +53,7 @@ function handleTableChange(pag) { pagination.value.current = pag.current; fetchL
 
 async function toggleStatus(record) {
   try {
-    await http.put(`/admin/users/${record.id}/status`, { status: record.status === 'active' ? 'disabled' : 'active' })
+    await http.put(`/admin/users/${record.id}/status`, { status: record.status === 'active' ? 'banned' : 'active' })
     message.success('操作成功')
     fetchList()
   } catch (e) { message.error('操作失败') }

@@ -24,8 +24,8 @@ const pagination = ref({ current: 1, pageSize: 20, total: 0 })
 const columns = [
   { title: '评论内容', dataIndex: 'content', key: 'content', ellipsis: true },
   { title: '评论者', dataIndex: 'author', key: 'author', width: 120 },
-  { title: '作品', dataIndex: 'artworkTitle', key: 'artworkTitle', width: 160 },
-  { title: '时间', dataIndex: 'createdAt', key: 'createdAt', width: 160 },
+  { title: '作品', dataIndex: 'artwork_title', key: 'artwork_title', width: 160 },
+  { title: '时间', dataIndex: 'created_at', key: 'created_at', width: 160 },
   { title: '操作', key: 'action', width: 80 }
 ]
 
