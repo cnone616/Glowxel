@@ -108,7 +108,8 @@ uniapp/
 │   ├── theme.css       # 主题 CSS 变量
 │   └── themes/         # 深色/浅色主题
 └── static/             # 静态资源
-    └── matrix-logo.png # 应用图标
+    ├── glowxel-icon.png # 应用图标
+    └── glowxel-logo.png # 应用Logo
 ```
 
 ## 🎨 设计规范
