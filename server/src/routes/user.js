@@ -4,6 +4,7 @@ const axios = require('axios');
 const crypto = require('crypto');
 const db = require('../config/db');
 const { auth } = require('../middleware/auth');
+const { contentFilter } = require('../middleware/contentFilter');
 
 // 工具：sha256 哈希密码
 const hashPassword = (pwd) => crypto.createHash('sha256').update(pwd + (process.env.PWD_SALT || 'glowxel')).digest('hex');
@@ -85,7 +86,7 @@ router.get('/profile', auth, async (req, res) => {
 });
 
 // 更新个人资料
-router.put('/profile', auth, async (req, res) => {
+router.put('/profile', auth, contentFilter(['name', 'bio']), async (req, res) => {
   try {
     const { name, avatar, bio } = req.body;
     await db.query('UPDATE users SET name = COALESCE(?, name), avatar = COALESCE(?, avatar), bio = COALESCE(?, bio) WHERE id = ?',
