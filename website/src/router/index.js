@@ -40,18 +40,6 @@ const routes = [
     path: '/login',
     name: 'Login',
     component: () => import('@/views/Login.vue')
-  },
-  {
-    path: '/admin',
-    name: 'Admin',
-    component: () => import('@/views/admin/Admin.vue'),
-    children: [
-      { path: '', name: 'AdminDashboard', component: () => import('@/views/admin/Dashboard.vue') },
-      { path: 'users', name: 'AdminUsers', component: () => import('@/views/admin/Users.vue') },
-      { path: 'artworks', name: 'AdminArtworks', component: () => import('@/views/admin/Artworks.vue') },
-      { path: 'templates', name: 'AdminTemplates', component: () => import('@/views/admin/AdminTemplates.vue') },
-      { path: 'challenges', name: 'AdminChallenges', component: () => import('@/views/admin/AdminChallenges.vue') }
-    ]
   }
 ]
 
