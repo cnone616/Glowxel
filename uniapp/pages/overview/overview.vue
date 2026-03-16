@@ -566,6 +566,11 @@ export default {
           projectName: `${this.project?.name || '未命名'} - ${board.id}`,
           palette: this.project?.palette,
           cellSize: 30,
+          showGrid: true,
+          showCoordinates: true,
+          showColorCodes: true,
+          showStatistics: true,
+          showLogo: true,
           canvasId: 'exportCanvas'
         })
         
@@ -621,6 +626,11 @@ export default {
           projectName: this.project.name,
           palette: this.project.palette,
           cellSize: cellSize,
+          showGrid: true,
+          showCoordinates: true,
+          showColorCodes: true,
+          showStatistics: true,
+          showLogo: true,
           canvasId: 'exportCanvas'
         })
         
