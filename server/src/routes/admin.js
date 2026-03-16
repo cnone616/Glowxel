@@ -210,6 +210,92 @@ router.delete('/challenges/:id', async (req, res) => {
   } catch (err) { res.json({ code: 500, message: '删除失败' }); }
 });
 
+// ─── 标签分类管理 ──────────────────────────────────────────────
+router.get('/tag-categories', async (req, res) => {
+  try {
+    const [list] = await db.query('SELECT * FROM tag_categories ORDER BY sort_order DESC, id ASC')
+    res.json({ code: 0, data: { list } })
+  } catch (err) { res.json({ code: 500, message: '获取失败' }) }
+})
+
+router.post('/tag-categories', async (req, res) => {
+  try {
+    const { name, sort_order } = req.body
+    if (!name) return res.json({ code: 400, message: '分类名不能为空' })
+    const [r] = await db.query('INSERT INTO tag_categories (name, sort_order) VALUES (?,?)', [name, sort_order || 0])
+    res.json({ code: 0, data: { id: r.insertId } })
+  } catch (err) { res.json({ code: 500, message: err.code === 'ER_DUP_ENTRY' ? '分类名已存在' : '创建失败' }) }
+})
+
+router.put('/tag-categories/:id', async (req, res) => {
+  try {
+    const { name, sort_order, is_active } = req.body
+    await db.query(
+      'UPDATE tag_categories SET name=COALESCE(?,name), sort_order=COALESCE(?,sort_order), is_active=COALESCE(?,is_active) WHERE id=?',
+      [name, sort_order, is_active !== undefined ? (is_active ? 1 : 0) : null, req.params.id]
+    )
+    res.json({ code: 0, message: '更新成功' })
+  } catch (err) { res.json({ code: 500, message: '更新失败' }) }
+})
+
+router.delete('/tag-categories/:id', async (req, res) => {
+  try {
+    const [[{ cnt }]] = await db.query('SELECT COUNT(*) as cnt FROM tags WHERE category_id=?', [req.params.id])
+    if (cnt > 0) return res.json({ code: 400, message: `该分类下还有 ${cnt} 个标签，请先删除` })
+    await db.query('DELETE FROM tag_categories WHERE id=?', [req.params.id])
+    res.json({ code: 0, message: '已删除' })
+  } catch (err) { res.json({ code: 500, message: '删除失败' }) }
+})
+
+// ─── 标签管理 ──────────────────────────────────────────────────
+router.get('/tags', async (req, res) => {
+  try {
+    const category_id = req.query.category_id || null
+    const keyword = req.query.keyword ? `%${req.query.keyword}%` : '%'
+    const catCond = category_id ? 'AND t.category_id=?' : ''
+    const params = category_id ? [keyword, category_id] : [keyword]
+    const [list] = await db.query(
+      `SELECT t.*, c.name as category_name
+       FROM tags t LEFT JOIN tag_categories c ON t.category_id = c.id
+       WHERE t.name LIKE ? ${catCond}
+       ORDER BY t.category_id ASC, t.sort_order DESC, t.id ASC`, params
+    )
+    res.json({ code: 0, data: { list } })
+  } catch (err) { res.json({ code: 500, message: '获取失败' }) }
+})
+
+router.post('/tags', async (req, res) => {
+  try {
+    const { name, category_id, sort_order } = req.body
+    if (!name || !category_id) return res.json({ code: 400, message: '标签名和分类不能为空' })
+    const [r] = await db.query(
+      'INSERT INTO tags (name, category_id, sort_order) VALUES (?,?,?)',
+      [name, category_id, sort_order || 0]
+    )
+    res.json({ code: 0, data: { id: r.insertId } })
+  } catch (err) { res.json({ code: 500, message: err.code === 'ER_DUP_ENTRY' ? '该分类下标签名已存在' : '创建失败' }) }
+})
+
+router.put('/tags/:id', async (req, res) => {
+  try {
+    const { name, category_id, sort_order, is_active } = req.body
+    await db.query(
+      `UPDATE tags SET name=COALESCE(?,name), category_id=COALESCE(?,category_id),
+       sort_order=COALESCE(?,sort_order), is_active=COALESCE(?,is_active) WHERE id=?`,
+      [name, category_id, sort_order, is_active !== undefined ? (is_active ? 1 : 0) : null, req.params.id]
+    )
+    res.json({ code: 0, message: '更新成功' })
+  } catch (err) { res.json({ code: 500, message: '更新失败' }) }
+})
+
+router.delete('/tags/:id', async (req, res) => {
+  try {
+    await db.query('DELETE FROM artwork_tags WHERE tag_id=?', [req.params.id])
+    await db.query('DELETE FROM tags WHERE id=?', [req.params.id])
+    res.json({ code: 0, message: '已删除' })
+  } catch (err) { res.json({ code: 500, message: '删除失败' }) }
+})
+
 // ─── 活动管理 ─────────────────────────────────────────────────
 router.get('/activities', async (req, res) => {
   try {
