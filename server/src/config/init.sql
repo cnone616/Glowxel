@@ -74,10 +74,46 @@ CREATE TABLE IF NOT EXISTS artworks (
 -- 作品标签关联表
 CREATE TABLE IF NOT EXISTS artwork_tags (
   artwork_id    BIGINT NOT NULL,
-  tag           VARCHAR(30) NOT NULL,
-  PRIMARY KEY (artwork_id, tag),
-  INDEX idx_tag (tag)
+  tag_id        BIGINT NOT NULL,           -- 关联 tags.id，不再存字符串
+  PRIMARY KEY (artwork_id, tag_id),
+  INDEX idx_tag (tag_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 标签分类表（管理员维护）
+CREATE TABLE IF NOT EXISTS tag_categories (
+  id            BIGINT PRIMARY KEY AUTO_INCREMENT,
+  name          VARCHAR(50) NOT NULL UNIQUE, -- 分类名，如：风格、主题、难度
+  sort_order    INT DEFAULT 0,              -- 排序权重，越大越靠前
+  is_active     TINYINT(1) DEFAULT 1,       -- 是否启用
+  created_at    DATETIME DEFAULT NOW(),
+  INDEX idx_sort (sort_order DESC)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 标签表（管理员维护，用户只能选不能自定义）
+CREATE TABLE IF NOT EXISTS tags (
+  id            BIGINT PRIMARY KEY AUTO_INCREMENT,
+  name          VARCHAR(50) NOT NULL,       -- 标签名，如：像素风、动物、简单
+  category_id   BIGINT NOT NULL,            -- 所属分类
+  sort_order    INT DEFAULT 0,              -- 分类内排序权重
+  is_active     TINYINT(1) DEFAULT 1,       -- 是否启用（下架不影响已有数据）
+  usage_count   INT DEFAULT 0,             -- 使用次数（冗余字段，方便排序）
+  created_at    DATETIME DEFAULT NOW(),
+  UNIQUE KEY uk_name_cat (name, category_id),
+  INDEX idx_category (category_id),
+  INDEX idx_sort (sort_order DESC)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 预置分类数据
+INSERT IGNORE INTO tag_categories (name, sort_order) VALUES
+  ('风格', 100), ('主题', 90), ('颜色', 80), ('尺寸', 70), ('难度', 60);
+
+-- 预置标签数据
+INSERT IGNORE INTO tags (name, category_id, sort_order) VALUES
+  ('像素风', 1, 100), ('极简', 1, 90), ('复古', 1, 80), ('赛博朋克', 1, 70),
+  ('动物', 2, 100), ('人物', 2, 90), ('风景', 2, 80), ('食物', 2, 70), ('建筑', 2, 60),
+  ('彩色', 3, 100), ('黑白', 3, 90), ('渐变', 3, 80),
+  ('16x16', 4, 100), ('32x32', 4, 90), ('64x64', 4, 80),
+  ('入门', 5, 100), ('进阶', 5, 90), ('高难', 5, 80);
 
 -- 关注关系表
 CREATE TABLE IF NOT EXISTS follows (
