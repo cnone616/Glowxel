@@ -17,7 +17,7 @@
         <h2 class="section-title">核心功能</h2>
         <div class="feature-grid">
           <div class="feature-card" v-for="f in features" :key="f.title">
-            <div class="feature-emoji">{{ f.icon }}</div>
+            <div class="feature-icon" v-html="f.icon"></div>
             <h3>{{ f.title }}</h3>
             <p>{{ f.desc }}</p>
           </div>
@@ -169,7 +169,11 @@ onMounted(async () => {
 
 .feature-card:hover { border-color: #ddd; }
 
-.feature-emoji { font-size: 28px; margin-bottom: 12px; }
+.feature-icon {
+  width: 44px; height: 44px; background: var(--color-bg-muted);
+  border-radius: var(--radius-sm); display: flex; align-items: center;
+  justify-content: center; margin-bottom: 16px; color: var(--color-text-primary);
+}
 .feature-card h3 { font-size: 16px; font-weight: 600; color: #1a1a1a; margin-bottom: 8px; }
 .feature-card p { font-size: 14px; color: #888; line-height: 1.6; }
 
