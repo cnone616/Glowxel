@@ -15,8 +15,10 @@
 
 | 模块 | 本地路径 | 服务器路径 |
 |------|---------|-----------|
-| 项目根目录 | `/Users/aflylong/Desktop/project/matrix` | `/home/ubuntu/glowxel-server` |
+| 项目根目录 | `/Users/aflylong/Desktop/project/Glowxel` | `/home/ubuntu/glowxel-repo` |
 | 后端服务 | `server/` | `/home/ubuntu/glowxel-server` |
+| 官网 | `website/` | `/var/www/glowxel` |
+| 后台管理 | `admin/` | `/var/www/glowxel-admin` |
 | 小程序 | `uniapp/` | 本地开发 |
 | ESP32 固件 | `esp32-firmware/` | 本地编译烧录 |
 
@@ -38,22 +40,31 @@
 | JWT 密钥 | glowxel_jwt_secret_2024 |
 | 框架 | Express.js |
 
-## 更新官网
+## 一键部署（推荐）
 
-每次更新官网代码后，执行以下步骤：
+本地执行一条命令搞定所有更新：
 
 ```bash
-# 1. 本地提交推送
-git add -A && git commit -m "描述改动" && git push
+# 全量更新（官网 + 后台 + 后端 + 数据库）
+bash deploy.sh
 
-# 2. SSH 到服务器
-ssh ubuntu@175.178.153.146
+# 只改了后端代码（最快，跳过前端构建）
+bash deploy.sh --skip-website --skip-admin
 
-# 3. 拉取代码、构建、部署
-cd ~/glowxel-repo && git pull && cd website && npm run build && sudo cp -r dist/* /var/www/glowxel/ && sudo chown -R www-data:www-data /var/www/glowxel
+# 只改了数据库结构
+bash deploy.sh --db-only
+
+# 只改了官网
+bash deploy.sh --skip-admin
+
+# 只改了后台管理
+bash deploy.sh --skip-website
 ```
 
 网站地址：https://glowxel.com
+后台管理：https://admin.glowxel.com
+
+> 首次部署后台需在服务器执行：`sudo certbot --nginx -d admin.glowxel.com`
 
 ---
 
@@ -63,21 +74,18 @@ cd ~/glowxel-repo && git pull && cd website && npm run build && sudo cp -r dist/
 # SSH 连接服务器
 ssh ubuntu@175.178.153.146
 
-# 更新代码并重启（最常用）
-cd ~/glowxel-repo && git pull && cd ~/glowxel-server && pm2 restart glowxel-server
-
-# 初始化数据库
-cd ~/glowxel-server && node src/config/seed.js
-
 # 查看服务状态
 pm2 status
 pm2 logs glowxel-server
 
-# 重启服务
+# 重启后端
 pm2 restart glowxel-server
 
-# 停止服务
-pm2 stop glowxel-server
+# 手动更新数据库结构
+cd ~/glowxel-server && mysql -u root -pmatrix123 matrix < src/config/init.sql
+
+# nginx 重载
+sudo nginx -t && sudo nginx -s reload
 
 # ESP32 固件编译
 cd esp32-firmware && pio run
@@ -90,27 +98,12 @@ pio run --target upload
 
 ```
 /home/ubuntu/
-├── glowxel-repo/       # git 仓库（完整项目）
-└── glowxel-server -> glowxel-repo/server/  # 软链接到 server 目录
-```
+├── glowxel-repo/        # git 仓库（完整项目）
+└── glowxel-server/      # 软链接到 glowxel-repo/server/
 
-## 本地推送流程
-
-```bash
-# 1. 本地提交
-cd /Users/aflylong/Desktop/project/matrix
-git add -A && git commit -m "描述改动"
-
-# 2. 推送到 GitHub
-git push
-
-
-# 3. SSH 到服务器更新
-ssh ubuntu@175.178.153.146
-cd ~/glowxel-repo && git pull && cd ~/glowxel-server && pm2 restart glowxel-server
-
-# 跑 seed（只需要这一次，写入管理员账号）
-node server/src/config/seed.j
+/var/www/
+├── glowxel/             # 官网静态文件
+└── glowxel-admin/       # 后台管理静态文件
 ```
 
 ## API 地址
