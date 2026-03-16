@@ -1,4 +1,4 @@
-import { findClosestColor, getColorByCode } from '@/data/artkal-colors'
+import { findClosestColor, getColorByCode } from '@/data/artkal-colors.js'
 
 /**
  * 将图片转换为像素数据
