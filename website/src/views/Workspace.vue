@@ -66,6 +66,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { artworkAPI } from '@/api/index.js'
 
 const router = useRouter()
 const projects = ref([])
@@ -89,13 +90,21 @@ function openEditor(p) { router.push(`/editor/${p.id}`) }
 
 async function deleteProject(p) {
   if (!confirm(`确认删除「${p.title || p.name || '未命名'}」？`)) return
-  projects.value = projects.value.filter(x => x.id !== p.id)
+  const res = await artworkAPI.remove(p.id)
+  if (res.success || res.code === 0) {
+    projects.value = projects.value.filter(x => x.id !== p.id)
+  }
 }
 
 onMounted(async () => {
   try {
-    await new Promise(r => setTimeout(r, 400))
-    projects.value = []
+    const token = localStorage.getItem('auth_token')
+    if (!token) { loading.value = false; return }
+    const res = await artworkAPI.getUserArtworks(
+      JSON.parse(localStorage.getItem('user_info') || '{}').id,
+      { page: 1, limit: 50 }
+    )
+    if (res.success) projects.value = res.data?.list || []
   } finally { loading.value = false }
 })
 </script>
