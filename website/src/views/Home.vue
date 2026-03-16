@@ -62,12 +62,12 @@ import { ref, onMounted } from 'vue'
 import { artworkAPI } from '@/api/index.js'
 
 const features = [
-  { icon: '🎨', title: '像素编辑器', desc: '64×64 画布，支持画笔、橡皮擦、填充、图片导入' },
-  { icon: '⏰', title: '时钟设计', desc: '自定义时间、日期、星期的位置和颜色' },
-  { icon: '🖼️', title: '图片处理', desc: '导入任意图片，智能转换为像素图案' },
-  { icon: '👥', title: '社区分享', desc: '发布作品、点赞评论、关注创作者' },
-  { icon: '📦', title: '模板库', desc: '丰富的预设模板，一键使用' },
-  { icon: '🏆', title: '创作挑战', desc: '参与主题挑战，展示你的创意' }
+  { icon: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/></svg>`, title: '像素编辑器', desc: '64×64 画布，支持画笔、橡皮擦、填充、图片导入' },
+  { icon: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`, title: '时钟设计', desc: '自定义时间、日期、星期的位置和颜色' },
+  { icon: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>`, title: '图片处理', desc: '导入任意图片，智能转换为像素图案' },
+  { icon: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>`, title: '社区分享', desc: '发布作品、点赞评论、关注创作者' },
+  { icon: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>`, title: '模板库', desc: '丰富的预设模板，一键使用' },
+  { icon: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>`, title: '创作挑战', desc: '参与主题挑战，展示你的创意' }
 ]
 
 const artworks = ref([])
