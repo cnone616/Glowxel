@@ -1,4 +1,5 @@
 const router = require('express').Router();
+const { contentFilter } = require('../middleware/contentFilter');
 const db = require('../config/db');
 const { auth } = require('../middleware/auth');
 
@@ -23,7 +24,7 @@ router.get('/:artworkId', async (req, res) => {
 });
 
 // 发表评论
-router.post('/:artworkId', auth, async (req, res) => {
+router.post('/:artworkId', auth, contentFilter(['content']), async (req, res) => {
   try {
     const { content, replyTo } = req.body;
     if (!content) return res.json({ code: 400, message: '评论内容不能为空' });
