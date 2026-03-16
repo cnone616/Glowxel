@@ -1,8 +1,37 @@
 const router = require('express').Router();
 const jwt = require('jsonwebtoken');
 const axios = require('axios');
+const crypto = require('crypto');
 const db = require('../config/db');
 const { auth } = require('../middleware/auth');
+
+// 工具：sha256 哈希密码
+const hashPassword = (pwd) => crypto.createHash('sha256').update(pwd + (process.env.PWD_SALT || 'glowxel')).digest('hex');
+
+// 管理员账号密码登录
+router.post('/admin-login', async (req, res) => {
+  try {
+    const { username, password } = req.body;
+    if (!username || !password) return res.json({ code: 400, message: '请输入用户名和密码' });
+
+    const [rows] = await db.query(
+      "SELECT id, name, avatar, role, admin_username, admin_password FROM users WHERE admin_username = ? AND role = 'admin'",
+      [username]
+    );
+    if (!rows.length) return res.json({ code: 401, message: '用户名或密码错误' });
+
+    const user = rows[0];
+    if (user.admin_password !== hashPassword(password)) {
+      return res.json({ code: 401, message: '用户名或密码错误' });
+    }
+
+    const token = jwt.sign({ id: user.id, role: 'admin' }, process.env.JWT_SECRET, { expiresIn: '7d' });
+    res.json({ code: 0, data: { token, user: { id: user.id, name: user.name, avatar: user.avatar, role: user.role } } });
+  } catch (err) {
+    console.error('管理员登录失败:', err);
+    res.json({ code: 500, message: '登录失败' });
+  }
+});
 
 // 微信登录
 router.post('/login', async (req, res) => {

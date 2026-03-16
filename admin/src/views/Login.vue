@@ -30,7 +30,7 @@ const loading = ref(false)
 async function handleLogin() {
   loading.value = true
   try {
-    const res = await http.post('/user/login', form.value)
+    const res = await http.post('/user/admin-login', form.value)
     if (res.data?.token) {
       localStorage.setItem('admin_token', res.data.token)
       message.success('登录成功')

@@ -7,6 +7,9 @@ require('dotenv').config({ path: require('path').join(__dirname, '../../.env') }
 const db = require('./db');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
+
+const hashPassword = (pwd) => crypto.createHash('sha256').update(pwd + (process.env.PWD_SALT || 'glowxel')).digest('hex');
 
 async function seed() {
   console.log('=== Glowxel 数据库初始化 ===\n');
@@ -24,14 +27,21 @@ async function seed() {
   }
   console.log('  ✓ 表结构就绪');
 
-  // 2. 补充 role 字段
+  // 2. 补充字段
   console.log('[2/6] 检查字段更新...');
-  try {
-    await db.query("ALTER TABLE users ADD COLUMN role ENUM('user','admin') DEFAULT 'user' AFTER status");
-    console.log('  ✓ users 表添加 role 字段');
-  } catch (e) {
-    if (e.code === 'ER_DUP_FIELDNAME') console.log('  - role 字段已存在');
-    else console.log('  !', e.message);
+  const alterColumns = [
+    ["ALTER TABLE users ADD COLUMN role ENUM('user','admin') DEFAULT 'user' AFTER status", 'role'],
+    ["ALTER TABLE users ADD COLUMN admin_username VARCHAR(50) NULL AFTER role", 'admin_username'],
+    ["ALTER TABLE users ADD COLUMN admin_password VARCHAR(64) NULL AFTER admin_username", 'admin_password'],
+  ];
+  for (const [sql, col] of alterColumns) {
+    try {
+      await db.query(sql);
+      console.log(`  ✓ users 表添加 ${col} 字段`);
+    } catch (e) {
+      if (e.code === 'ER_DUP_FIELDNAME') console.log(`  - ${col} 字段已存在`);
+      else console.log('  !', e.message);
+    }
   }
 
   // 3. 插入用户
@@ -48,9 +58,13 @@ async function seed() {
        VALUES (?,?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE name=VALUES(name)`, u
     );
   }
-  // 设第一个为管理员
+  // 设第一个为管理员，写入账号密码
   await db.query("UPDATE users SET role='admin' WHERE id=1");
-  console.log('  ✓ ' + users.length + ' 个用户（#1 为管理员）');
+  await db.query(
+    "UPDATE users SET admin_username=?, admin_password=? WHERE id=1",
+    ['along', hashPassword('along.0408')]
+  );
+  console.log('  ✓ ' + users.length + ' 个用户（#1 为管理员，账号: along）');
 
   // 4. 插入作品
   console.log('[4/6] 插入作品数据...');
