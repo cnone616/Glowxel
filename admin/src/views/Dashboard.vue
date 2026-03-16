@@ -48,18 +48,3 @@ onMounted(async () => {
 })
 </script>
 
-const chartRef = ref(null)
-
-onMounted(async () => {
-  try {
-    const res = await http.get('/admin/stats')
-    if (res.data) {
-      stats.value[0].value = res.data.userCount || 0
-      stats.value[1].value = res.data.artworkCount || 0
-      stats.value[2].value = res.data.templateCount || 0
-      stats.value[3].value = res.data.todayActive || 0
-    }
-  } catch (e) { /* ignore */ }
-})
-</script>
-

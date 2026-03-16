@@ -158,16 +158,49 @@ router.get('/my', auth, async (req, res) => {
   }
 });
 
-// 获取作品像素数据（收藏时用）
+// 获取作品像素数据
 router.get('/:id/pixels', auth, async (req, res) => {
   try {
-    const [rows] = await db.query('SELECT pixel_data, palette, width, height FROM artworks a JOIN projects p ON a.project_id = p.id WHERE a.id = ?', [req.params.id]);
+    const [rows] = await db.query('SELECT pixel_data, width, height FROM artworks WHERE id = ?', [req.params.id]);
     if (rows.length === 0) return res.json({ code: 404, message: '作品不存在' });
     const pixels = rows[0].pixel_data ? JSON.parse(rows[0].pixel_data.toString()) : null;
     res.json({ code: 0, data: { pixels, width: rows[0].width, height: rows[0].height } });
-  } catch (err) {
-    res.json({ code: 500, message: '获取失败' });
-  }
+  } catch (err) { res.json({ code: 500, message: '获取失败' }); }
+});
+
+// 关注的人的作品
+router.get('/following', auth, async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const offset = (page - 1) * limit;
+    const [list] = await db.query(
+      `SELECT a.id, a.title, a.cover_url, a.likes, a.views, a.created_at,
+       u.id as author_id, u.name as author_name, u.avatar as author_avatar
+       FROM artworks a JOIN users u ON a.user_id = u.id
+       WHERE a.status = 'published' AND a.user_id IN (
+         SELECT following_id FROM follows WHERE follower_id = ?
+       ) ORDER BY a.created_at DESC LIMIT ? OFFSET ?`,
+      [req.user.id, limit, offset]
+    );
+    res.json({ code: 0, data: { list } });
+  } catch (err) { res.json({ code: 500, message: '获取失败' }); }
+});
+
+// 相关作品
+router.get('/:id/related', optionalAuth, async (req, res) => {
+  try {
+    const [rows] = await db.query('SELECT user_id FROM artworks WHERE id = ?', [req.params.id]);
+    if (!rows.length) return res.json({ code: 0, data: { list: [] } });
+    const [list] = await db.query(
+      `SELECT a.id, a.title, a.cover_url, a.likes, a.views, a.created_at,
+       u.id as author_id, u.name as author_name, u.avatar as author_avatar
+       FROM artworks a JOIN users u ON a.user_id = u.id
+       WHERE a.status = 'published' AND a.id != ? AND a.user_id = ? LIMIT 8`,
+      [req.params.id, rows[0].user_id]
+    );
+    res.json({ code: 0, data: { list } });
+  } catch (err) { res.json({ code: 500, message: '获取失败' }); }
 });
 
 module.exports = router;

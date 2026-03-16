@@ -78,4 +78,15 @@ router.get('/:id/submissions', async (req, res) => {
   }
 });
 
+// 热门挑战
+router.get('/popular', async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 10;
+    const [list] = await db.query(
+      'SELECT id, title, banner_url, status, participants, submissions, prize, difficulty FROM challenges ORDER BY participants DESC LIMIT ?', [limit]
+    );
+    res.json({ code: 0, data: { list } });
+  } catch (err) { res.json({ code: 500, message: '获取失败' }); }
+});
+
 module.exports = router;

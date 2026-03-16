@@ -23,9 +23,15 @@ router.delete('/:artworkId', auth, async (req, res) => {
     }
     const [[{ likes }]] = await db.query('SELECT likes FROM artworks WHERE id = ?', [req.params.artworkId]);
     res.json({ code: 0, data: { success: true, likes } });
-  } catch (err) {
-    res.json({ code: 500, message: '操作失败' });
-  }
+  } catch (err) { res.json({ code: 500, message: '操作失败' }); }
+});
+
+// 检查是否点赞
+router.get('/:artworkId/check', auth, async (req, res) => {
+  try {
+    const [rows] = await db.query('SELECT 1 FROM likes WHERE user_id = ? AND artwork_id = ?', [req.user.id, req.params.artworkId]);
+    res.json({ code: 0, data: rows.length > 0 });
+  } catch (err) { res.json({ code: 500, message: '查询失败' }); }
 });
 
 module.exports = router;

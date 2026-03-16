@@ -67,4 +67,16 @@ router.post('/:id/use', async (req, res) => {
   }
 });
 
+// 搜索模板
+router.get('/search', async (req, res) => {
+  try {
+    const keyword = req.query.keyword ? `%${req.query.keyword}%` : '%';
+    const [list] = await db.query(
+      'SELECT id, name, image_url, category, size, difficulty, usage_count FROM templates WHERE name LIKE ? OR category LIKE ? ORDER BY usage_count DESC LIMIT 20',
+      [keyword, keyword]
+    );
+    res.json({ code: 0, data: { list } });
+  } catch (err) { res.json({ code: 500, message: '搜索失败' }); }
+});
+
 module.exports = router;

@@ -41,9 +41,15 @@ router.get('/list', auth, async (req, res) => {
     );
     const [[{ total }]] = await db.query('SELECT COUNT(*) as total FROM collections WHERE user_id = ?', [req.user.id]);
     res.json({ code: 0, data: { list, total } });
-  } catch (err) {
-    res.json({ code: 500, message: '获取失败' });
-  }
+  } catch (err) { res.json({ code: 500, message: '获取失败' }); }
+});
+
+// 检查是否收藏
+router.get('/:artworkId/check', auth, async (req, res) => {
+  try {
+    const [rows] = await db.query('SELECT 1 FROM collections WHERE user_id = ? AND artwork_id = ?', [req.user.id, req.params.artworkId]);
+    res.json({ code: 0, data: rows.length > 0 });
+  } catch (err) { res.json({ code: 500, message: '查询失败' }); }
 });
 
 module.exports = router;

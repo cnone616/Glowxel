@@ -98,8 +98,36 @@ router.put('/profile', auth, contentFilter(['name', 'bio']), async (req, res) =>
   }
 });
 
-// 获取他人主页
-router.get('/:id', async (req, res) => {
+// 用户统计
+router.get('/stats', auth, async (req, res) => {
+  try {
+    const [[u]] = await db.query('SELECT works_count, followers_count, following_count, total_likes FROM users WHERE id = ?', [req.user.id]);
+    const [[{ collects }]] = await db.query('SELECT COUNT(*) as collects FROM collections WHERE user_id = ?', [req.user.id]);
+    res.json({ code: 0, data: { ...u, collects } });
+  } catch (err) { res.json({ code: 500, message: '获取失败' }); }
+});
+
+// 推荐用户
+router.get('/recommended', async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 8;
+    const [list] = await db.query(
+      'SELECT id, name, avatar, bio, works_count, followers_count FROM users WHERE status = "active" ORDER BY followers_count DESC LIMIT ?', [limit]
+    );
+    res.json({ code: 0, data: { list } });
+  } catch (err) { res.json({ code: 500, message: '获取失败' }); }
+});
+
+// 搜索用户
+router.get('/search', async (req, res) => {
+  try {
+    const keyword = req.query.keyword ? `%${req.query.keyword}%` : '%';
+    const [list] = await db.query(
+      'SELECT id, name, avatar, bio, works_count, followers_count FROM users WHERE name LIKE ? AND status = "active" LIMIT 20', [keyword]
+    );
+    res.json({ code: 0, data: { list } });
+  } catch (err) { res.json({ code: 500, message: '搜索失败' }); }
+});
   try {
     const [rows] = await db.query('SELECT id, name, avatar, bio, level, followers_count, following_count, works_count, total_likes, created_at FROM users WHERE id = ?', [req.params.id]);
     if (rows.length === 0) return res.json({ code: 404, message: '用户不存在' });
