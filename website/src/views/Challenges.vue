@@ -8,13 +8,13 @@
         <div class="challenge-card" v-for="item in list" :key="item.id">
           <div class="challenge-header">
             <span class="challenge-tag" :class="item.status">{{ statusText(item.status) }}</span>
-            <span class="challenge-date">{{ item.endDate || '' }}</span>
+            <span class="challenge-date">{{ item.end_date ? item.end_date.slice(0,10) : '' }}</span>
           </div>
           <h3>{{ item.title || '未命名挑战' }}</h3>
           <p>{{ item.description || '暂无描述' }}</p>
           <div class="challenge-footer">
             <span class="participants">{{ item.participants || 0 }} 人参与</span>
-            <button class="join-btn" v-if="item.status === 'active'">参与挑战</button>
+            <button class="join-btn" v-if="item.status === 'active'" @click="handleJoin(item)">参与挑战</button>
           </div>
         </div>
       </div>
@@ -24,12 +24,23 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { challengeAPI } from '@/api/index.js'
 
+const router = useRouter()
 const list = ref([])
 
 function statusText(s) {
   return { active: '进行中', ended: '已结束', upcoming: '即将开始' }[s] || '未知'
+}
+
+async function handleJoin(item) {
+  const token = localStorage.getItem('auth_token')
+  if (!token) { router.push('/login'); return }
+  const res = await challengeAPI.join(item.id)
+  if (res.success) {
+    item.participants = (item.participants || 0) + 1
+  }
 }
 
 onMounted(async () => {

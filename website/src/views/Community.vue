@@ -11,12 +11,15 @@
 
       <div class="artwork-grid">
         <div class="artwork-card" v-for="item in list" :key="item.id" @click="$router.push(`/artwork/${item.id}`)">
-          <div class="artwork-img" :style="{ background: '#f5f5f5' }"></div>
+          <div class="artwork-img" :style="item.cover_url ? `background-image:url(${item.cover_url});background-size:cover;background-position:center` : 'background:#f0f0f0'"></div>
           <div class="artwork-info">
             <span class="title">{{ item.title || '未命名' }}</span>
             <div class="meta">
-              <span class="author">{{ item.author || '匿名' }}</span>
-              <span class="likes">❤ {{ item.likes || 0 }}</span>
+              <span class="author">{{ item.author_name || '匿名' }}</span>
+              <span class="likes">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style="color:#e53e3e;vertical-align:-1px"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+                {{ item.likes || 0 }}
+              </span>
             </div>
           </div>
         </div>
