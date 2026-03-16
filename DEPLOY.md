@@ -38,6 +38,25 @@
 | JWT 密钥 | glowxel_jwt_secret_2024 |
 | 框架 | Express.js |
 
+## 更新官网
+
+每次更新官网代码后，执行以下步骤：
+
+```bash
+# 1. 本地提交推送
+git add -A && git commit -m "描述改动" && git push
+
+# 2. SSH 到服务器
+ssh ubuntu@175.178.153.146
+
+# 3. 拉取代码、构建、部署
+cd ~/glowxel-repo && git pull && cd website && npm run build && sudo cp -r dist/* /var/www/glowxel/ && sudo chown -R www-data:www-data /var/www/glowxel
+```
+
+网站地址：https://glowxel.com
+
+---
+
 ## 常用命令
 
 ```bash
@@ -85,9 +104,13 @@ git add -A && git commit -m "描述改动"
 # 2. 推送到 GitHub
 git push
 
+
 # 3. SSH 到服务器更新
 ssh ubuntu@175.178.153.146
 cd ~/glowxel-repo && git pull && cd ~/glowxel-server && pm2 restart glowxel-server
+
+# 跑 seed（只需要这一次，写入管理员账号）
+node server/src/config/seed.j
 ```
 
 ## API 地址
