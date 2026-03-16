@@ -6,12 +6,12 @@
 
       <div class="template-grid">
         <div class="template-card" v-for="item in list" :key="item.id">
-          <div class="template-img" :style="{ background: '#f5f5f5' }"></div>
+          <div class="template-img" :style="item.image_url ? `background-image:url(${item.image_url});background-size:cover;background-position:center` : 'background:#f0f0f0'"></div>
           <div class="template-info">
             <span class="name">{{ item.name || '未命名模板' }}</span>
             <span class="category">{{ item.category || '通用' }}</span>
           </div>
-          <button class="use-btn">使用模板</button>
+          <button class="use-btn" @click="handleUse(item)">使用模板</button>
         </div>
       </div>
     </div>
@@ -20,9 +20,16 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { templateAPI } from '@/api/index.js'
 
+const router = useRouter()
 const list = ref([])
+
+async function handleUse(item) {
+  await templateAPI.use(item.id)
+  router.push(`/editor?templateId=${item.id}`)
+}
 
 onMounted(async () => {
   try {

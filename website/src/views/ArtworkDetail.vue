@@ -4,18 +4,24 @@
       <button class="back-btn" @click="$router.back()">← 返回</button>
       <div class="detail-layout">
         <div class="artwork-preview">
-          <div class="preview-img" :style="{ background: '#f5f5f5' }"></div>
+          <div class="preview-img" :style="detail.cover_url ? `background-image:url(${detail.cover_url});background-size:contain;background-repeat:no-repeat;background-position:center;background-color:#f0f0f0` : 'background:#f0f0f0'"></div>
         </div>
         <div class="artwork-sidebar">
           <h1>{{ detail.title || '加载中...' }}</h1>
-          <div class="author-row" v-if="detail.author">
-            <span class="author-name">{{ detail.author }}</span>
-            <button class="follow-btn">关注</button>
+          <div class="author-row" v-if="detail.author_name">
+            <span class="author-name" style="cursor:pointer" @click="$router.push(`/user/${detail.author_id}`)">{{ detail.author_name }}</span>
+            <button class="follow-btn" @click="handleFollow">{{ isFollowing ? '已关注' : '关注' }}</button>
           </div>
           <p class="desc">{{ detail.description || '暂无描述' }}</p>
           <div class="actions">
-            <button class="action-btn" @click="handleLike">❤ {{ detail.likes || 0 }}</button>
-            <button class="action-btn" @click="handleCollect">⭐ 收藏</button>
+            <button class="action-btn" :class="{ active: isLiked }" @click="handleLike">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+              {{ detail.likes || 0 }}
+            </button>
+            <button class="action-btn" :class="{ active: isCollected }" @click="handleCollect">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+              {{ isCollected ? '已收藏' : '收藏' }}
+            </button>
           </div>
           <div class="comments-section">
             <h3>评论</h3>
@@ -39,32 +45,62 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { artworkAPI, likeAPI, collectAPI, commentAPI } from '@/api/index.js'
+import { artworkAPI, likeAPI, collectAPI, commentAPI, followAPI } from '@/api/index.js'
 
 const route = useRoute()
 const detail = ref({})
 const comments = ref([])
 const commentText = ref('')
+const isLiked = ref(false)
+const isCollected = ref(false)
+const isFollowing = ref(false)
 
 onMounted(async () => {
   const id = route.params.id
-  try {
-    const res = await artworkAPI.getDetail(id)
-    if (res.success) detail.value = res.data || {}
-    const cRes = await commentAPI.getList(id, { page: 1, limit: 20 })
-    if (cRes.success) comments.value = cRes.data?.list || []
-  } catch (e) { /* ignore */ }
+  const [res, cRes, likedRes, collectedRes] = await Promise.allSettled([
+    artworkAPI.getDetail(id),
+    commentAPI.getList(id, { page: 1, limit: 20 }),
+    likeAPI.check(id),
+    collectAPI.check(id),
+  ])
+  if (res.value?.success) detail.value = res.value.data?.artwork || res.value.data || {}
+  if (cRes.value?.success) comments.value = cRes.value.data?.list || []
+  if (likedRes.value?.success) isLiked.value = likedRes.value.data === true
+  if (collectedRes.value?.success) isCollected.value = collectedRes.value.data === true
 })
 
 async function handleLike() {
-  await likeAPI.like(route.params.id)
-  detail.value.likes = (detail.value.likes || 0) + 1
+  if (isLiked.value) {
+    await likeAPI.unlike(route.params.id)
+    detail.value.likes = Math.max(0, (detail.value.likes || 1) - 1)
+  } else {
+    await likeAPI.like(route.params.id)
+    detail.value.likes = (detail.value.likes || 0) + 1
+  }
+  isLiked.value = !isLiked.value
 }
-async function handleCollect() { await collectAPI.collect(route.params.id) }
+
+async function handleCollect() {
+  if (isCollected.value) {
+    await collectAPI.uncollect(route.params.id)
+  } else {
+    await collectAPI.collect(route.params.id)
+  }
+  isCollected.value = !isCollected.value
+}
+
+async function handleFollow() {
+  const res = await followAPI.toggle(detail.value.author_id)
+  if (res.success) isFollowing.value = res.data?.followed ?? !isFollowing.value
+}
+
 async function submitComment() {
   if (!commentText.value.trim()) return
-  await commentAPI.add({ artworkId: route.params.id, content: commentText.value })
-  commentText.value = ''
+  const res = await commentAPI.add(route.params.id, commentText.value.trim())
+  if (res.success) {
+    comments.value.unshift({ id: Date.now(), author_name: '我', content: commentText.value })
+    commentText.value = ''
+  }
 }
 </script>
 
