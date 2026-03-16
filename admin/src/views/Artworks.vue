@@ -2,24 +2,27 @@
   <div>
     <div style="margin-bottom: 16px; display: flex; gap: 12px">
       <a-input-search v-model:value="keyword" placeholder="搜索作品" style="width: 240px" @search="fetchList" />
-      <a-select v-model:value="status" style="width: 120px" @change="fetchList">
-        <a-select-option value="">全部</a-select-option>
+      <a-select v-model:value="status" style="width: 120px" @change="fetchList" allow-clear placeholder="全部状态">
         <a-select-option value="published">已发布</a-select-option>
-        <a-select-option value="pending">待审核</a-select-option>
-        <a-select-option value="rejected">已拒绝</a-select-option>
+        <a-select-option value="hidden">已隐藏</a-select-option>
+        <a-select-option value="deleted">已删除</a-select-option>
       </a-select>
     </div>
     <a-table :columns="columns" :data-source="list" :loading="loading" :pagination="pagination" @change="handleTableChange" row-key="id">
       <template #bodyCell="{ column, record }">
+        <template v-if="column.key === 'cover'">
+          <img v-if="record.cover_url" :src="record.cover_url" style="width:50px;height:36px;object-fit:cover;border-radius:4px" />
+          <span v-else style="color:#ccc">无</span>
+        </template>
         <template v-if="column.key === 'status'">
-          <a-tag :color="{ published: 'green', pending: 'orange', rejected: 'red' }[record.status]">
-            {{ { published: '已发布', pending: '待审核', rejected: '已拒绝' }[record.status] }}
+          <a-tag :color="{ published: 'green', pending: 'orange', hidden: 'red' }[record.status]">
+            {{ { published: '已发布', pending: '待审核', hidden: '已隐藏' }[record.status] || record.status }}
           </a-tag>
         </template>
         <template v-if="column.key === 'action'">
           <a-space>
-            <a-button type="link" size="small" v-if="record.status === 'pending'" @click="review(record.id, 'published')">通过</a-button>
-            <a-button type="link" size="small" danger v-if="record.status === 'pending'" @click="review(record.id, 'rejected')">拒绝</a-button>
+            <a-button type="link" size="small" v-if="record.status !== 'published'" @click="review(record.id, 'published')">发布</a-button>
+            <a-button type="link" size="small" danger v-if="record.status === 'published'" @click="review(record.id, 'hidden')">隐藏</a-button>
             <a-popconfirm title="确定删除？" @confirm="remove(record.id)">
               <a-button type="link" size="small" danger>删除</a-button>
             </a-popconfirm>
@@ -42,12 +45,13 @@ const loading = ref(false)
 const pagination = ref({ current: 1, pageSize: 10, total: 0 })
 
 const columns = [
+  { title: '封面', key: 'cover', width: 70 },
   { title: '标题', dataIndex: 'title', key: 'title' },
-  { title: '作者', dataIndex: 'author', key: 'author' },
-  { title: '点赞', dataIndex: 'likes', key: 'likes', width: 80 },
-  { title: '评论', dataIndex: 'commentCount', key: 'commentCount', width: 80 },
-  { title: '发布时间', dataIndex: 'createdAt', key: 'createdAt' },
-  { title: '状态', key: 'status', width: 80 },
+  { title: '作者', dataIndex: 'author', key: 'author', width: 100 },
+  { title: '点赞', dataIndex: 'likes', key: 'likes', width: 70 },
+  { title: '评论', dataIndex: 'comments_count', key: 'comments_count', width: 70 },
+  { title: '发布时间', dataIndex: 'created_at', key: 'created_at', width: 160 },
+  { title: '状态', key: 'status', width: 90 },
   { title: '操作', key: 'action', width: 160 }
 ]
 
