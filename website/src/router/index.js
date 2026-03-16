@@ -12,9 +12,19 @@ const routes = [
     component: () => import('@/views/Community.vue')
   },
   {
+    path: '/workspace',
+    name: 'Workspace',
+    component: () => import('@/views/Workspace.vue')
+  },
+  {
     path: '/create',
     name: 'Create',
     component: () => import('@/views/Create.vue')
+  },
+  {
+    path: '/editor/:id?',
+    name: 'Editor',
+    component: () => import('@/views/Workspace.vue')
   },
   {
     path: '/templates',
