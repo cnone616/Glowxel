@@ -210,5 +210,80 @@ router.delete('/challenges/:id', async (req, res) => {
   } catch (err) { res.json({ code: 500, message: '删除失败' }); }
 });
 
+// ─── 活动管理 ─────────────────────────────────────────────────
+router.get('/activities', async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const offset = (page - 1) * limit;
+    const keyword = req.query.keyword ? `%${req.query.keyword}%` : '%';
+    const type = req.query.type || null;
+    const status = req.query.status || null;
+    const typeCond = type ? 'AND type = ?' : '';
+    const statusCond = status ? 'AND status = ?' : '';
+    const params = [keyword, ...(type ? [type] : []), ...(status ? [status] : []), limit, offset];
+    const [list] = await db.query(
+      `SELECT id, title, subtitle, cover_url, type, status, is_pinned, sort_order,
+              start_time, end_time, views, created_at, published_at
+       FROM activities
+       WHERE title LIKE ? ${typeCond} ${statusCond}
+       ORDER BY is_pinned DESC, sort_order DESC, created_at DESC
+       LIMIT ? OFFSET ?`, params
+    );
+    const countParams = [keyword, ...(type ? [type] : []), ...(status ? [status] : [])];
+    const [[{ total }]] = await db.query(
+      `SELECT COUNT(*) as total FROM activities WHERE title LIKE ? ${typeCond} ${statusCond}`, countParams
+    );
+    res.json({ code: 0, data: { list, total } });
+  } catch (err) { console.error(err); res.json({ code: 500, message: '获取失败' }); }
+});
+
+router.post('/activities', async (req, res) => {
+  try {
+    const { title, subtitle, cover_url, content, type, status, is_pinned,
+            sort_order, start_time, end_time, link_url, published_at } = req.body;
+    if (!title) return res.json({ code: 400, message: '标题不能为空' });
+    const [result] = await db.query(
+      `INSERT INTO activities (title, subtitle, cover_url, content, type, status,
+        is_pinned, sort_order, start_time, end_time, link_url, author_id, published_at)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      [title, subtitle || '', cover_url || '', content || '',
+       type || 'activity', status || 'draft', is_pinned ? 1 : 0,
+       sort_order || 0, start_time || null, end_time || null,
+       link_url || '', req.admin?.id || null,
+       status === 'published' ? (published_at || new Date()) : null]
+    );
+    res.json({ code: 0, data: { id: result.insertId } });
+  } catch (err) { console.error(err); res.json({ code: 500, message: '创建失败' }); }
+});
+
+router.put('/activities/:id', async (req, res) => {
+  try {
+    const { title, subtitle, cover_url, content, type, status, is_pinned,
+            sort_order, start_time, end_time, link_url, published_at } = req.body;
+    await db.query(
+      `UPDATE activities SET
+        title = COALESCE(?, title), subtitle = COALESCE(?, subtitle),
+        cover_url = COALESCE(?, cover_url), content = COALESCE(?, content),
+        type = COALESCE(?, type), status = COALESCE(?, status),
+        is_pinned = COALESCE(?, is_pinned), sort_order = COALESCE(?, sort_order),
+        start_time = ?, end_time = ?, link_url = COALESCE(?, link_url),
+        published_at = COALESCE(?, published_at)
+       WHERE id = ?`,
+      [title, subtitle, cover_url, content, type, status,
+       is_pinned !== undefined ? (is_pinned ? 1 : 0) : null,
+       sort_order, start_time, end_time, link_url, published_at, req.params.id]
+    );
+    res.json({ code: 0, message: '更新成功' });
+  } catch (err) { console.error(err); res.json({ code: 500, message: '更新失败' }); }
+});
+
+router.delete('/activities/:id', async (req, res) => {
+  try {
+    await db.query('DELETE FROM activities WHERE id = ?', [req.params.id]);
+    res.json({ code: 0, message: '已删除' });
+  } catch (err) { res.json({ code: 500, message: '删除失败' }); }
+});
+
 module.exports = router;
 

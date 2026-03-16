@@ -16,6 +16,7 @@ const routes = [
       { path: 'artworks', name: 'Artworks', component: () => import('@/views/Artworks.vue'), meta: { title: '作品管理' } },
       { path: 'templates', name: 'Templates', component: () => import('@/views/Templates.vue'), meta: { title: '模板管理' } },
       { path: 'challenges', name: 'Challenges', component: () => import('@/views/Challenges.vue'), meta: { title: '挑战管理' } },
+      { path: 'activities', name: 'Activities', component: () => import('@/views/Activities.vue'), meta: { title: '活动管理' } },
       { path: 'comments', name: 'Comments', component: () => import('@/views/Comments.vue'), meta: { title: '评论管理' } }
     ]
   }

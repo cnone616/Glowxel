@@ -23,6 +23,10 @@
           <template #icon><TrophyOutlined /></template>
           <span>挑战管理</span>
         </a-menu-item>
+        <a-menu-item key="/activities">
+          <template #icon><CalendarOutlined /></template>
+          <span>活动管理</span>
+        </a-menu-item>
         <a-menu-item key="/comments">
           <template #icon><MessageOutlined /></template>
           <span>评论管理</span>
@@ -44,7 +48,7 @@
 <script setup>
 import { ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { DashboardOutlined, UserOutlined, PictureOutlined, AppstoreOutlined, TrophyOutlined, MessageOutlined } from '@ant-design/icons-vue'
+import { DashboardOutlined, UserOutlined, PictureOutlined, AppstoreOutlined, TrophyOutlined, MessageOutlined, CalendarOutlined } from '@ant-design/icons-vue'
 
 const route = useRoute()
 const router = useRouter()
