@@ -17,20 +17,18 @@ router.get('/list', async (req, res) => {
     const [list] = await db.query(sql, params);
     const [[{ total }]] = await db.query('SELECT COUNT(*) as total FROM challenges');
     res.json({ code: 0, data: { list, total } });
-  } catch (err) {
-    res.json({ code: 500, message: '获取失败' });
-  }
+  } catch (err) { res.json({ code: 500, message: '获取失败' }); }
 });
 
-// 挑战详情
-router.get('/:id', async (req, res) => {
+// 热门挑战
+router.get('/popular', async (req, res) => {
   try {
-    const [rows] = await db.query('SELECT * FROM challenges WHERE id = ?', [req.params.id]);
-    if (rows.length === 0) return res.json({ code: 404, message: '挑战不存在' });
-    res.json({ code: 0, data: { challenge: rows[0] } });
-  } catch (err) {
-    res.json({ code: 500, message: '获取失败' });
-  }
+    const limit = parseInt(req.query.limit) || 10;
+    const [list] = await db.query(
+      'SELECT id, title, banner_url, status, participants, submissions, prize, difficulty FROM challenges ORDER BY participants DESC LIMIT ?', [limit]
+    );
+    res.json({ code: 0, data: { list } });
+  } catch (err) { res.json({ code: 500, message: '获取失败' }); }
 });
 
 // 参加挑战
@@ -39,9 +37,7 @@ router.post('/:id/join', auth, async (req, res) => {
     await db.query('INSERT IGNORE INTO challenge_participants (challenge_id, user_id) VALUES (?, ?)', [req.params.id, req.user.id]);
     await db.query('UPDATE challenges SET participants = participants + 1 WHERE id = ?', [req.params.id]);
     res.json({ code: 0, data: { success: true } });
-  } catch (err) {
-    res.json({ code: 500, message: '操作失败' });
-  }
+  } catch (err) { res.json({ code: 500, message: '操作失败' }); }
 });
 
 // 提交作品
@@ -52,9 +48,7 @@ router.post('/:id/submit', auth, async (req, res) => {
       [artworkId, req.params.id, req.user.id]);
     await db.query('UPDATE challenges SET submissions = submissions + 1 WHERE id = ?', [req.params.id]);
     res.json({ code: 0, data: { success: true } });
-  } catch (err) {
-    res.json({ code: 500, message: '提交失败' });
-  }
+  } catch (err) { res.json({ code: 500, message: '提交失败' }); }
 });
 
 // 挑战作品列表
@@ -73,19 +67,15 @@ router.get('/:id/submissions', async (req, res) => {
       [req.params.id, limit, offset]
     );
     res.json({ code: 0, data: { list } });
-  } catch (err) {
-    res.json({ code: 500, message: '获取失败' });
-  }
+  } catch (err) { res.json({ code: 500, message: '获取失败' }); }
 });
 
-// 热门挑战
-router.get('/popular', async (req, res) => {
+// 挑战详情 (/:id 必须在所有静态路由之后)
+router.get('/:id', async (req, res) => {
   try {
-    const limit = parseInt(req.query.limit) || 10;
-    const [list] = await db.query(
-      'SELECT id, title, banner_url, status, participants, submissions, prize, difficulty FROM challenges ORDER BY participants DESC LIMIT ?', [limit]
-    );
-    res.json({ code: 0, data: { list } });
+    const [rows] = await db.query('SELECT * FROM challenges WHERE id = ?', [req.params.id]);
+    if (rows.length === 0) return res.json({ code: 404, message: '挑战不存在' });
+    res.json({ code: 0, data: { challenge: rows[0] } });
   } catch (err) { res.json({ code: 500, message: '获取失败' }); }
 });
 
