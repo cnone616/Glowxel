@@ -50,14 +50,16 @@ if [ "$SKIP_WEBSITE" = false ]; then
   cd "$(dirname "$0")/website"
   npm install --silent
   npm run build
-  ssh $SERVER "sudo cp -r /dev/stdin /tmp/website-dist.tar" < <(tar -czf - -C dist .)
+  tar -czf /tmp/website-dist.tar.gz -C dist .
+  scp /tmp/website-dist.tar.gz $SERVER:/tmp/
   ssh $SERVER << 'REMOTE'
 sudo mkdir -p /var/www/glowxel
-cd /tmp && tar -xzf website-dist.tar -C /var/www/glowxel
+sudo tar -xzf /tmp/website-dist.tar.gz -C /var/www/glowxel
 sudo chown -R www-data:www-data /var/www/glowxel
-rm -f /tmp/website-dist.tar
+rm -f /tmp/website-dist.tar.gz
 echo "  ✓ 官网已更新"
 REMOTE
+  rm -f /tmp/website-dist.tar.gz
   cd "$(dirname "$0")"
 else
   echo "[3/5] 跳过官网构建"

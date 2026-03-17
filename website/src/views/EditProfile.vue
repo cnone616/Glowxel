@@ -75,8 +75,8 @@ async function handleSave() {
 .form-group input:focus, .form-group textarea:focus { border-color: #1a1a1a; }
 .form-group textarea { min-height: 80px; resize: vertical; }
 .char-count { position: absolute; right: 10px; bottom: 10px; font-size: 11px; color: #bbb; }
-.btn-save { width: 100%; padding: 12px; border: none; border-radius: 8px; background: #1a1a1a; color: #fff; font-size: 15px; font-weight: 600; cursor: pointer; margin-top: 8px; }
-.btn-save:hover { background: #333; }
+.btn-save { width: 100%; padding: 12px; border: none; border-radius: 8px; background: var(--color-primary); color: #fff; font-size: 15px; font-weight: 600; cursor: pointer; margin-top: 8px; }
+.btn-save:hover { background: var(--color-primary-hover); }
 .btn-save:disabled { background: #ccc; cursor: not-allowed; }
 .msg { text-align: center; font-size: 13px; margin-top: 12px; color: #2e7d32; }
 </style>

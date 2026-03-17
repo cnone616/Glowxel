@@ -7,10 +7,14 @@ router.post('/:userId', auth, async (req, res) => {
   try {
     const targetId = parseInt(req.params.userId);
     if (targetId === req.user.id) return res.json({ code: 400, message: '不能关注自己' });
-
     await db.query('INSERT IGNORE INTO follows (follower_id, following_id) VALUES (?, ?)', [req.user.id, targetId]);
     await db.query('UPDATE users SET following_count = following_count + 1 WHERE id = ?', [req.user.id]);
     await db.query('UPDATE users SET followers_count = followers_count + 1 WHERE id = ?', [targetId]);
+    // 写入通知
+    await db.query(
+      'INSERT INTO notifications (user_id, actor_id, type) VALUES (?,?,?)',
+      [targetId, req.user.id, 'follow']
+    );
     res.json({ code: 0, data: { success: true } });
   } catch (err) {
     res.json({ code: 500, message: '操作失败' });
@@ -121,6 +125,7 @@ router.post('/:userId/toggle', auth, async (req, res) => {
       await db.query('INSERT IGNORE INTO follows (follower_id, following_id) VALUES (?, ?)', [req.user.id, targetId]);
       await db.query('UPDATE users SET following_count = following_count+1 WHERE id = ?', [req.user.id]);
       await db.query('UPDATE users SET followers_count = followers_count+1 WHERE id = ?', [targetId]);
+      await db.query('INSERT INTO notifications (user_id, actor_id, type) VALUES (?,?,?)', [targetId, req.user.id, 'follow']);
       res.json({ code: 0, data: { followed: true } });
     }
   } catch (err) { res.json({ code: 500, message: '操作失败' }); }

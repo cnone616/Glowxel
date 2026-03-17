@@ -128,7 +128,27 @@ router.get('/search', async (req, res) => {
     res.json({ code: 0, data: { list } });
   } catch (err) { res.json({ code: 500, message: '搜索失败' }); }
 });
-// 获取用户详情
+
+// 用户设置（必须在 /:id 前面，否则会被 /:id 匹配到）
+router.get('/settings', auth, async (req, res) => {
+  try {
+    const [rows] = await db.query('SELECT settings FROM users WHERE id = ?', [req.user.id]);
+    res.json({ code: 0, data: { settings: rows[0]?.settings || {} } });
+  } catch (err) {
+    res.json({ code: 500, message: '获取失败' });
+  }
+});
+
+router.put('/settings', auth, async (req, res) => {
+  try {
+    await db.query('UPDATE users SET settings = ? WHERE id = ?', [JSON.stringify(req.body), req.user.id]);
+    res.json({ code: 0, data: { settings: req.body } });
+  } catch (err) {
+    res.json({ code: 500, message: '更新失败' });
+  }
+});
+
+// 获取用户详情（/:id 必须放在所有静态路由之后）
 router.get('/:id', async (req, res) => {
   try {
     const [rows] = await db.query('SELECT id, name, avatar, bio, level, followers_count, following_count, works_count, total_likes, created_at FROM users WHERE id = ?', [req.params.id]);
@@ -151,25 +171,6 @@ router.get('/:id/artworks', async (req, res) => {
     res.json({ code: 0, data: { list, total } });
   } catch (err) {
     res.json({ code: 500, message: '获取失败' });
-  }
-});
-
-// 用户设置
-router.get('/settings', auth, async (req, res) => {
-  try {
-    const [rows] = await db.query('SELECT settings FROM users WHERE id = ?', [req.user.id]);
-    res.json({ code: 0, data: { settings: rows[0]?.settings || {} } });
-  } catch (err) {
-    res.json({ code: 500, message: '获取失败' });
-  }
-});
-
-router.put('/settings', auth, async (req, res) => {
-  try {
-    await db.query('UPDATE users SET settings = ? WHERE id = ?', [JSON.stringify(req.body), req.user.id]);
-    res.json({ code: 0, data: { settings: req.body } });
-  } catch (err) {
-    res.json({ code: 500, message: '更新失败' });
   }
 });
 

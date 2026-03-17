@@ -175,6 +175,59 @@ export class GIFParser {
   }
 
   /**
+   * 渲染单帧为 RGBA 像素数组（用于预览，不渲染全部帧）
+   * @param {number} frameIndex - 帧索引
+   * @param {number} targetW - 目标宽度
+   * @param {number} targetH - 目标高度
+   * @returns {{ rgba: Uint8Array, delay: number } | null}
+   */
+  renderFrame(frameIndex = 0, targetW = 64, targetH = 64) {
+    if (frameIndex < 0 || frameIndex >= this.frames.length) return null
+    // 渲染到目标帧为止（因为 GIF 帧可能依赖前面的帧）
+    const buf = new Uint8Array(this.width * this.height * 4)
+    for (let fi = 0; fi <= frameIndex; fi++) {
+      const frame = this.frames[fi]
+      if (fi > 0 && this.frames[fi-1].disposalMethod === 2) {
+        const prevFrame = this.frames[fi-1]
+        for (let y = 0; y < prevFrame.height; y++) {
+          for (let x = 0; x < prevFrame.width; x++) {
+            const cx = prevFrame.left + x, cy = prevFrame.top + y
+            if (cx >= 0 && cx < this.width && cy >= 0 && cy < this.height) {
+              const di = (cy * this.width + cx) * 4
+              buf[di] = 0; buf[di+1] = 0; buf[di+2] = 0; buf[di+3] = 0
+            }
+          }
+        }
+      }
+      for (let y = 0; y < frame.height; y++) {
+        for (let x = 0; x < frame.width; x++) {
+          const idx = y * frame.width + x
+          if (idx >= frame.pixels.length) continue
+          const ci = frame.pixels[idx]
+          if (frame.transparentColorFlag && ci === frame.transparentColorIndex) continue
+          const color = frame.colorTable && frame.colorTable[ci] ? frame.colorTable[ci] : [0, 0, 0]
+          const cx = frame.left + x, cy = frame.top + y
+          if (cx >= 0 && cx < this.width && cy >= 0 && cy < this.height) {
+            const di = (cy * this.width + cx) * 4
+            buf[di] = color[0]; buf[di+1] = color[1]; buf[di+2] = color[2]; buf[di+3] = 255
+          }
+        }
+      }
+    }
+    // 缩放到目标尺寸
+    const scaled = new Uint8Array(targetW * targetH * 4)
+    const sx = this.width / targetW, sy = this.height / targetH
+    for (let y = 0; y < targetH; y++) {
+      for (let x = 0; x < targetW; x++) {
+        const srcX = Math.floor(x * sx), srcY = Math.floor(y * sy)
+        const si = (srcY * this.width + srcX) * 4, di = (y * targetW + x) * 4
+        scaled[di] = buf[si]; scaled[di+1] = buf[si+1]; scaled[di+2] = buf[si+2]; scaled[di+3] = buf[si+3]
+      }
+    }
+    return { rgba: new Uint8Array(scaled), delay: this.frames[frameIndex].delay || 100 }
+  }
+
+  /**
    * 将所有帧渲染为 RGBA 像素数组（纯数组，不依赖 Canvas）
    * @param {number} targetW - 目标宽度（默认64）
    * @param {number} targetH - 目标高度（默认64）
@@ -244,55 +297,55 @@ export class GIFParser {
    * @param {number} maxFrames - 最大帧数
    * @returns {{ frameCount, frames: Array<[type,delay,count,pixels]> }}
    */
-  generateESP32Data(targetW = 64, targetH = 64, maxFrames = 20, excludeRegions = []) {
+  generateESP32Data(targetW = 64, targetH = 64, maxFrames = 20, excludePixels = null, offsetX = 0, offsetY = 0) {
     const rendered = this.renderFrames(targetW, targetH)
     const count = Math.min(rendered.length, maxFrames)
     const frames = []
     let prevPixels = null
 
-    // 构建排除区域检查函数
-    const isExcluded = (x, y) => {
-      for (const r of excludeRegions) {
-        if (x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h) return true
-      }
-      return false
-    }
-
     for (let i = 0; i < count; i++) {
       const { rgba, delay } = rendered[i]
       const currentPixels = []
 
-      // 提取非黑像素，跳过时钟区域
       for (let y = 0; y < targetH; y++) {
         for (let x = 0; x < targetW; x++) {
-          if (isExcluded(x, y)) continue
+          const fx = x + offsetX
+          const fy = y + offsetY
+          if (fx < 0 || fx >= 64 || fy < 0 || fy >= 64) continue
+          if (excludePixels && excludePixels.has(`${fx},${fy}`)) continue
           const idx = (y * targetW + x) * 4
           const r = rgba[idx], g = rgba[idx+1], b = rgba[idx+2]
           if (r > 0 || g > 0 || b > 0) {
-            currentPixels.push([x, y, r, g, b])
+            currentPixels.push([fx, fy, r, g, b])
           }
         }
       }
 
+      // 限制最低50ms防止过快刷新
+      const safeDelay = Math.max(50, delay || 100)
+
       if (i === 0 || prevPixels === null) {
-        frames.push([1, delay, currentPixels.length, currentPixels])
+        frames.push([1, safeDelay, currentPixels.length, currentPixels])
       } else {
         const diff = []
         for (let y = 0; y < targetH; y++) {
           for (let x = 0; x < targetW; x++) {
-            if (isExcluded(x, y)) continue
+            const fx = x + offsetX
+            const fy = y + offsetY
+            if (fx < 0 || fx >= 64 || fy < 0 || fy >= 64) continue
+            if (excludePixels && excludePixels.has(`${fx},${fy}`)) continue
             const idx = (y * targetW + x) * 4
             const pr = prevPixels[idx], pg = prevPixels[idx+1], pb = prevPixels[idx+2]
             const cr = rgba[idx], cg = rgba[idx+1], cb = rgba[idx+2]
             if (pr !== cr || pg !== cg || pb !== cb) {
-              diff.push([x, y, cr, cg, cb])
+              diff.push([fx, fy, cr, cg, cb])
             }
           }
         }
         if (diff.length > currentPixels.length * 0.5) {
-          frames.push([1, delay, currentPixels.length, currentPixels])
+          frames.push([1, safeDelay, currentPixels.length, currentPixels])
         } else {
-          frames.push([0, delay, diff.length, diff])
+          frames.push([0, safeDelay, diff.length, diff])
         }
       }
       prevPixels = new Uint8Array(rgba)

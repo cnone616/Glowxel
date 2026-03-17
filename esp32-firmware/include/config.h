@@ -8,9 +8,9 @@
 // 服务器配置
 #define SERVER_PORT 8080
 
-// LED矩阵配置
+// LED矩阵配置（64x64 HUB75E）
 #define PANEL_WIDTH 64
-#define PANEL_HEIGHT 32
+#define PANEL_HEIGHT 64
 #define PANEL_CHAIN 1
 
 // HUB75E引脚配置（根据实际接线调整）

@@ -43,6 +43,31 @@
       </div>
     </section>
 
+    <!-- 硬件产品落地页 -->
+    <section class="hardware">
+      <div class="container">
+        <h2 class="section-title">Glowxel 像素显示设备</h2>
+        <p class="section-desc">64×64 RGB LED 矩阵，配套小程序实时控制，让你的像素作品真实发光</p>
+        <div class="hardware-grid">
+          <div class="hardware-card" v-for="spec in hardwareSpecs" :key="spec.label">
+            <div class="spec-icon" v-html="spec.icon"></div>
+            <div class="spec-label">{{ spec.label }}</div>
+            <div class="spec-value">{{ spec.value }}</div>
+          </div>
+        </div>
+        <div class="hardware-steps">
+          <div class="step" v-for="(step, i) in setupSteps" :key="i">
+            <div class="step-num">{{ i + 1 }}</div>
+            <div class="step-text">{{ step }}</div>
+          </div>
+        </div>
+        <div class="center">
+          <a href="https://item.taobao.com" target="_blank" rel="noopener" class="btn btn-primary">立即购买</a>
+          <a href="/hardware-guide.pdf" target="_blank" rel="noopener" class="btn btn-outline">组装指南</a>
+        </div>
+      </div>
+    </section>
+
     <section class="about">
       <div class="container">
         <h2 class="section-title">关于 Glowxel</h2>
@@ -71,6 +96,22 @@ const features = [
 ]
 
 const artworks = ref([])
+
+const hardwareSpecs = [
+  { icon: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="2"/><path d="M8 12h8M12 8v8"/></svg>`, label: '分辨率', value: '64 × 64 像素' },
+  { icon: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>`, label: '像素间距', value: 'P2 (2mm)' },
+  { icon: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>`, label: '主控芯片', value: 'ESP32-S3' },
+  { icon: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12.55a11 11 0 0 1 14.08 0M1.42 9a16 16 0 0 1 21.16 0M8.53 16.11a6 6 0 0 1 6.95 0M12 20h.01"/></svg>`, label: '连接方式', value: 'WiFi + BLE' },
+  { icon: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>`, label: '外壳尺寸', value: '约 135 × 135mm' },
+  { icon: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>`, label: '供电', value: 'USB-C 5V 2A' },
+]
+
+const setupSteps = [
+  '购买硬件套件，按组装指南完成焊接和组装',
+  '下载 Glowxel 小程序，蓝牙配网连接 WiFi',
+  '在编辑器设计像素图案或时钟样式',
+  '一键同步到设备，实时点亮你的作品',
+]
 
 onMounted(async () => {
   try {
@@ -129,19 +170,19 @@ onMounted(async () => {
 }
 
 .btn-primary {
-  background: #1a1a1a;
+  background: var(--color-primary);
   color: #fff;
 }
 
-.btn-primary:hover { background: #333; }
+.btn-primary:hover { background: var(--color-primary-hover); }
 
 .btn-outline {
   background: #fff;
-  color: #1a1a1a;
-  border: 1px solid #e0e0e0;
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-border);
 }
 
-.btn-outline:hover { border-color: #1a1a1a; }
+.btn-outline:hover { border-color: var(--color-primary); color: var(--color-primary); }
 
 .features { padding: 60px 0; }
 
@@ -229,6 +270,64 @@ onMounted(async () => {
   .btn { width: 100%; max-width: 280px; text-align: center; }
   .feature-grid { grid-template-columns: 1fr; }
   .artwork-grid { grid-template-columns: repeat(2, 1fr); }
+  .hardware-grid { grid-template-columns: repeat(2, 1fr); }
   .section-title { font-size: 22px; margin-bottom: 28px; }
 }
+
+.hardware { padding: 60px 0; background: #f8faff; }
+.section-desc { text-align: center; color: #666; margin-bottom: 40px; font-size: 16px; }
+
+.hardware-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+  margin-bottom: 40px;
+}
+
+.hardware-card {
+  background: #fff;
+  border: 1px solid #e8edf5;
+  border-radius: 12px;
+  padding: 24px;
+  text-align: center;
+}
+
+.spec-icon { color: #4F7FFF; margin-bottom: 12px; display: flex; justify-content: center; }
+.spec-label { font-size: 13px; color: #999; margin-bottom: 6px; }
+.spec-value { font-size: 16px; font-weight: 600; color: #1a1a1a; }
+
+.hardware-steps {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 40px;
+  flex-wrap: wrap;
+}
+
+.step {
+  flex: 1;
+  min-width: 180px;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background: #fff;
+  border-radius: 10px;
+  padding: 16px;
+  border: 1px solid #e8edf5;
+}
+
+.step-num {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #4F7FFF;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.step-text { font-size: 14px; color: #444; line-height: 1.5; }
 </style>

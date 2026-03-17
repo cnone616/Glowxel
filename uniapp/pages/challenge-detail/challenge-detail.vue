@@ -386,6 +386,9 @@ export default {
   padding: 12rpx 24rpx;
   border-radius: var(--radius-small);
   backdrop-filter: blur(10rpx);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .status-active {
@@ -404,6 +407,7 @@ export default {
   font-size: 24rpx;
   color: #FFFFFF;
   font-weight: 600;
+  line-height: 1.2;
 }
 
 .main-content {

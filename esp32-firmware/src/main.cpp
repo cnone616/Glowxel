@@ -90,17 +90,22 @@ void loop() {
     // 画布模式：每分钟更新一次时钟
     static unsigned long lastClockUpdate = 0;
     static int lastMinute = -1;
+    static unsigned long lastNtpRetry = 0;
 
-    // 获取当前时间
     struct tm timeinfo;
     if (getLocalTime(&timeinfo)) {
-      // 只有分钟变化时才刷新
       if (timeinfo.tm_min != lastMinute) {
         lastMinute = timeinfo.tm_min;
         DisplayManager::displayClock();
       }
     } else {
-      // 如果时间未同步，每10秒尝试刷新一次
+      // 时间未同步：每60秒重试一次 NTP
+      if (millis() - lastNtpRetry > 60000) {
+        lastNtpRetry = millis();
+        Serial.println("NTP 未同步，重试...");
+        configTime(8 * 3600, 0, "pool.ntp.org");
+      }
+      // 每10秒刷新一次显示
       if (millis() - lastClockUpdate > 10000) {
         lastClockUpdate = millis();
         DisplayManager::displayClock();

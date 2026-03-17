@@ -134,6 +134,20 @@ void WiFiManager::setupWiFi() {
       // 同步NTP时间
       configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
       Serial.println("正在同步网络时间...");
+
+      // 等待NTP同步完成，最多10秒
+      struct tm timeinfo;
+      int ntpRetry = 0;
+      while (!getLocalTime(&timeinfo) && ntpRetry < 20) {
+        delay(500);
+        ntpRetry++;
+        Serial.print(".");
+      }
+      if (ntpRetry < 20) {
+        Serial.println("\nNTP时间同步成功");
+      } else {
+        Serial.println("\nNTP同步超时，继续启动");
+      }
       
       // 在LED上显示WiFi大图标 + 右下角绿色勾徽章
       DisplayManager::dma_display->clearScreen();
@@ -145,10 +159,10 @@ void WiFiManager::setupWiFi() {
       DisplayManager::drawTinyTextCentered(ip.c_str(), 46, DisplayManager::dma_display->color565(150, 150, 150));
       
       delay(2000);
-      
-      // 进入画布模式（默认黑底+时钟）
-      DisplayManager::currentMode = MODE_CANVAS;
-      
+
+      // 不强制覆盖模式，ConfigManager::loadClockConfig() 已从 Preferences 恢复
+      // AnimationManager::init() 会从 LittleFS 加载动画数据并自动播放
+
       return;
     }
     

@@ -691,11 +691,17 @@ function copyESP32AnimationData() {
   
   const esp32Data = window.currentGifESP32Data;
   const esp32Format = esp32Data.esp32Format;
-  
-  // 简单压缩格式
+
+  // 应用当前速度倍率到每帧delay, 保证导出数据和预览一致
+  // 限制最低50ms防止过快刷新
+  const speedAdjustedFrames = esp32Format.d.map(frame => ({
+    ...frame,
+    d: Math.max(50, Math.round(frame.d / gifSpeed))
+  }));
+
   const compactData = {
     f: esp32Format.f,
-    d: esp32Format.d
+    d: speedAdjustedFrames
   };
   
   const jsonStr = JSON.stringify(compactData);
@@ -703,13 +709,13 @@ function copyESP32AnimationData() {
   
   // 检查数据大小
   if (jsonStr.length > 300000) { // 提高到300KB限制
-    alert(`⚠️ 数据过大 (${sizeKB} KB)！\n\n建议：\n1. 使用更小的 GIF 文件\n2. 减少帧数\n3. 降低分辨率\n\n当前数据可能导致 ESP32 内存不足`);
+    alert(`数据过大 (${sizeKB} KB)\n\n建议:\n1. 使用更小的 GIF 文件\n2. 减少帧数\n3. 降低分辨率\n\n当前数据可能导致 ESP32 内存不足`);
     return;
   }
-  
+
   navigator.clipboard.writeText(jsonStr).then(() => {
     const stats = esp32Data.statistics;
-    const message = `✅ ESP32 紧凑动画数据已复制！
+    const message = `ESP32 紧凑动画数据已复制
 
 数据大小: ${sizeKB} KB
 格式说明:

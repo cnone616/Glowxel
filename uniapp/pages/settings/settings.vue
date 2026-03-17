@@ -527,7 +527,7 @@ export default {
   flex: 1;
   padding: 32rpx 32rpx 80rpx;
   overflow-y: scroll;
-  width: calc(100% - 64rpx)
+  box-sizing: border-box;
 }
 
 .settings-section {

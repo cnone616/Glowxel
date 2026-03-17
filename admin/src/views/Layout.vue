@@ -31,6 +31,10 @@
           <template #icon><MessageOutlined /></template>
           <span>评论管理</span>
         </a-menu-item>
+        <a-menu-item key="/firmware">
+          <template #icon><CloudUploadOutlined /></template>
+          <span>固件管理</span>
+        </a-menu-item>
       </a-menu>
     </a-layout-sider>
     <a-layout>
@@ -48,7 +52,7 @@
 <script setup>
 import { ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { DashboardOutlined, UserOutlined, PictureOutlined, AppstoreOutlined, TrophyOutlined, MessageOutlined, CalendarOutlined } from '@ant-design/icons-vue'
+import { DashboardOutlined, UserOutlined, PictureOutlined, AppstoreOutlined, TrophyOutlined, MessageOutlined, CalendarOutlined, CloudUploadOutlined } from '@ant-design/icons-vue'
 
 const route = useRoute()
 const router = useRouter()

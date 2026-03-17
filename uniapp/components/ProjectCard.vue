@@ -246,15 +246,19 @@ export default {
   position: absolute;
   top: 12rpx;
   right: 12rpx;
-  padding: 4rpx 16rpx;
+  padding: 6rpx 16rpx;
   border-radius: 8rpx;
   z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .status-text {
   font-size: 20rpx;
   font-weight: 500;
   color: #FFFFFF;
+  line-height: 1.2;
 }
 
 .status-draft {

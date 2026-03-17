@@ -44,9 +44,9 @@ async function handleLogin() {
 .subtitle { text-align: center; color: #999; font-size: 14px; margin: 8px 0 28px; }
 form { display: flex; flex-direction: column; gap: 14px; }
 input { padding: 12px 14px; border: 1px solid #e0e0e0; border-radius: 8px; font-size: 14px; outline: none; }
-input:focus { border-color: #1a1a1a; }
-.login-btn { padding: 12px; border: none; border-radius: 8px; background: #1a1a1a; color: #fff; font-size: 15px; font-weight: 600; cursor: pointer; }
-.login-btn:hover { background: #333; }
+input:focus { border-color: var(--color-primary); }
+.login-btn { padding: 12px; border: none; border-radius: 8px; background: var(--color-primary); color: #fff; font-size: 15px; font-weight: 600; cursor: pointer; }
+.login-btn:hover { background: var(--color-primary-hover); }
 .login-btn:disabled { background: #ccc; cursor: not-allowed; }
 .error { text-align: center; color: #e53e3e; font-size: 13px; margin-top: 12px; }
 </style>

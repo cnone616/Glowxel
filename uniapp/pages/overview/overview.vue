@@ -250,7 +250,7 @@ import Icon from '../../components/Icon.vue'
 import Toast from '../../components/Toast.vue'
 import ConfirmModal from '../../components/ConfirmModal.vue'
 import { exportCanvasAsImage, saveImageToAlbum } from '../../utils/exportCanvas.js'
-import projectAPI from '../../api/project.js'
+import { getCloudProjects, deleteCloudProject } from '../../api/project.js'
 
 export default {
   mixins: [statusBarMixin],
@@ -699,12 +699,12 @@ export default {
       
       try {
         // 先获取云端项目
-        const cloudRes = await projectAPI.getUserProjects()
+        const cloudRes = await getCloudProjects()
         if (cloudRes.success) {
           const cloudProject = cloudRes.data.find(p => p.id === this.project.id)
           if (cloudProject && cloudProject._id) {
             // 删除云端项目
-            await projectAPI.deleteProject(cloudProject._id)
+            await deleteCloudProject(cloudProject._id)
           }
         }
         
