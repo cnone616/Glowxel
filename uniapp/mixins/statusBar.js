@@ -5,26 +5,22 @@ export default {
       statusBarHeight: 0
     }
   },
-  
+
   onLoad() {
     this.initStatusBar()
   },
-  
+
+  onShow() {
+    // tabBar 页面切换时不触发 onLoad，需在 onShow 里补充初始化
+    if (!this.statusBarHeight) {
+      this.initStatusBar()
+    }
+  },
+
   methods: {
     initStatusBar() {
-      // #ifdef MP-WEIXIN
       const systemInfo = uni.getSystemInfoSync()
       this.statusBarHeight = systemInfo.statusBarHeight || 0
-      // #endif
-      
-      // #ifdef H5
-      this.statusBarHeight = 0
-      // #endif
-      
-      // #ifdef APP-PLUS
-      const systemInfo = uni.getSystemInfoSync()
-      this.statusBarHeight = systemInfo.statusBarHeight || 0
-      // #endif
     }
   }
 }

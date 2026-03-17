@@ -69,11 +69,18 @@ static void _eraseClockRegion();
 static int clockConfig_timeY();
 
 void DisplayManager::displayClock() {
+  bool hasCustomImage = ConfigManager::clockConfig.image.show &&
+                        ConfigManager::imagePixels != nullptr &&
+                        ConfigManager::imagePixelCount > 0;
+
   struct tm timeinfo;
   if (!getLocalTime(&timeinfo)) {
-    // 时间未同步，只擦时钟区域，显示 "--:--"
+    // 时间未同步：擦除时钟区域，画默认背景，显示白色 "--:--"
     _eraseClockRegion();
-    drawTinyTextCentered("--:--", clockConfig_timeY(), dma_display->color565(100, 200, 255));
+    if (currentMode == MODE_CANVAS && !hasCustomImage) {
+      drawLogo(true);  // 没有自定义图片时，Logo作为默认背景
+    }
+    drawTinyTextCentered("--:--", clockConfig_timeY(), dma_display->color565(255, 255, 255));
     return;
   }
 
@@ -85,9 +92,10 @@ void DisplayManager::displayClock() {
   // 擦除上一次时钟文字区域（不 clearScreen，不影响背景）
   _eraseClockRegion();
 
-  // 绘制背景图片（只在首次或背景变化时绘制，动画模式由 updateGIFAnimation 负责）
+  // 绘制背景
   if (currentMode == MODE_CANVAS) {
-    if (ConfigManager::clockConfig.image.show && ConfigManager::imagePixels != nullptr && ConfigManager::imagePixelCount > 0) {
+    if (hasCustomImage) {
+      // 有自定义图片，画图片
       for (int i = 0; i < ConfigManager::imagePixelCount; i++) {
         PixelData& pixel = ConfigManager::imagePixels[i];
         if (pixel.x < PANEL_RES_X && pixel.y < PANEL_RES_Y) {
@@ -95,10 +103,13 @@ void DisplayManager::displayClock() {
         }
         if (i % 100 == 0) yield();
       }
+    } else {
+      // 没有自定义图片，画Logo九宫格作为默认背景
+      drawLogo(true);
     }
   }
 
-  // 叠加时钟文字
+  // 叠加时钟文字（白色，由 clockConfig 控制）
   drawClockOverlay();
 }
 

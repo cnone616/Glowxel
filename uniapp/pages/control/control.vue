@@ -1,9 +1,7 @@
 <template>
   <view class="control-page">
     <!-- 状态栏占位 -->
-    <!-- #ifdef MP-WEIXIN -->
     <view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
-    <!-- #endif -->
 
     <!-- 导航栏 -->
     <view class="navbar">

@@ -12,12 +12,13 @@
         <text class="modal-desc">{{ description }}</text>
         
         <view class="input-wrapper">
-          <input 
+          <input
             v-model="inputValue"
             type="text"
             class="custom-input"
             :placeholder="placeholder"
             placeholder-class="input-placeholder"
+            :adjust-position="false"
             @confirm="handleConfirm"
           />
         </view>

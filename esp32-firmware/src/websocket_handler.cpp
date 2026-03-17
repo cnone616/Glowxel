@@ -313,11 +313,13 @@ void WebSocketHandler::handleJsonCommand(AsyncWebSocketClient *client, JsonDocum
         AnimationManager::currentGIF->isPlaying = false;
       }
       DisplayManager::currentMode = MODE_CANVAS;
+      ConfigManager::saveClockConfig();  // 持久化模式，重启后保持静态
       DisplayManager::displayClock();
       response["message"] = "switched to static clock mode";
     } else if (mode == "canvas") {
       DisplayManager::currentMode = MODE_CANVAS;
-      
+      ConfigManager::saveClockConfig();  // 持久化模式
+
       // 如果有画布缓冲区数据，恢复显示
       if (DisplayManager::canvasInitialized) {
         Serial.println("恢复画布缓冲区数据");
@@ -335,11 +337,12 @@ void WebSocketHandler::handleJsonCommand(AsyncWebSocketClient *client, JsonDocum
       } else {
         DisplayManager::dma_display->clearScreen();
       }
-      
+
       response["message"] = "switched to canvas mode";
     } else if (mode == "animation") {
       DisplayManager::currentMode = MODE_ANIMATION;
-      
+      ConfigManager::saveClockConfig();  // 持久化模式
+
       // 如果有 GIF 动画，开始播放
       if (AnimationManager::currentGIF != nullptr) {
         AnimationManager::currentGIF->isPlaying = true;

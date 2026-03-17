@@ -38,6 +38,14 @@ void setup() {
     // OTA 检查更新
     OTAManager::init();
     OTAManager::checkUpdate();
+
+    // 清除WiFi状态画面，进入正常显示
+    DisplayManager::clearScreen();
+
+    // 立即渲染首帧：画布模式画时钟，动画模式由 AnimationManager::init() 已处理
+    if (DisplayManager::currentMode == MODE_CANVAS) {
+      DisplayManager::displayClock();
+    }
   }
   
   Serial.println("\n=================================");

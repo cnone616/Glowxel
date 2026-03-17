@@ -1,9 +1,7 @@
 <template>
   <view class="assist-page" :class="{ 'light-theme': false }">
     <!-- 状态栏占位 -->
-    <!-- #ifdef MP-WEIXIN -->
     <view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
-    <!-- #endif -->
     
     <!-- 行导航弹窗 -->
     <view v-if="isRowListOpen" class="modal-overlay" @click="isRowListOpen = false">
@@ -127,6 +125,9 @@
           </view>
           <!-- 操作按钮 -->
           <view class="header-actions">
+            <view class="icon-btn" @click="isHelpOpen = true">
+              <Icon name="help" :size="24" />
+            </view>
             <view 
               class="icon-btn device-btn"
               :class="{ 'connected': deviceConnected }"
@@ -408,11 +409,10 @@ export default {
       isIndexTouching: false,
       
       helpItems: [
-        { iconText: '🎨', title: '颜色模式 (默认)', description: '查看当前板子用到的所有颜色。点击某个颜色，画布上对应位置会高亮闪烁，方便批量拼装同色豆子。' },
-        { iconText: '📋', title: '逐行模式', description: '按行进行拼装。画布会自动遮罩其他行，专注于当前行。拼完一行后可点击「标记完成」并自动跳转下一行。空行会自动标记为完成，您也可以手动取消。' },
-        { iconText: '⊞', title: '行导航', description: '点击行控制栏左侧的「列表」图标，可以查看所有行的完成状态，并快速跳转到指定行。' },
-        { iconText: '👆', title: '高亮辅助', description: '点击任意颜色块即可高亮显示。再次点击取消高亮。' },
-        { iconText: '🔍', title: '画布操作', description: '双指捏合缩放画布，单指拖动查看细节。网格线会随缩放自动显示。' }
+        { iconText: '', title: '颜色模式 (默认)', description: '查看当前板子用到的所有颜色。点击某个颜色，画布上对应位置会高亮闪烁，方便批量拼装同色豆子。' },
+        { iconText: '', title: '行导航', description: '点击行控制栏左侧的「列表」图标，可以查看所有行的完成状态，并快速跳转到指定行。' },
+        { iconText: '', title: '高亮辅助', description: '点击任意颜色块即可高亮显示。再次点击取消高亮。' },
+        { iconText: '', title: '画布操作', description: '双指捏合缩放画布，单指拖动查看细节。网格线会随缩放自动显示。' }
       ]
     }
   },
@@ -513,6 +513,22 @@ export default {
   },
 
   watch: {
+    // 弹窗关闭时重试 canvas 初始化（canvas-container 被 v-if 控制，弹窗打开时不在 DOM 中）
+    isHelpOpen(newVal) {
+      if (!newVal && !this.canvasReady) {
+        this.$nextTick(() => this.initCanvas())
+      }
+    },
+    isRowListOpen(newVal) {
+      if (!newVal && !this.canvasReady) {
+        this.$nextTick(() => this.initCanvas())
+      }
+    },
+    showConnectModal(newVal) {
+      if (!newVal && !this.canvasReady) {
+        this.$nextTick(() => this.initCanvas())
+      }
+    },
     assistMode() {
       this.highlightColor = null
       this.saveProgress()
@@ -562,54 +578,24 @@ export default {
   },
 
   onReady() {
-    // 注册自定义 Toast 实例
     if (this.$refs.toastRef) {
       this.toast.setToastInstance(this.$refs.toastRef)
     }
-    
-    setTimeout(() => {
-      const query = uni.createSelectorQuery().in(this)
-      query.select('.canvas-container').boundingClientRect(data => {
-        if (data && data.width > 0 && data.height > 0) {
-          this.canvasWidth = data.width
-          this.canvasHeight = data.height
-          
-          const fitZoomW = (data.width * 0.9) / 64
-          const fitZoomH = (data.height * 0.9) / 64
-          const fitZoom = Math.min(fitZoomW, fitZoomH, 50)
-
-          const boardPixelWidth = 64 * fitZoom
-          const boardPixelHeight = 64 * fitZoom
-          
-          this.zoom = fitZoom
-          this.pan = {
-            x: (data.width - boardPixelWidth) / 2,
-            y: (data.height - boardPixelHeight) / 2
-          }
-          
-          this.canvasReady = true
-          
-          setTimeout(() => {
-            this.isCalculated = true
-          }, 10)
-        }
-      }).exec()
-    }, 100)
+    this.initCanvas()
   },
 
   onShow() {
-    // 如果设备已连接，确保模式正确并同步画布
+    if (!this.canvasReady) {
+      this.initCanvas()
+    }
     if (this.deviceConnected && this.localPixels.size > 0) {
       console.log('页面显示，确保画板模式并同步画布')
-      // 延迟一下，确保页面完全加载
       setTimeout(async () => {
         try {
           const ws = this.deviceStore.getWebSocket()
           if (ws) {
-            // 先切换到画板模式（可能从其他页面回来，板子可能是闹钟模式）
             await ws.send({ cmd: 'set_mode', mode: 'canvas' })
             await new Promise(resolve => setTimeout(resolve, 200))
-            // 同步画布
             await this.syncToDevice()
           }
         } catch (err) {
@@ -624,6 +610,39 @@ export default {
   },
 
   methods: {
+    // Canvas 初始化（弹窗可能遮挡 canvas-container 导致首次查询失败，需重试）
+    initCanvas() {
+      if (this.canvasReady) return
+      setTimeout(() => {
+        const query = uni.createSelectorQuery().in(this)
+        query.select('.canvas-container').boundingClientRect(data => {
+          if (data && data.width > 0 && data.height > 0) {
+            this.canvasWidth = data.width
+            this.canvasHeight = data.height
+
+            const fitZoomW = (data.width * 0.9) / 64
+            const fitZoomH = (data.height * 0.9) / 64
+            const fitZoom = Math.min(fitZoomW, fitZoomH, 50)
+
+            const boardPixelWidth = 64 * fitZoom
+            const boardPixelHeight = 64 * fitZoom
+
+            this.zoom = fitZoom
+            this.pan = {
+              x: (data.width - boardPixelWidth) / 2,
+              y: (data.height - boardPixelHeight) / 2
+            }
+
+            this.canvasReady = true
+
+            setTimeout(() => {
+              this.isCalculated = true
+            }, 10)
+          }
+        }).exec()
+      }, 150)
+    },
+
     // ========== 设备同步方法 ==========
     toggleDeviceSync() {
       if (this.deviceConnected) {
@@ -1039,6 +1058,11 @@ export default {
       
       this.completedRows = newSet
       this.completedColors = newColorSet
+
+      // 同步板子亮度（逐行模式下已完成的行变暗）
+      if (this.deviceConnected && this.assistMode === 'row') {
+        this.syncToDevice()
+      }
     },
 
     prevRow() {

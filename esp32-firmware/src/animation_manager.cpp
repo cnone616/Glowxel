@@ -31,6 +31,7 @@ void AnimationManager::init() {
 
 void AnimationManager::updateGIFAnimation() {
   if (currentGIF == nullptr || !currentGIF->isPlaying) return;
+  if (currentGIF->frameCount <= 1) return;  // 单帧无需更新
 
   unsigned long currentTime = millis();
   AnimationFrame& frame = currentGIF->frames[currentGIF->currentFrame];
@@ -40,11 +41,15 @@ void AnimationManager::updateGIFAnimation() {
 
   // 检查是否需要切换到下一帧
   if (currentTime - currentGIF->lastFrameTime >= frameDelay) {
-    // 渲染当前帧
-    renderGIFFrame(currentGIF->currentFrame);
+    // 切换到下一帧（帧0已在首次播放时渲染，后续循环跳过帧0避免全屏重绘闪烁）
+    int nextFrame = (currentGIF->currentFrame + 1) % currentGIF->frameCount;
+    if (nextFrame == 0 && currentGIF->frameCount > 1) {
+      nextFrame = 1;  // 跳过帧0，直接从帧1继续循环
+    }
+    currentGIF->currentFrame = nextFrame;
 
-    // 切换到下一帧
-    currentGIF->currentFrame = (currentGIF->currentFrame + 1) % currentGIF->frameCount;
+    // 渲染当前帧（diff帧只更新变化的像素，不会闪）
+    renderGIFFrame(currentGIF->currentFrame);
     currentGIF->lastFrameTime = currentTime;
   }
 }
