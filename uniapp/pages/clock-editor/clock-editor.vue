@@ -1,9 +1,7 @@
 <template>
   <view class="clock-editor-page">
     <!-- 状态栏占位 -->
-    <!-- #ifdef MP-WEIXIN -->
     <view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
-    <!-- #endif -->
     
     <!-- 头部 -->
     <view class="header">
@@ -1087,8 +1085,8 @@ export default {
         this.config.image[key] = newValue
 
         if (key === 'x' || key === 'y') {
-          // 位置变化：只重绘，不重转图片
-          this.drawGIFFrame()
+          // 位置变化：全量重绘避免旧位置残留重影
+          this.drawCanvas()
         } else if ((key === 'width' || key === 'height') && this.config.image.data) {
           // 尺寸变化：debounce 300ms，只渲染第一帧预览（不渲染全部帧，避免卡顿）
           if (this._resizeDebounceTimer) clearTimeout(this._resizeDebounceTimer)
@@ -1948,8 +1946,8 @@ export default {
 
         console.log('闹钟配置发送成功')
 
-        // 3. 检查是否有 GIF 动画数据
-        if (this.gifAnimationData && this.gifAnimationData.frameCount > 0) {
+        // 3. 只有动态模式才发送 GIF 动画数据；静态模式只发配置+静态像素
+        if (this.clockMode === 'animation' && this.gifAnimationData && this.gifAnimationData.frameCount > 0) {
           console.log(`发送 GIF 动画: ${this.gifAnimationData.frameCount} 帧`)
 
           // 不要提前切换到动画模式——animation_end 会自动切换并播放
@@ -1970,7 +1968,7 @@ export default {
           console.log('animation_begin 回复:', JSON.stringify(resp))
 
           const CHUNK_SIZE = 200  // 二进制每批200像素 = 1000字节，很轻松
-          const ws = this.deviceStore.getWebSocket()
+          // 注意：不要重新声明 ws，复用外层的 ws 实例
           for (let i = 0; i < frames.length; i++) {
             const frame = frames[i]  // [type, delay, count, pixels]
             const type = frame[0]
@@ -2011,6 +2009,8 @@ export default {
                 }, 15000)
                 const handler = (msg) => {
                   if (resolved) return
+                  // 过滤掉 show_loading 的回复，避免干扰二进制 chunk 确认
+                  if (msg && msg.message === 'loading displayed') return
                   resolved = true
                   clearTimeout(timeout)
                   ws.offMessage(handler)

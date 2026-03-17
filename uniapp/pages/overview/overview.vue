@@ -365,7 +365,10 @@ export default {
   },
   
   onShow() {
-    // 页面显示时的处理
+    // 从 assist 页返回时刷新进度数据
+    if (this.projectStore && this.projectId) {
+      this.project = this.projectStore.getProject(this.projectId)
+    }
   },
   
   methods: {
