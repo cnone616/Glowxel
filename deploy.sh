@@ -7,6 +7,7 @@
 
 set -e
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 SERVER="ubuntu@175.178.153.146"
 SKIP_WEBSITE=false
 SKIP_ADMIN=false
@@ -47,7 +48,7 @@ REMOTE
 # ── 3. 构建官网 ───────────────────────────────────────────────
 if [ "$SKIP_WEBSITE" = false ]; then
   echo "[3/5] 构建官网..."
-  cd "$(dirname "$0")/website"
+  cd "$SCRIPT_DIR/website"
   npm install --silent
   npm run build
   tar -czf /tmp/website-dist.tar.gz -C dist .
@@ -60,7 +61,7 @@ rm -f /tmp/website-dist.tar.gz
 echo "  ✓ 官网已更新"
 REMOTE
   rm -f /tmp/website-dist.tar.gz
-  cd "$(dirname "$0")"
+  cd "$SCRIPT_DIR"
 else
   echo "[3/5] 跳过官网构建"
 fi
@@ -68,7 +69,7 @@ fi
 # ── 4. 构建后台管理 ───────────────────────────────────────────
 if [ "$SKIP_ADMIN" = false ]; then
   echo "[4/5] 构建后台管理..."
-  cd "$(dirname "$0")/admin"
+  cd "$SCRIPT_DIR/admin"
   npm install --silent
   npm run build
   tar -czf /tmp/admin-dist.tar.gz -C dist .
@@ -81,7 +82,7 @@ rm -f /tmp/admin-dist.tar.gz
 echo "  ✓ 后台管理已更新"
 REMOTE
   rm -f /tmp/admin-dist.tar.gz
-  cd "$(dirname "$0")"
+  cd "$SCRIPT_DIR"
 else
   echo "[4/5] 跳过后台管理构建"
 fi
