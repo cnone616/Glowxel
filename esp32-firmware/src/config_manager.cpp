@@ -1,11 +1,13 @@
 #include "config_manager.h"
+#include "display_manager.h"
 
 // 静态成员初始化
 Preferences ConfigManager::preferences;
 ClockConfig ConfigManager::clockConfig = {
-  .time = {1, 17, 5, 255, 255, 255},
-  .date = {false, 1, 14, 55, 120, 120, 120},
-  .week = {false, 23, 44, 100, 100, 100},
+  // 默认：时间居中，size=2，白色
+  .time = {2, 22, 4, 255, 255, 255},
+  .date = {false, 1, 22, 10, 120, 120, 120},
+  .week = {false, 26, 47, 100, 100, 100},
   .image = {false, 0, 0, 64, 64}
 };
 PixelData* ConfigManager::imagePixels = nullptr;
@@ -47,12 +49,19 @@ void ConfigManager::loadClockConfig() {
     Serial.println("使用默认闹钟配置");
   }
 
+  // 恢复上次的显示模式
+  int savedMode = preferences.getInt("dispMode", 0);
+  DisplayManager::currentMode = (DeviceMode)savedMode;
+  Serial.printf("恢复显示模式: %s\n", savedMode == MODE_ANIMATION ? "ANIMATION" : "CANVAS");
+
   preferences.end();
 }
 
 void ConfigManager::saveClockConfig() {
   preferences.begin("clock", false);
   preferences.putBytes("config", &clockConfig, sizeof(ClockConfig));
+  // 持久化当前显示模式
+  preferences.putInt("dispMode", (int)DisplayManager::currentMode);
   preferences.end();
   Serial.println("闹钟配置已保存");
 }
@@ -129,9 +138,9 @@ void ConfigManager::resetToDefault() {
 
   // 恢复默认闹钟配置
   clockConfig = {
-    .time = {1, 17, 5, 255, 255, 255},
-    .date = {false, 1, 14, 55, 120, 120, 120},
-    .week = {false, 23, 44, 100, 100, 100},
+    .time = {2, 22, 4, 255, 255, 255},
+    .date = {false, 1, 22, 10, 120, 120, 120},
+    .week = {false, 26, 47, 100, 100, 100},
     .image = {false, 0, 0, 64, 64}
   };
 

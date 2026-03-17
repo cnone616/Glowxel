@@ -33,6 +33,14 @@ router.post('/:artworkId', auth, contentFilter(['content']), async (req, res) =>
       [req.params.artworkId, req.user.id, content, replyTo || null]
     );
     await db.query('UPDATE artworks SET comments_count = comments_count + 1 WHERE id = ?', [req.params.artworkId]);
+    // 写入通知（不通知自己）
+    const [[artwork]] = await db.query('SELECT user_id FROM artworks WHERE id = ?', [req.params.artworkId]);
+    if (artwork && artwork.user_id !== req.user.id) {
+      await db.query(
+        'INSERT INTO notifications (user_id, actor_id, type, artwork_id, comment_id) VALUES (?,?,?,?,?)',
+        [artwork.user_id, req.user.id, 'comment', req.params.artworkId, result.insertId]
+      );
+    }
     const [rows] = await db.query(
       `SELECT c.id, c.content, c.likes, c.reply_to, c.created_at,
        u.id as user_id, u.name as user_name, u.avatar as user_avatar

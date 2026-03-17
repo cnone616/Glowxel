@@ -343,27 +343,17 @@
     <!-- 自定义 Toast 组件 -->
     <Toast ref="toastRef" />
     
-    <!-- 需要登录弹窗 -->
-    <ConfirmModal
-      :visible.sync="showLoginModal"
-      title="需要登录"
-      content="创建项目需要先登录，是否前往登录？"
-      confirmText="前往登录"
-      cancelText="取消"
-      @confirm="goToLogin"
-    />
+
   </view>
 </template>
 
 <script>
-import { useUserStore } from '../../store/user.js'
 import { useProjectStore } from '../../store/project.js'
 import { useToast } from '../../composables/useToast.js'
 import { ARTKAL_COLORS_FULL, ARTKAL_OFFICIAL_SETS, ARTKAL_PRESETS } from '../../data/artkal-colors-full.js'
 import statusBarMixin from '../../mixins/statusBar.js'
 import Icon from '../../components/Icon.vue'
 import Toast from '../../components/Toast.vue'
-import ConfirmModal from '../../components/ConfirmModal.vue'
 import ProjectCard from '../../components/ProjectCard.vue'
 
 export default {
@@ -371,7 +361,6 @@ export default {
   components: {
     Icon,
     Toast,
-    ConfirmModal,
     ProjectCard
   },
   data() {
@@ -411,7 +400,7 @@ export default {
         { width: 576, height: 576 },
         { width: 640, height: 640 }
       ],
-      showLoginModal: false // 需要登录弹窗
+
     }
   },
   
@@ -504,13 +493,6 @@ export default {
   },
 
   onLoad(options) {
-    // 检查登录状态
-    const userStore = useUserStore()
-    if (!userStore.hasLogin) {
-      this.showLoginModal = true
-      return
-    }
-
     this.projectStore = useProjectStore()
     this.toast = useToast()
 
@@ -570,12 +552,7 @@ export default {
       this.isNameFocused = false
     },
     
-    // 前往登录
-    goToLogin() {
-      uni.switchTab({
-        url: '/pages/profile/profile'
-      })
-    },
+
     
     // 检测图片是否可能是像素画
     detectPixelArt(imageData, width, height) {

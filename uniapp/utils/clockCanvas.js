@@ -84,7 +84,62 @@ export const font5x7 = {
   '周': [0x7F, 0x49, 0x49, 0x49, 0x7F]
 }
 
-// Hex 转 RGB
+// 3x5 点阵字体（与 ESP32 FONT3X5 完全一致）
+// 每字符5行，每行3bit: bit2=左列, bit1=中列, bit0=右列
+export const font3x5 = {
+  '0':[7,5,5,5,7],'1':[2,6,2,2,7],'2':[7,1,7,4,7],'3':[7,1,7,1,7],
+  '4':[5,5,7,1,1],'5':[7,4,7,1,7],'6':[7,4,7,5,7],'7':[7,1,1,1,1],
+  '8':[7,5,7,5,7],'9':[7,5,7,1,7],
+  '.':[0,0,0,0,2],':':[0,2,0,2,0],'-':[0,0,7,0,0],' ':[0,0,0,0,0],
+  'A':[2,5,7,5,5],'B':[6,5,6,5,6],'C':[7,4,4,4,7],'D':[6,5,5,5,6],
+  'E':[7,4,7,4,7],'F':[7,4,7,4,4],'G':[7,4,5,5,7],'H':[5,5,7,5,5],
+  'I':[7,2,2,2,7],'J':[3,1,1,5,7],'K':[5,6,4,6,5],'L':[4,4,4,4,7],
+  'M':[5,7,5,5,5],'N':[5,7,7,5,5],'O':[7,5,5,5,7],'P':[7,5,7,4,4],
+  'Q':[7,5,5,7,1],'R':[7,5,7,6,5],'S':[7,4,7,1,7],'T':[7,2,2,2,2],
+  'U':[5,5,5,5,7],'V':[5,5,5,2,2],'W':[5,5,5,7,5],'X':[5,5,2,5,5],
+  'Y':[5,5,2,2,2],'Z':[7,1,2,4,7],
+  'a':[0,7,5,5,7],'b':[4,6,5,5,6],'c':[0,7,4,4,7],'d':[1,3,5,5,3],
+  'e':[0,7,5,7,4],'f':[3,4,7,4,4],'g':[7,5,7,1,7],'h':[4,4,6,5,5],
+  'i':[2,0,2,2,2],'k':[4,5,6,5,5],'l':[6,2,2,2,7],'m':[0,5,7,5,5],
+  'n':[0,6,5,5,5],'o':[0,7,5,5,7],'p':[7,5,7,4,4],'r':[0,7,4,4,4],
+  's':[7,4,7,1,7],'t':[4,7,4,4,3],'u':[0,5,5,5,7],'w':[0,5,5,7,5],
+  'x':[0,5,2,2,5],'y':[5,5,7,1,7]
+}
+
+// 绘制单个字符到像素 Map（3x5 字体，与 ESP32 drawTinyText 一致）
+export function drawTinyCharToPixels(char, x, y, color, pixelMap, size = 1) {
+  const glyph = font3x5[char]
+  if (!glyph) return 4 * size
+  for (let row = 0; row < 5; row++) {
+    const bits = glyph[row]
+    for (let sy = 0; sy < size; sy++) {
+      for (let sx = 0; sx < size; sx++) {
+        if (bits & 4) { const px = x + sx,       py = y + row * size + sy; if (px >= 0 && px < 64 && py >= 0 && py < 64) pixelMap.set(`${px},${py}`, color) }
+        if (bits & 2) { const px = x + size + sx, py = y + row * size + sy; if (px >= 0 && px < 64 && py >= 0 && py < 64) pixelMap.set(`${px},${py}`, color) }
+        if (bits & 1) { const px = x + size*2 + sx, py = y + row * size + sy; if (px >= 0 && px < 64 && py >= 0 && py < 64) pixelMap.set(`${px},${py}`, color) }
+      }
+    }
+  }
+  return (3 * size) + size  // 3列×size + 1px间距×size
+}
+
+// 绘制文本到像素 Map（3x5 字体，支持 size 缩放和对齐）
+export function drawTinyTextToPixels(text, x, y, color, pixelMap, size = 1, align = 'left') {
+  const totalWidth = getTinyTextWidth(text, size)
+  let startX = x
+  if (align === 'center') startX = x - Math.floor(totalWidth / 2)
+  else if (align === 'right') startX = x - totalWidth
+  let cx = startX
+  for (let i = 0; i < text.length; i++) {
+    cx += drawTinyCharToPixels(text[i], cx, y, color, pixelMap, size)
+  }
+}
+
+// 计算 3x5 文本宽度（支持 size 缩放）
+export function getTinyTextWidth(text, size = 1) {
+  if (!text || text.length === 0) return 0
+  return text.length * 4 * size - size  // 每字符(3+1)×size，最后一个字符不加间距
+}
 export function hexToRgb(hex) {
   const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex)
   return result ? {

@@ -258,321 +258,271 @@
 
 <script>
 import { useUserStore } from '../../store/user.js'
+import { useProjectStore } from '../../store/project.js'
 import { useToast } from '../../composables/useToast.js'
 import statusBarMixin from '../../mixins/statusBar.js'
 import Icon from '../../components/Icon.vue'
 import Toast from '../../components/Toast.vue'
+import { getSyncStatus, syncProject, batchSyncProjects, getCloudProjects, deleteCloudProject } from '../../api/project.js'
 
 export default {
   mixins: [statusBarMixin],
-  components: {
-    Icon,
-    Toast
-  },
-  
+  components: { Icon, Toast },
+
   data() {
     return {
       userStore: useUserStore(),
+      projectStore: useProjectStore(),
       toast: null,
       syncStatus: {
         enabled: false,
-        lastSync: Date.now() - 3600000,
+        lastSync: null,
         syncing: false
       },
       syncStats: {
-        projects: 12,
-        favorites: 8,
-        settings: 15,
-        dataSize: 2.5 * 1024 * 1024 // 2.5MB
+        projects: 0,
+        favorites: 0,
+        settings: 1,
+        dataSize: 0
       },
       settings: {
         autoSync: true,
         wifiOnly: true,
         syncThumbnails: false
       },
-      syncLogs: [
-        {
-          id: '1',
-          action: '自动同步完成',
-          status: 'success',
-          timestamp: Date.now() - 3600000
-        },
-        {
-          id: '2',
-          action: '上传作品数据',
-          status: 'success',
-          timestamp: Date.now() - 7200000
-        },
-        {
-          id: '3',
-          action: '同步失败',
-          status: 'error',
-          error: '网络连接超时',
-          timestamp: Date.now() - 10800000
-        },
-        {
-          id: '4',
-          action: '下载云端数据',
-          status: 'success',
-          timestamp: Date.now() - 14400000
-        }
-      ]
+      syncLogs: []
     }
   },
-  
+
   onLoad() {
     this.toast = useToast()
-    this.loadSyncSettings()
-    
     this.$nextTick(() => {
-      if (this.$refs.toastRef) {
-        this.toast.setToastInstance(this.$refs.toastRef)
-      }
+      if (this.$refs.toastRef) this.toast.setToastInstance(this.$refs.toastRef)
     })
+    this.loadSyncSettings()
+    if (this.userStore.isLoggedIn) {
+      this.syncStatus.enabled = true
+      this.loadSyncStats()
+    }
   },
-  
+
   methods: {
     goBack() {
       uni.navigateBack()
     },
-    
+
     loadSyncSettings() {
-      // 从用户store加载同步状态
-      this.syncStatus.enabled = this.userStore.syncEnabled || false
-      
-      // 从本地存储加载设置
-      const savedSettings = uni.getStorageSync('sync-settings')
-      if (savedSettings) {
-        this.settings = { ...this.settings, ...savedSettings }
-      }
+      const saved = uni.getStorageSync('sync-settings')
+      if (saved) this.settings = { ...this.settings, ...saved }
     },
-    
+
     saveSyncSettings() {
       uni.setStorageSync('sync-settings', this.settings)
     },
-    
+
+    async loadSyncStats() {
+      const res = await getSyncStatus()
+      if (res.success) {
+        this.syncStats.projects = res.data.count || 0
+        this.syncStatus.lastSync = res.data.lastSync ? new Date(res.data.lastSync).getTime() : null
+      }
+    },
+
     getStatusDescription() {
-      if (!this.syncStatus.enabled) {
-        return '开启后可在多设备间同步数据'
-      }
-      
-      if (this.syncStatus.syncing) {
-        return '正在同步数据...'
-      }
-      
+      if (!this.userStore.isLoggedIn) return '请先登录以使用云同步'
+      if (!this.syncStatus.enabled) return '开启后可在多设备间同步数据'
+      if (this.syncStatus.syncing) return '正在同步数据...'
       return '数据已安全备份到云端'
     },
-    
+
     async toggleSync(e) {
-      const enabled = e.detail.value
-      
-      if (enabled) {
-        // 开启云同步
-        uni.showLoading({ title: '开启中...' })
-        
-        try {
-          await this.userStore.enableSync()
-          this.syncStatus.enabled = true
-          this.toast.showSuccess('云同步已开启')
-        } catch (error) {
-          this.toast.showError('开启失败，请重试')
-        } finally {
-          uni.hideLoading()
-        }
+      if (!this.userStore.isLoggedIn) {
+        this.toast.showError('请先登录')
+        return
+      }
+      this.syncStatus.enabled = e.detail.value
+      if (this.syncStatus.enabled) {
+        await this.loadSyncStats()
+        this.toast.showSuccess('云同步已开启')
       } else {
-        // 关闭云同步
         uni.showModal({
           title: '关闭云同步',
           content: '关闭后将无法在多设备间同步数据，确定要关闭吗？',
-          success: async (res) => {
-            if (res.confirm) {
-              try {
-                await this.userStore.disableSync()
-                this.syncStatus.enabled = false
-                this.toast.showInfo('云同步已关闭')
-              } catch (error) {
-                this.toast.showError('操作失败，请重试')
-              }
-            }
+          success: (res) => {
+            if (!res.confirm) this.syncStatus.enabled = true
+            else this.toast.showInfo('云同步已关闭')
           }
         })
       }
     },
-    
+
     toggleAutoSync(e) {
       this.settings.autoSync = e.detail.value
       this.saveSyncSettings()
       this.toast.showInfo(this.settings.autoSync ? '自动同步已开启' : '自动同步已关闭')
     },
-    
+
     toggleWifiOnly(e) {
       this.settings.wifiOnly = e.detail.value
       this.saveSyncSettings()
-      this.toast.showInfo(this.settings.wifiOnly ? '仅WiFi同步已开启' : '移动网络同步已允许')
     },
-    
+
     toggleSyncThumbnails(e) {
       this.settings.syncThumbnails = e.detail.value
       this.saveSyncSettings()
-      this.toast.showInfo(this.settings.syncThumbnails ? '缩略图同步已开启' : '缩略图同步已关闭')
     },
-    
+
     async manualSync() {
       if (this.syncStatus.syncing) return
-      
+      if (!this.userStore.isLoggedIn) { this.toast.showError('请先登录'); return }
       this.syncStatus.syncing = true
       uni.showLoading({ title: '同步中...' })
-      
       try {
-        // 模拟同步过程
-        await new Promise(resolve => setTimeout(resolve, 2000))
-        
-        this.syncStatus.lastSync = Date.now()
-        this.addSyncLog('手动同步完成', 'success')
-        this.toast.showSuccess('同步完成')
-      } catch (error) {
-        this.addSyncLog('同步失败', 'error', error.message)
+        const projects = this.projectStore.projects
+        if (projects.length === 0) {
+          this.toast.showInfo('没有需要同步的项目')
+          return
+        }
+        const items = projects.map(p => {
+          const pixels = this.projectStore.getProjectPixels(p.id)
+          return { project: p, pixels: pixels.size > 0 ? Array.from(pixels.entries()) : null }
+        })
+        const res = await batchSyncProjects(items)
+        if (res.success) {
+          this.syncStatus.lastSync = Date.now()
+          this.addSyncLog(`同步 ${projects.length} 个项目`, 'success')
+          await this.loadSyncStats()
+          this.toast.showSuccess('同步完成')
+        } else {
+          this.addSyncLog('同步失败', 'error', res.message)
+          this.toast.showError(res.message || '同步失败')
+        }
+      } catch (e) {
+        this.addSyncLog('同步失败', 'error', e.message)
         this.toast.showError('同步失败，请重试')
       } finally {
         this.syncStatus.syncing = false
         uni.hideLoading()
       }
     },
-    
+
     async downloadFromCloud() {
       uni.showModal({
         title: '从云端恢复',
         content: '这将用云端数据覆盖本地数据，确定要继续吗？',
         success: async (res) => {
-          if (res.confirm) {
-            uni.showLoading({ title: '恢复中...' })
-            
-            try {
-              // 模拟下载过程
-              await new Promise(resolve => setTimeout(resolve, 3000))
-              
-              this.addSyncLog('从云端恢复数据', 'success')
-              this.toast.showSuccess('恢复完成')
-            } catch (error) {
-              this.addSyncLog('恢复失败', 'error', error.message)
-              this.toast.showError('恢复失败，请重试')
-            } finally {
-              uni.hideLoading()
+          if (!res.confirm) return
+          uni.showLoading({ title: '恢复中...' })
+          try {
+            const listRes = await getCloudProjects(1, 100)
+            if (!listRes.success) throw new Error(listRes.message)
+            const cloudProjects = listRes.data.list || []
+            for (const cp of cloudProjects) {
+              this.projectStore.updateProject(cp.id, {
+                name: cp.name, width: cp.width, height: cp.height,
+                thumbnail: cp.thumbnail_url, progress: cp.progress
+              })
             }
+            this.addSyncLog(`从云端恢复 ${cloudProjects.length} 个项目`, 'success')
+            this.toast.showSuccess('恢复完成')
+          } catch (e) {
+            this.addSyncLog('恢复失败', 'error', e.message)
+            this.toast.showError('恢复失败，请重试')
+          } finally {
+            uni.hideLoading()
           }
         }
       })
     },
-    
+
     async uploadToCloud() {
+      if (!this.userStore.isLoggedIn) { this.toast.showError('请先登录'); return }
       uni.showLoading({ title: '上传中...' })
-      
       try {
-        // 模拟上传过程
-        await new Promise(resolve => setTimeout(resolve, 2500))
-        
-        this.addSyncLog('上传到云端', 'success')
-        this.toast.showSuccess('上传完成')
-      } catch (error) {
-        this.addSyncLog('上传失败', 'error', error.message)
+        const projects = this.projectStore.projects
+        const items = projects.map(p => ({ project: p, pixels: null }))
+        const res = await batchSyncProjects(items)
+        if (res.success) {
+          this.addSyncLog(`上传 ${projects.length} 个项目`, 'success')
+          await this.loadSyncStats()
+          this.toast.showSuccess('上传完成')
+        } else {
+          throw new Error(res.message)
+        }
+      } catch (e) {
+        this.addSyncLog('上传失败', 'error', e.message)
         this.toast.showError('上传失败，请重试')
       } finally {
         uni.hideLoading()
       }
     },
-    
+
     clearCloudData() {
       uni.showModal({
         title: '清除云端数据',
         content: '这将永久删除所有云端备份数据，此操作无法撤销！',
         confirmColor: '#E74C3C',
         success: async (res) => {
-          if (res.confirm) {
-            uni.showLoading({ title: '清除中...' })
-            
-            try {
-              // 模拟清除过程
-              await new Promise(resolve => setTimeout(resolve, 1500))
-              
-              this.addSyncLog('清除云端数据', 'success')
-              this.toast.showSuccess('云端数据已清除')
-            } catch (error) {
-              this.addSyncLog('清除失败', 'error', error.message)
-              this.toast.showError('清除失败，请重试')
-            } finally {
-              uni.hideLoading()
+          if (!res.confirm) return
+          uni.showLoading({ title: '清除中...' })
+          try {
+            const listRes = await getCloudProjects(1, 100)
+            if (listRes.success) {
+              for (const p of listRes.data.list || []) {
+                await deleteCloudProject(p.id)
+              }
             }
+            this.syncStats.projects = 0
+            this.addSyncLog('清除云端数据', 'success')
+            this.toast.showSuccess('云端数据已清除')
+          } catch (e) {
+            this.addSyncLog('清除失败', 'error', e.message)
+            this.toast.showError('清除失败，请重试')
+          } finally {
+            uni.hideLoading()
           }
         }
       })
     },
-    
+
+    addSyncLog(action, status, error = null) {
+      this.syncLogs.unshift({ id: Date.now().toString(), action, status, error, timestamp: Date.now() })
+      if (this.syncLogs.length > 20) this.syncLogs = this.syncLogs.slice(0, 20)
+    },
+
     viewAllLogs() {
       this.toast.showInfo('同步日志详情功能开发中')
     },
-    
-    addSyncLog(action, status, error = null) {
-      const log = {
-        id: Date.now().toString(),
-        action,
-        status,
-        error,
-        timestamp: Date.now()
-      }
-      
-      this.syncLogs.unshift(log)
-      
-      // 只保留最近20条记录
-      if (this.syncLogs.length > 20) {
-        this.syncLogs = this.syncLogs.slice(0, 20)
-      }
-    },
-    
+
     formatLastSync() {
-      const date = new Date(this.syncStatus.lastSync)
-      const now = new Date()
-      const diff = now - date
-      
+      if (!this.syncStatus.lastSync) return '从未同步'
+      const diff = Date.now() - this.syncStatus.lastSync
       if (diff < 60000) return '刚刚'
       if (diff < 3600000) return `${Math.floor(diff / 60000)}分钟前`
       if (diff < 86400000) return `${Math.floor(diff / 3600000)}小时前`
-      
-      return date.toLocaleDateString() + ' ' + date.toLocaleTimeString()
+      return new Date(this.syncStatus.lastSync).toLocaleDateString()
     },
-    
+
     formatDataSize(bytes) {
+      if (!bytes) return '0B'
       if (bytes < 1024) return bytes + 'B'
       if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + 'KB'
       return (bytes / (1024 * 1024)).toFixed(1) + 'MB'
     },
-    
+
     formatLogTime(timestamp) {
-      const date = new Date(timestamp)
-      const now = new Date()
-      const diff = now - date
-      
+      const diff = Date.now() - timestamp
       if (diff < 3600000) return `${Math.floor(diff / 60000)}分钟前`
       if (diff < 86400000) return `${Math.floor(diff / 3600000)}小时前`
-      
-      return date.toLocaleDateString()
+      return new Date(timestamp).toLocaleDateString()
     },
-    
+
     getLogIcon(status) {
-      switch (status) {
-        case 'success': return 'check-circle'
-        case 'error': return 'x-circle'
-        case 'warning': return 'alert-circle'
-        default: return 'info'
-      }
+      return status === 'success' ? 'check-circle' : status === 'error' ? 'x-circle' : 'info'
     },
-    
+
     getLogColor(status) {
-      switch (status) {
-        case 'success': return 'var(--color-success)'
-        case 'error': return 'var(--color-error)'
-        case 'warning': return 'var(--color-warning)'
-        default: return 'var(--color-text-secondary)'
-      }
+      return status === 'success' ? 'var(--color-success)' : status === 'error' ? 'var(--color-error)' : 'var(--color-text-secondary)'
     }
   }
 }

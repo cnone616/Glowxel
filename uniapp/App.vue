@@ -28,7 +28,7 @@ export default {
 @import './styles/theme.css';
 @import './static/iconfont/iconfont.css';
 
-/* 全局样式 */
+/* 非小程序平台全局重置 */
 /* #ifndef MP-WEIXIN */
 * {
   box-sizing: border-box;
@@ -57,12 +57,18 @@ page {
   position: fixed;
   overscroll-behavior: none;
   /* #endif */
-  
+
   /* #ifdef MP-WEIXIN */
-  /* 小程序默认背景色，避免白屏 */
-  background-color: #1a1a1a;
+  background-color: #F5F5F7;
   /* #endif */
 }
+
+/* 小程序全局 view 元素也需要 box-sizing */
+/* #ifdef MP-WEIXIN */
+view, scroll-view, swiper, text, input, textarea, button, image {
+  box-sizing: border-box;
+}
+/* #endif */
 
 /* 禁用橡皮筋效果 */
 /* #ifndef MP-WEIXIN */

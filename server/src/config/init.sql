@@ -17,6 +17,8 @@ CREATE TABLE IF NOT EXISTS users (
   total_likes   INT DEFAULT 0,
   status        ENUM('active','banned') DEFAULT 'active',
   role          ENUM('user','admin') DEFAULT 'user',
+  admin_username VARCHAR(50) NULL,         -- 管理员登录用户名
+  admin_password VARCHAR(128) NULL,        -- 管理员登录密码(sha256)
   settings      JSON,
   created_at    DATETIME DEFAULT NOW(),
   updated_at    DATETIME DEFAULT NOW() ON UPDATE NOW()
@@ -74,9 +76,9 @@ CREATE TABLE IF NOT EXISTS artworks (
 -- 作品标签关联表
 CREATE TABLE IF NOT EXISTS artwork_tags (
   artwork_id    BIGINT NOT NULL,
-  tag_id        BIGINT NOT NULL,           -- 关联 tags.id，不再存字符串
-  PRIMARY KEY (artwork_id, tag_id),
-  INDEX idx_tag (tag_id)
+  tag           VARCHAR(50) NOT NULL,       -- 标签名（与路由代码一致）
+  PRIMARY KEY (artwork_id, tag),
+  INDEX idx_tag (tag)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- 标签分类表（管理员维护）
@@ -152,22 +154,6 @@ CREATE TABLE IF NOT EXISTS comments (
   likes         INT DEFAULT 0,
   created_at    DATETIME DEFAULT NOW(),
   INDEX idx_artwork (artwork_id, created_at)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
--- 模板表
-CREATE TABLE IF NOT EXISTS templates (
-  id            BIGINT PRIMARY KEY AUTO_INCREMENT,
-  name          VARCHAR(100),
-  image_url     VARCHAR(500),
-  category      VARCHAR(30),
-  size          VARCHAR(10),
-  color_count   INT,
-  difficulty    ENUM('简单','中等','困难'),
-  usage_count   INT DEFAULT 0,
-  description   TEXT,
-  tags          JSON,
-  pixel_data    LONGBLOB,
-  created_at    DATETIME DEFAULT NOW()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- 挑战表
@@ -272,4 +258,19 @@ CREATE TABLE IF NOT EXISTS firmware_versions (
   is_active     TINYINT(1) DEFAULT 1,
   created_at    DATETIME DEFAULT NOW(),
   INDEX idx_device_active (device_type, is_active)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
+-- 通知表
+CREATE TABLE IF NOT EXISTS notifications (
+  id          BIGINT PRIMARY KEY AUTO_INCREMENT,
+  user_id     BIGINT NOT NULL,           -- 接收通知的用户
+  actor_id    BIGINT NOT NULL,           -- 触发通知的用户
+  type        ENUM('like','comment','follow') NOT NULL,
+  artwork_id  BIGINT,                    -- 相关作品（like/comment 时有值）
+  comment_id  BIGINT,                    -- 相关评论（comment 时有值）
+  is_read     TINYINT(1) DEFAULT 0,
+  created_at  DATETIME DEFAULT NOW(),
+  INDEX idx_user_read (user_id, is_read),
+  INDEX idx_user_created (user_id, created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

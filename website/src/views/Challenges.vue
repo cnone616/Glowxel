@@ -80,9 +80,9 @@ onMounted(async () => {
 .participants { font-size: 13px; color: #999; }
 .join-btn {
   padding: 8px 20px; border-radius: 6px; border: none;
-  background: #1a1a1a; color: #fff; font-size: 13px; font-weight: 500; cursor: pointer;
+  background: var(--color-primary); color: #fff; font-size: 13px; font-weight: 500; cursor: pointer;
 }
-.join-btn:hover { background: #333; }
+.join-btn:hover { background: var(--color-primary-hover); }
 
 @media (max-width: 768px) {
   .page-title { font-size: 22px; }

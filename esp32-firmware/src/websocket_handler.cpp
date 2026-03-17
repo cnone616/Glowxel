@@ -39,18 +39,9 @@ void WebSocketHandler::onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *c
     // 断开连接后，如果有动画在播放则保持动画模式
     if (AnimationManager::currentGIF != nullptr && AnimationManager::currentGIF->isPlaying) {
       DisplayManager::currentMode = MODE_ANIMATION;
-    } else {
-      // 没有动画，回到画布模式，清空画布数据
-      DisplayManager::currentMode = MODE_CANVAS;
-      DisplayManager::canvasInitialized = false;
-
-      if (DisplayManager::blackPixels != nullptr) {
-        free(DisplayManager::blackPixels);
-        DisplayManager::blackPixels = nullptr;
-      }
-      DisplayManager::blackPixelCount = 0;
-      DisplayManager::displayClock();
     }
+    // 否则保持当前模式和画布数据不变，用户重连后可继续编辑
+    // 不清空 canvasBuffer / canvasInitialized / blackPixels
   }
   else if (type == WS_EVT_DATA) {
     AwsFrameInfo *info = (AwsFrameInfo*)arg;
@@ -433,7 +424,7 @@ void WebSocketHandler::handleJsonCommand(AsyncWebSocketClient *client, JsonDocum
   else if (cmd == "set_image_pixels") {
     // 接收图片像素数据
     JsonArray pixels = doc["pixels"];
-    
+
     if (pixels.size() == 0) {
       response["status"] = "error";
       response["message"] = "no pixels data";
@@ -443,6 +434,14 @@ void WebSocketHandler::handleJsonCommand(AsyncWebSocketClient *client, JsonDocum
         free(ConfigManager::imagePixels);
         ConfigManager::imagePixels = nullptr;
       }
+
+      // 重置 canvasInitialized，确保下次传背景时清空旧的 blackPixels
+      DisplayManager::canvasInitialized = false;
+      if (DisplayManager::blackPixels != nullptr) {
+        free(DisplayManager::blackPixels);
+        DisplayManager::blackPixels = nullptr;
+      }
+      DisplayManager::blackPixelCount = 0;
       
       // 分配新的像素数据（最多 64x64 像素）
       ConfigManager::imagePixelCount = pixels.size();
@@ -509,8 +508,9 @@ void WebSocketHandler::handleJsonCommand(AsyncWebSocketClient *client, JsonDocum
     }
   }
   else if (cmd == "animation_begin") {
-    // 逐帧传输：开始接收动画
+    // 逐帧传输：开始接收动画，立即切换模式阻止 displayClock() 刷屏
     int frameCount = doc["frameCount"] | 0;
+    DisplayManager::currentMode = MODE_ANIMATION;  // 立即切换，防止闹钟界面闪现
     if (AnimationManager::beginAnimation(frameCount)) {
       response["status"] = "success";
       response["message"] = "ready to receive frames";
@@ -575,8 +575,11 @@ void WebSocketHandler::handleJsonCommand(AsyncWebSocketClient *client, JsonDocum
       AnimationManager::currentGIF->lastFrameTime = millis();
       AnimationManager::renderGIFFrame(0);
 
-      // 暂不保存到 LittleFS，避免内存不足 crash
-      // AnimationManager::saveAnimation();
+      // 保存动画到 LittleFS，重启后可恢复
+      AnimationManager::saveAnimation();
+
+      // 保存当前模式到 Preferences，重启后恢复
+      ConfigManager::saveClockConfig();
 
       response["status"] = "success";
       response["message"] = "animation loaded and playing";
@@ -723,6 +726,31 @@ void WebSocketHandler::handleJsonCommand(AsyncWebSocketClient *client, JsonDocum
       response["status"] = "error";
       response["message"] = "not in canvas mode or canvas not initialized";
     }
+  }
+  else if (cmd == "show_loading") {
+    DisplayManager::dma_display->clearScreen();
+    int cx = DisplayManager::PANEL_RES_X / 2;
+    int cy = DisplayManager::PANEL_RES_Y / 2;
+    int r = 10;
+    // 暗色底圆
+    for (int deg = 0; deg < 360; deg += 20) {
+      float rad = deg * 3.14159f / 180.0f;
+      int x = cx + (int)(r * cos(rad));
+      int y = cy + (int)(r * sin(rad));
+      if (x >= 1 && x < DisplayManager::PANEL_RES_X-1 && y >= 1 && y < DisplayManager::PANEL_RES_Y-1)
+        DisplayManager::dma_display->fillRect(x-1, y-1, 2, 2, DisplayManager::dma_display->color565(30, 30, 30));
+    }
+    // 亮弧（4个点渐变）
+    int startDeg = doc["angle"] | 0;
+    for (int i = 0; i < 4; i++) {
+      float rad = (startDeg + i * 30) * 3.14159f / 180.0f;
+      int x = cx + (int)(r * cos(rad));
+      int y = cy + (int)(r * sin(rad));
+      uint8_t bright = (i == 3) ? 255 : (i == 2 ? 180 : (i == 1 ? 100 : 50));
+      if (x >= 1 && x < DisplayManager::PANEL_RES_X-1 && y >= 1 && y < DisplayManager::PANEL_RES_Y-1)
+        DisplayManager::dma_display->fillRect(x-1, y-1, 2, 2, DisplayManager::dma_display->color565(0, bright, bright));
+    }
+    response["message"] = "loading displayed";
   }
   else if (cmd == "text") {
     String text = doc["text"].as<String>();

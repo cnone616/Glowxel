@@ -4,134 +4,149 @@
     <!-- #ifdef MP-WEIXIN -->
     <view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
     <!-- #endif -->
-    
-    <!-- 头部 -->
-    <view class="header">
-      <view class="header-content">
-        <text class="header-title">设备控制</text>
-      </view>
+
+    <!-- 导航栏 -->
+    <view class="navbar">
+      <text class="nav-title">设备控制</text>
     </view>
 
-    <scroll-view scroll-y class="content" :show-scrollbar="true">
-      <!-- 设备连接卡片 -->
-      <view class="connection-card">
-        <view v-if="connectionStatus === 'connected'" class="connection-btn-wrapper">
-          <view class="connection-btn connected" @click="handleConnect">
-            <Icon name="success-filling" :size="40" color="#22c55e" />
-            <text class="connection-label connected-text">已连接</text>
-            <text class="connection-ip">{{ deviceIp }}</text>
+    <scroll-view scroll-y class="content">
+      <!-- 连接状态卡片 -->
+      <view class="card connection-card">
+        <view v-if="connectionStatus === 'connected'" class="connected-info" @click="handleConnect">
+          <view class="connected-dot"></view>
+          <view class="connected-detail">
+            <text class="connected-label">已连接</text>
+            <text class="connected-ip">{{ deviceIp }}</text>
+          </view>
+          <text class="disconnect-text">断开</text>
+        </view>
+        <view v-else class="connect-actions">
+          <view class="connect-btn" @click="handleConnect">
+            <view class="connect-btn-icon">
+              <Icon name="scanning" :size="44" color="#4F7FFF" />
+            </view>
+            <view class="connect-btn-info">
+              <text class="connect-btn-label">WiFi 连接</text>
+              <text class="connect-btn-desc">输入设备 IP 地址连接</text>
+            </view>
+            <Icon name="direction-right" :size="28" color="#C0C0C0" />
+          </view>
+          <view class="divider"></view>
+          <view class="connect-btn" @click="goToBleConfig">
+            <view class="connect-btn-icon">
+              <Icon name="mobile-phone" :size="44" color="#4F7FFF" />
+            </view>
+            <view class="connect-btn-info">
+              <text class="connect-btn-label">蓝牙配网</text>
+              <text class="connect-btn-desc">首次使用请先配置 WiFi</text>
+            </view>
+            <Icon name="direction-right" :size="28" color="#C0C0C0" />
           </view>
         </view>
-        <template v-else>
-          <view class="connection-btn-wrapper" @click="handleConnect">
-            <view class="connection-btn">
-              <Icon name="scanning" :size="40" color="var(--accent-primary)" />
-              <text class="connection-label">WiFi 连接</text>
-            </view>
-          </view>
-          <view class="connection-btn-wrapper" @click="goToBleConfig">
-            <view class="connection-btn ble">
-              <Icon name="mobile-phone" :size="40" color="var(--accent-primary)" />
-              <text class="connection-label">蓝牙配网</text>
-            </view>
-          </view>
-        </template>
       </view>
-      
-      <!-- 设备模式和功能 -->
-      <view v-if="connectionStatus === 'connected'" class="settings-section">
-        <!-- 模式切换 -->
-        <view class="mode-switch-card">
-          <view class="card-title-section">
-            <text class="card-title">设备模式</text>
-            <text class="card-subtitle">切换时钟或画板模式</text>
-          </view>
 
-          <view class="mode-switch-buttons three-col">
+      <!-- 已连接：显示设备功能 -->
+      <template v-if="connectionStatus === 'connected'">
+        <!-- 设备模式 -->
+        <view class="section-title">设备模式</view>
+        <view class="card">
+          <view class="mode-grid">
             <view
-              class="mode-btn"
-              :class="{ 'active': deviceMode === 'clock' }"
+              class="mode-item"
+              :class="{ active: deviceMode === 'clock' }"
               @click="switchMode('clock')"
             >
-              <Icon name="time" :size="36" />
-              <text class="mode-label">静态时钟</text>
-              <text class="mode-desc">静态背景</text>
+              <view class="mode-icon-wrap" :class="{ active: deviceMode === 'clock' }">
+                <Icon name="time" :size="40" :color="deviceMode === 'clock' ? '#4F7FFF' : '#999'" />
+              </view>
+              <text class="mode-name">静态时钟</text>
             </view>
-
             <view
-              class="mode-btn"
-              :class="{ 'active': deviceMode === 'animation' }"
+              class="mode-item"
+              :class="{ active: deviceMode === 'animation' }"
               @click="switchMode('animation')"
             >
-              <Icon name="play" :size="36" />
-              <text class="mode-label">动态时钟</text>
-              <text class="mode-desc">动画背景</text>
+              <view class="mode-icon-wrap" :class="{ active: deviceMode === 'animation' }">
+                <Icon name="play" :size="40" :color="deviceMode === 'animation' ? '#4F7FFF' : '#999'" />
+              </view>
+              <text class="mode-name">动态时钟</text>
             </view>
-
             <view
-              class="mode-btn"
-              :class="{ 'active': deviceMode === 'canvas' }"
+              class="mode-item"
+              :class="{ active: deviceMode === 'canvas' }"
               @click="switchMode('canvas')"
             >
-              <Icon name="picture" :size="36" />
-              <text class="mode-label">画板模式</text>
-              <text class="mode-desc">拼豆图案</text>
-            </view>
-          </view>
-
-          <view v-if="deviceMode === 'clock' || deviceMode === 'animation'" class="clock-actions">
-            <view class="clock-edit-btn" @click="editClock">
-              <Icon name="edit" :size="32" />
-              <text class="btn-text">自定义闹钟样式</text>
-            </view>
-            <view class="clock-edit-btn secondary" @click="importJSON">
-              <Icon name="add" :size="32" />
-              <text class="btn-text">导入 JSON 配置</text>
-            </view>
-          </view>
-        </view>
-        
-        <!-- 亮度控制 -->
-        <view class="brightness-card">
-          <view class="setting-item">
-            <view class="setting-header">
-              <view class="setting-label">
-                <view class="setting-icon">
-                  <Icon name="prompt" :size="28" />
-                </view>
-                <text class="setting-text">亮度</text>
+              <view class="mode-icon-wrap" :class="{ active: deviceMode === 'canvas' }">
+                <Icon name="picture" :size="40" :color="deviceMode === 'canvas' ? '#4F7FFF' : '#999'" />
               </view>
-              <text class="setting-value accent-primary">{{ brightness }}%</text>
+              <text class="mode-name">画板模式</text>
             </view>
-            <slider
-              :value="brightness"
-              @change="handleBrightnessChange"
-              min="0"
-              max="100"
-              activeColor="#4F7FFF"
-              backgroundColor="#e0e0e0"
-              block-size="20"
-              class="setting-slider"
-            />
           </view>
         </view>
 
-        <!-- 重置网络 -->
-        <view class="reset-wifi-card">
-          <view class="reset-wifi-btn" @click="handleResetWifi">
-            <Icon name="close" :size="32" />
-            <view class="reset-wifi-info">
-              <text class="reset-wifi-label">重置网络</text>
-              <text class="reset-wifi-desc">清除 WiFi 配置并重启设备进入配网模式</text>
+        <!-- 时钟快捷操作 -->
+        <view v-if="deviceMode === 'clock' || deviceMode === 'animation'" class="card">
+          <view class="action-row" @click="editClock">
+            <Icon name="edit" :size="36" color="#4F7FFF" />
+            <view class="action-info">
+              <text class="action-label">自定义时钟样式</text>
+              <text class="action-desc">编辑时钟字体、颜色和背景</text>
             </view>
+            <Icon name="direction-right" :size="28" color="#C0C0C0" />
+          </view>
+          <view class="divider"></view>
+          <view class="action-row" @click="importJSON">
+            <Icon name="add" :size="36" color="#4F7FFF" />
+            <view class="action-info">
+              <text class="action-label">导入 JSON 配置</text>
+              <text class="action-desc">从模拟器导入完整配置</text>
+            </view>
+            <Icon name="direction-right" :size="28" color="#C0C0C0" />
           </view>
         </view>
-      </view>
+
+        <!-- 亮度调节 -->
+        <view class="section-title">亮度调节</view>
+        <view class="card">
+          <view class="brightness-row">
+            <Icon name="prompt" :size="36" color="#4F7FFF" />
+            <text class="brightness-label">屏幕亮度</text>
+            <text class="brightness-value">{{ brightness }}%</text>
+          </view>
+          <slider
+            :value="brightness"
+            @change="handleBrightnessChange"
+            min="0"
+            max="100"
+            activeColor="#4F7FFF"
+            backgroundColor="#E8E8E8"
+            block-size="24"
+            class="brightness-slider"
+          />
+        </view>
+
+        <!-- 高级操作 -->
+        <view class="section-title">高级</view>
+        <view class="card">
+          <view class="action-row danger" @click="handleResetWifi">
+            <Icon name="close" :size="36" color="#FF4D4F" />
+            <view class="action-info">
+              <text class="action-label danger-text">重置网络</text>
+              <text class="action-desc">清除 WiFi 配置并重启设备</text>
+            </view>
+            <Icon name="direction-right" :size="28" color="#C0C0C0" />
+          </view>
+        </view>
+      </template>
+
+      <!-- 底部留白 -->
+      <view style="height: 120rpx;"></view>
     </scroll-view>
-    
-    <!-- 自定义 Toast 组件 -->
+
+    <!-- Toast -->
     <Toast ref="toastRef" />
-    
+
     <!-- 连接弹窗 -->
     <ConnectModal
       :visible="showConnectModal"
@@ -145,7 +160,7 @@
       @timeout="handleConnectTimeout"
       @update:visible="val => showConnectModal = val"
     />
-    
+
     <!-- JSON 导入弹窗 -->
     <JsonImportModal
       :visible="showJsonImportModal"
@@ -686,414 +701,245 @@ export default {
   height: 100vh;
   display: flex;
   flex-direction: column;
-  background-color: var(--bg-secondary);
+  background-color: #F5F5F7;
   overflow: hidden;
 }
 
-/* 头部 */
-.header {
+.navbar {
   flex-shrink: 0;
-  height: 112rpx;
-  display: flex;
-  align-items: center;
-  padding: 0 48rpx;
-  border-bottom: 2rpx solid var(--border-primary);
-  background-color: var(--bg-elevated);
-}
-
-.header-title {
-  font-size: 36rpx;
-  font-weight: 700;
-  color: var(--color-text-primary);
-}
-
-.header-left {
-  display: flex;
-  align-items: center;
-  gap: 32rpx;
-}
-
-.back-btn {
-  width: 64rpx;
-  height: 64rpx;
+  height: 88rpx;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 16rpx;
-  transition: var(--transition-base);
+  background-color: #FFFFFF;
+  border-bottom: 1rpx solid #EBEBEB;
 }
 
-.back-btn:active {
-  background-color: var(--bg-tertiary);
-  transform: scale(0.95);
+.nav-title {
+  font-size: 34rpx;
+  font-weight: 600;
+  color: #1A1A1A;
 }
 
-.icon {
-  font-size: 56rpx;
-  color: var(--text-primary);
-}
-
-.header-info {
-  display: flex;
-  flex-direction: column;
-  gap: 4rpx;
-}
-
-.header-subtitle {
-  font-size: 22rpx;
-  color: var(--text-secondary);
-  font-family: monospace;
-}
-
-/* 内容区域 */
 .content {
   flex: 1;
-  padding: 32rpx;
+  padding: 24rpx 28rpx;
   box-sizing: border-box;
-  overflow-y: auto;
 }
 
-/* 连接卡片 */
-.connection-card {
-  padding: 48rpx;
-  margin-bottom: 32rpx;
-  display: flex;
-}
-
-.card-title-section {
-  display: flex;
-  flex-direction: column;
-  gap: 8rpx;
-  margin-bottom: 32rpx;
-}
-
-.card-title {
-  font-size: 28rpx;
-  font-weight: 500;
-  color: var(--text-primary);
-}
-
-.card-subtitle {
-  font-size: 22rpx;
-  color: var(--text-secondary);
-}
-
-.connection-btn-wrapper {
-  display: flex;
-  justify-content: center;
+/* 通用卡片 */
+.card {
+  background-color: #FFFFFF;
+  border-radius: 24rpx;
   margin-bottom: 24rpx;
+  overflow: hidden;
 }
 
-.connection-btn {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 48rpx 80rpx;
-  background-color: var(--bg-secondary);
-  border: 2rpx solid var(--border-primary);
-  border-radius: 24rpx;
-  box-shadow: var(--shadow-sm);
-  transition: var(--transition-base);
-}
-
-.connection-btn:active:not(.disabled) {
-  transform: scale(0.98);
-  border-color: var(--accent-primary);
-  box-shadow: var(--shadow-glow);
-}
-
-.connection-btn.disabled {
-  opacity: 0.5;
-}
-
-.connection-label {
+.section-title {
   font-size: 26rpx;
-  color: var(--text-primary);
-  margin-top: 16rpx;
-}
-
-.device-info {
-  display: flex;
-  flex-direction: column;
-  gap: 8rpx;
-  padding: 24rpx;
-  background-color: var(--bg-secondary);
-  border-radius: 16rpx;
-  border: 2rpx solid var(--border-secondary);
-}
-
-.info-label {
-  font-size: 22rpx;
-  color: var(--text-secondary);
-}
-
-.info-value {
-  font-size: 24rpx;
-  font-family: monospace;
-  color: var(--accent-primary);
   font-weight: 500;
+  color: #999;
+  padding: 20rpx 8rpx 12rpx;
 }
 
-.status-badge {
-  padding: 12rpx 24rpx;
-  border-radius: 999rpx;
-  border: 2rpx solid;
-  font-size: 22rpx;
-  font-family: monospace;
-  font-weight: bold;
+.divider {
+  height: 1rpx;
+  background-color: #F0F0F0;
+  margin: 0 32rpx;
 }
 
-.status-connected {
-  background-color: rgba(0, 170, 136, 0.1);
-  border-color: var(--success-color);
-  box-shadow: 0 0 16rpx rgba(0, 170, 136, 0.3);
-}
-
-.status-connected .status-text {
-  color: var(--success-color);
-}
-
-.status-connecting {
-  background-color: rgba(238, 153, 0, 0.1);
-  border-color: var(--warning-color);
-  animation: pulse 2s ease-in-out infinite;
-}
-
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.6; }
-}
-
-.status-connecting .status-text {
-  color: var(--warning-color);
-}
-
-.status-disconnected {
-  background-color: var(--bg-tertiary);
-  border-color: var(--border-secondary);
-}
-
-.status-disconnected .status-text {
-  color: var(--text-secondary);
-}
-
-/* 设置区域 */
-.settings-section {
+/* 连接状态卡片 */
+.connected-info {
   display: flex;
-  flex-direction: column;
-  gap: 32rpx;
+  align-items: center;
+  padding: 32rpx 32rpx;
+  gap: 20rpx;
 }
 
-/* 模式切换卡片 */
-.mode-switch-card {
-  background-color: var(--bg-tertiary);
-  border: 2rpx solid var(--border-primary);
-  border-radius: 32rpx;
-  padding: 48rpx;
-  box-shadow: var(--shadow-md);
+.connected-dot {
+  width: 20rpx;
+  height: 20rpx;
+  border-radius: 50%;
+  background-color: #34C759;
+  box-shadow: 0 0 8rpx rgba(52, 199, 89, 0.4);
+  flex-shrink: 0;
 }
 
-.mode-switch-buttons {
-  display: flex;
-  gap: 16rpx;
-}
-
-.mode-switch-buttons.three-col .mode-btn {
-  padding: 30rpx 12rpx;
-}
-
-.mode-btn {
+.connected-detail {
   flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 40rpx 24rpx;
-  background-color: var(--bg-secondary);
-  border: 2rpx solid var(--border-primary);
-  border-radius: 24rpx;
-  transition: var(--transition-base);
-  gap: 12rpx;
-}
-
-.mode-btn:active {
-  transform: scale(0.98);
-}
-
-.mode-btn.active {
-  background-color: rgba(0, 243, 255, 0.1);
-  border-color: var(--accent-primary);
-  box-shadow: var(--shadow-glow);
-}
-
-.mode-label {
-  font-size: 24rpx;
-  font-weight: bold;
-  color: var(--text-primary);
-}
-
-.mode-btn.active .mode-label {
-  color: var(--accent-primary);
-}
-
-.mode-desc {
-  font-size: 20rpx;
-  color: var(--text-secondary);
-}
-
-.clock-edit-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 16rpx;
-  padding: 24rpx;
-  background-color: var(--bg-secondary);
-  border: 2rpx solid var(--border-primary);
-  border-radius: 16rpx;
-  transition: var(--transition-base);
-}
-
-.clock-edit-btn:active {
-  transform: scale(0.98);
-  border-color: var(--accent-primary);
-  box-shadow: var(--shadow-glow);
-}
-
-.clock-edit-btn.secondary {
-  border-color: var(--border-secondary);
-}
-
-.clock-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 16rpx;
-  margin-top: 24rpx;
-}
-
-.btn-text {
-  font-size: 24rpx;
-  color: var(--text-primary);
-}
-
-/* 亮度卡片 */
-.brightness-card {
-  background-color: var(--bg-tertiary);
-  border: 2rpx solid var(--border-primary);
-  border-radius: 32rpx;
-  padding: 48rpx;
-  box-shadow: var(--shadow-md);
-}
-
-.setting-item {
-  display: flex;
-  flex-direction: column;
-  gap: 16rpx;
-}
-
-.setting-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.setting-label {
-  display: flex;
-  align-items: center;
-  gap: 12rpx;
-}
-
-.setting-icon {
-  width: 48rpx;
-  height: 48rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 12rpx;
-  background-color: rgba(0, 243, 255, 0.1);
-  border: 2rpx solid rgba(0, 243, 255, 0.3);
-}
-
-.setting-text {
-  font-size: 26rpx;
-  color: var(--text-secondary);
-}
-
-.setting-value {
-  font-size: 24rpx;
-  font-family: monospace;
-  font-weight: bold;
-}
-
-.accent-primary {
-  color: var(--accent-primary);
-  text-shadow: 0 0 8rpx rgba(0, 243, 255, 0.3);
-}
-
-.accent-secondary {
-  color: var(--accent-secondary);
-  text-shadow: 0 0 8rpx rgba(255, 0, 255, 0.3);
-}
-
-.setting-slider {
-  width: 100%;
-}
-
-/* 重置网络卡片 */
-.reset-wifi-card {
-  background-color: var(--bg-tertiary);
-  border: 2rpx solid var(--border-primary);
-  border-radius: 32rpx;
-  padding: 36rpx 48rpx;
-  box-shadow: var(--shadow-md);
-}
-
-.reset-wifi-btn {
-  display: flex;
-  align-items: center;
-  gap: 24rpx;
-}
-
-.reset-wifi-btn:active {
-  opacity: 0.7;
-}
-
-.reset-wifi-info {
   display: flex;
   flex-direction: column;
   gap: 4rpx;
 }
 
-.reset-wifi-label {
+.connected-label {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #1A1A1A;
+}
+
+.connected-ip {
+  font-size: 24rpx;
+  color: #999;
+  font-family: monospace;
+}
+
+.disconnect-text {
   font-size: 26rpx;
-  color: #ff4d4f;
+  color: #FF3B30;
   font-weight: 500;
 }
 
-.reset-wifi-desc {
-  font-size: 20rpx;
-  color: var(--text-secondary);
+.connect-actions {
+  padding: 8rpx 0;
 }
 
-/* 蓝牙配网入口 */
-.ble-config-entry {
+.connect-btn {
+  display: flex;
+  align-items: center;
+  padding: 28rpx 32rpx;
+  gap: 20rpx;
+}
+
+.connect-btn:active {
+  background-color: #F8F8F8;
+}
+
+.connect-btn-icon {
+  width: 80rpx;
+  height: 80rpx;
+  border-radius: 20rpx;
+  background-color: #F0F4FF;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 12rpx;
-  padding: 20rpx;
-  margin-top: 24rpx;
-  border-top: 2rpx solid var(--border-secondary);
+  flex-shrink: 0;
 }
 
-.ble-config-entry:active {
-  opacity: 0.7;
+.connect-btn-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4rpx;
 }
 
-.ble-config-text {
+.connect-btn-label {
+  font-size: 30rpx;
+  font-weight: 500;
+  color: #1A1A1A;
+}
+
+.connect-btn-desc {
   font-size: 24rpx;
-  color: #4F7FFF;
+  color: #999;
 }
 
-</style>
+/* 模式切换 */
+.mode-grid {
+  display: flex;
+  padding: 24rpx 20rpx;
+  gap: 16rpx;
+}
 
+.mode-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12rpx;
+  padding: 24rpx 8rpx;
+  border-radius: 20rpx;
+  transition: all 0.2s;
+}
+
+.mode-item:active {
+  transform: scale(0.96);
+}
+
+.mode-icon-wrap {
+  width: 88rpx;
+  height: 88rpx;
+  border-radius: 22rpx;
+  background-color: #F5F5F7;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.mode-icon-wrap.active {
+  background-color: #EEF2FF;
+  box-shadow: 0 4rpx 16rpx rgba(79, 127, 255, 0.15);
+}
+
+.mode-name {
+  font-size: 24rpx;
+  color: #666;
+  font-weight: 500;
+}
+
+.mode-item.active .mode-name {
+  color: #4F7FFF;
+  font-weight: 600;
+}
+
+/* 操作行 */
+.action-row {
+  display: flex;
+  align-items: center;
+  padding: 28rpx 32rpx;
+  gap: 20rpx;
+}
+
+.action-row:active {
+  background-color: #F8F8F8;
+}
+
+.action-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4rpx;
+}
+
+.action-label {
+  font-size: 28rpx;
+  font-weight: 500;
+  color: #1A1A1A;
+}
+
+.action-desc {
+  font-size: 22rpx;
+  color: #999;
+}
+
+.danger-text {
+  color: #FF3B30;
+}
+
+/* 亮度调节 */
+.brightness-row {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  padding: 28rpx 32rpx 8rpx;
+}
+
+.brightness-label {
+  flex: 1;
+  font-size: 28rpx;
+  font-weight: 500;
+  color: #1A1A1A;
+}
+
+.brightness-value {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #4F7FFF;
+  font-family: monospace;
+}
+
+.brightness-slider {
+  margin: 0 32rpx 24rpx;
+}
+</style>

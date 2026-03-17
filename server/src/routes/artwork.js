@@ -44,7 +44,14 @@ router.get('/list', optionalAuth, async (req, res) => {
     sql += ' ORDER BY a.created_at DESC LIMIT ? OFFSET ?';
     params.push(limit, offset);
     const [list] = await db.query(sql, params);
-    const [[{ total }]] = await db.query('SELECT COUNT(*) as total FROM artworks WHERE status = "published"');
+    // total 也必须带上 tag 过滤条件，否则分页总数不准
+    let countSql = 'SELECT COUNT(*) as total FROM artworks WHERE status = "published"';
+    const countParams = [];
+    if (tag) {
+      countSql += ' AND id IN (SELECT artwork_id FROM artwork_tags WHERE tag = ?)';
+      countParams.push(tag);
+    }
+    const [[{ total }]] = await db.query(countSql, countParams);
     res.json({ code: 0, data: { list, total } });
   } catch (err) {
     res.json({ code: 500, message: '获取失败' });

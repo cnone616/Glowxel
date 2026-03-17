@@ -126,7 +126,7 @@ async function submitComment() {
 .comments-section h3 { font-size: 16px; font-weight: 600; margin-bottom: 12px; }
 .comment-input { display: flex; gap: 8px; margin-bottom: 16px; }
 .comment-input input { flex: 1; padding: 8px 12px; border: 1px solid #e0e0e0; border-radius: 6px; font-size: 13px; }
-.comment-input button { padding: 8px 16px; border: none; background: #1a1a1a; color: #fff; border-radius: 6px; font-size: 13px; cursor: pointer; }
+.comment-input button { padding: 8px 16px; border: none; background: var(--color-primary); color: #fff; border-radius: 6px; font-size: 13px; cursor: pointer; }
 .comment-item { padding: 8px 0; border-bottom: 1px solid #f5f5f5; }
 .comment-author { font-size: 13px; font-weight: 500; color: #1a1a1a; margin-right: 8px; }
 .comment-text { font-size: 13px; color: #666; }

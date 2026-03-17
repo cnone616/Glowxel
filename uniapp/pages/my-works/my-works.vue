@@ -683,6 +683,9 @@ export default {
   padding: 6rpx 12rpx;
   border-radius: 12rpx;
   backdrop-filter: blur(10rpx);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .type-badge.published {
@@ -697,6 +700,7 @@ export default {
   font-size: 18rpx;
   font-weight: 600;
   color: #FFFFFF;
+  line-height: 1.2;
 }
 
 /* 发布状态标识 */

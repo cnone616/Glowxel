@@ -182,222 +182,126 @@
 
 <script>
 import { useToast } from '../../composables/useToast.js'
+import { useUserStore } from '../../store/user.js'
+import { useProjectStore } from '../../store/project.js'
 import statusBarMixin from '../../mixins/statusBar.js'
 import Icon from '../../components/Icon.vue'
 import Toast from '../../components/Toast.vue'
 
+// 成就定义（静态配置）
+const ACHIEVEMENT_DEFS = [
+  { id: '1', category: 'create', title: '初出茅庐',   description: '完成第一个作品',       icon: 'picture',   rarity: 'common',    key: 'works_count',     target: 1   },
+  { id: '2', category: 'create', title: '作品达人',   description: '创作10个作品',          icon: 'gallery',   rarity: 'common',    key: 'works_count',     target: 10  },
+  { id: '3', category: 'create', title: '像素大师',   description: '创作50个作品',          icon: 'crown',     rarity: 'rare',      key: 'works_count',     target: 50  },
+  { id: '4', category: 'create', title: '传奇创作者', description: '创作100个作品',         icon: 'trophy',    rarity: 'legendary', key: 'works_count',     target: 100 },
+  { id: '5', category: 'social', title: '社交新手',   description: '获得第一个粉丝',        icon: 'heart',     rarity: 'common',    key: 'followers_count', target: 1   },
+  { id: '6', category: 'social', title: '人气作者',   description: '获得100个粉丝',         icon: 'users',     rarity: 'rare',      key: 'followers_count', target: 100 },
+  { id: '7', category: 'social', title: '点赞收割机', description: '作品获得1000个点赞',    icon: 'thumbs-up', rarity: 'epic',      key: 'total_likes',     target: 1000},
+  { id: '8', category: 'skill',  title: '色彩搭配师', description: '使用超过20种颜色创作',  icon: 'palette',   rarity: 'common',    key: 'color_count',     target: 20  },
+  { id: '9', category: 'skill',  title: '精密工匠',   description: '完成超过1000像素的作品',icon: 'target',    rarity: 'rare',      key: 'max_pixels',      target: 1000},
+  { id: '10',category: 'special',title: '夜猫子',     description: '在深夜12点后完成创作',  icon: 'moon',      rarity: 'epic',      key: 'night_create',    target: 1   },
+  { id: '11',category: 'special',title: '完美主义者', description: '连续7天都有创作',       icon: 'calendar',  rarity: 'legendary', key: 'streak_days',     target: 7   },
+]
+
 export default {
   mixins: [statusBarMixin],
-  components: {
-    Icon,
-    Toast
-  },
-  
+  components: { Icon, Toast },
+
   data() {
     return {
       toast: null,
       currentCategory: 'all',
       selectedAchievement: null,
       categories: [
-        { value: 'all', label: '全部', icon: 'grid', count: 0 },
-        { value: 'create', label: '创作', icon: 'palette', count: 0 },
-        { value: 'social', label: '社交', icon: 'users', count: 0 },
-        { value: 'skill', label: '技能', icon: 'star', count: 0 },
-        { value: 'special', label: '特殊', icon: 'award', count: 0 }
+        { value: 'all',     label: '全部', icon: 'grid',    count: 0 },
+        { value: 'create',  label: '创作', icon: 'palette', count: 0 },
+        { value: 'social',  label: '社交', icon: 'users',   count: 0 },
+        { value: 'skill',   label: '技能', icon: 'star',    count: 0 },
+        { value: 'special', label: '特殊', icon: 'award',   count: 0 },
       ],
-      achievements: [
-        // 创作类成就
-        {
-          id: '1',
-          category: 'create',
-          title: '初出茅庐',
-          description: '完成第一个作品',
-          icon: 'picture',
-          rarity: 'common',
-          unlocked: true,
-          unlockedAt: Date.now() - 86400000 * 30,
-          current: 1,
-          target: 1
-        },
-        {
-          id: '2',
-          category: 'create',
-          title: '作品达人',
-          description: '创作10个作品',
-          icon: 'gallery',
-          rarity: 'common',
-          unlocked: true,
-          unlockedAt: Date.now() - 86400000 * 15,
-          current: 12,
-          target: 10
-        },
-        {
-          id: '3',
-          category: 'create',
-          title: '像素大师',
-          description: '创作50个作品',
-          icon: 'crown',
-          rarity: 'rare',
-          unlocked: false,
-          current: 12,
-          target: 50,
-          hint: '继续创作更多精彩作品'
-        },
-        {
-          id: '4',
-          category: 'create',
-          title: '传奇创作者',
-          description: '创作100个作品',
-          icon: 'trophy',
-          rarity: 'legendary',
-          unlocked: false,
-          current: 12,
-          target: 100,
-          hint: '成为真正的像素艺术传奇'
-        },
-        
-        // 社交类成就
-        {
-          id: '5',
-          category: 'social',
-          title: '社交新手',
-          description: '获得第一个粉丝',
-          icon: 'heart',
-          rarity: 'common',
-          unlocked: true,
-          unlockedAt: Date.now() - 86400000 * 20,
-          current: 1,
-          target: 1
-        },
-        {
-          id: '6',
-          category: 'social',
-          title: '人气作者',
-          description: '获得100个粉丝',
-          icon: 'users',
-          rarity: 'rare',
-          unlocked: false,
-          current: 45,
-          target: 100,
-          hint: '分享更多优质作品吸引粉丝'
-        },
-        {
-          id: '7',
-          category: 'social',
-          title: '点赞收割机',
-          description: '作品获得1000个点赞',
-          icon: 'thumbs-up',
-          rarity: 'epic',
-          unlocked: false,
-          current: 234,
-          target: 1000,
-          hint: '创作更受欢迎的作品'
-        },
-        
-        // 技能类成就
-        {
-          id: '8',
-          category: 'skill',
-          title: '色彩搭配师',
-          description: '使用超过20种颜色创作',
-          icon: 'palette',
-          rarity: 'common',
-          unlocked: true,
-          unlockedAt: Date.now() - 86400000 * 10,
-          current: 25,
-          target: 20
-        },
-        {
-          id: '9',
-          category: 'skill',
-          title: '精密工匠',
-          description: '完成一个超过1000像素的作品',
-          icon: 'target',
-          rarity: 'rare',
-          unlocked: false,
-          current: 0,
-          target: 1,
-          hint: '挑战更大尺寸的创作'
-        },
-        
-        // 特殊成就
-        {
-          id: '10',
-          category: 'special',
-          title: '早起的鸟儿',
-          description: '在早上6点前完成创作',
-          icon: 'sun',
-          rarity: 'epic',
-          unlocked: false,
-          current: 0,
-          target: 1,
-          hint: '早起创作有奇效'
-        },
-        {
-          id: '11',
-          category: 'special',
-          title: '夜猫子',
-          description: '在深夜12点后完成创作',
-          icon: 'moon',
-          rarity: 'epic',
-          unlocked: true,
-          unlockedAt: Date.now() - 86400000 * 5,
-          current: 1,
-          target: 1
-        },
-        {
-          id: '12',
-          category: 'special',
-          title: '完美主义者',
-          description: '连续7天都有创作',
-          icon: 'calendar',
-          rarity: 'legendary',
-          unlocked: false,
-          current: 3,
-          target: 7,
-          hint: '保持每日创作的习惯'
-        }
-      ]
+      achievements: []
     }
   },
-  
+
   computed: {
     filteredAchievements() {
-      if (this.currentCategory === 'all') {
-        return this.achievements
-      }
+      if (this.currentCategory === 'all') return this.achievements
       return this.achievements.filter(a => a.category === this.currentCategory)
     },
-    
-    unlockedCount() {
-      return this.achievements.filter(a => a.unlocked).length
-    },
-    
-    totalCount() {
-      return this.achievements.length
-    },
-    
-    completionRate() {
-      return Math.round((this.unlockedCount / this.totalCount) * 100)
-    }
+    unlockedCount() { return this.achievements.filter(a => a.unlocked).length },
+    totalCount()    { return this.achievements.length },
+    completionRate(){ return this.totalCount ? Math.round((this.unlockedCount / this.totalCount) * 100) : 0 }
   },
-  
+
   onLoad() {
     this.toast = useToast()
-    this.updateCategoryCounts()
-    
     this.$nextTick(() => {
-      if (this.$refs.toastRef) {
-        this.toast.setToastInstance(this.$refs.toastRef)
-      }
+      if (this.$refs.toastRef) this.toast.setToastInstance(this.$refs.toastRef)
     })
+    this.buildAchievements()
+    this.updateCategoryCounts()
   },
-  
+
   methods: {
-    goBack() {
-      uni.navigateBack()
+    goBack() { uni.navigateBack() },
+
+    buildAchievements() {
+      const userStore = useUserStore()
+      const projectStore = useProjectStore()
+
+      // 从用户数据取指标
+      const stats = {
+        works_count:     userStore.works_count     || 0,
+        followers_count: userStore.followers_count || 0,
+        total_likes:     userStore.total_likes     || 0,
+        color_count:     this._getMaxColorCount(projectStore),
+        max_pixels:      this._getMaxPixels(projectStore),
+        night_create:    uni.getStorageSync('achievement_night_create') || 0,
+        streak_days:     uni.getStorageSync('achievement_streak_days')  || 0,
+      }
+
+      // 已解锁记录（本地持久化）
+      const unlocked = uni.getStorageSync('achievements_unlocked') || {}
+
+      this.achievements = ACHIEVEMENT_DEFS.map(def => {
+        const current = Math.min(stats[def.key] || 0, def.target)
+        const wasUnlocked = !!unlocked[def.id]
+        const nowUnlocked = current >= def.target
+
+        // 新解锁：写入本地存储
+        if (nowUnlocked && !wasUnlocked) {
+          unlocked[def.id] = Date.now()
+          uni.setStorageSync('achievements_unlocked', unlocked)
+        }
+
+        return {
+          ...def,
+          current,
+          progress: current,
+          unlocked: nowUnlocked,
+          unlockedAt: unlocked[def.id] || null,
+          hint: nowUnlocked ? null : `还差 ${def.target - current} 即可解锁`
+        }
+      })
     },
-    
+
+    _getMaxColorCount(projectStore) {
+      let max = 0
+      for (const p of projectStore.projects) {
+        if (p.palette && p.palette.length > max) max = p.palette.length
+      }
+      return max
+    },
+
+    _getMaxPixels(projectStore) {
+      let max = 0
+      for (const p of projectStore.projects) {
+        const pixels = (p.width || 0) * (p.height || 0)
+        if (pixels > max) max = pixels
+      }
+      return max
+    },
+
     updateCategoryCounts() {
       this.categories[0].count = this.achievements.length
       this.categories[1].count = this.achievements.filter(a => a.category === 'create').length
@@ -405,41 +309,22 @@ export default {
       this.categories[3].count = this.achievements.filter(a => a.category === 'skill').length
       this.categories[4].count = this.achievements.filter(a => a.category === 'special').length
     },
-    
-    showAchievementDetail(achievement) {
-      this.selectedAchievement = achievement
-    },
-    
-    shareAchievements() {
-      this.toast.showInfo('分享功能开发中')
-    },
-    
+
+    showAchievementDetail(achievement) { this.selectedAchievement = achievement },
+    shareAchievements() { this.toast.showInfo('分享功能开发中') },
+
     getIconColor(achievement) {
-      if (!achievement.unlocked) {
-        return 'var(--color-text-disabled)'
-      }
-      
-      switch (achievement.rarity) {
-        case 'rare': return '#4F7FFF'
-        case 'epic': return '#9333EA'
-        case 'legendary': return '#F59E0B'
-        default: return 'var(--color-text-primary)'
-      }
+      if (!achievement.unlocked) return 'var(--color-text-disabled)'
+      const map = { rare: '#4F7FFF', epic: '#9333EA', legendary: '#F59E0B' }
+      return map[achievement.rarity] || 'var(--color-text-primary)'
     },
-    
+
     getRarityText(rarity) {
-      const rarityMap = {
-        common: '普通',
-        rare: '稀有',
-        epic: '史诗',
-        legendary: '传说'
-      }
-      return rarityMap[rarity] || '普通'
+      return { common: '普通', rare: '稀有', epic: '史诗', legendary: '传说' }[rarity] || '普通'
     },
-    
+
     formatUnlockTime(timestamp) {
-      const date = new Date(timestamp)
-      return date.toLocaleDateString() + ' 解锁'
+      return new Date(timestamp).toLocaleDateString() + ' 解锁'
     }
   }
 }
@@ -599,7 +484,7 @@ export default {
   flex: 1;
   padding: 32rpx;
   overflow-y: auto;
-  width: calc(100% - 64rpx)
+  box-sizing: border-box;
 }
 
 .achievements-grid {

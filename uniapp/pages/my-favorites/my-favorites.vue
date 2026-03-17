@@ -379,7 +379,6 @@ export default {
   background-color: var(--color-card-background);
   border-bottom: 2rpx solid var(--border-primary);
   position: relative;
-  width: calc(100% * 64rpx)
 }
 
 .nav-left {
@@ -458,7 +457,7 @@ export default {
 .content {
   flex: 1;
   padding: 32rpx;
-  width: calc(100% - 64rpx)
+  box-sizing: border-box;
 }
 
 .empty-state {

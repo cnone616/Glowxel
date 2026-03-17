@@ -180,9 +180,9 @@
           <div class="control-group">
             <label>GIF 动画控制</label>
             <div class="gif-control-buttons">
-              <button id="playBtn" onclick="playGif()">▶️ 播放</button>
-              <button id="pauseBtn" onclick="pauseGif()" style="display: none;">⏸️ 暂停</button>
-              <button onclick="stopGif()">⏹️ 停止</button>
+              <button id="playBtn" onclick="playGif()">播放</button>
+              <button id="pauseBtn" onclick="pauseGif()" style="display: none;">暂停</button>
+              <button onclick="stopGif()">停止</button>
             </div>
           </div>
           
@@ -238,7 +238,7 @@
             <input type="number" id="imageWidth" min="8" max="128" value="64" oninput="checkImageSize('width', this.value); updateDisplay()">
             <button class="num-btn" onclick="adjustValue('imageWidth', 1)">+</button>
           </div>
-          <div id="widthWarning" class="warning-text" style="display: none;">⚠️ 宽度超过64可能显示不完整</div>
+          <div id="widthWarning" class="warning-text" style="display: none;">注意: 宽度超过64可能显示不完整</div>
         </div>
         
         <div class="control-group">
@@ -248,7 +248,7 @@
             <input type="number" id="imageHeight" min="8" max="128" value="64" oninput="checkImageSize('height', this.value); updateDisplay()">
             <button class="num-btn" onclick="adjustValue('imageHeight', 1)">+</button>
           </div>
-          <div id="heightWarning" class="warning-text" style="display: none;">⚠️ 高度超过64可能显示不完整</div>
+          <div id="heightWarning" class="warning-text" style="display: none;">注意: 高度超过64可能显示不完整</div>
         </div>
         
         <div class="control-group">

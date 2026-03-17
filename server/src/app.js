@@ -28,6 +28,8 @@ app.use('/api/comment', require('./routes/comment'));
 app.use('/api/template', require('./routes/template'));
 app.use('/api/challenge', require('./routes/challenge'));
 app.use('/api/firmware', require('./routes/firmware'));
+app.use('/api/upload', require('./routes/upload'));
+app.use('/api/notification', require('./routes/notification'));
 
 // 健康检查
 app.get('/api/health', (req, res) => {

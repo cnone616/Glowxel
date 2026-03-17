@@ -6,6 +6,10 @@
 GIFAnimation* AnimationManager::currentGIF = nullptr;
 int AnimationManager::receivingFrameIndex = -1;
 
+// 上一帧像素缓冲，用于 full 帧时清除残留
+static PixelData* s_prevPixels = nullptr;
+static int s_prevPixelCount = 0;
+
 void AnimationManager::init() {
   // 动画管理器初始化
   currentGIF = nullptr;
@@ -14,12 +18,14 @@ void AnimationManager::init() {
   // 尝试从 LittleFS 加载保存的动画
   if (loadAnimation() && currentGIF != nullptr) {
     Serial.printf("已恢复保存的动画: %d 帧\n", currentGIF->frameCount);
-    // 自动播放
-    DisplayManager::currentMode = MODE_ANIMATION;
-    currentGIF->isPlaying = true;
-    currentGIF->currentFrame = 0;
-    currentGIF->lastFrameTime = millis();
-    renderGIFFrame(0);
+    // 只在 ConfigManager 恢复的模式确实是 ANIMATION 时才自动播放
+    // 不要覆盖 currentMode，模式由 ConfigManager::loadClockConfig() 恢复
+    if (DisplayManager::currentMode == MODE_ANIMATION) {
+      currentGIF->isPlaying = true;
+      currentGIF->currentFrame = 0;
+      currentGIF->lastFrameTime = millis();
+      renderGIFFrame(0);
+    }
   }
 }
 
@@ -29,8 +35,11 @@ void AnimationManager::updateGIFAnimation() {
   unsigned long currentTime = millis();
   AnimationFrame& frame = currentGIF->frames[currentGIF->currentFrame];
 
+  // 限制最低帧间隔50ms, 防止过快刷新
+  unsigned long frameDelay = frame.delay < 50 ? 50 : frame.delay;
+
   // 检查是否需要切换到下一帧
-  if (currentTime - currentGIF->lastFrameTime >= frame.delay) {
+  if (currentTime - currentGIF->lastFrameTime >= frameDelay) {
     // 渲染当前帧
     renderGIFFrame(currentGIF->currentFrame);
 
@@ -45,7 +54,21 @@ void AnimationManager::renderGIFFrame(int frameIndex) {
 
   AnimationFrame& frame = currentGIF->frames[frameIndex];
 
-  // 直接覆盖绘制所有像素（不清屏，不跳过任何区域）
+  if (frame.type == "full") {
+    // full 帧：先清掉上一帧的像素，再画新帧，避免 clearScreen() 闪烁
+    if (s_prevPixels != nullptr) {
+      for (int i = 0; i < s_prevPixelCount; i++) {
+        DisplayManager::dma_display->drawPixelRGB888(s_prevPixels[i].x, s_prevPixels[i].y, 0, 0, 0);
+      }
+    }
+    // 更新 prevPixels 缓冲
+    if (s_prevPixels != nullptr) free(s_prevPixels);
+    s_prevPixelCount = frame.pixelCount;
+    s_prevPixels = (PixelData*)malloc(sizeof(PixelData) * s_prevPixelCount);
+    if (s_prevPixels) memcpy(s_prevPixels, frame.pixels, sizeof(PixelData) * s_prevPixelCount);
+  }
+
+  // 绘制当前帧像素
   for (int i = 0; i < frame.pixelCount; i++) {
     PixelData& pixel = frame.pixels[i];
     if (pixel.x < DisplayManager::PANEL_RES_X && pixel.y < DisplayManager::PANEL_RES_Y) {
@@ -67,6 +90,12 @@ void AnimationManager::freeGIFAnimation() {
     free(currentGIF->frames);
     free(currentGIF);
     currentGIF = nullptr;
+  }
+  // 释放上一帧缓冲
+  if (s_prevPixels != nullptr) {
+    free(s_prevPixels);
+    s_prevPixels = nullptr;
+    s_prevPixelCount = 0;
   }
 }
 
@@ -505,10 +534,21 @@ bool AnimationManager::loadAnimation() {
   // 释放旧动画
   freeGIFAnimation();
 
-  // 分配新动画
-  currentGIF = new GIFAnimation();
+  // 分配新动画（统一用 malloc/calloc，与 freeGIFAnimation 中的 free 配对）
+  currentGIF = (GIFAnimation*)malloc(sizeof(GIFAnimation));
+  if (currentGIF == nullptr) {
+    f.close();
+    return false;
+  }
+  memset(currentGIF, 0, sizeof(GIFAnimation));
   currentGIF->frameCount = frameCount;
-  currentGIF->frames = new AnimationFrame[frameCount];
+  currentGIF->frames = (AnimationFrame*)calloc(frameCount, sizeof(AnimationFrame));
+  if (currentGIF->frames == nullptr) {
+    free(currentGIF);
+    currentGIF = nullptr;
+    f.close();
+    return false;
+  }
   currentGIF->currentFrame = 0;
   currentGIF->lastFrameTime = 0;
   currentGIF->isPlaying = false;

@@ -72,7 +72,7 @@ onMounted(() => fetchList())
   padding: 8px 24px; border-radius: 20px; border: 1px solid #e0e0e0;
   background: #fff; color: #666; font-size: 14px; cursor: pointer; transition: all 0.2s;
 }
-.tabs button.active { background: #1a1a1a; color: #fff; border-color: #1a1a1a; }
+.tabs button.active { background: var(--color-primary); color: #fff; border-color: var(--color-primary); }
 
 .artwork-grid {
   display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px;
@@ -97,7 +97,7 @@ onMounted(() => fetchList())
   padding: 10px 28px; border-radius: 8px; border: 1px solid #e0e0e0;
   background: #fff; color: #1a1a1a; font-size: 14px; cursor: pointer;
 }
-.btn-outline:hover { border-color: #1a1a1a; }
+.btn-outline:hover { border-color: var(--color-primary); color: var(--color-primary); }
 
 @media (max-width: 768px) {
   .artwork-grid { grid-template-columns: repeat(2, 1fr); }

@@ -209,7 +209,28 @@ export default {
         sizeType: ['compressed'],
         sourceType: ['album', 'camera'],
         success: (res) => {
-          this.form.avatar = res.tempFilePaths[0]
+          const tempPath = res.tempFilePaths[0]
+          uni.showLoading({ title: '上传中...' })
+          uni.uploadFile({
+            url: 'https://glowxel.com/api/upload?type=avatar',
+            filePath: tempPath,
+            name: 'file',
+            header: { Authorization: `Bearer ${uni.getStorageSync('auth_token')}` },
+            success: (uploadRes) => {
+              try {
+                const data = JSON.parse(uploadRes.data)
+                if (data.code === 0) {
+                  this.form.avatar = data.data.url
+                } else {
+                  this.toast.showError(data.message || '上传失败')
+                }
+              } catch (e) {
+                this.toast.showError('上传失败')
+              }
+            },
+            fail: () => this.toast.showError('上传失败，请重试'),
+            complete: () => uni.hideLoading()
+          })
         }
       })
     },
@@ -305,7 +326,7 @@ export default {
   flex: 1;
   padding: 32rpx 32rpx 210rpx;
   overflow-y: scroll;
-  width: calc(100% - 64rpx)
+  box-sizing: border-box;
 }
 
 .avatar-section {

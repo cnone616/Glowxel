@@ -85,8 +85,8 @@ onMounted(async () => {
 .info-card h1 { font-size: 22px; font-weight: 700; color: #1a1a1a; margin-bottom: 10px; }
 .desc { font-size: 14px; color: #888; line-height: 1.7; margin-bottom: 16px; }
 .stats-row { display: flex; gap: 20px; font-size: 13px; color: #666; margin-bottom: 20px; }
-.btn-join { padding: 10px 28px; border: none; border-radius: 8px; background: #1a1a1a; color: #fff; font-size: 14px; font-weight: 500; cursor: pointer; }
-.btn-join:hover { background: #333; }
+.btn-join { padding: 10px 28px; border: none; border-radius: 8px; background: var(--color-primary); color: #fff; font-size: 14px; font-weight: 500; cursor: pointer; }
+.btn-join:hover { background: var(--color-primary-hover); }
 .btn-join:disabled { background: #ccc; cursor: not-allowed; }
 .section-title { font-size: 18px; font-weight: 600; color: #1a1a1a; margin-bottom: 16px; }
 .artwork-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 40px; }

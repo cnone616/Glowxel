@@ -23,8 +23,8 @@ public:
   static void setBrightness(int brightness);
 
   // 3x5 微型字体渲染
-  static void drawTinyText(const char* text, int x, int y, uint16_t color);
-  static void drawTinyTextCentered(const char* text, int y, uint16_t color);
+  static void drawTinyText(const char* text, int x, int y, uint16_t color, int size = 1);
+  static void drawTinyTextCentered(const char* text, int y, uint16_t color, int size = 1);
 
   static MatrixPanel_I2S_DMA* dma_display;
   static DeviceMode currentMode;

@@ -256,6 +256,9 @@ export default {
   padding: 8rpx 16rpx;
   border-radius: var(--radius-small);
   backdrop-filter: blur(10rpx);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .status-active {

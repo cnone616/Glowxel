@@ -499,10 +499,10 @@ class GIFParser {
         pixels = pixels.slice(0, maxPixelsPerFrame);
       }
       
-      // 紧凑格式
+      // 紧凑格式, 限制最低50ms防止过快刷新
       const esp32Frame = {
         t: frame.type === 'full' ? 1 : 0,
-        d: frame.delay,
+        d: Math.max(50, frame.delay || 100),
         c: pixels.length,
         p: pixels.map(pixel => [pixel.x, pixel.y, pixel.r, pixel.g, pixel.b])
       };

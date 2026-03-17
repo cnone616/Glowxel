@@ -13,6 +13,11 @@ class WebSocket {
     this.onConnectCallback = null
     this.onDisconnectCallback = null
     this.onErrorCallback = null
+    // 指数退避重连
+    this._reconnectAttempts = 0
+    this._reconnectTimer = null
+    this._manualDisconnect = false  // 区分手动断开 vs 意外断线
+    this._maxReconnectAttempts = 10
   }
 
   /**
@@ -63,6 +68,8 @@ class WebSocket {
       socketTask.onOpen(() => {
         console.log('WebSocket 连接成功')
         this.connected = true
+        this._reconnectAttempts = 0
+        this._manualDisconnect = false
         if (this.onConnectCallback) {
           this.onConnectCallback()
         }
@@ -89,6 +96,10 @@ class WebSocket {
         this.connected = false
         if (this.onDisconnectCallback) {
           this.onDisconnectCallback()
+        }
+        // 意外断线时自动重连（指数退避）
+        if (!this._manualDisconnect && this.host) {
+          this._scheduleReconnect()
         }
       })
 
@@ -134,6 +145,12 @@ class WebSocket {
    * 断开连接
    */
   disconnect() {
+    this._manualDisconnect = true
+    if (this._reconnectTimer) {
+      clearTimeout(this._reconnectTimer)
+      this._reconnectTimer = null
+    }
+    this._reconnectAttempts = 0
     if (this.socket) {
       this.socket.close({
         success: () => {
@@ -143,6 +160,26 @@ class WebSocket {
       this.socket = null
       this.connected = false
     }
+  }
+
+  /**
+   * 指数退避重连（意外断线时自动调用）
+   */
+  _scheduleReconnect() {
+    if (this._reconnectAttempts >= this._maxReconnectAttempts) {
+      console.log(`已达最大重连次数 ${this._maxReconnectAttempts}，停止重连`)
+      return
+    }
+    const delay = Math.min(1000 * Math.pow(2, this._reconnectAttempts), 30000)
+    this._reconnectAttempts++
+    console.log(`将在 ${delay}ms 后第 ${this._reconnectAttempts} 次重连...`)
+    this._reconnectTimer = setTimeout(() => {
+      if (this._manualDisconnect) return
+      console.log('正在重连...')
+      this.connect(this.host, this.port).catch(err => {
+        console.error('重连失败:', err)
+      })
+    }, delay)
   }
 
   /**
@@ -312,13 +349,15 @@ class WebSocket {
   /**
    * 发送稀疏像素数据（只发送有颜色的像素，包括黑色）
    * @param {Array} sparsePixels - 稀疏像素数据 [x, y, r, g, b, x, y, r, g, b, ...]
+   * @param {number} width - 画布宽度（用于计算居中偏移）
+   * @param {number} height - 画布高度（用于计算居中偏移）
    */
-  async showSparseImage(sparsePixels) {
+  async showSparseImage(sparsePixels, width = 64, height = 64) {
     if (sparsePixels.length === 0) return
-    
-    // 计算居中偏移（板子是64x64，数据是52x52）
-    const offsetX = Math.floor((64 - 52) / 2)
-    const offsetY = Math.floor((64 - 52) / 2)
+
+    // 根据实际画布尺寸动态计算居中偏移（板子是64x64）
+    const offsetX = Math.floor((64 - width) / 2)
+    const offsetY = Math.floor((64 - height) / 2)
     
     // 先清屏
     await this.send({ cmd: 'clear' })
@@ -362,13 +401,15 @@ class WebSocket {
   /**
    * 发送部分更新（不清屏，直接更新像素）
    * @param {Array} pixelData - 像素数据 [x, y, r, g, b, x, y, r, g, b, ...]
+   * @param {number} width - 画布宽度（用于计算居中偏移）
+   * @param {number} height - 画布高度（用于计算居中偏移）
    */
-  async sendPartialUpdate(pixelData) {
+  async sendPartialUpdate(pixelData, width = 64, height = 64) {
     if (pixelData.length === 0) return
-    
-    // 计算居中偏移
-    const offsetX = Math.floor((64 - 52) / 2)
-    const offsetY = Math.floor((64 - 52) / 2)
+
+    // 根据实际画布尺寸动态计算居中偏移（板子是64x64）
+    const offsetX = Math.floor((64 - width) / 2)
+    const offsetY = Math.floor((64 - height) / 2)
     
     // 添加偏移
     const offsetData = []

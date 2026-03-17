@@ -92,7 +92,8 @@ export const useUserStore = defineStore('user', {
       try {
         const res = await userAPI.getProfile()
         if (res.success) {
-          this.currentUser = res.data
+          // 后端返回 { code: 0, data: { user: {...} } }，request.js 转换后 res.data = { user: {...} }
+          this.currentUser = res.data.user || res.data
           this.userInfo = {
             nickName: this.currentUser.name || this.currentUser.nickname,
             avatarUrl: this.currentUser.avatar
