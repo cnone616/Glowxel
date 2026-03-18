@@ -4,23 +4,27 @@
     <!-- #ifdef MP-WEIXIN -->
     <view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
     <!-- #endif -->
-    
+
     <!-- 导航栏 -->
     <view class="navbar">
-      <view class="nav-left" @click="goBack">
-        <Icon name="direction-left" :size="32" color="var(--color-text-primary)" />
+      <view class="nav-left" @click="handleBack">
+        <Icon
+          name="direction-left"
+          :size="32"
+          color="var(--color-text-primary)"
+        />
       </view>
       <text class="nav-title">编辑资料</text>
       <view class="nav-right"></view>
     </view>
-    
+
     <scroll-view scroll-y class="content">
       <!-- 头像编辑 -->
       <view class="avatar-section">
         <view class="avatar-container" @click="chooseAvatar">
-          <image 
-            v-if="form.avatar" 
-            :src="form.avatar" 
+          <image
+            v-if="form.avatar"
+            :src="form.avatar"
             class="avatar-image"
             mode="aspectFill"
           />
@@ -30,14 +34,14 @@
         </view>
         <text class="avatar-tip">点击更换头像</text>
       </view>
-      
+
       <!-- 基本信息 -->
       <view class="form-section">
         <view class="section-title">基本信息</view>
-        
+
         <view class="form-item">
           <text class="form-label">昵称</text>
-          <input 
+          <input
             v-model="form.nickname"
             class="form-input"
             placeholder="请输入昵称"
@@ -45,10 +49,10 @@
           />
           <text class="char-count">{{ form.nickname.length }}/20</text>
         </view>
-        
+
         <view class="form-item">
           <text class="form-label">个人简介</text>
-          <textarea 
+          <textarea
             v-model="form.bio"
             class="form-textarea"
             placeholder="介绍一下自己吧..."
@@ -57,11 +61,11 @@
           />
           <text class="char-count">{{ form.bio.length }}/100</text>
         </view>
-        
+
         <view class="form-item">
           <text class="form-label">性别</text>
           <view class="gender-options">
-            <view 
+            <view
               v-for="option in genderOptions"
               :key="option.value"
               class="gender-option"
@@ -74,12 +78,12 @@
           </view>
         </view>
       </view>
-      
+
       <!-- 兴趣标签 -->
       <view class="form-section">
         <view class="section-title">兴趣标签</view>
         <view class="tags-container">
-          <view 
+          <view
             v-for="tag in availableTags"
             :key="tag"
             class="tag-item"
@@ -91,186 +95,200 @@
         </view>
         <text class="tags-tip">最多选择5个标签</text>
       </view>
-      
+
       <!-- 隐私设置 -->
       <view class="form-section">
         <view class="section-title">隐私设置</view>
-        
+
         <view class="form-item switch-item">
           <view class="switch-info">
             <text class="form-label">公开作品</text>
             <text class="form-desc">允许其他用户查看我的作品</text>
           </view>
-          <switch 
-            :checked="form.publicWorks" 
+          <switch
+            :checked="form.publicWorks"
             @change="form.publicWorks = $event.detail.value"
             color="#4F7FFF"
           />
         </view>
-        
+
         <view class="form-item switch-item">
           <view class="switch-info">
             <text class="form-label">接收关注通知</text>
             <text class="form-desc">有新粉丝时通知我</text>
           </view>
-          <switch 
-            :checked="form.followNotify" 
+          <switch
+            :checked="form.followNotify"
             @change="form.followNotify = $event.detail.value"
             color="#4F7FFF"
           />
         </view>
       </view>
     </scroll-view>
-    
+
     <!-- 底部保存按钮 -->
     <view class="footer-actions">
       <view class="save-button" @click="handleSave">
         <text class="save-button-text">保存</text>
       </view>
     </view>
-    
+
     <!-- Toast -->
     <Toast ref="toastRef" />
   </view>
 </template>
 
 <script>
-import { useUserStore } from '../../store/user.js'
-import { useToast } from '../../composables/useToast.js'
-import statusBarMixin from '../../mixins/statusBar.js'
-import Icon from '../../components/Icon.vue'
-import Toast from '../../components/Toast.vue'
+import { useUserStore } from "../../store/user.js";
+import { useToast } from "../../composables/useToast.js";
+import statusBarMixin from "../../mixins/statusBar.js";
+import Icon from "../../components/Icon.vue";
+import Toast from "../../components/Toast.vue";
 
 export default {
   mixins: [statusBarMixin],
   components: {
     Icon,
-    Toast
+    Toast,
   },
-  
+
   data() {
     return {
       userStore: useUserStore(),
       toast: null,
       form: {
-        avatar: '',
-        nickname: '',
-        bio: '',
-        gender: 'unknown',
+        avatar: "",
+        nickname: "",
+        bio: "",
+        gender: "unknown",
         tags: [],
         publicWorks: true,
-        followNotify: true
+        followNotify: true,
       },
       genderOptions: [
-        { value: 'male', label: '男', icon: 'user' },
-        { value: 'female', label: '女', icon: 'user' },
-        { value: 'unknown', label: '保密', icon: 'user' }
+        { value: "male", label: "男", icon: "user" },
+        { value: "female", label: "女", icon: "user" },
+        { value: "unknown", label: "保密", icon: "user" },
       ],
       availableTags: [
-        '像素艺术', '游戏', '动漫', '设计', '创意',
-        '手工', '拼豆', '艺术', '摄影', '音乐',
-        '编程', '科技', '旅行', '美食', '运动'
-      ]
-    }
+        "像素艺术",
+        "游戏",
+        "动漫",
+        "设计",
+        "创意",
+        "手工",
+        "拼豆",
+        "艺术",
+        "摄影",
+        "音乐",
+        "编程",
+        "科技",
+        "旅行",
+        "美食",
+        "运动",
+      ],
+    };
   },
-  
+
   onLoad() {
-    this.toast = useToast()
-    this.loadUserData()
-    
+    this.toast = useToast();
+    this.loadUserData();
+
     this.$nextTick(() => {
       if (this.$refs.toastRef) {
-        this.toast.setToastInstance(this.$refs.toastRef)
+        this.toast.setToastInstance(this.$refs.toastRef);
       }
-    })
+    });
   },
-  
+
   methods: {
     loadUserData() {
       // 加载用户数据
       this.form = {
-        avatar: this.userStore.avatar || '',
-        nickname: this.userStore.nickname || '',
-        bio: this.userStore.bio || '',
-        gender: this.userStore.gender || 'unknown',
+        avatar: this.userStore.avatar || "",
+        nickname: this.userStore.nickname || "",
+        bio: this.userStore.bio || "",
+        gender: this.userStore.gender || "unknown",
         tags: this.userStore.tags || [],
         publicWorks: this.userStore.publicWorks !== false,
-        followNotify: this.userStore.followNotify !== false
-      }
+        followNotify: this.userStore.followNotify !== false,
+      };
     },
-    
-    goBack() {
-      uni.navigateBack()
+
+    handleBack() {
+      uni.navigateBack();
     },
-    
+
     chooseAvatar() {
       uni.chooseImage({
         count: 1,
-        sizeType: ['compressed'],
-        sourceType: ['album', 'camera'],
+        sizeType: ["compressed"],
+        sourceType: ["album", "camera"],
         success: (res) => {
-          const tempPath = res.tempFilePaths[0]
-          uni.showLoading({ title: '上传中...' })
+          const tempPath = res.tempFilePaths[0];
+          uni.showLoading({ title: "上传中..." });
           uni.uploadFile({
-            url: 'https://glowxel.com/api/upload?type=avatar',
+            url: "https://glowxel.com/api/upload?type=avatar",
             filePath: tempPath,
-            name: 'file',
-            header: { Authorization: `Bearer ${uni.getStorageSync('auth_token')}` },
+            name: "file",
+            header: {
+              Authorization: `Bearer ${uni.getStorageSync("auth_token")}`,
+            },
             success: (uploadRes) => {
               try {
-                const data = JSON.parse(uploadRes.data)
+                const data = JSON.parse(uploadRes.data);
                 if (data.code === 0) {
-                  this.form.avatar = data.data.url
+                  this.form.avatar = data.data.url;
                 } else {
-                  this.toast.showError(data.message || '上传失败')
+                  this.toast.showError(data.message || "上传失败");
                 }
               } catch (e) {
-                this.toast.showError('上传失败')
+                this.toast.showError("上传失败");
               }
             },
-            fail: () => this.toast.showError('上传失败，请重试'),
-            complete: () => uni.hideLoading()
-          })
-        }
-      })
+            fail: () => this.toast.showError("上传失败，请重试"),
+            complete: () => uni.hideLoading(),
+          });
+        },
+      });
     },
-    
+
     toggleTag(tag) {
-      const index = this.form.tags.indexOf(tag)
+      const index = this.form.tags.indexOf(tag);
       if (index > -1) {
-        this.form.tags.splice(index, 1)
+        this.form.tags.splice(index, 1);
       } else if (this.form.tags.length < 5) {
-        this.form.tags.push(tag)
+        this.form.tags.push(tag);
       } else {
-        this.toast.showError('最多只能选择5个标签')
+        this.toast.showError("最多只能选择5个标签");
       }
     },
-    
+
     async handleSave() {
       if (!this.form.nickname.trim()) {
-        this.toast.showError('请输入昵称')
-        return
+        this.toast.showError("请输入昵称");
+        return;
       }
-      
-      uni.showLoading({ title: '保存中...' })
-      
+
+      uni.showLoading({ title: "保存中..." });
+
       try {
         // 更新用户信息
-        await this.userStore.updateProfile(this.form)
-        
-        uni.hideLoading()
-        this.toast.showSuccess('保存成功')
-        
+        await this.userStore.updateProfile(this.form);
+
+        uni.hideLoading();
+        this.toast.showSuccess("保存成功");
+
         setTimeout(() => {
-          uni.navigateBack()
-        }, 1000)
+          uni.navigateBack();
+        }, 1000);
       } catch (error) {
-        uni.hideLoading()
-        this.toast.showError('保存失败，请重试')
+        uni.hideLoading();
+        this.toast.showError("保存失败，请重试");
       }
-    }
-  }
-}
+    },
+  },
+};
 </script>
 
 <style scoped>
@@ -344,8 +362,7 @@ export default {
   overflow: hidden;
   margin-bottom: 16rpx;
   border-radius: 50%;
-  border: 1px solid #4F7FFF;
-
+  border: 1px solid #4f7fff;
 }
 
 .avatar-image {
@@ -476,7 +493,7 @@ export default {
 .gender-option.active {
   background-color: var(--color-brand-primary);
   border-color: var(--color-brand-primary);
-  color: #FFFFFF;
+  color: #ffffff;
 }
 
 .gender-text {
@@ -510,7 +527,7 @@ export default {
 }
 
 .tag-item.active .tag-text {
-  color: #FFFFFF;
+  color: #ffffff;
 }
 
 .tags-tip {
@@ -551,7 +568,11 @@ export default {
 .save-button {
   width: 100%;
   height: 88rpx;
-  background: linear-gradient(135deg, var(--color-brand-primary), var(--color-brand-accent));
+  background: linear-gradient(
+    135deg,
+    var(--color-brand-primary),
+    var(--color-brand-accent)
+  );
   border-radius: 16rpx;
   display: flex;
   align-items: center;
@@ -568,7 +589,6 @@ export default {
 .save-button-text {
   font-size: 32rpx;
   font-weight: 600;
-  color: #FFFFFF;
+  color: #ffffff;
 }
-
 </style>

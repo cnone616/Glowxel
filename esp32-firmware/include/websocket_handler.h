@@ -22,10 +22,13 @@ public:
   // 二进制数据接收状态
   static unsigned long lastBinaryReceiveTime;
   static bool binaryDataPending;
-  
+
   // WebSocket 分片数据缓存
   static String fragmentBuffer;
   static bool isReceivingFragments;
+
+  // 心跳超时检测
+  static unsigned long lastMessageTime;
   
 private:
   static void handleJsonCommand(AsyncWebSocketClient *client, JsonDocument& doc);

@@ -4,7 +4,7 @@
     <!-- #ifdef MP-WEIXIN -->
     <view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
     <!-- #endif -->
-    
+
     <!-- 顶部导航 -->
     <view class="header">
       <view class="header-content">
@@ -17,14 +17,14 @@
         </view>
       </view>
     </view>
-    
+
     <!-- 主要内容 -->
     <scroll-view scroll-y class="main-content">
       <!-- 作品展示区域 -->
       <view class="artwork-section">
         <view class="artwork-container">
-          <image 
-            :src="artwork.coverUrl" 
+          <image
+            :src="artwork.coverUrl"
             class="artwork-image"
             mode="aspectFit"
             @click="previewImage"
@@ -35,7 +35,7 @@
           </view>
         </view>
       </view>
-      
+
       <!-- 作品信息 -->
       <view class="info-section">
         <view class="artwork-info">
@@ -43,7 +43,9 @@
           <view class="artwork-meta">
             <view class="meta-item">
               <Icon name="modular" :size="28" color="#666666" />
-              <text class="meta-text">{{ artwork.width }}×{{ artwork.height }}</text>
+              <text class="meta-text"
+                >{{ artwork.width }}×{{ artwork.height }}</text
+              >
             </view>
             <view class="meta-item">
               <Icon name="picture" :size="28" color="#666666" />
@@ -54,82 +56,91 @@
               <text class="meta-text">{{ formatDate(artwork.createdAt) }}</text>
             </view>
           </view>
-          
+
           <!-- 标签 -->
-          <view v-if="artwork.tags && artwork.tags.length" class="tags-container">
-            <view 
-              v-for="tag in artwork.tags" 
-              :key="tag" 
-              class="tag-item"
-            >
+          <view
+            v-if="artwork.tags && artwork.tags.length"
+            class="tags-container"
+          >
+            <view v-for="tag in artwork.tags" :key="tag" class="tag-item">
               <text class="tag-text">#{{ tag }}</text>
             </view>
           </view>
         </view>
-        
+
         <!-- 作者信息 -->
         <view class="author-section">
           <view class="author-info" @click="goToUserProfile">
             <Avatar :src="artwork.author.avatar" :size="80" />
             <view class="author-details">
               <text class="author-name">{{ artwork.author.name }}</text>
-              <text class="author-stats">{{ artwork.author.worksCount }}个作品</text>
+              <text class="author-stats"
+                >{{ artwork.author.worksCount }}个作品</text
+              >
             </view>
           </view>
-          <view 
+          <view
             class="follow-btn"
-            :class="{ 'following': artwork.author.isFollowing }"
+            :class="{ following: artwork.author.isFollowing }"
             @click="toggleFollow"
           >
             <text class="follow-text">
-              {{ artwork.author.isFollowing ? '已关注' : '关注' }}
+              {{ artwork.author.isFollowing ? "已关注" : "关注" }}
             </text>
           </view>
         </view>
       </view>
-      
+
       <!-- 交互按钮 -->
       <view class="action-section">
         <view class="action-buttons">
-          <view 
+          <view
             class="action-btn"
-            :class="{ 'active': isLiked }"
+            :class="{ active: isLiked }"
             @click="toggleLike"
           >
-            <Icon :name="isLiked ? 'favorite-filling' : 'favorite'" :size="40" :color="isLiked ? '#FF4757' : '#666666'" />
+            <Icon
+              :name="isLiked ? 'favorite-filling' : 'favorite'"
+              :size="40"
+              :color="isLiked ? '#FF4757' : '#666666'"
+            />
             <text class="action-text">{{ artwork.likes || 0 }}</text>
           </view>
-          
-          <view 
+
+          <view
             class="action-btn"
-            :class="{ 'active': isCollected }"
+            :class="{ active: isCollected }"
             @click="toggleCollect"
           >
-            <Icon :name="isCollected ? 'file-common-filling' : 'file-common'" :size="40" :color="isCollected ? '#4F7FFF' : '#666666'" />
+            <Icon
+              :name="isCollected ? 'file-common-filling' : 'file-common'"
+              :size="40"
+              :color="isCollected ? '#4F7FFF' : '#666666'"
+            />
             <text class="action-text">{{ artwork.collects || 0 }}</text>
           </view>
-          
+
           <view class="action-btn" @click="showCommentInput">
             <Icon name="comment" :size="40" color="#666666" />
             <text class="action-text">{{ artwork.comments || 0 }}</text>
           </view>
-          
+
           <view class="action-btn" @click="shareArtwork">
             <Icon name="share" :size="40" color="#666666" />
             <text class="action-text">分享</text>
           </view>
         </view>
       </view>
-      
+
       <!-- 评论区域 -->
       <view class="comment-section">
         <view class="section-header">
           <text class="section-title">评论 ({{ comments.length }})</text>
         </view>
-        
+
         <!-- 评论列表 -->
         <view v-if="comments.length > 0" class="comment-list">
-          <Comment 
+          <Comment
             v-for="comment in comments"
             :key="comment.id"
             :comment="comment"
@@ -138,21 +149,21 @@
             @delete="handleCommentDelete"
           />
         </view>
-        
+
         <!-- 空状态 -->
         <view v-else class="empty-comments">
           <Icon name="comment" :size="80" color="#CCCCCC" />
           <text class="empty-text">还没有评论，快来抢沙发吧！</text>
         </view>
       </view>
-      
+
       <!-- 相关推荐 -->
       <view class="related-section">
         <view class="section-header">
           <text class="section-title">相关推荐</text>
         </view>
         <view class="related-grid">
-          <ArtworkCard 
+          <ArtworkCard
             v-for="item in relatedArtworks"
             :key="item.id"
             :artwork="item"
@@ -161,7 +172,7 @@
         </view>
       </view>
     </scroll-view>
-    
+
     <!-- 底部评论输入 -->
     <view v-if="showCommentBar" class="comment-input-bar">
       <view class="comment-input-container">
@@ -173,16 +184,16 @@
           clearable
           @blur="handleCommentBlur"
         />
-        <view 
+        <view
           class="send-btn"
-          :class="{ 'active': commentText.trim() }"
+          :class="{ active: commentText.trim() }"
           @click="sendComment"
         >
           <text class="send-text">发送</text>
         </view>
       </view>
     </view>
-    
+
     <!-- 更多操作弹窗 -->
     <Modal v-model:visible="showMoreModal" title="更多操作">
       <view class="more-actions">
@@ -204,15 +215,21 @@
 </template>
 
 <script>
-import { artworkAPI, commentAPI, likeAPI, collectionAPI, followAPI } from '../../api/index.js'
-import { useProjectStore } from '../../store/project.js'
-import statusBarMixin from '../../mixins/statusBar.js'
-import Icon from '../../components/Icon.vue'
-import Avatar from '../../components/Avatar.vue'
-import Comment from '../../components/Comment.vue'
-import ArtworkCard from '../../components/ArtworkCard.vue'
-import Modal from '../../components/Modal.vue'
-import Input from '../../components/Input.vue'
+import {
+  artworkAPI,
+  commentAPI,
+  likeAPI,
+  collectionAPI,
+  followAPI,
+} from "../../api/index.js";
+import { useProjectStore } from "../../store/project.js";
+import statusBarMixin from "../../mixins/statusBar.js";
+import Icon from "../../components/Icon.vue";
+import Avatar from "../../components/Avatar.vue";
+import Comment from "../../components/Comment.vue";
+import ArtworkCard from "../../components/ArtworkCard.vue";
+import Modal from "../../components/Modal.vue";
+import Input from "../../components/Input.vue";
 
 export default {
   mixins: [statusBarMixin],
@@ -222,347 +239,348 @@ export default {
     Comment,
     ArtworkCard,
     Modal,
-    Input
+    Input,
   },
-  
+
   data() {
     return {
-      artworkId: '',
+      artworkId: "",
       artwork: {},
       comments: [],
       relatedArtworks: [],
-      
+
       // 交互状态
       isLiked: false,
       isCollected: false,
-      
+
       // 评论相关
       showCommentBar: false,
-      commentText: '',
+      commentText: "",
       commentInputFocus: false,
-      
+
       // 弹窗状态
       showMoreModal: false,
-      
+
       // 加载状态
-      isLoading: true
-    }
+      isLoading: true,
+    };
   },
-  
+
   onLoad(options) {
-    this.artworkId = options.id
+    this.artworkId = options.id;
     if (this.artworkId) {
-      this.loadArtworkDetail()
+      this.loadArtworkDetail();
     }
   },
-  
+
   methods: {
     async loadArtworkDetail() {
       try {
-        this.isLoading = true
+        this.isLoading = true;
 
-        const artRes = await artworkAPI.getArtworkById(this.artworkId)
-        if (artRes.success) this.artwork = artRes.data
+        const artRes = await artworkAPI.getArtworkById(this.artworkId);
+        if (artRes.success) this.artwork = artRes.data;
 
-        const cmtRes = await commentAPI.getComments(this.artworkId)
-        if (cmtRes.success) this.comments = cmtRes.data?.list || []
+        const cmtRes = await commentAPI.getComments(this.artworkId);
+        if (cmtRes.success) this.comments = cmtRes.data?.list || [];
 
-        const relRes = await artworkAPI.getRelatedArtworks(this.artworkId)
-        if (relRes.success) this.relatedArtworks = relRes.data?.list || relRes.data || []
+        const relRes = await artworkAPI.getRelatedArtworks(this.artworkId);
+        if (relRes.success)
+          this.relatedArtworks = relRes.data?.list || relRes.data || [];
 
-        this.isLiked = await likeAPI.isLiked(this.artworkId)
-        this.isCollected = await collectionAPI.isCollected(this.artworkId)
-        
+        this.isLiked = await likeAPI.isLiked(this.artworkId);
+        this.isCollected = await collectionAPI.isCollected(this.artworkId);
       } catch (error) {
-        console.error('加载作品详情失败:', error)
+        console.error("加载作品详情失败:", error);
         uni.showToast({
-          title: '加载失败',
-          icon: 'error'
-        })
+          title: "加载失败",
+          icon: "error",
+        });
       } finally {
-        this.isLoading = false
+        this.isLoading = false;
       }
     },
-    
+
     handleBack() {
-      uni.navigateBack()
+      uni.navigateBack();
     },
-    
+
     previewImage() {
       uni.previewImage({
         urls: [this.artwork.coverUrl],
-        current: this.artwork.coverUrl
-      })
+        current: this.artwork.coverUrl,
+      });
     },
-    
+
     goToUserProfile() {
       uni.navigateTo({
-        url: `/pages/user-detail/user-detail?id=${this.artwork.author.id}`
-      })
+        url: `/pages/user-detail/user-detail?id=${this.artwork.author.id}`,
+      });
     },
-    
+
     async toggleFollow() {
       try {
-        const isFollowing = !this.artwork.author.isFollowing
-        
+        const isFollowing = !this.artwork.author.isFollowing;
+
         // 调用关注API
         if (isFollowing) {
-          await followAPI.followUser(this.artwork.author.id)
+          await followAPI.followUser(this.artwork.author.id);
         } else {
-          await followAPI.unfollowUser(this.artwork.author.id)
+          await followAPI.unfollowUser(this.artwork.author.id);
         }
-        
-        this.artwork.author.isFollowing = isFollowing
-        
+
+        this.artwork.author.isFollowing = isFollowing;
+
         uni.showToast({
-          title: isFollowing ? '关注成功' : '取消关注',
-          icon: 'success'
-        })
+          title: isFollowing ? "关注成功" : "取消关注",
+          icon: "success",
+        });
       } catch (error) {
-        console.error('关注操作失败:', error)
+        console.error("关注操作失败:", error);
         uni.showToast({
-          title: '操作失败',
-          icon: 'error'
-        })
+          title: "操作失败",
+          icon: "error",
+        });
       }
     },
-    
+
     async toggleLike() {
       try {
-        const liked = !this.isLiked
-        
+        const liked = !this.isLiked;
+
         // 调用点赞API
         if (liked) {
-          await likeAPI.likeArtwork(this.artworkId)
-          this.artwork.likes = (this.artwork.likes || 0) + 1
+          await likeAPI.likeArtwork(this.artworkId);
+          this.artwork.likes = (this.artwork.likes || 0) + 1;
         } else {
-          await likeAPI.unlikeArtwork(this.artworkId)
-          this.artwork.likes = Math.max(0, (this.artwork.likes || 0) - 1)
+          await likeAPI.unlikeArtwork(this.artworkId);
+          this.artwork.likes = Math.max(0, (this.artwork.likes || 0) - 1);
         }
-        
-        this.isLiked = liked
-        
+
+        this.isLiked = liked;
       } catch (error) {
-        console.error('点赞操作失败:', error)
+        console.error("点赞操作失败:", error);
         uni.showToast({
-          title: '操作失败',
-          icon: 'error'
-        })
+          title: "操作失败",
+          icon: "error",
+        });
       }
     },
-    
+
     async toggleCollect() {
       try {
-        const collected = !this.isCollected
+        const collected = !this.isCollected;
 
         // 调用收藏API
         if (collected) {
-          await collectionAPI.collectArtwork(this.artworkId)
-          this.artwork.collects = (this.artwork.collects || 0) + 1
+          await collectionAPI.collectArtwork(this.artworkId);
+          this.artwork.collects = (this.artwork.collects || 0) + 1;
 
           // 收藏时创建只读本地项目
-          this._addCollectedProject()
+          this._addCollectedProject();
         } else {
-          await collectionAPI.uncollectArtwork(this.artworkId)
-          this.artwork.collects = Math.max(0, (this.artwork.collects || 0) - 1)
+          await collectionAPI.uncollectArtwork(this.artworkId);
+          this.artwork.collects = Math.max(0, (this.artwork.collects || 0) - 1);
 
           // 取消收藏时删除本地项目
-          this._removeCollectedProject()
+          this._removeCollectedProject();
         }
 
-        this.isCollected = collected
+        this.isCollected = collected;
 
         uni.showToast({
-          title: collected ? '已收藏并添加到我的项目' : '取消收藏',
-          icon: 'success'
-        })
+          title: collected ? "已收藏并添加到我的项目" : "取消收藏",
+          icon: "success",
+        });
       } catch (error) {
-        console.error('收藏操作失败:', error)
+        console.error("收藏操作失败:", error);
         uni.showToast({
-          title: '操作失败',
-          icon: 'error'
-        })
+          title: "操作失败",
+          icon: "error",
+        });
       }
     },
 
     // 收藏时添加只读项目到本地
     _addCollectedProject() {
-      if (!this.artwork) return
-      const projectStore = useProjectStore()
+      if (!this.artwork) return;
+      const projectStore = useProjectStore();
       projectStore.addCollectedProject({
         name: this.artwork.title,
         width: this.artwork.width || 52,
         height: this.artwork.height || 52,
         palette: [],
-        thumbnail: this.artwork.coverUrl || '',
+        thumbnail: this.artwork.coverUrl || "",
         artworkId: this.artwork.id,
-        originalAuthor: this.artwork.author ? {
-          id: this.artwork.author.id,
-          name: this.artwork.author.name,
-          avatar: this.artwork.author.avatar
-        } : null
-      })
+        originalAuthor: this.artwork.author
+          ? {
+              id: this.artwork.author.id,
+              name: this.artwork.author.name,
+              avatar: this.artwork.author.avatar,
+            }
+          : null,
+      });
     },
 
     // 取消收藏时删除对应的本地项目
     _removeCollectedProject() {
-      if (!this.artwork) return
-      const projectStore = useProjectStore()
+      if (!this.artwork) return;
+      const projectStore = useProjectStore();
       const project = projectStore.projects.find(
-        p => p.source === 'collected' && p.artworkId === this.artwork.id
-      )
+        (p) => p.source === "collected" && p.artworkId === this.artwork.id,
+      );
       if (project) {
-        projectStore.deleteProject(project.id)
+        projectStore.deleteProject(project.id);
       }
     },
-    
+
     showCommentInput() {
-      this.showCommentBar = true
-      this.commentInputFocus = true
+      this.showCommentBar = true;
+      this.commentInputFocus = true;
     },
-    
+
     handleCommentBlur() {
       if (!this.commentText.trim()) {
-        this.showCommentBar = false
+        this.showCommentBar = false;
       }
     },
-    
+
     async sendComment() {
-      if (!this.commentText.trim()) return
-      
+      if (!this.commentText.trim()) return;
+
       try {
         const cmtRes = await commentAPI.addComment(
           this.artworkId,
-          this.commentText.trim()
-        )
-        const newComment = cmtRes.success ? cmtRes.data : null
-        if (!newComment) throw new Error('评论失败')
-        
-        this.comments.unshift(newComment)
-        this.artwork.comments = (this.artwork.comments || 0) + 1
-        this.commentText = ''
-        this.showCommentBar = false
-        
+          this.commentText.trim(),
+        );
+        const newComment = cmtRes.success ? cmtRes.data : null;
+        if (!newComment) throw new Error("评论失败");
+
+        this.comments.unshift(newComment);
+        this.artwork.comments = (this.artwork.comments || 0) + 1;
+        this.commentText = "";
+        this.showCommentBar = false;
+
         uni.showToast({
-          title: '评论成功',
-          icon: 'success'
-        })
+          title: "评论成功",
+          icon: "success",
+        });
       } catch (error) {
-        console.error('发表评论失败:', error)
+        console.error("发表评论失败:", error);
         uni.showToast({
-          title: '评论失败',
-          icon: 'error'
-        })
+          title: "评论失败",
+          icon: "error",
+        });
       }
     },
-    
+
     handleReply(comment) {
-      this.commentText = `@${comment.author.name} `
-      this.showCommentInput()
+      this.commentText = `@${comment.author.name} `;
+      this.showCommentInput();
     },
-    
+
     async handleCommentLike(comment) {
       try {
-        const liked = !comment.isLiked
-        
+        const liked = !comment.isLiked;
+
         if (liked) {
-          await commentAPI.likeComment(comment.id)
-          comment.likes = (comment.likes || 0) + 1
+          await commentAPI.likeComment(comment.id);
+          comment.likes = (comment.likes || 0) + 1;
         } else {
-          await commentAPI.likeComment(comment.id)
-          comment.likes = Math.max(0, (comment.likes || 0) - 1)
+          await commentAPI.likeComment(comment.id);
+          comment.likes = Math.max(0, (comment.likes || 0) - 1);
         }
-        
-        comment.isLiked = liked
+
+        comment.isLiked = liked;
       } catch (error) {
-        console.error('评论点赞失败:', error)
+        console.error("评论点赞失败:", error);
       }
     },
-    
+
     async handleCommentDelete(comment) {
       try {
-        await commentAPI.deleteComment(comment.id)
-        
-        const index = this.comments.findIndex(c => c.id === comment.id)
+        await commentAPI.deleteComment(comment.id);
+
+        const index = this.comments.findIndex((c) => c.id === comment.id);
         if (index > -1) {
-          this.comments.splice(index, 1)
-          this.artwork.comments = Math.max(0, (this.artwork.comments || 0) - 1)
+          this.comments.splice(index, 1);
+          this.artwork.comments = Math.max(0, (this.artwork.comments || 0) - 1);
         }
-        
+
         uni.showToast({
-          title: '删除成功',
-          icon: 'success'
-        })
+          title: "删除成功",
+          icon: "success",
+        });
       } catch (error) {
-        console.error('删除评论失败:', error)
+        console.error("删除评论失败:", error);
         uni.showToast({
-          title: '删除失败',
-          icon: 'error'
-        })
+          title: "删除失败",
+          icon: "error",
+        });
       }
     },
-    
+
     shareArtwork() {
       // 微信小程序分享
       uni.showShareMenu({
-        withShareTicket: true
-      })
+        withShareTicket: true,
+      });
     },
-    
+
     showMoreActions() {
-      this.showMoreModal = true
+      this.showMoreModal = true;
     },
-    
+
     downloadArtwork() {
-      this.showMoreModal = false
+      this.showMoreModal = false;
       uni.showToast({
-        title: '下载功能开发中',
-        icon: 'none'
-      })
+        title: "下载功能开发中",
+        icon: "none",
+      });
     },
-    
+
     useAsTemplate() {
-      this.showMoreModal = false
+      this.showMoreModal = false;
       uni.navigateTo({
-        url: `/pages/create/create?templateId=${this.artworkId}`
-      })
+        url: `/pages/create/create?templateId=${this.artworkId}`,
+      });
     },
-    
+
     reportArtwork() {
-      this.showMoreModal = false
+      this.showMoreModal = false;
       uni.showToast({
-        title: '举报功能开发中',
-        icon: 'none'
-      })
+        title: "举报功能开发中",
+        icon: "none",
+      });
     },
-    
+
     goToArtwork(artwork) {
       uni.navigateTo({
-        url: `/pages/artwork-detail/artwork-detail?id=${artwork.id}`
-      })
+        url: `/pages/artwork-detail/artwork-detail?id=${artwork.id}`,
+      });
     },
-    
+
     formatDate(dateString) {
-      const date = new Date(dateString)
-      const now = new Date()
-      const diff = now - date
-      
-      const minute = 60 * 1000
-      const hour = 60 * minute
-      const day = 24 * hour
-      
+      const date = new Date(dateString);
+      const now = new Date();
+      const diff = now - date;
+
+      const minute = 60 * 1000;
+      const hour = 60 * minute;
+      const day = 24 * hour;
+
       if (diff < hour) {
-        return Math.floor(diff / minute) + '分钟前'
+        return Math.floor(diff / minute) + "分钟前";
       } else if (diff < day) {
-        return Math.floor(diff / hour) + '小时前'
+        return Math.floor(diff / hour) + "小时前";
       } else if (diff < 7 * day) {
-        return Math.floor(diff / day) + '天前'
+        return Math.floor(diff / day) + "天前";
       } else {
-        return date.toLocaleDateString()
+        return date.toLocaleDateString();
       }
-    }
-  }
-}
+    },
+  },
+};
 </script>
 
 <style scoped>
@@ -592,7 +610,8 @@ export default {
   padding: 24rpx 32rpx;
 }
 
-.back-btn, .more-btn {
+.back-btn,
+.more-btn {
   width: 80rpx;
   height: 80rpx;
   display: flex;
@@ -602,7 +621,8 @@ export default {
   transition: all 0.2s ease;
 }
 
-.back-btn:active, .more-btn:active {
+.back-btn:active,
+.more-btn:active {
   transform: scale(0.95);
   background-color: rgba(255, 255, 255, 0.1);
 }
@@ -610,7 +630,7 @@ export default {
 .header-title {
   font-size: 36rpx;
   font-weight: 700;
-  color: #FFFFFF;
+  color: #ffffff;
   flex: 1;
   text-align: center;
 }
@@ -654,7 +674,7 @@ export default {
 
 .zoom-text {
   font-size: 24rpx;
-  color: #FFFFFF;
+  color: #ffffff;
 }
 
 /* 信息区域 */
@@ -766,7 +786,7 @@ export default {
 .follow-text {
   font-size: 28rpx;
   font-weight: 500;
-  color: #FFFFFF;
+  color: #ffffff;
 }
 
 .follow-btn.following .follow-text {
@@ -899,7 +919,7 @@ export default {
 
 .send-text {
   font-size: 26rpx;
-  color: #FFFFFF;
+  color: #ffffff;
   font-weight: 500;
 }
 

@@ -4,29 +4,35 @@
     <!-- #ifdef MP-WEIXIN -->
     <view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
     <!-- #endif -->
-    
+
     <!-- 顶部栏 -->
     <view class="header">
       <view class="header-left">
-        <view class="back-btn" @click="goBack">
-          <Icon name="direction-left" :size="40" color="var(--color-text-primary)" />
+        <view class="back-btn" @click="handleBack">
+          <Icon
+            name="direction-left"
+            :size="40"
+            color="var(--color-text-primary)"
+          />
         </view>
         <view class="header-info">
           <text class="header-title">画布总览</text>
-          <text class="header-subtitle">选择一个画布以进行详细编辑</text>
-        </view>
-        <view class="action-btn danger" @click="handleDeleteClick">
-          <Icon name="ashbin" :size="32" />
+          <view class="action-btn primary" @click="handleEdit">
+            <Icon name="edit" :size="32" class="edit-icon" />
+          </view>
+          <view class="action-btn danger" @click="handleDeleteClick">
+            <Icon name="ashbin" :size="32" />
+          </view>
         </view>
       </view>
     </view>
-    
+
     <!-- 搜索栏 -->
     <view class="search-section">
       <view class="search-bar">
         <view class="search-input-wrapper">
           <Icon name="search" :size="28" color="var(--text-tertiary)" />
-          <input 
+          <input
             v-model="searchQuery"
             type="text"
             class="search-input"
@@ -38,11 +44,11 @@
         </view>
       </view>
     </view>
-    
+
     <!-- 侧边栏索引 - 行号 -->
     <view class="sidebar-index">
       <view class="index-container">
-        <view 
+        <view
           v-for="label in rowLabels"
           :key="label"
           class="index-item"
@@ -52,20 +58,23 @@
         </view>
       </view>
     </view>
-    
+
     <!-- 画布网格 -->
-    <scroll-view 
-      scroll-y 
+    <scroll-view
+      scroll-y
       scroll-x
-      class="board-grid-container" 
+      class="board-grid-container"
       :scroll-top="scrollTop"
       :scroll-left="scrollLeft"
       :scroll-with-animation="true"
       @scroll="handleScroll"
     >
       <view class="board-grid-wrapper">
-        <view class="board-grid" :style="{ gridTemplateColumns: `repeat(${cols}, 1fr)` }">
-          <view 
+        <view
+          class="board-grid"
+          :style="{ gridTemplateColumns: `repeat(${cols}, 1fr)` }"
+        >
+          <view
             v-for="board in boards"
             :key="board.id"
             :id="`board-${board.id}`"
@@ -77,7 +86,7 @@
               <view class="grid-pattern"></view>
               <!-- 使用项目缩略图裁剪显示看板区域 -->
               <view v-if="project && project.thumbnail" class="thumbnail-crop">
-                <image 
+                <image
                   :src="project.thumbnail"
                   class="thumbnail-full-image"
                   :style="getBoardImagePosition(board)"
@@ -89,22 +98,31 @@
                 <text class="placeholder-text">{{ board.id }}</text>
               </view>
             </view>
-            
+
             <!-- 完成标识 -->
-            <view v-if="board.progress && board.progress.completion >= 1" class="complete-badge">
+            <view
+              v-if="board.progress && board.progress.completion >= 1"
+              class="complete-badge"
+            >
               <Icon name="check-item" :size="28" color="#000000" />
             </view>
-            
+
             <!-- 进度条 -->
             <view class="board-progress">
               <view class="progress-info">
                 <text class="progress-label">{{ board.id }}</text>
-                <text class="progress-value">{{ Math.round((board.progress?.completion || 0) * 100) }}%</text>
+                <text class="progress-value"
+                  >{{
+                    Math.round((board.progress?.completion || 0) * 100)
+                  }}%</text
+                >
               </view>
               <view class="progress-bar">
-                <view 
+                <view
                   class="progress-fill"
-                  :style="{ width: ((board.progress?.completion || 0) * 100) + '%' }"
+                  :style="{
+                    width: (board.progress?.completion || 0) * 100 + '%',
+                  }"
                 ></view>
               </view>
             </view>
@@ -112,28 +130,43 @@
         </view>
       </view>
     </scroll-view>
-    
+
     <!-- 底部统计 -->
     <view class="footer-stats">
       <!-- 导出完整图纸按钮 - 收藏项目不显示 -->
-      <view v-if="isExportable" class="export-button" @click="handleBatchExport">
+      <view
+        v-if="isExportable"
+        class="export-button"
+        @click="handleBatchExport"
+      >
         <Icon name="download" :size="32" color="#ffffff" />
         <text class="export-text">导出完整图纸</text>
       </view>
-      
+
       <view class="stat-row">
         <text class="stat-label">总画布数: {{ boards.length }}</text>
-        <text class="stat-label">{{ project?.width }}×{{ project?.height }} 像素</text>
+        <text class="stat-label"
+          >{{ project?.width }}×{{ project?.height }} 像素</text
+        >
       </view>
-      
-      <view v-if="project?.paddedWidth && (project.paddedWidth !== project.width || project.paddedHeight !== project.height)" class="stat-row">
-        <text class="stat-label stat-hint">填充后: {{ project?.paddedWidth }}×{{ project?.paddedHeight }}</text>
+
+      <view
+        v-if="
+          project?.paddedWidth &&
+          (project.paddedWidth !== project.width ||
+            project.paddedHeight !== project.height)
+        "
+        class="stat-row"
+      >
+        <text class="stat-label stat-hint"
+          >填充后: {{ project?.paddedWidth }}×{{ project?.paddedHeight }}</text
+        >
       </view>
-      
+
       <view class="total-progress">
         <text class="total-label">总进度</text>
         <view class="total-bar">
-          <view 
+          <view
             class="total-fill"
             :style="{ width: (project?.progress || 0) + '%' }"
           ></view>
@@ -141,45 +174,61 @@
         <text class="total-value">{{ project?.progress || 0 }}%</text>
       </view>
     </view>
-    
+
     <!-- 操作弹窗 -->
-    <view v-if="selectedBoard" class="modal-overlay" @click="selectedBoard = null">
+    <view
+      v-if="selectedBoard"
+      class="modal-overlay"
+      @click="selectedBoard = null"
+    >
       <view class="action-modal" @click.stop>
         <view class="modal-close" @click="selectedBoard = null">
           <Icon name="close" :size="40" />
         </view>
-        
+
         <text class="modal-board-id">{{ selectedBoard }}</text>
         <text class="modal-subtitle">选择操作模式</text>
-        
+
         <view class="modal-actions">
           <view class="modal-action-btn primary" @click="goToEditor">
             <Icon name="edit" :size="36" />
             <text class="modal-action-text">编辑 (绘图模式)</text>
           </view>
-          
+
           <view class="modal-action-btn secondary" @click="goToAssist">
             <Icon name="work" :size="36" />
             <text class="modal-action-text">辅助拼豆模式</text>
           </view>
 
-          <view v-if="isExportable" class="modal-action-btn tertiary" @click="exportBoard">
+          <view
+            v-if="isExportable"
+            class="modal-action-btn tertiary"
+            @click="exportBoard"
+          >
             <Icon name="download" :size="36" />
             <text class="modal-action-text">导出此画布</text>
           </view>
         </view>
       </view>
     </view>
-    
+
     <!-- 删除确认弹窗 -->
-    <view v-if="showDeleteConfirm" class="modal-overlay" @click="showDeleteConfirm = false">
+    <view
+      v-if="showDeleteConfirm"
+      class="modal-overlay"
+      @click="showDeleteConfirm = false"
+    >
       <view class="confirm-modal" @click.stop>
         <view class="confirm-icon">
           <Icon name="ashbin" :size="96" />
         </view>
         <text class="confirm-title">删除画布？</text>
-        <text class="confirm-desc">您确定要删除 "{{ project?.name }}" 吗？<text class="confirm-warning">此操作无法撤销，所有设计数据将永久丢失。</text></text>
-        
+        <text class="confirm-desc"
+          >您确定要删除 "{{ project?.name }}" 吗？<text class="confirm-warning"
+            >此操作无法撤销，所有设计数据将永久丢失。</text
+          ></text
+        >
+
         <view class="confirm-actions">
           <view class="confirm-btn cancel" @click="showDeleteConfirm = false">
             <text class="confirm-btn-text">取消</text>
@@ -190,21 +239,70 @@
         </view>
       </view>
     </view>
-    
+
+    <!-- 重命名弹窗 -->
+    <view
+      v-if="showRenameModal"
+      class="modal-overlay"
+      @click="showRenameModal = false"
+    >
+      <view class="rename-modal" @click.stop>
+        <view class="rename-header">
+          <text class="rename-title">修改项目名称</text>
+          <view class="close-btn" @click="showRenameModal = false">
+            <Icon name="close" :size="32" />
+          </view>
+        </view>
+        <view class="rename-body">
+          <view class="rename-input-wrap">
+            <input
+              v-model="newProjectName"
+              type="text"
+              class="rename-input"
+              placeholder="输入新名称"
+              placeholder-class="rename-placeholder"
+              maxlength="30"
+              :focus="showRenameModal"
+              @confirm="confirmRename"
+            />
+          </view>
+        </view>
+        <view class="rename-footer">
+          <view class="rename-btn cancel" @click="showRenameModal = false">
+            <text class="rename-btn-text">取消</text>
+          </view>
+          <view
+            class="rename-btn confirm"
+            :class="{ disabled: !newProjectName.trim() }"
+            @click="confirmRename"
+          >
+            <text class="rename-btn-text">确认</text>
+          </view>
+        </view>
+      </view>
+    </view>
+
     <!-- 导出确认弹窗 -->
-    <view v-if="showExportConfirm" class="modal-overlay" @click="showExportConfirm = false">
+    <view
+      v-if="showExportConfirm"
+      class="modal-overlay"
+      @click="showExportConfirm = false"
+    >
       <view class="confirm-modal" @click.stop>
         <view class="confirm-icon">
           <Icon name="download" :size="96" color="#00f3ff" />
         </view>
-        <text class="confirm-title">{{ exportType === 'batch' ? '导出完整图纸？' : '导出此画布？' }}</text>
+        <text class="confirm-title">{{
+          exportType === "batch" ? "导出完整图纸？" : "导出此画布？"
+        }}</text>
         <text class="confirm-desc">
-          {{ exportType === 'batch' 
-            ? `将导出 "${project?.name}" 的完整图纸，包含所有看板和颜色标注。` 
-            : `将导出看板 "${exportBoardData}" 的图纸，包含颜色标注。` 
+          {{
+            exportType === "batch"
+              ? `将导出 "${project?.name}" 的完整图纸，包含所有看板和颜色标注。`
+              : `将导出看板 "${exportBoardData}" 的图纸，包含颜色标注。`
           }}
         </text>
-        
+
         <view class="confirm-actions">
           <view class="confirm-btn cancel" @click="showExportConfirm = false">
             <text class="confirm-btn-text">取消</text>
@@ -215,18 +313,24 @@
         </view>
       </view>
     </view>
-    
+
     <!-- 隐藏的 Canvas 用于导出 -->
-    <canvas 
-      canvas-id="exportCanvas" 
+    <canvas
+      canvas-id="exportCanvas"
       id="exportCanvas"
       type="2d"
-      style="position: fixed; left: -9999px; top: -9999px; width: 1px; height: 1px;"
+      style="
+        position: fixed;
+        left: -9999px;
+        top: -9999px;
+        width: 1px;
+        height: 1px;
+      "
     />
-    
+
     <!-- 自定义 Toast 组件 -->
     <Toast ref="toastRef" />
-    
+
     <!-- 删除云端备份确认弹窗 -->
     <ConfirmModal
       :visible.sync="showDeleteCloudModal"
@@ -242,331 +346,344 @@
 </template>
 
 <script>
-import { useProjectStore } from '../../store/project.js'
-import { useUserStore } from '../../store/user.js'
-import { useToast } from '../../composables/useToast.js'
-import statusBarMixin from '../../mixins/statusBar.js'
-import Icon from '../../components/Icon.vue'
-import Toast from '../../components/Toast.vue'
-import ConfirmModal from '../../components/ConfirmModal.vue'
-import { exportCanvasAsImage, saveImageToAlbum } from '../../utils/exportCanvas.js'
-import { getCloudProjects, deleteCloudProject } from '../../api/project.js'
+import { useProjectStore } from "../../store/project.js";
+import { useUserStore } from "../../store/user.js";
+import { useToast } from "../../composables/useToast.js";
+import statusBarMixin from "../../mixins/statusBar.js";
+import Icon from "../../components/Icon.vue";
+import Toast from "../../components/Toast.vue";
+import ConfirmModal from "../../components/ConfirmModal.vue";
+import {
+  exportCanvasAsImage,
+  saveImageToAlbum,
+} from "../../utils/exportCanvas.js";
+import { getCloudProjects, deleteCloudProject } from "../../api/project.js";
 
 export default {
   mixins: [statusBarMixin],
-  name: 'OverviewPage',
+  name: "OverviewPage",
   components: {
     Icon,
     Toast,
-    ConfirmModal
+    ConfirmModal,
   },
   data() {
     return {
       projectStore: null,
       toast: null,
-      projectId: '',
+      projectId: "",
       project: null,
       pixels: new Map(),
       selectedBoard: null,
       showDeleteConfirm: false,
       showExportConfirm: false, // 导出确认弹窗
-      exportType: '', // 'batch' 或 'single'
+      showRenameModal: false,
+      newProjectName: "",
+      exportType: "", // 'batch' 或 'single'
       exportBoardData: null, // 要导出的看板数据
       isExporting: false,
-      searchQuery: '',
+      searchQuery: "",
       loadedBoards: new Set(), // 已加载的board ID集合
       loadBatchSize: 6, // 每批加载的数量
       isLoadingMore: false, // 是否正在加载更多
       scrollTop: 0, // 垂直滚动位置
       scrollLeft: 0, // 水平滚动位置
-      showDeleteCloudModal: false // 删除云端备份确认弹窗
-    }
+      showDeleteCloudModal: false, // 删除云端备份确认弹窗
+    };
   },
-  
+
   computed: {
     // 是否可导出（收藏项目不可导出）
     isExportable() {
-      if (!this.project) return false
-      if (this.project.source === 'collected') return false
-      if (this.project.permissions && !this.project.permissions.canExport) return false
-      return true
+      if (!this.project) return false;
+      if (this.project.source === "collected") return false;
+      if (this.project.permissions && !this.project.permissions.canExport)
+        return false;
+      return true;
     },
 
     cols() {
       // 使用填充后的宽度计算板子数量
-      const paddedWidth = this.project?.paddedWidth || this.project?.width || 64
-      return Math.ceil(paddedWidth / 64)
+      const paddedWidth =
+        this.project?.paddedWidth || this.project?.width || 64;
+      return Math.ceil(paddedWidth / 64);
     },
 
     rows() {
       // 使用填充后的高度计算板子数量
-      const paddedHeight = this.project?.paddedHeight || this.project?.height || 64
-      return Math.ceil(paddedHeight / 64)
+      const paddedHeight =
+        this.project?.paddedHeight || this.project?.height || 64;
+      return Math.ceil(paddedHeight / 64);
     },
-    
+
     rowLabels() {
-      const labels = []
+      const labels = [];
       for (let y = 0; y < this.rows; y++) {
-        labels.push(String.fromCharCode(65 + y))
+        labels.push(String.fromCharCode(65 + y));
       }
-      return labels
+      return labels;
     },
-    
+
     boards() {
-      const result = []
-      
+      const result = [];
+
       for (let y = 0; y < this.rows; y++) {
         for (let x = 0; x < this.cols; x++) {
-          const rowLabel = String.fromCharCode(65 + y)
-          const colLabel = x + 1
-          const id = `${rowLabel}${colLabel}`
-          const progress = this.getBoardProgress(id)
+          const rowLabel = String.fromCharCode(65 + y);
+          const colLabel = x + 1;
+          const id = `${rowLabel}${colLabel}`;
+          const progress = this.getBoardProgress(id);
           // 延迟计算像素数据，只在需要时才计算
-          const boardPixels = null // 不在这里计算
-          const thumbnail = null // 不在这里获取
-          
-          result.push({ id, x, y, progress, pixels: boardPixels, thumbnail })
+          const boardPixels = null; // 不在这里计算
+          const thumbnail = null; // 不在这里获取
+
+          result.push({ id, x, y, progress, pixels: boardPixels, thumbnail });
         }
       }
-      
+
       // 搜索过滤
       if (this.searchQuery.trim()) {
-        const query = this.searchQuery.trim().toUpperCase()
-        return result.filter(board => board.id.toUpperCase().includes(query))
+        const query = this.searchQuery.trim().toUpperCase();
+        return result.filter((board) => board.id.toUpperCase().includes(query));
       }
-      
-      return result
-    }
+
+      return result;
+    },
   },
-  
+
   onLoad(options) {
-    this.projectStore = useProjectStore()
-    this.toast = useToast()
-    
-    this.projectId = options.id
-    this.project = this.projectStore.getProject(this.projectId)
-    
+    this.projectStore = useProjectStore();
+    this.toast = useToast();
+
+    this.projectId = options.id;
+    this.project = this.projectStore.getProject(this.projectId);
+
     if (!this.project) {
-      this.toast.showError('项目不存在')
+      this.toast.showError("项目不存在");
       setTimeout(() => {
         uni.switchTab({
-          url: '/pages/workspace/workspace'
-        })
-      }, 1000)
-      return
+          url: "/pages/workspace/workspace",
+        });
+      }, 1000);
+      return;
     }
-    
-    this.loadPixels()
-    
+
+    this.loadPixels();
+
     // 延迟500ms后开始加载缩略图
     setTimeout(() => {
-      this.loadInitialBoards()
-    }, 500)
+      this.loadInitialBoards();
+    }, 500);
   },
-  
+
   onShow() {
     // 从 assist 页返回时刷新进度数据
     if (this.projectStore && this.projectId) {
-      this.project = this.projectStore.getProject(this.projectId)
+      this.project = this.projectStore.getProject(this.projectId);
     }
   },
-  
+
   methods: {
     loadPixels() {
-      const savedPixels = uni.getStorageSync(`pixels-${this.projectId}`)
+      const savedPixels = uni.getStorageSync(`pixels-${this.projectId}`);
       if (savedPixels) {
         try {
-          const parsed = JSON.parse(savedPixels)
-          this.pixels = new Map(parsed)
+          const parsed = JSON.parse(savedPixels);
+          this.pixels = new Map(parsed);
         } catch (e) {
-          console.error('Failed to load pixels', e)
-          this.pixels = new Map()
+          console.error("Failed to load pixels", e);
+          this.pixels = new Map();
         }
       }
     },
-    
+
     // 初始加载前几批缩略图
     loadInitialBoards() {
-      const initialCount = Math.min(this.boards.length, this.loadBatchSize) // 初始只加载1批
+      const initialCount = Math.min(this.boards.length, this.loadBatchSize); // 初始只加载1批
       for (let i = 0; i < initialCount; i++) {
-        this.loadedBoards.add(this.boards[i].id)
+        this.loadedBoards.add(this.boards[i].id);
       }
-      
+
       // 继续加载剩余的
       if (this.boards.length > initialCount) {
         setTimeout(() => {
-          this.loadMoreBoards()
-        }, 200)
+          this.loadMoreBoards();
+        }, 200);
       }
     },
-    
+
     // 加载更多缩略图
     loadMoreBoards() {
-      if (this.isLoadingMore) return
-      
-      this.isLoadingMore = true
-      const currentCount = this.loadedBoards.size
-      const totalCount = this.boards.length
-      
+      if (this.isLoadingMore) return;
+
+      this.isLoadingMore = true;
+      const currentCount = this.loadedBoards.size;
+      const totalCount = this.boards.length;
+
       if (currentCount >= totalCount) {
-        this.isLoadingMore = false
-        return
+        this.isLoadingMore = false;
+        return;
       }
-      
+
       // 每次加载一批
-      const endIndex = Math.min(currentCount + this.loadBatchSize, totalCount)
+      const endIndex = Math.min(currentCount + this.loadBatchSize, totalCount);
       for (let i = currentCount; i < endIndex; i++) {
-        this.loadedBoards.add(this.boards[i].id)
+        this.loadedBoards.add(this.boards[i].id);
       }
-      
-      this.isLoadingMore = false
-      
+
+      this.isLoadingMore = false;
+
       // 如果还有未加载的，继续加载
       if (endIndex < totalCount) {
         setTimeout(() => {
-          this.loadMoreBoards()
-        }, 100)
+          this.loadMoreBoards();
+        }, 100);
       }
     },
-    
+
     // 滚动时触发加载
     handleScroll(e) {
       // 简单的滚动触发，确保所有内容最终都会加载
       if (!this.isLoadingMore && this.loadedBoards.size < this.boards.length) {
-        this.loadMoreBoards()
+        this.loadMoreBoards();
       }
     },
-    
+
     getBoardPixels(boardX, boardY) {
-      const local = new Map()
-      const startX = boardX * 64
-      const startY = boardY * 64
+      const local = new Map();
+      const startX = boardX * 64;
+      const startY = boardY * 64;
 
       this.pixels.forEach((color, key) => {
-        const [px, py] = key.split(',').map(Number)
-        if (px >= startX && px < startX + 64 && py >= startY && py < startY + 64) {
-          local.set(`${px - startX},${py - startY}`, color)
+        const [px, py] = key.split(",").map(Number);
+        if (
+          px >= startX &&
+          px < startX + 64 &&
+          py >= startY &&
+          py < startY + 64
+        ) {
+          local.set(`${px - startX},${py - startY}`, color);
         }
-      })
-      
-      return local
+      });
+
+      return local;
     },
-    
+
     getBoardImagePosition(board) {
       // 计算整个项目有多少个看板
-      const paddedWidth = this.project.paddedWidth || this.project.width
-      const paddedHeight = this.project.paddedHeight || this.project.height
-      const boardsX = Math.ceil(paddedWidth / 64)
-      const boardsY = Math.ceil(paddedHeight / 64)
-      
+      const paddedWidth = this.project.paddedWidth || this.project.width;
+      const paddedHeight = this.project.paddedHeight || this.project.height;
+      const boardsX = Math.ceil(paddedWidth / 64);
+      const boardsY = Math.ceil(paddedHeight / 64);
+
       // 容器尺寸（需要通过CSS变量或固定值）
       // 假设容器是正方形，宽高相等，这里用百分比计算
       // 图片宽度 = 容器宽度 * boardsX
       // 图片高度 = 容器高度 * boardsY
-      
+
       // 当前看板的偏移 = -容器尺寸 * 看板索引
       // left: board.x = 0 时是 0，board.x = 1 时是 -100%，board.x = 2 时是 -200%
-      
+
       return {
         width: `${boardsX * 100}%`,
         height: `${boardsY * 100}%`,
         left: `${-board.x * 100}%`,
-        top: `${-board.y * 100}%`
-      }
+        top: `${-board.y * 100}%`,
+      };
     },
-    
+
     getBoardProgress(boardId) {
-      if (!this.project) return null
-      return this.projectStore.getBoardProgress(this.project.id, boardId)
+      if (!this.project) return null;
+      return this.projectStore.getBoardProgress(this.project.id, boardId);
     },
-    
+
     scrollToRow(label) {
       // 如果是第一行A，直接滚到顶部并保留边距
-      if (label === 'A') {
-        this.scrollTop = 0
-        this.scrollLeft = 0
-        this.$forceUpdate()
-        return
+      if (label === "A") {
+        this.scrollTop = 0;
+        this.scrollLeft = 0;
+        this.$forceUpdate();
+        return;
       }
-      
+
       // 计算目标行的位置
-      const targetId = `board-${label}1`
-      
+      const targetId = `board-${label}1`;
+
       // 使用 uni.createSelectorQuery 获取元素位置
-      const query = uni.createSelectorQuery().in(this)
-      query.select(`#${targetId}`).boundingClientRect()
-      query.select('.board-grid-wrapper').boundingClientRect()
-      query.select('.board-grid-container').boundingClientRect()
+      const query = uni.createSelectorQuery().in(this);
+      query.select(`#${targetId}`).boundingClientRect();
+      query.select(".board-grid-wrapper").boundingClientRect();
+      query.select(".board-grid-container").boundingClientRect();
       query.exec((res) => {
         if (res && res[0] && res[1] && res[2]) {
-          const targetRect = res[0]
-          const wrapperRect = res[1]
-          
+          const targetRect = res[0];
+          const wrapperRect = res[1];
+
           // 计算滚动位置，保留64rpx的上边距
-          const padding = uni.upx2px(64)
-          this.scrollTop = targetRect.top - wrapperRect.top - padding
-          
+          const padding = uni.upx2px(64);
+          this.scrollTop = targetRect.top - wrapperRect.top - padding;
+
           // 保持左边距不变，或者重置为初始左边距
-          this.scrollLeft = 0
-          
+          this.scrollLeft = 0;
+
           // 触发滚动
-          this.$forceUpdate()
+          this.$forceUpdate();
         }
-      })
+      });
     },
-    
+
     scrollToCol(col) {
       // 列跳转暂时不需要，已删除横向索引
     },
-    
-    goBack() {
-      uni.navigateBack()
+
+    handleBack() {
+      uni.navigateBack();
     },
-    
+
     goToFullEditor() {
       uni.navigateTo({
-        url: `/pages/editor/editor?id=${this.projectId}`
-      })
+        url: `/pages/editor/editor?id=${this.projectId}`,
+      });
     },
-    
+
     goToEditor() {
       uni.navigateTo({
-        url: `/pages/editor/editor?id=${this.projectId}&board=${this.selectedBoard}`
-      })
-      this.selectedBoard = null
+        url: `/pages/editor/editor?id=${this.projectId}&board=${this.selectedBoard}`,
+      });
+      this.selectedBoard = null;
     },
-    
+
     goToAssist() {
       uni.navigateTo({
-        url: `/pages/assist/assist?id=${this.projectId}&board=${this.selectedBoard}`
-      })
-      this.selectedBoard = null
+        url: `/pages/assist/assist?id=${this.projectId}&board=${this.selectedBoard}`,
+      });
+      this.selectedBoard = null;
     },
-    
+
     exportBoard() {
-      if (!this.selectedBoard) return
-      
-      const board = this.boards.find(b => b.id === this.selectedBoard)
-      if (!board) return
-      
+      if (!this.selectedBoard) return;
+
+      const board = this.boards.find((b) => b.id === this.selectedBoard);
+      if (!board) return;
+
       // 显示确认弹窗
-      this.exportType = 'single'
-      this.exportBoardData = this.selectedBoard
-      this.showExportConfirm = true
+      this.exportType = "single";
+      this.exportBoardData = this.selectedBoard;
+      this.showExportConfirm = true;
     },
-    
+
     async handleExportBoard(board) {
       try {
-        this.toast.showInfo('正在生成图纸...')
-        
+        this.toast.showInfo("正在生成图纸...");
+
         // 实时计算像素数据
-        const boardPixels = this.getBoardPixels(board.x, board.y)
-        
+        const boardPixels = this.getBoardPixels(board.x, board.y);
+
         const tempFilePath = await exportCanvasAsImage({
           pixels: boardPixels,
           width: 64,
           height: 64,
-          projectName: `${this.project?.name || '未命名'} - ${board.id}`,
+          projectName: `${this.project?.name || "未命名"} - ${board.id}`,
           palette: this.project?.palette,
           cellSize: 30,
           showGrid: true,
@@ -574,53 +691,53 @@ export default {
           showColorCodes: true,
           showStatistics: true,
           showLogo: true,
-          canvasId: 'exportCanvas'
-        })
-        
-        await saveImageToAlbum(tempFilePath)
-        this.toast.showSuccess(`画布 ${board.id} 已保存到相册`)
+          canvasId: "exportCanvas",
+        });
+
+        await saveImageToAlbum(tempFilePath);
+        this.toast.showSuccess(`画布 ${board.id} 已保存到相册`);
       } catch (error) {
-        console.error('导出失败:', error)
-        this.toast.showError(error.message || '导出失败，请重试')
+        console.error("导出失败:", error);
+        this.toast.showError(error.message || "导出失败，请重试");
       }
     },
-    
+
     async handleBatchExport() {
-      if (this.isExporting || !this.project) return
-      
+      if (this.isExporting || !this.project) return;
+
       // 显示确认弹窗
-      this.exportType = 'batch'
-      this.showExportConfirm = true
+      this.exportType = "batch";
+      this.showExportConfirm = true;
     },
-    
+
     async performBatchExport() {
-      if (this.isExporting || !this.project) return
-      
-      this.isExporting = true
-      this.toast.showInfo('正在生成完整图纸...')
-      
+      if (this.isExporting || !this.project) return;
+
+      this.isExporting = true;
+      this.toast.showInfo("正在生成完整图纸...");
+
       try {
         // 根据画布大小动态调整 cellSize
-        const width = this.project.paddedWidth || this.project.width
-        const height = this.project.paddedHeight || this.project.height
-        const maxDimension = Math.max(width, height)
-        let cellSize = 30
-        
+        const width = this.project.paddedWidth || this.project.width;
+        const height = this.project.paddedHeight || this.project.height;
+        const maxDimension = Math.max(width, height);
+        let cellSize = 30;
+
         // 根据最大边长调整 cellSize
         if (maxDimension >= 520) {
-          cellSize = 7
+          cellSize = 7;
         } else if (maxDimension >= 400) {
-          cellSize = 9
+          cellSize = 9;
         } else if (maxDimension >= 300) {
-          cellSize = 12
+          cellSize = 12;
         } else if (maxDimension >= 200) {
-          cellSize = 18
+          cellSize = 18;
         } else if (maxDimension >= 100) {
-          cellSize = 25
+          cellSize = 25;
         }
-        
-        console.log(`画布尺寸: ${width}x${height}, 使用 cellSize: ${cellSize}`)
-        
+
+        console.log(`画布尺寸: ${width}x${height}, 使用 cellSize: ${cellSize}`);
+
         // 直接使用全局像素数据，不需要遍历boards
         const tempFilePath = await exportCanvasAsImage({
           pixels: this.pixels,
@@ -634,107 +751,129 @@ export default {
           showColorCodes: true,
           showStatistics: true,
           showLogo: true,
-          canvasId: 'exportCanvas'
-        })
-        
-        await saveImageToAlbum(tempFilePath)
-        this.toast.showSuccess('完整图纸已保存到相册')
+          canvasId: "exportCanvas",
+        });
+
+        await saveImageToAlbum(tempFilePath);
+        this.toast.showSuccess("完整图纸已保存到相册");
       } catch (error) {
-        console.error('导出失败:', error)
+        console.error("导出失败:", error);
         // 如果是因为尺寸过大导致的错误，给出更友好的提示
-        if (error.message && error.message.includes('分块导出')) {
-          this.toast.showError('图纸过大，建议在下方选择单个看板导出')
+        if (error.message && error.message.includes("分块导出")) {
+          this.toast.showError("图纸过大，建议在下方选择单个看板导出");
         } else {
-          this.toast.showError(error.message || '导出失败，请重试')
+          this.toast.showError(error.message || "导出失败，请重试");
         }
       } finally {
-        this.isExporting = false
+        this.isExporting = false;
       }
     },
-    
-    handleDeleteClick() {
-      this.showDeleteConfirm = true
+
+    handleEdit() {
+      this.newProjectName = this.project?.name || "";
+      this.showRenameModal = true;
     },
-    
+
+    async confirmRename() {
+      const name = this.newProjectName.trim();
+      if (!name || !this.project) return;
+      try {
+        this.project.name = name;
+        this.project.updatedAt = Date.now();
+        await this.projectStore.saveProject(this.project);
+        this.showRenameModal = false;
+        this.toast.showSuccess("已修改");
+      } catch (err) {
+        console.error("重命名失败:", err);
+        this.toast.showError("修改失败");
+      }
+    },
+
+    handleDeleteClick() {
+      this.showDeleteConfirm = true;
+    },
+
     confirmExport() {
-      this.showExportConfirm = false
-      
-      if (this.exportType === 'batch') {
+      this.showExportConfirm = false;
+
+      if (this.exportType === "batch") {
         // 批量导出
-        this.performBatchExport()
-      } else if (this.exportType === 'single') {
+        this.performBatchExport();
+      } else if (this.exportType === "single") {
         // 单个看板导出
-        const board = this.boards.find(b => b.id === this.exportBoardData)
+        const board = this.boards.find((b) => b.id === this.exportBoardData);
         if (board) {
-          this.selectedBoard = null
-          this.handleExportBoard(board)
+          this.selectedBoard = null;
+          this.handleExportBoard(board);
         }
       }
     },
-    
+
     async confirmDelete() {
-      if (!this.project) return
-      
+      if (!this.project) return;
+
       // 检查是否已登录且开启云同步
-      const userStore = useUserStore()
-      
+      const userStore = useUserStore();
+
       if (userStore.hasLogin && userStore.syncEnabled) {
         // 显示删除云端备份确认弹窗
-        this.showDeleteCloudModal = true
+        this.showDeleteCloudModal = true;
       } else {
         // 未登录或未开启云同步，直接删除本地
-        this.deleteProjectLocal()
+        this.deleteProjectLocal();
       }
     },
-    
+
     // 删除本地项目
     deleteProjectLocal() {
-      this.projectStore.deleteProject(this.project.id)
-      this.toast.showSuccess('本地画布已删除')
+      this.projectStore.deleteProject(this.project.id);
+      this.toast.showSuccess("本地画布已删除");
       uni.switchTab({
-        url: '/pages/workspace/workspace'
-      })
+        url: "/pages/workspace/workspace",
+      });
     },
-    
+
     // 删除本地和云端项目
     async deleteProjectWithCloud() {
-      uni.showLoading({ title: '删除中...' })
-      
+      uni.showLoading({ title: "删除中..." });
+
       try {
         // 先获取云端项目
-        const cloudRes = await getCloudProjects()
+        const cloudRes = await getCloudProjects();
         if (cloudRes.success) {
-          const cloudProject = cloudRes.data.find(p => p.id === this.project.id)
+          const cloudProject = cloudRes.data.find(
+            (p) => p.id === this.project.id,
+          );
           if (cloudProject && cloudProject._id) {
             // 删除云端项目
-            await deleteCloudProject(cloudProject._id)
+            await deleteCloudProject(cloudProject._id);
           }
         }
-        
+
         // 删除本地项目
-        this.projectStore.deleteProject(this.project.id)
-        
-        uni.hideLoading()
-        this.toast.showSuccess('本地和云端画布已删除')
+        this.projectStore.deleteProject(this.project.id);
+
+        uni.hideLoading();
+        this.toast.showSuccess("本地和云端画布已删除");
         uni.switchTab({
-          url: '/pages/workspace/workspace'
-        })
+          url: "/pages/workspace/workspace",
+        });
       } catch (error) {
-        uni.hideLoading()
-        console.error('删除云端项目失败:', error)
-        this.toast.showError('云端删除失败，仅删除了本地')
-        
+        uni.hideLoading();
+        console.error("删除云端项目失败:", error);
+        this.toast.showError("云端删除失败，仅删除了本地");
+
         // 即使云端删除失败，也删除本地
-        this.projectStore.deleteProject(this.project.id)
+        this.projectStore.deleteProject(this.project.id);
         setTimeout(() => {
           uni.switchTab({
-            url: '/pages/workspace/workspace'
-          })
-        }, 1500)
+            url: "/pages/workspace/workspace",
+          });
+        }, 1500);
       }
-    }
-  }
-}
+    },
+  },
+};
 </script>
 
 <style scoped>
@@ -748,11 +887,11 @@ export default {
 }
 
 .header {
-  height: 112rpx;
+  height: 88rpx;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0 48rpx;
+  padding: 0 20rpx;
   border-bottom: 2rpx solid var(--border-primary);
   background-color: var(--bg-elevated);
   z-index: 30;
@@ -787,13 +926,13 @@ export default {
 
 .header-info {
   display: flex;
-  flex-direction: column;
   flex: 1;
+  align-items: center;
 }
 
 .header-title {
   font-size: 36rpx;
-  font-weight: 300;
+  font-weight: 700;
   color: var(--text-primary);
 }
 
@@ -818,6 +957,7 @@ export default {
   background-color: var(--bg-tertiary);
   border: 2rpx solid var(--border-primary);
   transition: var(--transition-base);
+  margin-left: 20rpx;
 }
 
 .action-btn:active {
@@ -1064,7 +1204,7 @@ export default {
   position: absolute;
   inset: 0;
   opacity: 0.1;
-  background-image: 
+  background-image:
     linear-gradient(var(--canvas-grid) 2rpx, transparent 2rpx),
     linear-gradient(90deg, var(--canvas-grid) 2rpx, transparent 2rpx);
   background-size: 16rpx 16rpx;
@@ -1128,7 +1268,11 @@ export default {
 
 .progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, var(--accent-primary), var(--accent-secondary));
+  background: linear-gradient(
+    90deg,
+    var(--accent-primary),
+    var(--accent-secondary)
+  );
   transition: var(--transition-slow);
 }
 
@@ -1207,7 +1351,11 @@ export default {
 
 .total-fill {
   height: 100%;
-  background: linear-gradient(90deg, var(--accent-primary), var(--accent-secondary));
+  background: linear-gradient(
+    90deg,
+    var(--accent-primary),
+    var(--accent-secondary)
+  );
   transition: var(--transition-slow);
 }
 
@@ -1474,5 +1622,90 @@ export default {
   color: var(--text-tertiary);
   font-family: monospace;
   opacity: 0.5;
+}
+
+/* 重命名弹窗 */
+.rename-modal {
+  width: 100%;
+  max-width: 600rpx;
+  background-color: var(--bg-tertiary);
+  border-radius: 24rpx;
+  border: 2rpx solid var(--border-primary);
+  overflow: hidden;
+  animation: scaleIn 0.2s ease-out;
+}
+@keyframes scaleIn {
+  from {
+    transform: scale(0.9);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+.rename-header {
+  padding: 32rpx;
+  border-bottom: 2rpx solid var(--border-primary);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.rename-title {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.rename-body {
+  padding: 32rpx;
+}
+.rename-input-wrap {
+  background-color: var(--bg-secondary);
+  border: 2rpx solid var(--border-primary);
+  border-radius: 16rpx;
+  padding: 0 24rpx;
+  height: 88rpx;
+  display: flex;
+  align-items: center;
+}
+.rename-input {
+  width: 100%;
+  font-size: 28rpx;
+  color: var(--text-primary);
+  background: transparent;
+}
+.rename-placeholder {
+  color: var(--text-tertiary);
+}
+.rename-footer {
+  padding: 0 32rpx 32rpx;
+  display: flex;
+  gap: 24rpx;
+}
+.rename-btn {
+  flex: 1;
+  padding: 24rpx;
+  border-radius: 16rpx;
+  text-align: center;
+}
+.rename-btn.cancel {
+  background-color: var(--bg-secondary);
+  border: 2rpx solid var(--border-secondary);
+}
+.rename-btn.confirm {
+  background-color: var(--accent-primary);
+}
+.rename-btn.confirm.disabled {
+  opacity: 0.5;
+}
+.rename-btn.cancel .rename-btn-text {
+  color: var(--text-primary);
+  font-size: 28rpx;
+  font-weight: 600;
+}
+.rename-btn.confirm .rename-btn-text {
+  color: #fff;
+  font-size: 28rpx;
+  font-weight: 600;
 }
 </style>

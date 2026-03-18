@@ -4,6 +4,7 @@
 #include "animation_manager.h"
 #include "wifi_manager.h"
 #include "ota_manager.h"
+#include "tetris_effect.h"
 
 // 静态成员初始化
 AsyncWebSocket WebSocketHandler::ws("/ws");
@@ -11,6 +12,7 @@ unsigned long WebSocketHandler::lastBinaryReceiveTime = 0;
 bool WebSocketHandler::binaryDataPending = false;
 String WebSocketHandler::fragmentBuffer = "";
 bool WebSocketHandler::isReceivingFragments = false;
+unsigned long WebSocketHandler::lastMessageTime = 0;
 
 void WebSocketHandler::init() {
   ws.onEvent(onWsEvent);
@@ -21,6 +23,7 @@ void WebSocketHandler::onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *c
   if (type == WS_EVT_CONNECT) {
     Serial.printf("WebSocket 客户端已连接: %u\n", client->id());
     DisplayManager::clientConnected = true;
+    lastMessageTime = millis();
     
     // 连接时不切换模式，保持当前状态
 
@@ -44,6 +47,7 @@ void WebSocketHandler::onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *c
     // 不清空 canvasBuffer / canvasInitialized / blackPixels
   }
   else if (type == WS_EVT_DATA) {
+    lastMessageTime = millis();
     AwsFrameInfo *info = (AwsFrameInfo*)arg;
     
     // 处理二进制数据
@@ -144,49 +148,58 @@ void WebSocketHandler::handleBinaryData(AsyncWebSocketClient *client, uint8_t *d
       return;
     }
     
-    // 闹钟模式：保存到 imagePixels（背景图）
+    // 闹钟模式：保存到对应模式的 imagePixels（背景图）
+    // 根据当前模式选择对应的像素存储
+    PixelData*& imagePixels = (DisplayManager::currentMode == MODE_ANIMATION)
+      ? ConfigManager::animImagePixels
+      : ConfigManager::staticImagePixels;
+
+    int& imagePixelCount = (DisplayManager::currentMode == MODE_ANIMATION)
+      ? ConfigManager::animImagePixelCount
+      : ConfigManager::staticImagePixelCount;
+
     // 如果是新的一批数据（距离上次超过1秒），清空旧数据重新开始
     if (millis() - lastBinaryReceiveTime > 1000) {
-      if (ConfigManager::imagePixels != nullptr) {
-        free(ConfigManager::imagePixels);
-        ConfigManager::imagePixels = nullptr;
+      if (imagePixels != nullptr) {
+        free(imagePixels);
+        imagePixels = nullptr;
       }
-      ConfigManager::imagePixelCount = 0;
+      imagePixelCount = 0;
     }
-    
+
     // 追加数据
-    PixelData* newBuffer = (PixelData*)realloc(ConfigManager::imagePixels, sizeof(PixelData) * (ConfigManager::imagePixelCount + pixelCount));
+    PixelData* newBuffer = (PixelData*)realloc(imagePixels, sizeof(PixelData) * (imagePixelCount + pixelCount));
     if (newBuffer != nullptr) {
-      ConfigManager::imagePixels = newBuffer;
-      
+      imagePixels = newBuffer;
+
       int validPixels = 0;
       // 复制像素数据
       for (size_t i = 0; i + 4 < len; i += 5) {
         // 达到最大像素数量后，忽略后续数据，避免占用过多 NVS 空间
-        if (ConfigManager::imagePixelCount >= DisplayManager::MAX_PIXELS) {
+        if (imagePixelCount >= DisplayManager::MAX_PIXELS) {
           break;
         }
-        
+
         uint8_t x = data[i];
         uint8_t y = data[i + 1];
         uint8_t r = data[i + 2];
         uint8_t g = data[i + 3];
         uint8_t b = data[i + 4];
-        
+
         if (x < DisplayManager::PANEL_RES_X && y < DisplayManager::PANEL_RES_Y) {
           // 保存到内存
-          ConfigManager::imagePixels[ConfigManager::imagePixelCount].x = x;
-          ConfigManager::imagePixels[ConfigManager::imagePixelCount].y = y;
-          ConfigManager::imagePixels[ConfigManager::imagePixelCount].r = r;
-          ConfigManager::imagePixels[ConfigManager::imagePixelCount].g = g;
-          ConfigManager::imagePixels[ConfigManager::imagePixelCount].b = b;
-          ConfigManager::imagePixelCount++;
+          imagePixels[imagePixelCount].x = x;
+          imagePixels[imagePixelCount].y = y;
+          imagePixels[imagePixelCount].r = r;
+          imagePixels[imagePixelCount].g = g;
+          imagePixels[imagePixelCount].b = b;
+          imagePixelCount++;
           validPixels++;
-          
+
           // 立即绘制
           DisplayManager::dma_display->drawPixelRGB888(x, y, r, g, b);
         }
-        
+
         // 每处理100个像素让出CPU，防止看门狗超时
         if (i % 500 == 0) {
           yield();
@@ -307,22 +320,30 @@ void WebSocketHandler::handleJsonCommand(AsyncWebSocketClient *client, JsonDocum
   }
   else if (cmd == "set_mode") {
     String mode = doc["mode"].as<String>();
+
+    // === 统一：先停掉所有活动 ===
+    TetrisEffect::isActive = false;
+    if (AnimationManager::currentGIF != nullptr) {
+      AnimationManager::currentGIF->isPlaying = false;
+    }
+    // === 统一：清屏，防止残留 ===
+    DisplayManager::dma_display->clearScreen();
+
     if (mode == "clock") {
-      // 静态时钟模式：切到 canvas，停止动画播放
-      if (AnimationManager::currentGIF != nullptr) {
-        AnimationManager::currentGIF->isPlaying = false;
-      }
+      // 静态时钟模式
+      DisplayManager::isCanvasMode = false;
       DisplayManager::currentMode = MODE_CANVAS;
-      ConfigManager::saveClockConfig();  // 持久化模式，重启后保持静态
-      DisplayManager::displayClock();
+      ConfigManager::saveClockConfig();
+      DisplayManager::displayClock(true);  // 强制重绘
       response["message"] = "switched to static clock mode";
     } else if (mode == "canvas") {
+      // 画板模式（不画时钟）
+      DisplayManager::isCanvasMode = true;
       DisplayManager::currentMode = MODE_CANVAS;
-      ConfigManager::saveClockConfig();  // 持久化模式
+      ConfigManager::saveClockConfig();
 
-      // 如果有画布缓冲区数据，恢复显示
       if (DisplayManager::canvasInitialized) {
-        Serial.println("恢复画布缓冲区数据");
+        // 恢复画布数据
         for (int y = 0; y < DisplayManager::PANEL_RES_Y; y++) {
           for (int x = 0; x < DisplayManager::PANEL_RES_X; x++) {
             uint8_t r = DisplayManager::canvasBuffer[y][x][0];
@@ -335,160 +356,119 @@ void WebSocketHandler::handleJsonCommand(AsyncWebSocketClient *client, JsonDocum
           if (y % 8 == 0) yield();
         }
       } else {
-        DisplayManager::dma_display->clearScreen();
+        // 没有画布数据，显示 Logo 表示画板就绪
+        DisplayManager::drawLogo(12, 12);  // 画板模式居中
       }
 
       response["message"] = "switched to canvas mode";
     } else if (mode == "animation") {
+      // 动态时钟模式
+      DisplayManager::isCanvasMode = false;
       DisplayManager::currentMode = MODE_ANIMATION;
-      ConfigManager::saveClockConfig();  // 持久化模式
+      ConfigManager::saveClockConfig();
 
-      // 如果有 GIF 动画，开始播放
       if (AnimationManager::currentGIF != nullptr) {
         AnimationManager::currentGIF->isPlaying = true;
         AnimationManager::currentGIF->currentFrame = 0;
         AnimationManager::currentGIF->lastFrameTime = millis();
-        AnimationManager::renderGIFFrame(0); // 立即显示第一帧
+        AnimationManager::renderGIFFrame(0);
         response["message"] = "switched to animation mode";
-        Serial.printf("切换到动画模式，开始播放 %d 帧动画\n", AnimationManager::currentGIF->frameCount);
       } else {
-        DisplayManager::dma_display->clearScreen();
-        response["message"] = "switched to animation mode (no animation loaded)";
-        Serial.println("切换到动画模式，但没有加载动画");
+        // 没有 GIF，显示动态时钟（背景图+时钟）
+        DisplayManager::displayClock(true);
+        response["message"] = "switched to animation mode (no GIF)";
       }
+    } else if (mode == "tetris") {
+      // 俄罗斯方块屏保
+      DisplayManager::isCanvasMode = false;
+      DisplayManager::currentMode = MODE_ANIMATION;
+      bool clearMode = doc["clearMode"] | true;
+      int cellSz = doc["cellSize"] | 2;
+      int speed = doc["speed"] | 150;
+      bool clock = doc["showClock"] | true;
+      // pieces 数组转 bitmask
+      uint8_t mask = 0x7F;
+      if (doc.containsKey("pieces")) {
+        mask = 0;
+        JsonArray arr = doc["pieces"].as<JsonArray>();
+        for (JsonVariant v : arr) {
+          int idx = v.as<int>();
+          if (idx >= 0 && idx < 7) mask |= (1 << idx);
+        }
+        if (mask == 0) mask = 0x7F;
+      }
+      TetrisEffect::init(clearMode, cellSz, speed, clock, mask);
+      response["message"] = "tetris started";
     } else {
       response["status"] = "error";
       response["message"] = "invalid mode";
     }
   }
   else if (cmd == "set_clock_config") {
-    // 接收闹钟配置
     JsonObject config = doc["config"];
-    
-    // 时间配置
+    String clockMode = doc["clockMode"] | "clock"; // "clock"=静态, "animation"=动态
+
+    // 根据模式选择写入哪个 config
+    ClockConfig& target = (clockMode == "animation")
+      ? ConfigManager::animClockConfig
+      : ConfigManager::clockConfig;
+
     if (config.containsKey("time")) {
       JsonObject time = config["time"];
-      ConfigManager::clockConfig.time.fontSize = time["fontSize"] | 1;
-      ConfigManager::clockConfig.time.x = time["x"] | 17;
-      ConfigManager::clockConfig.time.y = time["y"] | 18;
+      target.time.fontSize = time["fontSize"] | 1;
+      target.time.x = time["x"] | 17;
+      target.time.y = time["y"] | 18;
       JsonObject timeColor = time["color"];
-      ConfigManager::clockConfig.time.r = timeColor["r"] | 100;
-      ConfigManager::clockConfig.time.g = timeColor["g"] | 200;
-      ConfigManager::clockConfig.time.b = timeColor["b"] | 255;
+      target.time.r = timeColor["r"] | 100;
+      target.time.g = timeColor["g"] | 200;
+      target.time.b = timeColor["b"] | 255;
     }
-    
-    // 日期配置
+
     if (config.containsKey("date")) {
       JsonObject date = config["date"];
-      ConfigManager::clockConfig.date.show = date["show"] | true;
-      ConfigManager::clockConfig.date.fontSize = date["fontSize"] | 1;
-      ConfigManager::clockConfig.date.x = date["x"] | 3;
-      ConfigManager::clockConfig.date.y = date["y"] | 30;
+      target.date.show = date["show"] | true;
+      target.date.fontSize = date["fontSize"] | 1;
+      target.date.x = date["x"] | 3;
+      target.date.y = date["y"] | 30;
       JsonObject dateColor = date["color"];
-      ConfigManager::clockConfig.date.r = dateColor["r"] | 120;
-      ConfigManager::clockConfig.date.g = dateColor["g"] | 120;
-      ConfigManager::clockConfig.date.b = dateColor["b"] | 120;
+      target.date.r = dateColor["r"] | 120;
+      target.date.g = dateColor["g"] | 120;
+      target.date.b = dateColor["b"] | 120;
     }
-    
-    // 星期配置
+
     if (config.containsKey("week")) {
       JsonObject week = config["week"];
-      ConfigManager::clockConfig.week.show = week["show"] | true;
-      ConfigManager::clockConfig.week.x = week["x"] | 23;
-      ConfigManager::clockConfig.week.y = week["y"] | 44;
+      target.week.show = week["show"] | true;
+      target.week.x = week["x"] | 23;
+      target.week.y = week["y"] | 44;
       JsonObject weekColor = week["color"];
-      ConfigManager::clockConfig.week.r = weekColor["r"] | 100;
-      ConfigManager::clockConfig.week.g = weekColor["g"] | 100;
-      ConfigManager::clockConfig.week.b = weekColor["b"] | 100;
+      target.week.r = weekColor["r"] | 100;
+      target.week.g = weekColor["g"] | 100;
+      target.week.b = weekColor["b"] | 100;
     }
-    
-    // 图片配置
+
     if (config.containsKey("image")) {
       JsonObject image = config["image"];
-      ConfigManager::clockConfig.image.show = image["show"] | false;
-      ConfigManager::clockConfig.image.x = image["x"] | 0;
-      ConfigManager::clockConfig.image.y = image["y"] | 0;
-      ConfigManager::clockConfig.image.width = image["width"] | 64;
-      ConfigManager::clockConfig.image.height = image["height"] | 64;
+      target.image.show = image["show"] | false;
+      target.image.x = image["x"] | 0;
+      target.image.y = image["y"] | 0;
+      target.image.width = image["width"] | 64;
+      target.image.height = image["height"] | 64;
     }
-    
-    // 保存配置
-    ConfigManager::saveClockConfig();
-    
-    Serial.println("闹钟配置已更新并保存");
-    
-    // 如果当前是闹钟模式，立即刷新显示
-    if (DisplayManager::currentMode == MODE_CANVAS) {
-      DisplayManager::displayClock();
-    }
-    
-    response["message"] = "clock config updated and saved";
-  }
-  else if (cmd == "set_image_pixels") {
-    // 接收图片像素数据
-    JsonArray pixels = doc["pixels"];
 
-    if (pixels.size() == 0) {
-      response["status"] = "error";
-      response["message"] = "no pixels data";
+    // 按模式分别保存
+    if (clockMode == "animation") {
+      ConfigManager::saveAnimClockConfig();
     } else {
-      // 释放旧的像素数据
-      if (ConfigManager::imagePixels != nullptr) {
-        free(ConfigManager::imagePixels);
-        ConfigManager::imagePixels = nullptr;
-      }
-
-      // 重置 canvasInitialized，确保下次传背景时清空旧的 blackPixels
-      DisplayManager::canvasInitialized = false;
-      if (DisplayManager::blackPixels != nullptr) {
-        free(DisplayManager::blackPixels);
-        DisplayManager::blackPixels = nullptr;
-      }
-      DisplayManager::blackPixelCount = 0;
-      
-      // 分配新的像素数据（最多 64x64 像素）
-      ConfigManager::imagePixelCount = pixels.size();
-      if (ConfigManager::imagePixelCount > DisplayManager::MAX_PIXELS) {
-        Serial.printf("像素数量过大（%d），截断到最大值 %d\n", ConfigManager::imagePixelCount, DisplayManager::MAX_PIXELS);
-        ConfigManager::imagePixelCount = DisplayManager::MAX_PIXELS;
-      }
-      ConfigManager::imagePixels = (PixelData*)malloc(sizeof(PixelData) * ConfigManager::imagePixelCount);
-      
-      if (ConfigManager::imagePixels == nullptr) {
-        response["status"] = "error";
-        response["message"] = "memory allocation failed";
-        ConfigManager::imagePixelCount = 0;
-      } else {
-        // 复制像素数据
-        for (int i = 0; i < ConfigManager::imagePixelCount; i++) {
-          JsonObject pixel = pixels[i];
-          ConfigManager::imagePixels[i].x = pixel["x"];
-          ConfigManager::imagePixels[i].y = pixel["y"];
-          ConfigManager::imagePixels[i].r = pixel["r"];
-          ConfigManager::imagePixels[i].g = pixel["g"];
-          ConfigManager::imagePixels[i].b = pixel["b"];
-          
-          // 每100个像素让出CPU
-          if (i % 100 == 0) yield();
-        }
-        
-        // 保存像素数据
-        ConfigManager::saveImagePixels();
-        
-        // 如果当前是闹钟模式，立即刷新显示
-        if (DisplayManager::currentMode == MODE_CANVAS) {
-          DisplayManager::displayClock();
-        }
-        
-        response["message"] = "image pixels updated and saved";
-        response["count"] = ConfigManager::imagePixelCount;
-      }
+      ConfigManager::saveClockConfig();
     }
-  }
-  else if (cmd == "get_pixel_count") {
-    // 查询当前保存的像素数量
-    response["pixelCount"] = ConfigManager::imagePixelCount;
-    response["message"] = "current pixel count";
+
+    // 立即刷新显示
+    if (DisplayManager::currentMode == MODE_CANVAS) {
+      DisplayManager::displayClock(true);
+    }
+
+    response["message"] = "clock config updated";
   }
   else if (cmd == "set_gif_animation") {
     // 接收 GIF 动画数据（超紧凑数组格式）
@@ -734,24 +714,24 @@ void WebSocketHandler::handleJsonCommand(AsyncWebSocketClient *client, JsonDocum
     DisplayManager::dma_display->clearScreen();
     int cx = DisplayManager::PANEL_RES_X / 2;
     int cy = DisplayManager::PANEL_RES_Y / 2;
-    int r = 10;
-    // 暗色底圆
+    int r = 12;
+    // 暗色底圆（更亮的灰色）
     for (int deg = 0; deg < 360; deg += 20) {
       float rad = deg * 3.14159f / 180.0f;
       int x = cx + (int)(r * cos(rad));
       int y = cy + (int)(r * sin(rad));
       if (x >= 1 && x < DisplayManager::PANEL_RES_X-1 && y >= 1 && y < DisplayManager::PANEL_RES_Y-1)
-        DisplayManager::dma_display->fillRect(x-1, y-1, 2, 2, DisplayManager::dma_display->color565(30, 30, 30));
+        DisplayManager::dma_display->fillRect(x-1, y-1, 3, 3, DisplayManager::dma_display->color565(60, 60, 60));
     }
-    // 亮弧（4个点渐变）
+    // 亮弧（白蓝渐变，更大更亮）
     int startDeg = doc["angle"] | 0;
-    for (int i = 0; i < 4; i++) {
-      float rad = (startDeg + i * 30) * 3.14159f / 180.0f;
+    for (int i = 0; i < 5; i++) {
+      float rad = (startDeg + i * 25) * 3.14159f / 180.0f;
       int x = cx + (int)(r * cos(rad));
       int y = cy + (int)(r * sin(rad));
-      uint8_t bright = (i == 3) ? 255 : (i == 2 ? 180 : (i == 1 ? 100 : 50));
+      uint8_t bright = (i == 4) ? 255 : (i == 3 ? 220 : (i == 2 ? 160 : (i == 1 ? 100 : 50)));
       if (x >= 1 && x < DisplayManager::PANEL_RES_X-1 && y >= 1 && y < DisplayManager::PANEL_RES_Y-1)
-        DisplayManager::dma_display->fillRect(x-1, y-1, 2, 2, DisplayManager::dma_display->color565(0, bright, bright));
+        DisplayManager::dma_display->fillRect(x-1, y-1, 3, 3, DisplayManager::dma_display->color565(bright, bright, 255));
     }
     response["message"] = "loading displayed";
   }

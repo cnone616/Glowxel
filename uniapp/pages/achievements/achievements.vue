@@ -4,18 +4,22 @@
     <!-- #ifdef MP-WEIXIN -->
     <view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
     <!-- #endif -->
-    
+
     <!-- 导航栏 -->
     <view class="navbar">
-      <view class="nav-left" @click="goBack">
-        <Icon name="direction-left" :size="32" color="var(--color-text-primary)" />
+      <view class="nav-left" @click="handleBack">
+        <Icon
+          name="direction-left"
+          :size="32"
+          color="var(--color-text-primary)"
+        />
       </view>
       <text class="nav-title">成就</text>
       <view class="nav-right" @click="shareAchievements">
         <Icon name="share" :size="32" />
       </view>
     </view>
-    
+
     <!-- 成就统计 -->
     <view class="stats-section">
       <view class="stats-card">
@@ -34,21 +38,21 @@
           <text class="stat-label">完成度</text>
         </view>
       </view>
-      
+
       <view class="progress-section">
         <text class="progress-title">成就进度</text>
         <view class="progress-bar">
-          <view 
+          <view
             class="progress-fill"
             :style="{ width: completionRate + '%' }"
           ></view>
         </view>
       </view>
     </view>
-    
+
     <!-- 分类标签 -->
     <view class="category-tabs">
-      <view 
+      <view
         v-for="category in categories"
         :key="category.value"
         class="category-tab"
@@ -57,151 +61,302 @@
       >
         <Icon :name="category.icon" :size="32" />
         <text class="category-text">{{ category.label }}</text>
-        <text v-if="category.count > 0" class="category-count">{{ category.count }}</text>
+        <text v-if="category.count > 0" class="category-count">{{
+          category.count
+        }}</text>
       </view>
     </view>
-    
+
     <!-- 成就列表 -->
     <scroll-view scroll-y class="content">
       <view class="achievements-grid">
-        <view 
+        <view
           v-for="achievement in filteredAchievements"
           :key="achievement.id"
           class="achievement-card"
-          :class="{ 
+          :class="{
             unlocked: achievement.unlocked,
             rare: achievement.rarity === 'rare',
             epic: achievement.rarity === 'epic',
-            legendary: achievement.rarity === 'legendary'
+            legendary: achievement.rarity === 'legendary',
           }"
           @click="showAchievementDetail(achievement)"
         >
           <!-- 成就图标 -->
           <view class="achievement-icon">
-            <Icon 
-              :name="achievement.icon" 
-              :size="80" 
+            <Icon
+              :name="achievement.icon"
+              :size="80"
               :color="getIconColor(achievement)"
             />
-            
+
             <!-- 稀有度光效 -->
-            <view v-if="achievement.unlocked && achievement.rarity !== 'common'" class="rarity-glow"></view>
-            
+            <view
+              v-if="achievement.unlocked && achievement.rarity !== 'common'"
+              class="rarity-glow"
+            ></view>
+
             <!-- 未解锁遮罩 -->
             <view v-if="!achievement.unlocked" class="locked-overlay">
               <Icon name="lock" :size="40" color="var(--color-text-disabled)" />
             </view>
           </view>
-          
+
           <!-- 成就信息 -->
           <view class="achievement-info">
             <text class="achievement-title">{{ achievement.title }}</text>
             <text class="achievement-desc">{{ achievement.description }}</text>
-            
+
             <!-- 进度条 -->
-            <view v-if="achievement.progress !== undefined" class="achievement-progress">
+            <view
+              v-if="achievement.progress !== undefined"
+              class="achievement-progress"
+            >
               <view class="progress-info">
-                <text class="progress-text">{{ achievement.current }}/{{ achievement.target }}</text>
-                <text class="progress-percent">{{ Math.round((achievement.current / achievement.target) * 100) }}%</text>
+                <text class="progress-text"
+                  >{{ achievement.current }}/{{ achievement.target }}</text
+                >
+                <text class="progress-percent"
+                  >{{
+                    Math.round(
+                      (achievement.current / achievement.target) * 100,
+                    )
+                  }}%</text
+                >
               </view>
               <view class="progress-bar-small">
-                <view 
+                <view
                   class="progress-fill-small"
-                  :style="{ width: ((achievement.current / achievement.target) * 100) + '%' }"
+                  :style="{
+                    width:
+                      (achievement.current / achievement.target) * 100 + '%',
+                  }"
                 ></view>
               </view>
             </view>
-            
+
             <!-- 解锁时间 -->
-            <text v-if="achievement.unlocked && achievement.unlockedAt" class="unlock-time">
+            <text
+              v-if="achievement.unlocked && achievement.unlockedAt"
+              class="unlock-time"
+            >
               {{ formatUnlockTime(achievement.unlockedAt) }}
             </text>
-            
+
             <!-- 稀有度标签 -->
             <view class="rarity-badge" :class="achievement.rarity">
-              <text class="rarity-text">{{ getRarityText(achievement.rarity) }}</text>
+              <text class="rarity-text">{{
+                getRarityText(achievement.rarity)
+              }}</text>
             </view>
           </view>
         </view>
       </view>
     </scroll-view>
-    
+
     <!-- 成就详情弹窗 -->
-    <view v-if="selectedAchievement" class="modal-overlay" @click="selectedAchievement = null">
+    <view
+      v-if="selectedAchievement"
+      class="modal-overlay"
+      @click="selectedAchievement = null"
+    >
       <view class="achievement-modal" @click.stop>
         <view class="modal-close" @click="selectedAchievement = null">
           <Icon name="close" :size="32" />
         </view>
-        
+
         <view class="modal-icon">
-          <Icon 
-            :name="selectedAchievement.icon" 
-            :size="120" 
+          <Icon
+            :name="selectedAchievement.icon"
+            :size="120"
             :color="getIconColor(selectedAchievement)"
           />
-          <view v-if="selectedAchievement.unlocked && selectedAchievement.rarity !== 'common'" class="modal-glow"></view>
+          <view
+            v-if="
+              selectedAchievement.unlocked &&
+              selectedAchievement.rarity !== 'common'
+            "
+            class="modal-glow"
+          ></view>
         </view>
-        
+
         <text class="modal-title">{{ selectedAchievement.title }}</text>
         <text class="modal-desc">{{ selectedAchievement.description }}</text>
-        
+
         <view v-if="selectedAchievement.unlocked" class="modal-unlocked">
           <Icon name="check-circle" :size="40" color="var(--color-success)" />
           <text class="unlocked-text">已解锁</text>
-          <text class="unlock-date">{{ formatUnlockTime(selectedAchievement.unlockedAt) }}</text>
+          <text class="unlock-date">{{
+            formatUnlockTime(selectedAchievement.unlockedAt)
+          }}</text>
         </view>
-        
+
         <view v-else class="modal-locked">
-          <view v-if="selectedAchievement.progress !== undefined" class="modal-progress">
+          <view
+            v-if="selectedAchievement.progress !== undefined"
+            class="modal-progress"
+          >
             <text class="progress-label">完成进度</text>
             <view class="progress-bar-modal">
-              <view 
+              <view
                 class="progress-fill-modal"
-                :style="{ width: ((selectedAchievement.current / selectedAchievement.target) * 100) + '%' }"
+                :style="{
+                  width:
+                    (selectedAchievement.current / selectedAchievement.target) *
+                      100 +
+                    '%',
+                }"
               ></view>
             </view>
-            <text class="progress-detail">{{ selectedAchievement.current }}/{{ selectedAchievement.target }}</text>
+            <text class="progress-detail"
+              >{{ selectedAchievement.current }}/{{
+                selectedAchievement.target
+              }}</text
+            >
           </view>
-          
-          <text class="hint-text">{{ selectedAchievement.hint || '继续努力，即将解锁！' }}</text>
+
+          <text class="hint-text">{{
+            selectedAchievement.hint || "继续努力，即将解锁！"
+          }}</text>
         </view>
-        
+
         <view class="modal-rarity">
           <text class="rarity-label">稀有度:</text>
           <view class="rarity-badge" :class="selectedAchievement.rarity">
-            <text class="rarity-text">{{ getRarityText(selectedAchievement.rarity) }}</text>
+            <text class="rarity-text">{{
+              getRarityText(selectedAchievement.rarity)
+            }}</text>
           </view>
         </view>
       </view>
     </view>
-    
+
     <!-- Toast -->
     <Toast ref="toastRef" />
   </view>
 </template>
 
 <script>
-import { useToast } from '../../composables/useToast.js'
-import { useUserStore } from '../../store/user.js'
-import { useProjectStore } from '../../store/project.js'
-import statusBarMixin from '../../mixins/statusBar.js'
-import Icon from '../../components/Icon.vue'
-import Toast from '../../components/Toast.vue'
+import { useToast } from "../../composables/useToast.js";
+import { useUserStore } from "../../store/user.js";
+import { useProjectStore } from "../../store/project.js";
+import statusBarMixin from "../../mixins/statusBar.js";
+import Icon from "../../components/Icon.vue";
+import Toast from "../../components/Toast.vue";
 
 // 成就定义（静态配置）
 const ACHIEVEMENT_DEFS = [
-  { id: '1', category: 'create', title: '初出茅庐',   description: '完成第一个作品',       icon: 'picture',   rarity: 'common',    key: 'works_count',     target: 1   },
-  { id: '2', category: 'create', title: '作品达人',   description: '创作10个作品',          icon: 'gallery',   rarity: 'common',    key: 'works_count',     target: 10  },
-  { id: '3', category: 'create', title: '像素大师',   description: '创作50个作品',          icon: 'crown',     rarity: 'rare',      key: 'works_count',     target: 50  },
-  { id: '4', category: 'create', title: '传奇创作者', description: '创作100个作品',         icon: 'trophy',    rarity: 'legendary', key: 'works_count',     target: 100 },
-  { id: '5', category: 'social', title: '社交新手',   description: '获得第一个粉丝',        icon: 'heart',     rarity: 'common',    key: 'followers_count', target: 1   },
-  { id: '6', category: 'social', title: '人气作者',   description: '获得100个粉丝',         icon: 'users',     rarity: 'rare',      key: 'followers_count', target: 100 },
-  { id: '7', category: 'social', title: '点赞收割机', description: '作品获得1000个点赞',    icon: 'thumbs-up', rarity: 'epic',      key: 'total_likes',     target: 1000},
-  { id: '8', category: 'skill',  title: '色彩搭配师', description: '使用超过20种颜色创作',  icon: 'palette',   rarity: 'common',    key: 'color_count',     target: 20  },
-  { id: '9', category: 'skill',  title: '精密工匠',   description: '完成超过1000像素的作品',icon: 'target',    rarity: 'rare',      key: 'max_pixels',      target: 1000},
-  { id: '10',category: 'special',title: '夜猫子',     description: '在深夜12点后完成创作',  icon: 'moon',      rarity: 'epic',      key: 'night_create',    target: 1   },
-  { id: '11',category: 'special',title: '完美主义者', description: '连续7天都有创作',       icon: 'calendar',  rarity: 'legendary', key: 'streak_days',     target: 7   },
-]
+  {
+    id: "1",
+    category: "create",
+    title: "初出茅庐",
+    description: "完成第一个作品",
+    icon: "picture",
+    rarity: "common",
+    key: "works_count",
+    target: 1,
+  },
+  {
+    id: "2",
+    category: "create",
+    title: "作品达人",
+    description: "创作10个作品",
+    icon: "gallery",
+    rarity: "common",
+    key: "works_count",
+    target: 10,
+  },
+  {
+    id: "3",
+    category: "create",
+    title: "像素大师",
+    description: "创作50个作品",
+    icon: "crown",
+    rarity: "rare",
+    key: "works_count",
+    target: 50,
+  },
+  {
+    id: "4",
+    category: "create",
+    title: "传奇创作者",
+    description: "创作100个作品",
+    icon: "trophy",
+    rarity: "legendary",
+    key: "works_count",
+    target: 100,
+  },
+  {
+    id: "5",
+    category: "social",
+    title: "社交新手",
+    description: "获得第一个粉丝",
+    icon: "heart",
+    rarity: "common",
+    key: "followers_count",
+    target: 1,
+  },
+  {
+    id: "6",
+    category: "social",
+    title: "人气作者",
+    description: "获得100个粉丝",
+    icon: "users",
+    rarity: "rare",
+    key: "followers_count",
+    target: 100,
+  },
+  {
+    id: "7",
+    category: "social",
+    title: "点赞收割机",
+    description: "作品获得1000个点赞",
+    icon: "thumbs-up",
+    rarity: "epic",
+    key: "total_likes",
+    target: 1000,
+  },
+  {
+    id: "8",
+    category: "skill",
+    title: "色彩搭配师",
+    description: "使用超过20种颜色创作",
+    icon: "palette",
+    rarity: "common",
+    key: "color_count",
+    target: 20,
+  },
+  {
+    id: "9",
+    category: "skill",
+    title: "精密工匠",
+    description: "完成超过1000像素的作品",
+    icon: "target",
+    rarity: "rare",
+    key: "max_pixels",
+    target: 1000,
+  },
+  {
+    id: "10",
+    category: "special",
+    title: "夜猫子",
+    description: "在深夜12点后完成创作",
+    icon: "moon",
+    rarity: "epic",
+    key: "night_create",
+    target: 1,
+  },
+  {
+    id: "11",
+    category: "special",
+    title: "完美主义者",
+    description: "连续7天都有创作",
+    icon: "calendar",
+    rarity: "legendary",
+    key: "streak_days",
+    target: 7,
+  },
+];
 
 export default {
   mixins: [statusBarMixin],
@@ -210,68 +365,80 @@ export default {
   data() {
     return {
       toast: null,
-      currentCategory: 'all',
+      currentCategory: "all",
       selectedAchievement: null,
       categories: [
-        { value: 'all',     label: '全部', icon: 'grid',    count: 0 },
-        { value: 'create',  label: '创作', icon: 'palette', count: 0 },
-        { value: 'social',  label: '社交', icon: 'users',   count: 0 },
-        { value: 'skill',   label: '技能', icon: 'star',    count: 0 },
-        { value: 'special', label: '特殊', icon: 'award',   count: 0 },
+        { value: "all", label: "全部", icon: "grid", count: 0 },
+        { value: "create", label: "创作", icon: "palette", count: 0 },
+        { value: "social", label: "社交", icon: "users", count: 0 },
+        { value: "skill", label: "技能", icon: "star", count: 0 },
+        { value: "special", label: "特殊", icon: "award", count: 0 },
       ],
-      achievements: []
-    }
+      achievements: [],
+    };
   },
 
   computed: {
     filteredAchievements() {
-      if (this.currentCategory === 'all') return this.achievements
-      return this.achievements.filter(a => a.category === this.currentCategory)
+      if (this.currentCategory === "all") return this.achievements;
+      return this.achievements.filter(
+        (a) => a.category === this.currentCategory,
+      );
     },
-    unlockedCount() { return this.achievements.filter(a => a.unlocked).length },
-    totalCount()    { return this.achievements.length },
-    completionRate(){ return this.totalCount ? Math.round((this.unlockedCount / this.totalCount) * 100) : 0 }
+    unlockedCount() {
+      return this.achievements.filter((a) => a.unlocked).length;
+    },
+    totalCount() {
+      return this.achievements.length;
+    },
+    completionRate() {
+      return this.totalCount
+        ? Math.round((this.unlockedCount / this.totalCount) * 100)
+        : 0;
+    },
   },
 
   onLoad() {
-    this.toast = useToast()
+    this.toast = useToast();
     this.$nextTick(() => {
-      if (this.$refs.toastRef) this.toast.setToastInstance(this.$refs.toastRef)
-    })
-    this.buildAchievements()
-    this.updateCategoryCounts()
+      if (this.$refs.toastRef) this.toast.setToastInstance(this.$refs.toastRef);
+    });
+    this.buildAchievements();
+    this.updateCategoryCounts();
   },
 
   methods: {
-    goBack() { uni.navigateBack() },
+    handleBack() {
+      uni.navigateBack();
+    },
 
     buildAchievements() {
-      const userStore = useUserStore()
-      const projectStore = useProjectStore()
+      const userStore = useUserStore();
+      const projectStore = useProjectStore();
 
       // 从用户数据取指标
       const stats = {
-        works_count:     userStore.works_count     || 0,
+        works_count: userStore.works_count || 0,
         followers_count: userStore.followers_count || 0,
-        total_likes:     userStore.total_likes     || 0,
-        color_count:     this._getMaxColorCount(projectStore),
-        max_pixels:      this._getMaxPixels(projectStore),
-        night_create:    uni.getStorageSync('achievement_night_create') || 0,
-        streak_days:     uni.getStorageSync('achievement_streak_days')  || 0,
-      }
+        total_likes: userStore.total_likes || 0,
+        color_count: this._getMaxColorCount(projectStore),
+        max_pixels: this._getMaxPixels(projectStore),
+        night_create: uni.getStorageSync("achievement_night_create") || 0,
+        streak_days: uni.getStorageSync("achievement_streak_days") || 0,
+      };
 
       // 已解锁记录（本地持久化）
-      const unlocked = uni.getStorageSync('achievements_unlocked') || {}
+      const unlocked = uni.getStorageSync("achievements_unlocked") || {};
 
-      this.achievements = ACHIEVEMENT_DEFS.map(def => {
-        const current = Math.min(stats[def.key] || 0, def.target)
-        const wasUnlocked = !!unlocked[def.id]
-        const nowUnlocked = current >= def.target
+      this.achievements = ACHIEVEMENT_DEFS.map((def) => {
+        const current = Math.min(stats[def.key] || 0, def.target);
+        const wasUnlocked = !!unlocked[def.id];
+        const nowUnlocked = current >= def.target;
 
         // 新解锁：写入本地存储
         if (nowUnlocked && !wasUnlocked) {
-          unlocked[def.id] = Date.now()
-          uni.setStorageSync('achievements_unlocked', unlocked)
+          unlocked[def.id] = Date.now();
+          uni.setStorageSync("achievements_unlocked", unlocked);
         }
 
         return {
@@ -280,54 +447,70 @@ export default {
           progress: current,
           unlocked: nowUnlocked,
           unlockedAt: unlocked[def.id] || null,
-          hint: nowUnlocked ? null : `还差 ${def.target - current} 即可解锁`
-        }
-      })
+          hint: nowUnlocked ? null : `还差 ${def.target - current} 即可解锁`,
+        };
+      });
     },
 
     _getMaxColorCount(projectStore) {
-      let max = 0
+      let max = 0;
       for (const p of projectStore.projects) {
-        if (p.palette && p.palette.length > max) max = p.palette.length
+        if (p.palette && p.palette.length > max) max = p.palette.length;
       }
-      return max
+      return max;
     },
 
     _getMaxPixels(projectStore) {
-      let max = 0
+      let max = 0;
       for (const p of projectStore.projects) {
-        const pixels = (p.width || 0) * (p.height || 0)
-        if (pixels > max) max = pixels
+        const pixels = (p.width || 0) * (p.height || 0);
+        if (pixels > max) max = pixels;
       }
-      return max
+      return max;
     },
 
     updateCategoryCounts() {
-      this.categories[0].count = this.achievements.length
-      this.categories[1].count = this.achievements.filter(a => a.category === 'create').length
-      this.categories[2].count = this.achievements.filter(a => a.category === 'social').length
-      this.categories[3].count = this.achievements.filter(a => a.category === 'skill').length
-      this.categories[4].count = this.achievements.filter(a => a.category === 'special').length
+      this.categories[0].count = this.achievements.length;
+      this.categories[1].count = this.achievements.filter(
+        (a) => a.category === "create",
+      ).length;
+      this.categories[2].count = this.achievements.filter(
+        (a) => a.category === "social",
+      ).length;
+      this.categories[3].count = this.achievements.filter(
+        (a) => a.category === "skill",
+      ).length;
+      this.categories[4].count = this.achievements.filter(
+        (a) => a.category === "special",
+      ).length;
     },
 
-    showAchievementDetail(achievement) { this.selectedAchievement = achievement },
-    shareAchievements() { this.toast.showInfo('分享功能开发中') },
+    showAchievementDetail(achievement) {
+      this.selectedAchievement = achievement;
+    },
+    shareAchievements() {
+      this.toast.showInfo("分享功能开发中");
+    },
 
     getIconColor(achievement) {
-      if (!achievement.unlocked) return 'var(--color-text-disabled)'
-      const map = { rare: '#4F7FFF', epic: '#9333EA', legendary: '#F59E0B' }
-      return map[achievement.rarity] || 'var(--color-text-primary)'
+      if (!achievement.unlocked) return "var(--color-text-disabled)";
+      const map = { rare: "#4F7FFF", epic: "#9333EA", legendary: "#F59E0B" };
+      return map[achievement.rarity] || "var(--color-text-primary)";
     },
 
     getRarityText(rarity) {
-      return { common: '普通', rare: '稀有', epic: '史诗', legendary: '传说' }[rarity] || '普通'
+      return (
+        { common: "普通", rare: "稀有", epic: "史诗", legendary: "传说" }[
+          rarity
+        ] || "普通"
+      );
     },
 
     formatUnlockTime(timestamp) {
-      return new Date(timestamp).toLocaleDateString() + ' 解锁'
-    }
-  }
-}
+      return new Date(timestamp).toLocaleDateString() + " 解锁";
+    },
+  },
+};
 </script>
 
 <style scoped>
@@ -432,7 +615,11 @@ export default {
 
 .progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, var(--color-brand-primary), var(--color-brand-accent));
+  background: linear-gradient(
+    90deg,
+    var(--color-brand-primary),
+    var(--color-brand-accent)
+  );
   transition: width 0.3s ease;
 }
 
@@ -460,7 +647,7 @@ export default {
 .category-tab.active {
   background-color: var(--color-brand-primary);
   border-color: var(--color-brand-primary);
-  color: #FFFFFF;
+  color: #ffffff;
 }
 
 .category-text {
@@ -469,7 +656,7 @@ export default {
 }
 
 .category-tab.active .category-text {
-  color: #FFFFFF;
+  color: #ffffff;
 }
 
 .category-count {
@@ -546,7 +733,12 @@ export default {
   position: absolute;
   inset: -8rpx;
   border-radius: 68rpx;
-  background: conic-gradient(from 0deg, transparent, var(--color-brand-primary), transparent);
+  background: conic-gradient(
+    from 0deg,
+    transparent,
+    var(--color-brand-primary),
+    transparent
+  );
   animation: rotate 3s linear infinite;
   z-index: -1;
 }
@@ -601,7 +793,8 @@ export default {
   width: 100%;
 }
 
-.progress-text, .progress-percent {
+.progress-text,
+.progress-percent {
   font-size: 20rpx;
   color: var(--color-text-disabled);
 }
@@ -642,17 +835,17 @@ export default {
 
 .rarity-badge.rare {
   background-color: rgba(79, 127, 255, 0.2);
-  color: #4F7FFF;
+  color: #4f7fff;
 }
 
 .rarity-badge.epic {
   background-color: rgba(147, 51, 234, 0.2);
-  color: #9333EA;
+  color: #9333ea;
 }
 
 .rarity-badge.legendary {
   background-color: rgba(245, 158, 11, 0.2);
-  color: #F59E0B;
+  color: #f59e0b;
 }
 
 /* 弹窗样式 */
@@ -704,7 +897,12 @@ export default {
   position: absolute;
   inset: -12rpx;
   border-radius: 92rpx;
-  background: conic-gradient(from 0deg, transparent, var(--color-brand-primary), transparent);
+  background: conic-gradient(
+    from 0deg,
+    transparent,
+    var(--color-brand-primary),
+    transparent
+  );
   animation: rotate 3s linear infinite;
   z-index: -1;
 }

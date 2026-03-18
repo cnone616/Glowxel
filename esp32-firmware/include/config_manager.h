@@ -5,7 +5,7 @@
 #include <Preferences.h>
 #include <ArduinoJson.h>
 
-#define CONFIG_VERSION 7  // 改默认配置时递增此版本号
+#define CONFIG_VERSION 8  // 改默认配置时递增此版本号
 
 // 闹钟配置结构
 struct ClockConfig {
@@ -60,13 +60,25 @@ public:
   static void init();
   static void loadClockConfig();
   static void saveClockConfig();
-  static void loadImagePixels();
-  static void saveImagePixels();
-  static void resetToDefault();  // 清除所有配置，恢复默认
-  
+  static void loadAnimClockConfig();
+  static void saveAnimClockConfig();
+  static void loadStaticImagePixels();
+  static void saveStaticImagePixels();
+  static void loadAnimImagePixels();
+  static void saveAnimImagePixels();
+  static void resetToDefault();
+
   static ClockConfig clockConfig;
-  static PixelData* imagePixels;
-  static int imagePixelCount;
+  static ClockConfig animClockConfig;
+
+  // 静态时钟的背景图片像素
+  static PixelData* staticImagePixels;
+  static int staticImagePixelCount;
+
+  // 动态时钟的背景图片像素（如果不用 GIF 动画，可以用静态图）
+  static PixelData* animImagePixels;
+  static int animImagePixelCount;
+
   static Preferences preferences;
 
 private:

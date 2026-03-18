@@ -8,7 +8,7 @@
 // 画WiFi扇形图标，弧线两端圆头
 static void drawWifiIcon(int cx, int cy, int maxR, uint16_t color) {
   auto* d = DisplayManager::dma_display;
-  const int gap = 8;
+  const int gap = 7;
   const float spread = 0.66f; // ~52° 扇形宽度
   const int thickness = 3;
 
