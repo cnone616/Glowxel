@@ -410,6 +410,14 @@
     />
     <!-- #endif -->
 
+    <!-- 图片裁剪组件 -->
+    <ImageCropper
+      :visible="showCropper"
+      :src="cropperSrc"
+      @confirm="onCropConfirm"
+      @cancel="onCropCancel"
+    />
+
     <!-- 自定义 Toast 组件 -->
     <Toast ref="toastRef" />
   </view>
@@ -427,6 +435,7 @@ import statusBarMixin from "../../mixins/statusBar.js";
 import Icon from "../../components/Icon.vue";
 import Toast from "../../components/Toast.vue";
 import ProjectCard from "../../components/ProjectCard.vue";
+import ImageCropper from "../../components/ImageCropper.vue";
 
 export default {
   mixins: [statusBarMixin],
@@ -434,6 +443,7 @@ export default {
     Icon,
     Toast,
     ProjectCard,
+    ImageCropper,
   },
   data() {
     return {
@@ -451,6 +461,9 @@ export default {
       challengeId: null, // 挑战ID
       imageFile: null,
       previewUrl: null,
+      showCropper: false,
+      cropperSrc: "",
+      isCropped: false,
       recommendedSize: null, // 根据图片内容推荐的尺寸 { width, height }
       previewPixels: null, // 预览的像素数据
       previewCanvas: null, // 预览用的canvas
@@ -480,17 +493,6 @@ export default {
   computed: {
     // 动态快捷尺寸：图片模式下按内容宽高比生成，空白模式下用默认正方形
     sizePresets() {
-      if (this.mode === "image" && this.contentRatio) {
-        const { w, h } = this.contentRatio;
-        const presets = [];
-        for (let multiplier = 1; multiplier <= 20; multiplier++) {
-          const pw = w * multiplier;
-          const ph = h * multiplier;
-          if (pw > 640 || ph > 640) break;
-          presets.push({ width: pw, height: ph });
-        }
-        return presets.length > 0 ? presets : this.defaultSizePresets;
-      }
       return this.defaultSizePresets;
     },
 
@@ -727,12 +729,57 @@ export default {
         sizeType: ["compressed"],
         sourceType: ["album", "camera"],
         success: (res) => {
-          this.imageFile = res.tempFilePaths[0];
-          this.previewUrl = res.tempFilePaths[0];
-          this.recommendedSize = null;
-          this._detectImageContentSize(res.tempFilePaths[0]);
+          this.cropperSrc = res.tempFilePaths[0];
+          this.showCropper = true;
         },
       });
+    },
+
+    onCropConfirm(cropData) {
+      this.showCropper = false;
+      this.isCropped = true;
+      // 用 canvas 裁剪出选区，生成新图片
+      // #ifdef H5
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        canvas.width = cropData.sw;
+        canvas.height = cropData.sh;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(
+          img,
+          cropData.sx,
+          cropData.sy,
+          cropData.sw,
+          cropData.sh,
+          0,
+          0,
+          cropData.sw,
+          cropData.sh,
+        );
+        const dataUrl = canvas.toDataURL("image/png");
+        this.imageFile = dataUrl;
+        this.previewUrl = dataUrl;
+        this.recommendedSize = null;
+        this._detectImageContentSize(dataUrl);
+      };
+      img.src = cropData.src;
+      // #endif
+
+      // #ifdef MP-WEIXIN
+      // 小程序用 canvas 裁剪
+      this.imageFile = cropData.src;
+      this.previewUrl = cropData.src;
+      this.recommendedSize = null;
+      this._detectImageContentSize(cropData.src);
+      // 保存裁剪参数供后续处理使用
+      this.cropParams = cropData;
+      // #endif
+    },
+
+    onCropCancel() {
+      this.showCropper = false;
     },
 
     // 检测图片有效内容尺寸，推荐合适的画布大小
@@ -820,6 +867,7 @@ export default {
       this.previewUrl = null;
       this.recommendedSize = null;
       this.contentRatio = null;
+      this.isCropped = false;
     },
 
     async generatePreview() {
@@ -885,7 +933,12 @@ export default {
             return;
           }
 
-          if (isPixelArt) {
+          if (this.isCropped) {
+            // 裁剪过的图片直接缩放填满目标尺寸
+            ctx.imageSmoothingEnabled = !isPixelArt;
+            if (!isPixelArt) ctx.imageSmoothingQuality = "high";
+            ctx.drawImage(img, 0, 0, this.customWidth, this.customHeight);
+          } else if (isPixelArt) {
             // 像素画模式：先检测内容边界，再整数倍缩放
             ctx.imageSmoothingEnabled = false;
             ctx.mozImageSmoothingEnabled = false;
@@ -1112,6 +1165,34 @@ export default {
               // 重置canvas为目标尺寸
               canvas.width = this.customWidth;
               canvas.height = this.customHeight;
+
+              if (this.isCropped && this.cropParams) {
+                // 裁剪过的图片：直接把裁剪区域缩放填满目标尺寸
+                ctx.imageSmoothingEnabled = !isPixelArt;
+                ctx.drawImage(
+                  img,
+                  this.cropParams.sx,
+                  this.cropParams.sy,
+                  this.cropParams.sw,
+                  this.cropParams.sh,
+                  0,
+                  0,
+                  this.customWidth,
+                  this.customHeight,
+                );
+                const imageData = ctx.getImageData(
+                  0,
+                  0,
+                  this.customWidth,
+                  this.customHeight,
+                );
+                this.processImageData(
+                  imageData.data,
+                  artkalPalette,
+                  selectedArtkalColors,
+                );
+                return;
+              }
 
               if (isPixelArt) {
                 // 像素画模式：使用整数倍缩放策略
@@ -1353,7 +1434,7 @@ export default {
           const idx = (y * this.customWidth + x) * 4;
           const alpha = data[idx + 3];
 
-          // 跳过透明像素
+          // 只跳过透明像素
           if (alpha < 128) continue;
 
           const r = data[idx];
@@ -1549,6 +1630,7 @@ export default {
       this.usedColors = [];
       this.recommendedSize = null;
       this.contentRatio = null;
+      this.isCropped = false;
     },
 
     handleNext() {
