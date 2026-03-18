@@ -62,8 +62,7 @@ void DisplayManager::drawLogo(int x, int y) {
       dma_display->fillRect(x + col * step, y + row * step, bs, bs, grid[row][col]);
 }
 
-// 前向声明（定义在后面）
-static void _eraseClockRegion();
+// 前向声明
 static int clockConfig_timeY();
 
 void DisplayManager::displayClock(bool force) {
@@ -100,12 +99,9 @@ void DisplayManager::displayClock(bool force) {
   if (!force && timeinfo.tm_min == s_lastMin) return;
   s_lastMin = timeinfo.tm_min;
 
-  // 强制模式：先清屏再重绘全部
+  // 强制模式：先清屏（清掉 loading 圈等残留）
   if (force) {
     dma_display->clearScreen();
-  } else {
-    // 普通模式：只擦除时钟文字区域
-    _eraseClockRegion();
   }
 
   // 绘制背景
@@ -129,47 +125,6 @@ void DisplayManager::displayClock(bool force) {
   drawClockOverlay();
 }
 
-// 擦除时钟文字区域，然后恢复该区域的背景像素（避免黑条覆盖背景图）
-static void _eraseClockRegion() {
-  auto* d = DisplayManager::dma_display;
-  auto& c = (DisplayManager::currentMode == MODE_ANIMATION)
-    ? ConfigManager::animClockConfig
-    : ConfigManager::clockConfig;
-
-  PixelData* imagePixels = (DisplayManager::currentMode == MODE_ANIMATION)
-    ? ConfigManager::animImagePixels
-    : ConfigManager::staticImagePixels;
-
-  int imagePixelCount = (DisplayManager::currentMode == MODE_ANIMATION)
-    ? ConfigManager::animImagePixelCount
-    : ConfigManager::staticImagePixelCount;
-
-  bool hasImage = c.image.show && imagePixels != nullptr && imagePixelCount > 0;
-
-  auto eraseRow = [&](int y, int fontSize) {
-    int h = fontSize * 6;
-    int startY = y - 1;
-    if (startY < 0) startY = 0;
-    int endY = startY + h;
-    if (endY > 64) endY = 64;
-    for (int py = startY; py < endY; py++) {
-      for (int px = 0; px < 64; px++) {
-        d->drawPixelRGB888(px, py, 0, 0, 0);
-      }
-    }
-    if (hasImage) {
-      for (int i = 0; i < imagePixelCount; i++) {
-        PixelData& pixel = imagePixels[i];
-        if (pixel.y >= startY && pixel.y < endY && pixel.x < 64) {
-          d->drawPixelRGB888(pixel.x, pixel.y, pixel.r, pixel.g, pixel.b);
-        }
-      }
-    }
-  };
-  eraseRow(c.time.y, c.time.fontSize > 0 ? c.time.fontSize : 1);
-  if (c.date.show) eraseRow(c.date.y, c.date.fontSize > 0 ? c.date.fontSize : 1);
-  if (c.week.show) eraseRow(c.week.y, 1);
-}
 
 static int clockConfig_timeY() {
   return (DisplayManager::currentMode == MODE_ANIMATION)

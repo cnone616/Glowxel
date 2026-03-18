@@ -18,6 +18,7 @@ int TetrisEffect::curY = 0;
 uint8_t TetrisEffect::curColor = 1;
 unsigned long TetrisEffect::lastDropTime = 0;
 bool TetrisEffect::needsRender = true;
+uint8_t TetrisEffect::prevDisplay[TETRIS_MAX][TETRIS_MAX];
 
 // 7种方块的4种旋转，用16bit编码4x4网格（从左上到右下，行优先）
 const uint16_t TetrisEffect::pieces[7][4] = {
@@ -57,6 +58,7 @@ void TetrisEffect::init(bool clearMode, int cellSz, int speed, bool clock, uint8
   cols = 64 / cellSize;
   rows = 64 / cellSize;
   resetBoard();
+  memset(prevDisplay, 0, sizeof(prevDisplay));
   spawnPiece();
   lastDropTime = millis();
   needsRender = true;
@@ -280,10 +282,26 @@ void TetrisEffect::render(MatrixPanel_I2S_DMA* display) {
   if (!isActive || !needsRender) return;
   needsRender = false;
 
-  // 绘制已锁定的方块
+  // 构建当前帧的合成状态（board + 当前下落方块）
+  uint8_t curDisplay[TETRIS_MAX][TETRIS_MAX];
+  memcpy(curDisplay, board, sizeof(board));
+
+  int cells[4][2];
+  getPieceCells(curType, curRot, cells);
+  for (int i = 0; i < 4; i++) {
+    int px = curX + cells[i][0];
+    int py = curY + cells[i][1];
+    if (px >= 0 && px < cols && py >= 0 && py < rows) {
+      curDisplay[py][px] = curColor; // 和 lockPiece 一致
+    }
+  }
+
+  // 增量渲染：只重绘变化的格子
   for (int y = 0; y < rows; y++) {
     for (int x = 0; x < cols; x++) {
-      uint8_t c = board[y][x];
+      if (curDisplay[y][x] == prevDisplay[y][x]) continue;
+
+      uint8_t c = curDisplay[y][x];
       if (c > 0) {
         const uint8_t* rgb = colors[c - 1];
         for (int dy = 0; dy < cellSize; dy++) {
@@ -292,7 +310,6 @@ void TetrisEffect::render(MatrixPanel_I2S_DMA* display) {
           }
         }
       } else {
-        // 空格画黑色
         for (int dy = 0; dy < cellSize; dy++) {
           for (int dx = 0; dx < cellSize; dx++) {
             display->drawPixelRGB888(x * cellSize + dx, y * cellSize + dy, 0, 0, 0);
@@ -302,23 +319,10 @@ void TetrisEffect::render(MatrixPanel_I2S_DMA* display) {
     }
   }
 
-  // 绘制当前下落中的方块
-  int cells[4][2];
-  getPieceCells(curType, curRot, cells);
-  const uint8_t* rgb = colors[curType];
-  for (int i = 0; i < 4; i++) {
-    int px = curX + cells[i][0];
-    int py = curY + cells[i][1];
-    if (px >= 0 && px < cols && py >= 0 && py < rows) {
-      for (int dy = 0; dy < cellSize; dy++) {
-        for (int dx = 0; dx < cellSize; dx++) {
-          display->drawPixelRGB888(px * cellSize + dx, py * cellSize + dy, rgb[0], rgb[1], rgb[2]);
-        }
-      }
-    }
-  }
+  // 保存当前帧状态
+  memcpy(prevDisplay, curDisplay, sizeof(prevDisplay));
 
-  // 时钟在方块上层，只在渲染帧时叠加
+  // 时钟在方块上层叠加
   if (showClock) {
     DisplayManager::drawClockOverlay();
   }

@@ -43,9 +43,6 @@ void AnimationManager::updateGIFAnimation() {
   if (currentTime - currentGIF->lastFrameTime >= frameDelay) {
     // 切换到下一帧（帧0已在首次播放时渲染，后续循环跳过帧0避免全屏重绘闪烁）
     int nextFrame = (currentGIF->currentFrame + 1) % currentGIF->frameCount;
-    if (nextFrame == 0 && currentGIF->frameCount > 1) {
-      nextFrame = 1;  // 跳过帧0，直接从帧1继续循环
-    }
     currentGIF->currentFrame = nextFrame;
 
     // 渲染当前帧（diff帧只更新变化的像素，不会闪）
@@ -60,13 +57,8 @@ void AnimationManager::renderGIFFrame(int frameIndex) {
   AnimationFrame& frame = currentGIF->frames[frameIndex];
 
   if (frame.type == "full") {
-    // full 帧：先清掉上一帧的像素，再画新帧，避免 clearScreen() 闪烁
-    if (s_prevPixels != nullptr) {
-      for (int i = 0; i < s_prevPixelCount; i++) {
-        DisplayManager::dma_display->drawPixelRGB888(s_prevPixels[i].x, s_prevPixels[i].y, 0, 0, 0);
-      }
-    }
-    // 更新 prevPixels 缓冲
+    // full 帧：直接覆盖，不先擦除（避免闪烁）
+    // 更新 prevPixels 缓冲（用于跟踪上一帧覆盖的区域）
     if (s_prevPixels != nullptr) free(s_prevPixels);
     s_prevPixelCount = frame.pixelCount;
     s_prevPixels = (PixelData*)malloc(sizeof(PixelData) * s_prevPixelCount);

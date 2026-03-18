@@ -553,9 +553,9 @@ export default {
               height: data.height,
             };
 
-            const fitZoomW = data.width / this.boardOffset.w;
-            const fitZoomH = data.height / this.boardOffset.h;
-            const fitZoom = Math.min(fitZoomW, fitZoomH, 3) * 0.9; // 限制初始最大缩放为3，留10%边距
+            const fitZoomW = (data.width * 0.9) / this.boardOffset.w;
+            const fitZoomH = (data.height * 0.9) / this.boardOffset.h;
+            const fitZoom = Math.min(fitZoomW, fitZoomH, 50);
 
             const boardPixelWidth = this.boardOffset.w * fitZoom;
             const boardPixelHeight = this.boardOffset.h * fitZoom;
@@ -783,9 +783,9 @@ export default {
         this.containerSize.height > 0 &&
         this.boardOffset.w > 0
       ) {
-        const fitZoomW = this.containerSize.width / this.boardOffset.w;
-        const fitZoomH = this.containerSize.height / this.boardOffset.h;
-        const fitZoom = Math.min(fitZoomW, fitZoomH, 4.5) * 1.35; // 增加1.5倍缩放（0.9 * 1.5 = 1.35），最大缩放提升到4.5
+        const fitZoomW = (this.containerSize.width * 0.9) / this.boardOffset.w;
+        const fitZoomH = (this.containerSize.height * 0.9) / this.boardOffset.h;
+        const fitZoom = Math.min(fitZoomW, fitZoomH, 50);
 
         this.zoom = fitZoom;
 
