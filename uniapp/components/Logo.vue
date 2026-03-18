@@ -7,11 +7,14 @@
       :style="{ width: size + 'rpx', height: size + 'rpx' }"
       mode="aspectFit"
     />
-    
+
     <!-- Glowxel 文字 -->
-    <view v-if="showText" class="logo-text">
-      <text class="text-content" :style="{ fontSize: textSize + 'rpx' }">Glowxel</text>
-    </view>
+    <image
+      src="/static/glowxel-logo.png"
+      class="logo-logo"
+      :style="{ width: size * 2.5 + 'rpx', height: size / 2 + 'rpx' }"
+      mode="aspectFit"
+    />
   </view>
 </template>
 
@@ -20,20 +23,20 @@ export default {
   props: {
     size: {
       type: Number,
-      default: 64
+      default: 64,
     },
     showText: {
       type: Boolean,
-      default: true
-    }
+      default: true,
+    },
   },
-  
+
   computed: {
     textSize() {
-      return this.size * 0.7
-    }
-  }
-}
+      return this.size * 0.7;
+    },
+  },
+};
 </script>
 
 <style scoped>
@@ -51,7 +54,7 @@ export default {
 }
 
 .text-content {
-  color: #4F7FFF;
+  color: #4f7fff;
   font-family: monospace;
   font-weight: bold;
   letter-spacing: 0.15em;

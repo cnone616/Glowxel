@@ -4,22 +4,25 @@
     <!-- #ifdef MP-WEIXIN -->
     <view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
     <!-- #endif -->
-    
+
     <!-- 导航栏 -->
     <view class="navbar">
-      <view class="nav-left" @click="goBack">
-        <Icon name="direction-left" :size="32" color="var(--color-text-primary)" />
+      <view class="nav-left" @click="handleBack">
+        <Icon
+          name="direction-left"
+          :size="32"
+          color="var(--color-text-primary)"
+        />
       </view>
       <text class="nav-title">我的作品</text>
-      <view class="nav-right" @click="showSortModal = true">
-      </view>
+      <view class="nav-right" @click="showSortModal = true"> </view>
     </view>
-    
+
     <!-- 搜索和筛选 -->
     <view class="search-section">
       <view class="search-bar">
         <Icon name="search" :size="28" color="var(--color-text-disabled)" />
-        <input 
+        <input
           v-model="searchQuery"
           class="search-input"
           placeholder="搜索作品名称..."
@@ -28,9 +31,9 @@
           <Icon name="close" :size="24" />
         </view>
       </view>
-      
+
       <view class="filter-tabs">
-        <view 
+        <view
           v-for="filter in filterOptions"
           :key="filter.value"
           class="filter-tab"
@@ -38,11 +41,13 @@
           @click="currentFilter = filter.value"
         >
           <text class="filter-text">{{ filter.label }}</text>
-          <text v-if="filter.count" class="filter-count">{{ filter.count }}</text>
+          <text v-if="filter.count" class="filter-count">{{
+            filter.count
+          }}</text>
         </view>
       </view>
     </view>
-    
+
     <!-- 作品网格 -->
     <scroll-view scroll-y class="content" @scrolltolower="loadMore">
       <view v-if="filteredWorks.length === 0" class="empty-state">
@@ -54,9 +59,9 @@
           <text>创建作品</text>
         </button>
       </view>
-      
+
       <view v-else class="works-grid">
-        <view 
+        <view
           v-for="work in filteredWorks"
           :key="work.id"
           class="work-card"
@@ -64,21 +69,27 @@
           @longpress="showWorkMenu(work)"
         >
           <view class="work-thumbnail">
-            <image 
+            <image
               v-if="work.thumbnail"
               :src="work.thumbnail"
               class="thumbnail-image"
               mode="aspectFill"
             />
             <view v-else class="thumbnail-placeholder">
-              <Icon name="picture" :size="60" color="var(--color-text-disabled)" />
+              <Icon
+                name="picture"
+                :size="60"
+                color="var(--color-text-disabled)"
+              />
             </view>
-            
+
             <!-- 类型标识 -->
             <view class="type-badge" :class="work.type">
-              <text class="type-text">{{ work.type === 'published' ? '已发布' : '草稿' }}</text>
+              <text class="type-text">{{
+                work.type === "published" ? "已发布" : "草稿"
+              }}</text>
             </view>
-            
+
             <!-- 发布状态标识 -->
             <view v-if="work.type === 'published'" class="published-badge">
               <Icon name="check" :size="20" color="#FFFFFF" />
@@ -87,28 +98,35 @@
               <Icon name="upload" :size="20" color="#FFFFFF" />
             </view>
           </view>
-          
+
           <view class="work-info">
             <text class="work-name">{{ work.name || work.title }}</text>
             <view class="work-meta">
               <text class="work-size">{{ work.width }}×{{ work.height }}</text>
               <text class="work-date">{{ formatDate(work.updatedAt) }}</text>
             </view>
-            <view v-if="work.type === 'published' && work.description" class="work-desc">
+            <view
+              v-if="work.type === 'published' && work.description"
+              class="work-desc"
+            >
               <text class="desc-text">{{ work.description }}</text>
             </view>
           </view>
         </view>
       </view>
-      
+
       <!-- 加载更多 -->
       <view v-if="hasMore" class="load-more">
         <text class="load-text">加载更多...</text>
       </view>
     </scroll-view>
-    
+
     <!-- 排序弹窗 -->
-    <view v-if="showSortModal" class="modal-overlay" @click="showSortModal = false">
+    <view
+      v-if="showSortModal"
+      class="modal-overlay"
+      @click="showSortModal = false"
+    >
       <view class="sort-modal" @click.stop>
         <view class="modal-header">
           <text class="modal-title">排序方式</text>
@@ -116,9 +134,9 @@
             <Icon name="close" :size="32" />
           </view>
         </view>
-        
+
         <view class="sort-options">
-          <view 
+          <view
             v-for="option in sortOptions"
             :key="option.value"
             class="sort-option"
@@ -131,30 +149,34 @@
         </view>
       </view>
     </view>
-    
+
     <!-- 作品菜单 -->
-    <view v-if="selectedWork" class="modal-overlay" @click="selectedWork = null">
+    <view
+      v-if="selectedWork"
+      class="modal-overlay"
+      @click="selectedWork = null"
+    >
       <view class="work-menu" @click.stop>
         <view class="menu-header">
           <text class="menu-title">{{ selectedWork.name }}</text>
         </view>
-        
+
         <view class="menu-actions">
           <view class="menu-action" @click="editWork">
             <Icon name="edit" :size="32" />
             <text class="action-text">编辑</text>
           </view>
-          
+
           <view class="menu-action" @click="duplicateWork">
             <Icon name="copy" :size="32" />
             <text class="action-text">复制</text>
           </view>
-          
+
           <view class="menu-action" @click="shareWork">
             <Icon name="share" :size="32" />
             <text class="action-text">分享</text>
           </view>
-          
+
           <view class="menu-action danger" @click="deleteWork">
             <Icon name="delete" :size="32" />
             <text class="action-text">删除</text>
@@ -162,298 +184,312 @@
         </view>
       </view>
     </view>
-    
+
     <!-- Toast -->
     <Toast ref="toastRef" />
   </view>
 </template>
 
 <script>
-import { useProjectStore } from '../../store/project.js'
-import { useToast } from '../../composables/useToast.js'
-import statusBarMixin from '../../mixins/statusBar.js'
-import Icon from '../../components/Icon.vue'
-import Toast from '../../components/Toast.vue'
+import { useProjectStore } from "../../store/project.js";
+import { useToast } from "../../composables/useToast.js";
+import statusBarMixin from "../../mixins/statusBar.js";
+import Icon from "../../components/Icon.vue";
+import Toast from "../../components/Toast.vue";
 
 export default {
   mixins: [statusBarMixin],
   components: {
     Icon,
-    Toast
+    Toast,
   },
-  
+
   data() {
     return {
       projectStore: null,
       toast: null,
-      searchQuery: '',
-      currentFilter: 'all',
-      currentSort: 'updated',
+      searchQuery: "",
+      currentFilter: "all",
+      currentSort: "updated",
       showSortModal: false,
       selectedWork: null,
       hasMore: false,
       filterOptions: [
-        { value: 'all', label: '全部', count: 0 },
-        { value: 'published', label: '已发布', count: 0 },
-        { value: 'reviewing', label: '审核中', count: 0 },
-        { value: 'rejected', label: '已退回', count: 0 },
-        { value: 'drafts', label: '草稿', count: 0 }
+        { value: "all", label: "全部", count: 0 },
+        { value: "published", label: "已发布", count: 0 },
+        { value: "reviewing", label: "审核中", count: 0 },
+        { value: "rejected", label: "已退回", count: 0 },
+        { value: "drafts", label: "草稿", count: 0 },
       ],
       sortOptions: [
-        { value: 'updated', label: '最近更新' },
-        { value: 'created', label: '创建时间' },
-        { value: 'name', label: '名称' },
-        { value: 'size', label: '尺寸' }
-      ]
-    }
+        { value: "updated", label: "最近更新" },
+        { value: "created", label: "创建时间" },
+        { value: "name", label: "名称" },
+        { value: "size", label: "尺寸" },
+      ],
+    };
   },
 
   computed: {
     // 获取已发布的项目
     publishedWorks() {
-      if (!this.projectStore) return []
-      return (this.projectStore.projects || []).filter(p => p.status === 'published')
+      if (!this.projectStore) return [];
+      return (this.projectStore.projects || []).filter(
+        (p) => p.status === "published",
+      );
     },
 
     // 获取未发布的草稿项目
     draftWorks() {
-      if (!this.projectStore) return []
-      return (this.projectStore.projects || []).filter(p => p.status === 'draft')
+      if (!this.projectStore) return [];
+      return (this.projectStore.projects || []).filter(
+        (p) => p.status === "draft",
+      );
     },
 
     // 获取审核中的项目
     reviewingWorks() {
-      if (!this.projectStore) return []
-      return (this.projectStore.projects || []).filter(p => p.status === 'reviewing')
+      if (!this.projectStore) return [];
+      return (this.projectStore.projects || []).filter(
+        (p) => p.status === "reviewing",
+      );
     },
 
     // 获取已退回的项目
     rejectedWorks() {
-      if (!this.projectStore) return []
-      return (this.projectStore.projects || []).filter(p => p.status === 'rejected')
+      if (!this.projectStore) return [];
+      return (this.projectStore.projects || []).filter(
+        (p) => p.status === "rejected",
+      );
     },
 
     // 根据当前筛选获取作品列表
     allWorks() {
-      const formatList = (list, type) => list.map(work => ({
-        ...work,
-        type: type,
-        updatedAt: new Date(work.updatedAt || work.createdAt),
-        createdAt: new Date(work.createdAt),
-        progress: work.progress || 0
-      }))
+      const formatList = (list, type) =>
+        list.map((work) => ({
+          ...work,
+          type: type,
+          updatedAt: new Date(work.updatedAt || work.createdAt),
+          createdAt: new Date(work.createdAt),
+          progress: work.progress || 0,
+        }));
 
       switch (this.currentFilter) {
-        case 'published':
-          return formatList(this.publishedWorks, 'published')
-        case 'drafts':
-          return formatList(this.draftWorks, 'draft')
-        case 'reviewing':
-          return formatList(this.reviewingWorks, 'reviewing')
-        case 'rejected':
-          return formatList(this.rejectedWorks, 'rejected')
-        case 'all':
+        case "published":
+          return formatList(this.publishedWorks, "published");
+        case "drafts":
+          return formatList(this.draftWorks, "draft");
+        case "reviewing":
+          return formatList(this.reviewingWorks, "reviewing");
+        case "rejected":
+          return formatList(this.rejectedWorks, "rejected");
+        case "all":
           return [
-            ...formatList(this.publishedWorks, 'published'),
-            ...formatList(this.reviewingWorks, 'reviewing'),
-            ...formatList(this.rejectedWorks, 'rejected'),
-            ...formatList(this.draftWorks, 'draft')
-          ]
+            ...formatList(this.publishedWorks, "published"),
+            ...formatList(this.reviewingWorks, "reviewing"),
+            ...formatList(this.rejectedWorks, "rejected"),
+            ...formatList(this.draftWorks, "draft"),
+          ];
         default:
-          return []
+          return [];
       }
     },
-    
+
     filteredWorks() {
-      let works = [...this.allWorks]
-      
+      let works = [...this.allWorks];
+
       // 搜索过滤
       if (this.searchQuery.trim()) {
-        const query = this.searchQuery.toLowerCase()
-        works = works.filter(work => 
-          work.name.toLowerCase().includes(query) ||
-          (work.title && work.title.toLowerCase().includes(query))
-        )
+        const query = this.searchQuery.toLowerCase();
+        works = works.filter(
+          (work) =>
+            work.name.toLowerCase().includes(query) ||
+            (work.title && work.title.toLowerCase().includes(query)),
+        );
       }
-      
+
       // 排序
       works.sort((a, b) => {
         switch (this.currentSort) {
-          case 'updated':
-            return b.updatedAt - a.updatedAt
-          case 'created':
-            return b.createdAt - a.createdAt
-          case 'name':
-            return (a.name || a.title || '').localeCompare(b.name || b.title || '')
-          case 'size':
-            return (b.width * b.height) - (a.width * a.height)
+          case "updated":
+            return b.updatedAt - a.updatedAt;
+          case "created":
+            return b.createdAt - a.createdAt;
+          case "name":
+            return (a.name || a.title || "").localeCompare(
+              b.name || b.title || "",
+            );
+          case "size":
+            return b.width * b.height - a.width * a.height;
           default:
-            return 0
+            return 0;
         }
-      })
-      
-      return works
-    }
+      });
+
+      return works;
+    },
   },
-  
+
   onLoad() {
-    this.projectStore = useProjectStore()
-    this.toast = useToast()
+    this.projectStore = useProjectStore();
+    this.toast = useToast();
 
     // 加载项目数据
-    this.projectStore.loadProjects()
-    this.updateFilterCounts()
+    this.projectStore.loadProjects();
+    this.updateFilterCounts();
 
     this.$nextTick(() => {
       if (this.$refs.toastRef) {
-        this.toast.setToastInstance(this.$refs.toastRef)
+        this.toast.setToastInstance(this.$refs.toastRef);
       }
-    })
+    });
   },
 
   onShow() {
     // 页面显示时刷新数据
     if (this.projectStore) {
-      this.projectStore.loadProjects()
-      this.updateFilterCounts()
+      this.projectStore.loadProjects();
+      this.updateFilterCounts();
     }
   },
-  
+
   methods: {
-    goBack() {
-      uni.navigateBack()
+    handleBack() {
+      uni.navigateBack();
     },
-    
+
     goToCreate() {
       uni.navigateTo({
-        url: '/pages/create/create'
-      })
+        url: "/pages/create/create",
+      });
     },
-    
-    updateFilterCounts() {
-      const publishedCount = this.publishedWorks.length
-      const draftCount = this.draftWorks.length
-      const reviewingCount = this.reviewingWorks.length
-      const rejectedCount = this.rejectedWorks.length
-      const totalCount = publishedCount + draftCount + reviewingCount + rejectedCount
 
-      this.filterOptions[0].count = totalCount        // 全部
-      this.filterOptions[1].count = publishedCount    // 已发布
-      this.filterOptions[2].count = reviewingCount    // 审核中
-      this.filterOptions[3].count = rejectedCount     // 已退回
-      this.filterOptions[4].count = draftCount        // 草稿
+    updateFilterCounts() {
+      const publishedCount = this.publishedWorks.length;
+      const draftCount = this.draftWorks.length;
+      const reviewingCount = this.reviewingWorks.length;
+      const rejectedCount = this.rejectedWorks.length;
+      const totalCount =
+        publishedCount + draftCount + reviewingCount + rejectedCount;
+
+      this.filterOptions[0].count = totalCount; // 全部
+      this.filterOptions[1].count = publishedCount; // 已发布
+      this.filterOptions[2].count = reviewingCount; // 审核中
+      this.filterOptions[3].count = rejectedCount; // 已退回
+      this.filterOptions[4].count = draftCount; // 草稿
     },
-    
+
     selectSort(value) {
-      this.currentSort = value
-      this.showSortModal = false
+      this.currentSort = value;
+      this.showSortModal = false;
     },
-    
+
     openWork(work) {
-      if (work.type === 'published') {
+      if (work.type === "published") {
         // 查看已发布的作品详情
-        this.viewPublishedWork(work)
+        this.viewPublishedWork(work);
       } else {
         // 编辑草稿
-        this.editDraft(work)
+        this.editDraft(work);
       }
     },
-    
+
     viewPublishedWork(work) {
       // 创建作品详情页面或弹窗显示
       uni.showModal({
         title: work.title || work.name,
-        content: `作品尺寸: ${work.width}×${work.height}\n发布时间: ${this.formatDate(work.createdAt)}\n\n${work.description || '暂无描述'}`,
+        content: `作品尺寸: ${work.width}×${work.height}\n发布时间: ${this.formatDate(work.createdAt)}\n\n${work.description || "暂无描述"}`,
         showCancel: false,
-        confirmText: '确定'
-      })
+        confirmText: "确定",
+      });
     },
-    
+
     editDraft(work) {
       // 编辑草稿 - 先进入看板总览
       uni.navigateTo({
-        url: `/pages/overview/overview?id=${work.id}`
-      })
+        url: `/pages/overview/overview?id=${work.id}`,
+      });
     },
-    
-    showWorkMenu(work) {
-      this.selectedWork = work
-    },
-    
-    editWork() {
-      if (!this.selectedWork) return
-      
-      if (this.selectedWork.type === 'published') {
-        this.toast.showError('已发布的作品无法编辑')
-        this.selectedWork = null
-        return
-      }
-      
-      // 编辑草稿
-      this.editDraft(this.selectedWork)
-      this.selectedWork = null
-    },
-    
-    duplicateWork() {
-      if (!this.selectedWork) return
-      
-      this.projectStore.duplicateProject(this.selectedWork.id)
-      this.toast.showSuccess('作品已复制')
-      this.selectedWork = null
-      this.updateFilterCounts()
-    },
-    
-    shareWork() {
-      if (!this.selectedWork) return
-      
-      // 分享功能
-      this.toast.showInfo('分享功能开发中')
-      this.selectedWork = null
-    },
-    
-    deleteWork() {
-      if (!this.selectedWork) return
 
-      const workName = this.selectedWork.name || this.selectedWork.title
-      const typeLabel = this.selectedWork.type === 'published' ? '作品' : '草稿'
+    showWorkMenu(work) {
+      this.selectedWork = work;
+    },
+
+    editWork() {
+      if (!this.selectedWork) return;
+
+      if (this.selectedWork.type === "published") {
+        this.toast.showError("已发布的作品无法编辑");
+        this.selectedWork = null;
+        return;
+      }
+
+      // 编辑草稿
+      this.editDraft(this.selectedWork);
+      this.selectedWork = null;
+    },
+
+    duplicateWork() {
+      if (!this.selectedWork) return;
+
+      this.projectStore.duplicateProject(this.selectedWork.id);
+      this.toast.showSuccess("作品已复制");
+      this.selectedWork = null;
+      this.updateFilterCounts();
+    },
+
+    shareWork() {
+      if (!this.selectedWork) return;
+
+      // 分享功能
+      this.toast.showInfo("分享功能开发中");
+      this.selectedWork = null;
+    },
+
+    deleteWork() {
+      if (!this.selectedWork) return;
+
+      const workName = this.selectedWork.name || this.selectedWork.title;
+      const typeLabel =
+        this.selectedWork.type === "published" ? "作品" : "草稿";
 
       uni.showModal({
-        title: '确认删除',
+        title: "确认删除",
         content: `确定要删除${typeLabel}"${workName}"吗？`,
         success: (res) => {
           if (res.confirm) {
             try {
-              this.projectStore.deleteProject(this.selectedWork.id)
-              this.toast.showSuccess(`${typeLabel}已删除`)
-              this.updateFilterCounts()
+              this.projectStore.deleteProject(this.selectedWork.id);
+              this.toast.showSuccess(`${typeLabel}已删除`);
+              this.updateFilterCounts();
             } catch (error) {
-              console.error('删除失败:', error)
-              this.toast.showError('删除失败')
+              console.error("删除失败:", error);
+              this.toast.showError("删除失败");
             }
           }
-          this.selectedWork = null
-        }
-      })
+          this.selectedWork = null;
+        },
+      });
     },
-    
+
     loadMore() {
       // 加载更多逻辑
     },
-    
+
     formatDate(timestamp) {
-      const date = new Date(timestamp)
-      const now = new Date()
-      const diff = now - date
-      
-      if (diff < 60000) return '刚刚'
-      if (diff < 3600000) return `${Math.floor(diff / 60000)}分钟前`
-      if (diff < 86400000) return `${Math.floor(diff / 3600000)}小时前`
-      if (diff < 604800000) return `${Math.floor(diff / 86400000)}天前`
-      
-      return date.toLocaleDateString()
-    }
-  }
-}
+      const date = new Date(timestamp);
+      const now = new Date();
+      const diff = now - date;
+
+      if (diff < 60000) return "刚刚";
+      if (diff < 3600000) return `${Math.floor(diff / 60000)}分钟前`;
+      if (diff < 86400000) return `${Math.floor(diff / 3600000)}小时前`;
+      if (diff < 604800000) return `${Math.floor(diff / 86400000)}天前`;
+
+      return date.toLocaleDateString();
+    },
+  },
+};
 </script>
 
 <style scoped>
@@ -526,7 +562,7 @@ export default {
   padding: 8rpx;
   border-radius: 50%;
   background-color: var(--color-text-disabled);
-  color: #FFFFFF;
+  color: #ffffff;
 }
 
 .filter-tabs {
@@ -556,7 +592,7 @@ export default {
 }
 
 .filter-tab.active .filter-text {
-  color: #FFFFFF;
+  color: #ffffff;
 }
 
 .filter-count {
@@ -598,7 +634,7 @@ export default {
   gap: 12rpx;
   padding: 24rpx 48rpx;
   background-color: var(--color-brand-primary);
-  color: #FFFFFF;
+  color: #ffffff;
   border: none;
   border-radius: 16rpx;
   font-size: 28rpx;
@@ -659,7 +695,7 @@ export default {
 
 .progress-text {
   font-size: 20rpx;
-  color: #FFFFFF;
+  color: #ffffff;
 }
 
 .complete-badge {
@@ -699,7 +735,7 @@ export default {
 .type-text {
   font-size: 18rpx;
   font-weight: 600;
-  color: #FFFFFF;
+  color: #ffffff;
   line-height: 1.2;
 }
 
@@ -751,7 +787,8 @@ export default {
   align-items: center;
 }
 
-.work-size, .work-date {
+.work-size,
+.work-date {
   font-size: 22rpx;
   color: var(--color-text-disabled);
 }
@@ -794,7 +831,8 @@ export default {
   z-index: 1000;
 }
 
-.sort-modal, .work-menu {
+.sort-modal,
+.work-menu {
   background-color: var(--color-card-background);
   border-radius: 24rpx;
   margin: 32rpx;
@@ -811,7 +849,8 @@ export default {
   border-bottom: 2rpx solid var(--border-primary);
 }
 
-.modal-title, .menu-title {
+.modal-title,
+.menu-title {
   font-size: 32rpx;
   font-weight: 600;
   color: var(--color-text-primary);
@@ -821,11 +860,13 @@ export default {
   padding: 8rpx;
 }
 
-.sort-options, .menu-actions {
+.sort-options,
+.menu-actions {
   padding: 16rpx 0;
 }
 
-.sort-option, .menu-action {
+.sort-option,
+.menu-action {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -833,7 +874,8 @@ export default {
   transition: all 0.2s ease;
 }
 
-.sort-option:active, .menu-action:active {
+.sort-option:active,
+.menu-action:active {
   background-color: var(--color-app-background);
 }
 
@@ -841,7 +883,8 @@ export default {
   background-color: rgba(79, 127, 255, 0.1);
 }
 
-.sort-text, .action-text {
+.sort-text,
+.action-text {
   font-size: 28rpx;
   color: var(--color-text-primary);
 }

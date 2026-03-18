@@ -4,21 +4,25 @@
     <!-- #ifdef MP-WEIXIN -->
     <view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
     <!-- #endif -->
-    
+
     <!-- 导航栏 -->
     <view class="navbar">
-      <view class="nav-left" @click="goBack">
-        <Icon name="direction-left" :size="32" color="var(--color-text-primary)" />
+      <view class="nav-left" @click="handleBack">
+        <Icon
+          name="direction-left"
+          :size="32"
+          color="var(--color-text-primary)"
+        />
       </view>
       <text class="nav-title">我的收藏</text>
       <view class="nav-right" @click="toggleEditMode">
-        <text class="edit-btn">{{ isEditMode ? '完成' : '编辑' }}</text>
+        <text class="edit-btn">{{ isEditMode ? "完成" : "编辑" }}</text>
       </view>
     </view>
-    
+
     <!-- 分类标签 -->
     <view class="category-tabs">
-      <view 
+      <view
         v-for="category in categories"
         :key="category.value"
         class="category-tab"
@@ -27,10 +31,12 @@
       >
         <Icon :name="category.icon" :size="32" />
         <text class="category-text">{{ category.label }}</text>
-        <text v-if="category.count > 0" class="category-count">{{ category.count }}</text>
+        <text v-if="category.count > 0" class="category-count">{{
+          category.count
+        }}</text>
       </view>
     </view>
-    
+
     <!-- 收藏列表 -->
     <scroll-view scroll-y class="content">
       <view v-if="filteredFavorites.length === 0" class="empty-state">
@@ -42,9 +48,9 @@
           <text>去探索</text>
         </button>
       </view>
-      
+
       <view v-else class="favorites-list">
-        <view 
+        <view
           v-for="item in filteredFavorites"
           :key="item.id"
           class="favorite-item"
@@ -52,39 +58,47 @@
           @click="openFavorite(item)"
         >
           <!-- 选择框 -->
-          <view v-if="isEditMode" class="select-checkbox" @click.stop="toggleSelect(item.id)">
-            <Icon 
+          <view
+            v-if="isEditMode"
+            class="select-checkbox"
+            @click.stop="toggleSelect(item.id)"
+          >
+            <Icon
               v-if="selectedItems.includes(item.id)"
-              name="check-circle-fill" 
-              :size="40" 
-              color="var(--color-brand-primary)" 
+              name="check-circle-fill"
+              :size="40"
+              color="var(--color-brand-primary)"
             />
-            <Icon 
+            <Icon
               v-else
-              name="circle" 
-              :size="40" 
-              color="var(--color-text-disabled)" 
+              name="circle"
+              :size="40"
+              color="var(--color-text-disabled)"
             />
           </view>
-          
+
           <!-- 缩略图 -->
           <view class="item-thumbnail">
-            <image 
+            <image
               v-if="item.thumbnail"
               :src="item.thumbnail"
               class="thumbnail-image"
               mode="aspectFill"
             />
             <view v-else class="thumbnail-placeholder">
-              <Icon :name="getTypeIcon(item.type)" :size="60" color="var(--color-text-disabled)" />
+              <Icon
+                :name="getTypeIcon(item.type)"
+                :size="60"
+                color="var(--color-text-disabled)"
+              />
             </view>
-            
+
             <!-- 类型标识 -->
             <view class="type-badge" :class="item.type">
               <Icon :name="getTypeIcon(item.type)" :size="24" />
             </view>
           </view>
-          
+
           <!-- 信息 -->
           <view class="item-info">
             <text class="item-title">{{ item.title }}</text>
@@ -94,272 +108,295 @@
               <text class="item-date">{{ formatDate(item.favoriteTime) }}</text>
             </view>
             <view v-if="item.tags && item.tags.length > 0" class="item-tags">
-              <text 
+              <text
                 v-for="tag in item.tags.slice(0, 3)"
                 :key="tag"
                 class="tag"
-              >{{ tag }}</text>
+                >{{ tag }}</text
+              >
             </view>
           </view>
-          
+
           <!-- 操作按钮 -->
           <view v-if="!isEditMode" class="item-actions">
             <view class="action-btn" @click.stop="downloadFavorite(item)">
               <Icon name="download" :size="32" />
             </view>
             <view class="action-btn" @click.stop="removeFavorite(item)">
-              <Icon name="bookmark-fill" :size="32" color="var(--color-brand-primary)" />
+              <Icon
+                name="ashbin"
+                :size="32"
+                color="var(--color-brand-primary)"
+              />
             </view>
           </view>
         </view>
       </view>
     </scroll-view>
-    
+
     <!-- 批量操作栏 -->
     <view v-if="isEditMode" class="batch-actions">
       <view class="batch-info">
         <text class="selected-count">已选择 {{ selectedItems.length }} 项</text>
       </view>
       <view class="batch-buttons">
-        <button class="batch-btn" @click="batchDownload" :disabled="selectedItems.length === 0">
+        <button
+          class="batch-btn"
+          @click="batchDownload"
+          :disabled="selectedItems.length === 0"
+        >
           <Icon name="download" :size="32" />
           <text>下载</text>
         </button>
-        <button class="batch-btn danger" @click="batchRemove" :disabled="selectedItems.length === 0">
+        <button
+          class="batch-btn danger"
+          @click="batchRemove"
+          :disabled="selectedItems.length === 0"
+        >
           <Icon name="delete" :size="32" />
           <text>移除</text>
         </button>
       </view>
     </view>
-    
+
     <!-- Toast -->
     <Toast ref="toastRef" />
   </view>
 </template>
 
 <script>
-import { useToast } from '../../composables/useToast.js'
-import statusBarMixin from '../../mixins/statusBar.js'
-import Icon from '../../components/Icon.vue'
-import Toast from '../../components/Toast.vue'
+import { useToast } from "../../composables/useToast.js";
+import statusBarMixin from "../../mixins/statusBar.js";
+import Icon from "../../components/Icon.vue";
+import Toast from "../../components/Toast.vue";
 
 export default {
   mixins: [statusBarMixin],
   components: {
     Icon,
-    Toast
+    Toast,
   },
-  
+
   data() {
     return {
       toast: null,
-      currentCategory: 'all',
+      currentCategory: "all",
       isEditMode: false,
       selectedItems: [],
       categories: [
-        { value: 'all', label: '全部', icon: 'grid', count: 0 },
-        { value: 'artwork', label: '作品', icon: 'picture', count: 0 },
-        { value: 'template', label: '模板', icon: 'layout', count: 0 },
-        { value: 'pattern', label: '图案', icon: 'star', count: 0 }
+        { value: "all", label: "全部", icon: "grid", count: 0 },
+        { value: "artwork", label: "作品", icon: "picture", count: 0 },
+        { value: "template", label: "模板", icon: "layout", count: 0 },
+        { value: "pattern", label: "图案", icon: "star", count: 0 },
       ],
       favorites: [
         // 模拟数据
         {
-          id: '1',
-          type: 'artwork',
-          title: '像素小猫',
-          author: '设计师A',
+          id: "1",
+          type: "artwork",
+          title: "像素小猫",
+          author: "设计师A",
           width: 32,
           height: 32,
-          thumbnail: '',
+          thumbnail: "",
           favoriteTime: Date.now() - 86400000,
-          tags: ['可爱', '动物', '像素']
+          tags: ["可爱", "动物", "像素"],
         },
         {
-          id: '2',
-          type: 'template',
-          title: '圣诞树模板',
-          author: '官方',
+          id: "2",
+          type: "template",
+          title: "圣诞树模板",
+          author: "官方",
           width: 64,
           height: 64,
-          thumbnail: '',
+          thumbnail: "",
           favoriteTime: Date.now() - 172800000,
-          tags: ['节日', '圣诞', '模板']
+          tags: ["节日", "圣诞", "模板"],
         },
         {
-          id: '3',
-          type: 'pattern',
-          title: '几何图案',
-          author: '用户B',
+          id: "3",
+          type: "pattern",
+          title: "几何图案",
+          author: "用户B",
           width: 16,
           height: 16,
-          thumbnail: '',
+          thumbnail: "",
           favoriteTime: Date.now() - 259200000,
-          tags: ['几何', '抽象']
-        }
-      ]
-    }
+          tags: ["几何", "抽象"],
+        },
+      ],
+    };
   },
-  
+
   computed: {
     filteredFavorites() {
-      if (this.currentCategory === 'all') {
-        return this.favorites
+      if (this.currentCategory === "all") {
+        return this.favorites;
       }
-      return this.favorites.filter(item => item.type === this.currentCategory)
-    }
+      return this.favorites.filter(
+        (item) => item.type === this.currentCategory,
+      );
+    },
   },
-  
+
   onLoad() {
-    this.toast = useToast()
-    this.updateCategoryCounts()
-    
+    this.toast = useToast();
+    this.updateCategoryCounts();
+
     this.$nextTick(() => {
       if (this.$refs.toastRef) {
-        this.toast.setToastInstance(this.$refs.toastRef)
+        this.toast.setToastInstance(this.$refs.toastRef);
       }
-    })
+    });
   },
-  
+
   methods: {
-    goBack() {
-      uni.navigateBack()
+    handleBack() {
+      uni.navigateBack();
     },
-    
+
     goToExplore() {
       uni.switchTab({
-        url: '/pages/community/community'
-      })
+        url: "/pages/community/community",
+      });
     },
-    
+
     updateCategoryCounts() {
-      this.categories[0].count = this.favorites.length
-      this.categories[1].count = this.favorites.filter(f => f.type === 'artwork').length
-      this.categories[2].count = this.favorites.filter(f => f.type === 'template').length
-      this.categories[3].count = this.favorites.filter(f => f.type === 'pattern').length
+      this.categories[0].count = this.favorites.length;
+      this.categories[1].count = this.favorites.filter(
+        (f) => f.type === "artwork",
+      ).length;
+      this.categories[2].count = this.favorites.filter(
+        (f) => f.type === "template",
+      ).length;
+      this.categories[3].count = this.favorites.filter(
+        (f) => f.type === "pattern",
+      ).length;
     },
-    
+
     toggleEditMode() {
-      this.isEditMode = !this.isEditMode
+      this.isEditMode = !this.isEditMode;
       if (!this.isEditMode) {
-        this.selectedItems = []
+        this.selectedItems = [];
       }
     },
-    
+
     toggleSelect(id) {
-      const index = this.selectedItems.indexOf(id)
+      const index = this.selectedItems.indexOf(id);
       if (index > -1) {
-        this.selectedItems.splice(index, 1)
+        this.selectedItems.splice(index, 1);
       } else {
-        this.selectedItems.push(id)
+        this.selectedItems.push(id);
       }
     },
-    
+
     openFavorite(item) {
       if (this.isEditMode) {
-        this.toggleSelect(item.id)
-        return
+        this.toggleSelect(item.id);
+        return;
       }
-      
+
       // 根据类型跳转到不同页面
       switch (item.type) {
-        case 'artwork':
+        case "artwork":
           uni.navigateTo({
-            url: `/pages/artwork-detail/artwork-detail?id=${item.id}`
-          })
-          break
-        case 'template':
+            url: `/pages/artwork-detail/artwork-detail?id=${item.id}`,
+          });
+          break;
+        case "template":
           // 跳转到模板详情或直接使用
-          this.useTemplate(item)
-          break
-        case 'pattern':
+          this.useTemplate(item);
+          break;
+        case "pattern":
           // 跳转到图案详情
-          this.toast.showInfo('图案详情功能开发中')
-          break
+          this.toast.showInfo("图案详情功能开发中");
+          break;
       }
     },
-    
+
     useTemplate(template) {
       uni.showModal({
-        title: '使用模板',
+        title: "使用模板",
         content: `确定要使用模板"${template.title}"创建新作品吗？`,
         success: (res) => {
           if (res.confirm) {
             // 跳转到创建页面并传递模板信息
             uni.navigateTo({
-              url: `/pages/create/create?template=${template.id}`
-            })
+              url: `/pages/create/create?template=${template.id}`,
+            });
           }
-        }
-      })
+        },
+      });
     },
-    
+
     downloadFavorite(item) {
-      this.toast.showInfo('下载功能开发中')
+      this.toast.showInfo("下载功能开发中");
     },
-    
+
     removeFavorite(item) {
       uni.showModal({
-        title: '移除收藏',
+        title: "移除收藏",
         content: `确定要移除"${item.title}"吗？`,
         success: (res) => {
           if (res.confirm) {
-            const index = this.favorites.findIndex(f => f.id === item.id)
+            const index = this.favorites.findIndex((f) => f.id === item.id);
             if (index > -1) {
-              this.favorites.splice(index, 1)
-              this.updateCategoryCounts()
-              this.toast.showSuccess('已移除收藏')
+              this.favorites.splice(index, 1);
+              this.updateCategoryCounts();
+              this.toast.showSuccess("已移除收藏");
             }
           }
-        }
-      })
+        },
+      });
     },
-    
+
     batchDownload() {
-      if (this.selectedItems.length === 0) return
-      
-      this.toast.showInfo(`批量下载 ${this.selectedItems.length} 项功能开发中`)
+      if (this.selectedItems.length === 0) return;
+
+      this.toast.showInfo(`批量下载 ${this.selectedItems.length} 项功能开发中`);
     },
-    
+
     batchRemove() {
-      if (this.selectedItems.length === 0) return
-      
+      if (this.selectedItems.length === 0) return;
+
       uni.showModal({
-        title: '批量移除',
+        title: "批量移除",
         content: `确定要移除选中的 ${this.selectedItems.length} 项收藏吗？`,
         success: (res) => {
           if (res.confirm) {
-            this.favorites = this.favorites.filter(f => !this.selectedItems.includes(f.id))
-            this.selectedItems = []
-            this.updateCategoryCounts()
-            this.toast.showSuccess('批量移除成功')
+            this.favorites = this.favorites.filter(
+              (f) => !this.selectedItems.includes(f.id),
+            );
+            this.selectedItems = [];
+            this.updateCategoryCounts();
+            this.toast.showSuccess("批量移除成功");
           }
-        }
-      })
+        },
+      });
     },
-    
+
     getTypeIcon(type) {
       const icons = {
-        artwork: 'picture',
-        template: 'layout',
-        pattern: 'star'
-      }
-      return icons[type] || 'picture'
+        artwork: "picture",
+        template: "layout",
+        pattern: "star",
+      };
+      return icons[type] || "picture";
     },
-    
+
     formatDate(timestamp) {
-      const date = new Date(timestamp)
-      const now = new Date()
-      const diff = now - date
-      
-      if (diff < 86400000) return '今天'
-      if (diff < 172800000) return '昨天'
-      if (diff < 604800000) return `${Math.floor(diff / 86400000)}天前`
-      
-      return date.toLocaleDateString()
-    }
-  }
-}
+      const date = new Date(timestamp);
+      const now = new Date();
+      const diff = now - date;
+
+      if (diff < 86400000) return "今天";
+      if (diff < 172800000) return "昨天";
+      if (diff < 604800000) return `${Math.floor(diff / 86400000)}天前`;
+
+      return date.toLocaleDateString();
+    },
+  },
+};
 </script>
 
 <style scoped>
@@ -434,7 +471,7 @@ export default {
 .category-tab.active {
   background-color: var(--color-brand-primary);
   border-color: var(--color-brand-primary);
-  color: #FFFFFF;
+  color: #ffffff;
 }
 
 .category-text {
@@ -443,7 +480,7 @@ export default {
 }
 
 .category-tab.active .category-text {
-  color: #FFFFFF;
+  color: #ffffff;
 }
 
 .category-count {
@@ -486,7 +523,7 @@ export default {
   gap: 12rpx;
   padding: 24rpx 48rpx;
   background-color: var(--color-brand-primary);
-  color: #FFFFFF;
+  color: #ffffff;
   border: none;
   border-radius: 16rpx;
   font-size: 28rpx;
@@ -560,7 +597,7 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #FFFFFF;
+  color: #ffffff;
 }
 
 .type-badge.artwork {
@@ -602,7 +639,8 @@ export default {
   gap: 16rpx;
 }
 
-.item-size, .item-date {
+.item-size,
+.item-date {
   font-size: 22rpx;
   color: var(--color-text-disabled);
 }
@@ -669,7 +707,7 @@ export default {
   gap: 8rpx;
   padding: 16rpx 24rpx;
   background-color: var(--color-brand-primary);
-  color: #FFFFFF;
+  color: #ffffff;
   border: none;
   border-radius: 12rpx;
   font-size: 24rpx;

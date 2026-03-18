@@ -2,9 +2,13 @@
   <view class="assist-page" :class="{ 'light-theme': false }">
     <!-- 状态栏占位 -->
     <view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
-    
+
     <!-- 行导航弹窗 -->
-    <view v-if="isRowListOpen" class="modal-overlay" @click="isRowListOpen = false">
+    <view
+      v-if="isRowListOpen"
+      class="modal-overlay"
+      @click="isRowListOpen = false"
+    >
       <view class="row-list-modal" @click.stop>
         <view class="modal-header">
           <text class="modal-title">行导航</text>
@@ -12,7 +16,7 @@
             <text class="close-icon">×</text>
           </view>
         </view>
-        
+
         <scroll-view scroll-y class="row-grid-scroll">
           <view class="row-grid">
             <view
@@ -20,13 +24,18 @@
               :key="i - 1"
               class="row-grid-item"
               :class="{
-                'current': currentRow === i - 1,
-                'completed': completedRows.has(i - 1) && currentRow !== i - 1
+                current: currentRow === i - 1,
+                completed: completedRows.has(i - 1) && currentRow !== i - 1,
               }"
               @click="handleRowListSelect(i - 1)"
             >
               <text class="row-number">{{ i }}</text>
-              <Icon name="check-item" v-if="completedRows.has(i - 1)" :size="32" class="check-mark" />
+              <Icon
+                name="check-item"
+                v-if="completedRows.has(i - 1)"
+                :size="32"
+                class="check-mark"
+              />
             </view>
           </view>
         </scroll-view>
@@ -47,16 +56,26 @@
         </view>
       </view>
     </view>
-
+    <!-- 导航栏 -->
+    <view class="navbar">
+      <view class="nav-left" @click="goToOverview">
+        <Icon
+          name="direction-left"
+          :size="32"
+          color="var(--color-text-primary)"
+        />
+      </view>
+      <text class="nav-title">{{ boardId }}</text>
+    </view>
     <!-- 头部 -->
     <view class="header" :style="{ paddingRight: capsuleRight + 'px' }">
-      <view class="header-left">
+      <!-- <view class="header-left">
         <view class="back-btn" @click="goToOverview">
           <text class="icon">‹</text>
         </view>
         <text class="board-id">{{ boardId }}</text>
-      </view>
-      
+      </view> -->
+
       <!-- 模式切换 -->
       <!-- <view class="mode-switch">
         <view 
@@ -83,7 +102,7 @@
     <view v-if="assistMode === 'row'" class="info-banner">
       <text class="info-text">行 {{ currentRow + 1 }} / 64</text>
     </view>
-    
+
     <!--  
     <view v-if="assistMode === 'color' && highlightColor" class="info-banner">
       <view class="color-dot" :style="{ backgroundColor: highlightColor }"></view>
@@ -91,7 +110,10 @@
     </view>
     -->
     <!-- Canvas 画布 -->
-    <view class="canvas-container" v-if="!isHelpOpen && !isRowListOpen && !showConnectModal">
+    <view
+      class="canvas-container"
+      v-if="!isHelpOpen && !isRowListOpen && !showConnectModal"
+    >
       <PixelCanvas
         v-if="canvasReady"
         :width="64"
@@ -118,19 +140,37 @@
       <!-- 颜色列表 -->
       <view class="color-section">
         <view class="section-header">
-          <text class="section-title">{{ assistMode === 'row' ? '行颜色' : '全部颜色' }} ({{ displayedColors.size }})</text>
-          <view v-if="assistMode === 'color' && highlightColor" style="display:flex;justify-content: space-between;align-items: center;">
-            <view class="cont-color-dot" :style="{ backgroundColor: highlightColor }"></view>
-            <text class="info-text">{{ getColorCode(highlightColor) }} ({{ boardColors.get(highlightColor) }})</text>
+          <text class="section-title"
+            >{{ assistMode === "row" ? "行颜色" : "全部颜色" }} ({{
+              displayedColors.size
+            }})</text
+          >
+          <view
+            v-if="assistMode === 'color' && highlightColor"
+            style="
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+            "
+          >
+            <view
+              class="cont-color-dot"
+              :style="{ backgroundColor: highlightColor }"
+            ></view>
+            <text class="info-text"
+              >{{ getColorCode(highlightColor) }} ({{
+                boardColors.get(highlightColor)
+              }})</text
+            >
           </view>
           <!-- 操作按钮 -->
           <view class="header-actions">
             <view class="icon-btn" @click="isHelpOpen = true">
               <Icon name="help" :size="24" />
             </view>
-            <view 
+            <view
               class="icon-btn device-btn"
-              :class="{ 'connected': deviceConnected }"
+              :class="{ connected: deviceConnected }"
               @click="toggleDeviceSync"
             >
               <Icon name="link" :size="24" />
@@ -138,9 +178,9 @@
             <view class="icon-btn" @click="handleFit">
               <Icon name="fullscreen-expand" :size="24" />
             </view>
-            <view 
+            <view
               class="icon-btn"
-              :class="{ 'active': focusMode }"
+              :class="{ active: focusMode }"
               @click="focusMode = !focusMode"
             >
               <Icon name="browse" v-if="focusMode" :size="24" />
@@ -148,9 +188,9 @@
             </view>
           </view>
         </view>
-        
-        <scroll-view 
-          scroll-y 
+
+        <scroll-view
+          scroll-y
           class="color-list"
           :scroll-into-view="scrollIntoView"
           :scroll-top="colorListScrollTop"
@@ -159,42 +199,51 @@
         >
           <view v-if="assistMode === 'color' && colorGroups.length > 0">
             <!-- 按字母分组显示 -->
-            <view v-for="group in colorGroups" :key="group.letter" class="color-group">
+            <view
+              v-for="group in colorGroups"
+              :key="group.letter"
+              class="color-group"
+            >
               <!-- 分组标题 -->
-              <view 
-                :id="'letter-' + group.letter"
-                class="group-header"
-              >
+              <view :id="'letter-' + group.letter" class="group-header">
                 <text class="group-letter">{{ group.letter }}</text>
                 <text class="group-count">({{ group.colors.length }})</text>
               </view>
-              
+
               <!-- 该字母下的颜色 -->
               <view class="color-grid">
-                <view 
+                <view
                   v-for="[color, count] in group.colors"
                   :key="color"
                   class="color-item"
                   :class="{
-                    'active': highlightColor === color,
-                    'completed': isColorCompleted(color) && highlightColor !== color
+                    active: highlightColor === color,
+                    completed:
+                      isColorCompleted(color) && highlightColor !== color,
                   }"
-                  @click="setHighlightColor(highlightColor === color ? null : color)"
+                  @click="
+                    setHighlightColor(highlightColor === color ? null : color)
+                  "
                 >
                   <!-- 左侧：颜色和色号 -->
                   <view class="color-info">
-                    <view class="color-swatch" :style="{ backgroundColor: color }"></view>
+                    <view
+                      class="color-swatch"
+                      :style="{ backgroundColor: color }"
+                    ></view>
                     <text class="color-code">{{ getColorCode(color) }}</text>
                   </view>
-                  
+
                   <!-- 右侧：勾选框和数量 -->
                   <view class="color-actions">
-                    <view 
+                    <view
                       class="check-btn"
-                      :class="{ 'checked': isColorCompleted(color) }"
+                      :class="{ checked: isColorCompleted(color) }"
                       @click.stop="toggleColorComplete(color)"
                     >
-                      <text v-if="isColorCompleted(color)" class="check-icon">✓</text>
+                      <text v-if="isColorCompleted(color)" class="check-icon"
+                        >✓</text
+                      >
                       <view v-else class="check-box"></view>
                     </view>
                     <text class="color-count">×{{ count }}</text>
@@ -203,32 +252,43 @@
               </view>
             </view>
           </view>
-          
+
           <view v-else>
             <!-- 逐行模式：不分组 -->
             <view class="color-grid">
-              <view 
+              <view
                 v-for="[color, count] in Array.from(displayedColors.entries())"
                 :key="color"
                 class="color-item"
                 :class="{
-                  'active': highlightColor === color,
-                  'completed': isColorCompleted(color) && highlightColor !== color
+                  active: highlightColor === color,
+                  completed:
+                    isColorCompleted(color) && highlightColor !== color,
                 }"
-                @click="setHighlightColor(highlightColor === color ? null : color)"
+                @click="
+                  setHighlightColor(highlightColor === color ? null : color)
+                "
               >
                 <view class="color-info">
-                  <view class="color-swatch" :style="{ backgroundColor: color }"></view>
+                  <view
+                    class="color-swatch"
+                    :style="{ backgroundColor: color }"
+                  ></view>
                   <text class="color-code">{{ getColorCode(color) }}</text>
                 </view>
-                
+
                 <view class="color-actions">
-                  <view 
+                  <view
                     class="check-btn"
-                    :class="{ 'checked': isColorCompleted(color) }"
+                    :class="{ checked: isColorCompleted(color) }"
                     @click.stop="toggleColorComplete(color)"
                   >
-                    <Icon name="check-item" v-if="isColorCompleted(color)" :size="28" color="#ffffff" />
+                    <Icon
+                      name="check-item"
+                      v-if="isColorCompleted(color)"
+                      :size="28"
+                      color="#ffffff"
+                    />
                     <view v-else class="check-box"></view>
                   </view>
                   <text class="color-count">×{{ count }}</text>
@@ -237,9 +297,9 @@
             </view>
           </view>
         </scroll-view>
-        
+
         <!-- 右侧字母索引条（仅颜色模式） -->
-        <view 
+        <view
           v-if="assistMode === 'color' && availableColorLetters.length > 1"
           class="index-bar"
           @touchstart="handleIndexTouchStart"
@@ -251,18 +311,21 @@
             :key="letter"
             :data-letter="letter"
             class="index-letter"
-            :class="{ 'active': currentVisibleLetter === letter }"
+            :class="{ active: currentVisibleLetter === letter }"
             @click="scrollToColorLetter(letter)"
           >
             {{ letter }}
           </view>
         </view>
-        
+
         <!-- 字母提示气泡 -->
-        <view 
+        <view
           v-if="showLetterBubble && currentTouchLetter"
           class="letter-bubble"
-          :style="{ left: bubblePosition.x + 'px', top: bubblePosition.y + 'px' }"
+          :style="{
+            left: bubblePosition.x + 'px',
+            top: bubblePosition.y + 'px',
+          }"
         >
           {{ currentTouchLetter }}
         </view>
@@ -273,26 +336,33 @@
         <view class="row-btn" @click="prevRow">
           <text class="row-icon">▲</text>
         </view>
-        
+
         <view class="row-info-container">
           <view class="row-list-btn" @click="isRowListOpen = true">
             <Icon name="column-3" :size="32" />
             <text class="list-label">列表</text>
           </view>
-          
+
           <view class="row-info">
             <text class="row-number">{{ currentRow + 1 }}</text>
             <text class="row-total">/ 64</text>
           </view>
-          
-          <view 
+
+          <view
             class="row-complete-btn"
-            :class="{ 'completed': completedRows.has(currentRow) }"
+            :class="{ completed: completedRows.has(currentRow) }"
             @click="toggleRowComplete"
           >
-            <Icon name="check-item" v-if="completedRows.has(currentRow)" :size="28" color="#ffffff" />
+            <Icon
+              name="check-item"
+              v-if="completedRows.has(currentRow)"
+              :size="28"
+              color="#ffffff"
+            />
             <view v-else class="complete-box"></view>
-            <text class="complete-text">{{ completedRows.has(currentRow) ? '完成' : '标记' }}</text>
+            <text class="complete-text">{{
+              completedRows.has(currentRow) ? "完成" : "标记"
+            }}</text>
           </view>
         </view>
 
@@ -303,13 +373,13 @@
     </view>
 
     <!-- HelpModal -->
-    <HelpModal 
+    <HelpModal
       :is-open="isHelpOpen"
       @close="isHelpOpen = false"
       title="拼豆操作指南"
       :items="helpItems"
     />
-    
+
     <!-- 连接弹窗 -->
     <ConnectModal
       :visible.sync="showConnectModal"
@@ -321,36 +391,29 @@
       @confirm="handleConnectConfirm"
       @cancel="handleConnectCancel"
     />
-    
+
     <!-- 自定义 Toast 组件 -->
     <Toast ref="toastRef" />
   </view>
 </template>
 
 <script>
-import { useProjectStore } from '../../store/project.js'
-import { useDeviceStore } from '../../store/device.js'
-import { useToast } from '../../composables/useToast.js'
-import { ARTKAL_COLORS_FULL } from '../../data/artkal-colors-full.js'
-import statusBarMixin from '../../mixins/statusBar.js'
-import PixelCanvas from '../../components/PixelCanvas.vue'
-import HelpModal from '../../components/HelpModal.vue'
-import ConnectModal from '../../components/ConnectModal.vue'
-import Toast from '../../components/Toast.vue'
-import Icon from "../../components/Icon.vue"
-
-
-
-
-
-
-
+import { useProjectStore } from "../../store/project.js";
+import { useDeviceStore } from "../../store/device.js";
+import { useToast } from "../../composables/useToast.js";
+import { ARTKAL_COLORS_FULL } from "../../data/artkal-colors-full.js";
+import statusBarMixin from "../../mixins/statusBar.js";
+import PixelCanvas from "../../components/PixelCanvas.vue";
+import HelpModal from "../../components/HelpModal.vue";
+import ConnectModal from "../../components/ConnectModal.vue";
+import Toast from "../../components/Toast.vue";
+import Icon from "../../components/Icon.vue";
 
 // 创建颜色查找映射
-const colorCodeMap = new Map()
-ARTKAL_COLORS_FULL.forEach(color => {
-  colorCodeMap.set(color.hex.toLowerCase(), color.code)
-})
+const colorCodeMap = new Map();
+ARTKAL_COLORS_FULL.forEach((color) => {
+  colorCodeMap.set(color.hex.toLowerCase(), color.code);
+});
 
 export default {
   mixins: [statusBarMixin],
@@ -359,7 +422,7 @@ export default {
     HelpModal,
     ConnectModal,
     Toast,
-    Icon
+    Icon,
   },
 
   data() {
@@ -367,817 +430,869 @@ export default {
       projectStore: null,
       deviceStore: null,
       toast: null,
-      projectId: '',
-      boardId: '',
+      projectId: "",
+      boardId: "",
       project: null,
-      
+
       // 数据
       pixels: new Map(),
       localPixels: new Map(),
-      
+
       // 模式
-      assistMode: 'color',
+      assistMode: "color",
       focusMode: true,
       currentRow: 0,
       highlightColor: null,
       lastSyncedRow: undefined,
-      
+
       // 进度
       completedRows: new Set(),
       completedColors: new Set(),
-      
+
       // 视图
       zoom: 7,
       pan: { x: 0, y: 0 },
-      
+
       // 容器
       canvasWidth: 0,
       canvasHeight: 0,
       canvasReady: false,
       isCalculated: false,
-      
+
       // UI
       isHelpOpen: false,
       isRowListOpen: false,
       showConnectModal: false,
-      scrollIntoView: '',
+      scrollIntoView: "",
       colorListScrollTop: -1,
-      currentVisibleLetter: '',
+      currentVisibleLetter: "",
       showLetterBubble: false,
-      currentTouchLetter: '',
+      currentTouchLetter: "",
       bubblePosition: { x: 0, y: 0 },
       isIndexTouching: false,
-      
+
       helpItems: [
-        { iconText: '', title: '颜色模式 (默认)', description: '查看当前板子用到的所有颜色。点击某个颜色，画布上对应位置会高亮闪烁，方便批量拼装同色豆子。' },
-        { iconText: '', title: '行导航', description: '点击行控制栏左侧的「列表」图标，可以查看所有行的完成状态，并快速跳转到指定行。' },
-        { iconText: '', title: '高亮辅助', description: '点击任意颜色块即可高亮显示。再次点击取消高亮。' },
-        { iconText: '', title: '画布操作', description: '双指捏合缩放画布，单指拖动查看细节。网格线会随缩放自动显示。' }
-      ]
-    }
+        {
+          iconName: "picture",
+          title: "颜色模式 (默认)",
+          description:
+            "查看当前板子用到的所有颜色。点击某个颜色，画布上对应位置会高亮闪烁，方便批量拼装同色豆子。",
+        },
+        {
+          iconName: "menu",
+          title: "行导航",
+          description:
+            "点击行控制栏左侧的「列表」图标，可以查看所有行的完成状态，并快速跳转到指定行。",
+        },
+        {
+          iconName: "prompt",
+          title: "高亮辅助",
+          description: "点击任意颜色块即可高亮显示。再次点击取消高亮。",
+        },
+        {
+          iconName: "move",
+          title: "画布操作",
+          description:
+            "双指捏合缩放画布，单指拖动查看细节。网格线会随缩放自动显示。",
+        },
+      ],
+    };
   },
 
   computed: {
     deviceConnected() {
-      return this.deviceStore?.connected || false
+      return this.deviceStore?.connected || false;
     },
-    
+
     boardX() {
-      const colIndex = parseInt(this.boardId.slice(1)) - 1
-      return colIndex * 64
+      const colIndex = parseInt(this.boardId.slice(1)) - 1;
+      return colIndex * 64;
     },
 
     boardY() {
-      const rowIndex = this.boardId.charCodeAt(0) - 65
-      return rowIndex * 64
+      const rowIndex = this.boardId.charCodeAt(0) - 65;
+      return rowIndex * 64;
     },
-    
+
     rowColorsMap() {
-      const map = new Map()
+      const map = new Map();
       this.localPixels.forEach((color, key) => {
-        const [, ly] = key.split(',').map(Number)
-        if (!map.has(ly)) map.set(ly, new Set())
-        map.get(ly).add(color)
-      })
-      return map
+        const [, ly] = key.split(",").map(Number);
+        if (!map.has(ly)) map.set(ly, new Set());
+        map.get(ly).add(color);
+      });
+      return map;
     },
-    
+
     colorRowsMap() {
-      const map = new Map()
+      const map = new Map();
       this.localPixels.forEach((color, key) => {
-        const [, ly] = key.split(',').map(Number)
-        if (!map.has(color)) map.set(color, new Set())
-        map.get(color).add(ly)
-      })
-      return map
+        const [, ly] = key.split(",").map(Number);
+        if (!map.has(color)) map.set(color, new Set());
+        map.get(color).add(ly);
+      });
+      return map;
     },
-    
+
     currentRowColors() {
-      const colors = new Map()
+      const colors = new Map();
       this.localPixels.forEach((color, key) => {
-        const [, ly] = key.split(',').map(Number)
+        const [, ly] = key.split(",").map(Number);
         if (ly === this.currentRow) {
-          colors.set(color, (colors.get(color) || 0) + 1)
+          colors.set(color, (colors.get(color) || 0) + 1);
         }
-      })
-      return colors
+      });
+      return colors;
     },
-    
+
     boardColors() {
-      const colors = new Map()
+      const colors = new Map();
       this.localPixels.forEach((color) => {
-        colors.set(color, (colors.get(color) || 0) + 1)
-      })
-      return colors
+        colors.set(color, (colors.get(color) || 0) + 1);
+      });
+      return colors;
     },
-    
+
     displayedColors() {
-      return this.assistMode === 'row' ? this.currentRowColors : this.boardColors
+      return this.assistMode === "row"
+        ? this.currentRowColors
+        : this.boardColors;
     },
-    
+
     // 按字母分组颜色（仅颜色模式）
     colorGroups() {
-      if (this.assistMode !== 'color') return []
-      
-      const groups = new Map()
-      
+      if (this.assistMode !== "color") return [];
+
+      const groups = new Map();
+
       // 将颜色按色号分组
       Array.from(this.displayedColors.entries()).forEach(([color, count]) => {
-        const code = this.getColorCode(color)
-        if (code && code !== '?') {
-          const letter = code.charAt(0).toUpperCase()
+        const code = this.getColorCode(color);
+        if (code && code !== "?") {
+          const letter = code.charAt(0).toUpperCase();
           if (!groups.has(letter)) {
-            groups.set(letter, [])
+            groups.set(letter, []);
           }
-          groups.get(letter).push([color, count])
+          groups.get(letter).push([color, count]);
         }
-      })
-      
+      });
+
       // 排序并转换为数组
       return Array.from(groups.entries())
         .sort((a, b) => a[0].localeCompare(b[0]))
         .map(([letter, colors]) => ({
           letter,
           colors: colors.sort((a, b) => {
-            const codeA = this.getColorCode(a[0])
-            const codeB = this.getColorCode(b[0])
-            return codeA.localeCompare(codeB)
-          })
-        }))
+            const codeA = this.getColorCode(a[0]);
+            const codeB = this.getColorCode(b[0]);
+            return codeA.localeCompare(codeB);
+          }),
+        }));
     },
-    
+
     // 可用的字母列表
     availableColorLetters() {
-      return this.colorGroups.map(g => g.letter)
-    }
+      return this.colorGroups.map((g) => g.letter);
+    },
   },
 
   watch: {
     // 弹窗关闭时重试 canvas 初始化（canvas-container 被 v-if 控制，弹窗打开时不在 DOM 中）
     isHelpOpen(newVal) {
       if (!newVal && !this.canvasReady) {
-        this.$nextTick(() => this.initCanvas())
+        this.$nextTick(() => this.initCanvas());
       }
     },
     isRowListOpen(newVal) {
       if (!newVal && !this.canvasReady) {
-        this.$nextTick(() => this.initCanvas())
+        this.$nextTick(() => this.initCanvas());
       }
     },
     showConnectModal(newVal) {
       if (!newVal && !this.canvasReady) {
-        this.$nextTick(() => this.initCanvas())
+        this.$nextTick(() => this.initCanvas());
       }
     },
     assistMode() {
-      this.highlightColor = null
-      this.saveProgress()
+      this.highlightColor = null;
+      this.saveProgress();
     },
     completedRows: {
       handler() {
-        this.saveProgress()
+        this.saveProgress();
       },
-      deep: true
+      deep: true,
     },
     completedColors: {
       handler() {
-        this.saveProgress()
+        this.saveProgress();
       },
-      deep: true
-    }
+      deep: true,
+    },
   },
 
   onLoad(options) {
-    this.projectStore = useProjectStore()
-    this.deviceStore = useDeviceStore()
-    this.toast = useToast()
-    
-    this.projectId = options.id
-    this.boardId = options.board
-    this.project = this.projectStore.getProject(this.projectId)
-    
+    this.projectStore = useProjectStore();
+    this.deviceStore = useDeviceStore();
+    this.toast = useToast();
+
+    this.projectId = options.id;
+    this.boardId = options.board;
+    this.project = this.projectStore.getProject(this.projectId);
+
     if (!this.project) {
-      this.toast.showError('项目不存在')
+      this.toast.showError("项目不存在");
       setTimeout(() => {
         uni.switchTab({
-          url: '/pages/workspace/workspace'
-        })
-      }, 1000)
-      return
+          url: "/pages/workspace/workspace",
+        });
+      }, 1000);
+      return;
     }
-    
+
     // 检查是否首次使用
-    const hasSeenHelp = uni.getStorageSync('hasSeenBoardHelp')
+    const hasSeenHelp = uni.getStorageSync("hasSeenBoardHelp");
     if (!hasSeenHelp) {
-      this.isHelpOpen = true
-      uni.setStorageSync('hasSeenBoardHelp', 'true')
+      this.isHelpOpen = true;
+      uni.setStorageSync("hasSeenBoardHelp", "true");
     }
-    
-    this.loadPixels()
-    this.loadProgress()
+
+    this.loadPixels();
+    this.loadProgress();
   },
 
   onReady() {
     if (this.$refs.toastRef) {
-      this.toast.setToastInstance(this.$refs.toastRef)
+      this.toast.setToastInstance(this.$refs.toastRef);
     }
-    this.initCanvas()
+    this.initCanvas();
   },
 
   onShow() {
     if (!this.canvasReady) {
-      this.initCanvas()
+      this.initCanvas();
     }
     if (this.deviceConnected && this.localPixels.size > 0) {
-      console.log('页面显示，确保画板模式并同步画布')
+      console.log("页面显示，确保画板模式并同步画布");
       setTimeout(async () => {
         try {
-          const ws = this.deviceStore.getWebSocket()
+          const ws = this.deviceStore.getWebSocket();
           if (ws) {
-            await ws.send({ cmd: 'set_mode', mode: 'canvas' })
-            await new Promise(resolve => setTimeout(resolve, 200))
-            await this.syncToDevice()
+            await ws.send({ cmd: "set_mode", mode: "canvas" });
+            await new Promise((resolve) => setTimeout(resolve, 200));
+            await this.syncToDevice();
           }
         } catch (err) {
-          console.error('切换模式或同步失败:', err)
+          console.error("切换模式或同步失败:", err);
         }
-      }, 300)
+      }, 300);
     }
   },
 
   onUnload() {
-    this.saveProgress()
+    this.saveProgress();
   },
 
   methods: {
     // Canvas 初始化（弹窗可能遮挡 canvas-container 导致首次查询失败，需重试）
     initCanvas() {
-      if (this.canvasReady) return
+      if (this.canvasReady) return;
       setTimeout(() => {
-        const query = uni.createSelectorQuery().in(this)
-        query.select('.canvas-container').boundingClientRect(data => {
-          if (data && data.width > 0 && data.height > 0) {
-            this.canvasWidth = data.width
-            this.canvasHeight = data.height
+        const query = uni.createSelectorQuery().in(this);
+        query
+          .select(".canvas-container")
+          .boundingClientRect((data) => {
+            if (data && data.width > 0 && data.height > 0) {
+              this.canvasWidth = data.width;
+              this.canvasHeight = data.height;
 
-            const fitZoomW = (data.width * 0.9) / 64
-            const fitZoomH = (data.height * 0.9) / 64
-            const fitZoom = Math.min(fitZoomW, fitZoomH, 50)
+              const fitZoomW = (data.width * 0.9) / 64;
+              const fitZoomH = (data.height * 0.9) / 64;
+              const fitZoom = Math.min(fitZoomW, fitZoomH, 50);
 
-            const boardPixelWidth = 64 * fitZoom
-            const boardPixelHeight = 64 * fitZoom
+              const boardPixelWidth = 64 * fitZoom;
+              const boardPixelHeight = 64 * fitZoom;
 
-            this.zoom = fitZoom
-            this.pan = {
-              x: (data.width - boardPixelWidth) / 2,
-              y: (data.height - boardPixelHeight) / 2
+              this.zoom = fitZoom;
+              this.pan = {
+                x: (data.width - boardPixelWidth) / 2,
+                y: (data.height - boardPixelHeight) / 2,
+              };
+
+              this.canvasReady = true;
+
+              setTimeout(() => {
+                this.isCalculated = true;
+              }, 10);
             }
-
-            this.canvasReady = true
-
-            setTimeout(() => {
-              this.isCalculated = true
-            }, 10)
-          }
-        }).exec()
-      }, 150)
+          })
+          .exec();
+      }, 150);
     },
 
     // ========== 设备同步方法 ==========
     toggleDeviceSync() {
       if (this.deviceConnected) {
         // 断开连接
-        this.deviceStore.disconnect()
-        this.toast.showInfo('设备已断开')
+        this.deviceStore.disconnect();
+        this.toast.showInfo("设备已断开");
       } else {
         // 显示连接弹窗
-        this.showConnectModal = true
+        this.showConnectModal = true;
       }
     },
-    
+
     async handleConnectConfirm(ip) {
       try {
-        const result = await this.deviceStore.connect(ip)
+        const result = await this.deviceStore.connect(ip);
         if (result.success) {
           // 连接成功后，ESP32 肯定是闹钟模式（断开连接后会回到闹钟模式）
           // 需要先切换到画板模式，再同步画布
           setTimeout(async () => {
             try {
-              const ws = this.deviceStore.getWebSocket()
+              const ws = this.deviceStore.getWebSocket();
               if (ws) {
-                console.log('切换到画板模式')
-                await ws.send({ cmd: 'set_mode', mode: 'canvas' })
+                console.log("切换到画板模式");
+                await ws.send({ cmd: "set_mode", mode: "canvas" });
                 // 等待模式切换完成
-                await new Promise(resolve => setTimeout(resolve, 200))
+                await new Promise((resolve) => setTimeout(resolve, 200));
                 // 同步画布
-                await this.syncToDevice()
+                await this.syncToDevice();
               }
             } catch (err) {
-              console.error('切换模式或同步失败:', err)
-              this.toast.showError('同步失败')
+              console.error("切换模式或同步失败:", err);
+              this.toast.showError("同步失败");
             }
-          }, 500)
-          
-          this.$refs.connectModal.onSuccess()
-          this.toast.showSuccess('设备已连接')
+          }, 500);
+
+          this.$refs.connectModal.onSuccess();
+          this.toast.showSuccess("设备已连接");
         } else {
-          this.$refs.connectModal.onError('连接失败，请检查 IP 地址')
+          this.$refs.connectModal.onError("连接失败，请检查 IP 地址");
         }
       } catch (err) {
-        console.error('连接失败:', err)
-        this.$refs.connectModal.onError('连接失败，请检查 IP 地址')
+        console.error("连接失败:", err);
+        this.$refs.connectModal.onError("连接失败，请检查 IP 地址");
       }
     },
-    
+
     handleConnectCancel() {
       // 取消连接
     },
-    
+
     // 同步画布到设备（根据当前模式）
     async syncToDevice() {
       if (!this.deviceConnected) {
-        console.log('设备未连接，跳过同步')
-        return
+        console.log("设备未连接，跳过同步");
+        return;
       }
-      
+
       // 检查是否有像素数据
       if (this.localPixels.size === 0) {
-        console.log('没有像素数据，跳过同步')
-        return
+        console.log("没有像素数据，跳过同步");
+        return;
       }
-      
+
       try {
-        console.log('开始同步画布到设备，模式:', this.assistMode)
-        
+        console.log("开始同步画布到设备，模式:", this.assistMode);
+
         // hex 转 RGB 的辅助函数
         const hexToRgb = (hex) => {
-          const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex)
-          return result ? {
-            r: parseInt(result[1], 16),
-            g: parseInt(result[2], 16),
-            b: parseInt(result[3], 16)
-          } : { r: 0, g: 0, b: 0 }
-        }
-        
+          const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+          return result
+            ? {
+                r: parseInt(result[1], 16),
+                g: parseInt(result[2], 16),
+                b: parseInt(result[3], 16),
+              }
+            : { r: 0, g: 0, b: 0 };
+        };
+
         // 只发送 localPixels 中有的像素（稀疏格式）
-        const sparsePixels = []
-        
+        const sparsePixels = [];
+
         this.localPixels.forEach((hexColor, key) => {
-          const [x, y] = key.split(',').map(Number)
-          
+          const [x, y] = key.split(",").map(Number);
+
           // 用 hex 查找颜色对象
-          const colorObj = ARTKAL_COLORS_FULL.find(c => c.hex.toLowerCase() === hexColor.toLowerCase())
-          
+          const colorObj = ARTKAL_COLORS_FULL.find(
+            (c) => c.hex.toLowerCase() === hexColor.toLowerCase(),
+          );
+
           if (colorObj) {
             // 将 hex 转换为 RGB
-            const rgb = hexToRgb(colorObj.hex)
-            let r = rgb.r
-            let g = rgb.g
-            let b = rgb.b
-            
+            const rgb = hexToRgb(colorObj.hex);
+            let r = rgb.r;
+            let g = rgb.g;
+            let b = rgb.b;
+
             // 逐行模式：当前行高亮，其他行降低亮度
-            if (this.assistMode === 'row' && y !== this.currentRow) {
-              r = Math.floor(r * 0.2)
-              g = Math.floor(g * 0.2)
-              b = Math.floor(b * 0.2)
+            if (this.assistMode === "row" && y !== this.currentRow) {
+              r = Math.floor(r * 0.2);
+              g = Math.floor(g * 0.2);
+              b = Math.floor(b * 0.2);
             }
             // 颜色模式：如果有高亮颜色，非高亮颜色降低亮度
-            else if (this.assistMode === 'color' && this.highlightColor && hexColor.toLowerCase() !== this.highlightColor.toLowerCase()) {
-              r = Math.floor(r * 0.2)
-              g = Math.floor(g * 0.2)
-              b = Math.floor(b * 0.2)
+            else if (
+              this.assistMode === "color" &&
+              this.highlightColor &&
+              hexColor.toLowerCase() !== this.highlightColor.toLowerCase()
+            ) {
+              r = Math.floor(r * 0.2);
+              g = Math.floor(g * 0.2);
+              b = Math.floor(b * 0.2);
             }
-            
-            sparsePixels.push(x, y, r, g, b)
+
+            sparsePixels.push(x, y, r, g, b);
           }
-        })
-        
-        console.log(`准备发送 ${sparsePixels.length / 5} 个有效像素（稀疏格式）`)
-        
-        await this.deviceStore.sendSparseImage(sparsePixels)
-        console.log('画布同步成功')
+        });
+
+        console.log(
+          `准备发送 ${sparsePixels.length / 5} 个有效像素（稀疏格式）`,
+        );
+
+        await this.deviceStore.sendSparseImage(sparsePixels);
+        console.log("画布同步成功");
       } catch (err) {
-        console.error('同步到设备失败:', err)
-        this.toast.showError('同步失败')
+        console.error("同步到设备失败:", err);
+        this.toast.showError("同步失败");
       }
     },
-    
+
     // 快速更新行亮度（仅逐行模式）
     async updateRowBrightness() {
       if (!this.deviceConnected) {
-        console.log('设备未连接，跳过行亮度更新')
-        return
+        console.log("设备未连接，跳过行亮度更新");
+        return;
       }
-      
-      if (this.assistMode !== 'row') {
-        console.log('不在逐行模式，跳过行亮度更新')
-        return
+
+      if (this.assistMode !== "row") {
+        console.log("不在逐行模式，跳过行亮度更新");
+        return;
       }
-      
+
       try {
-        const ws = this.deviceStore.getWebSocket()
+        const ws = this.deviceStore.getWebSocket();
         if (!ws) {
-          console.error('WebSocket 未初始化')
-          return
+          console.error("WebSocket 未初始化");
+          return;
         }
-        
-        console.log('发送高亮行命令:', this.currentRow)
-        
+
+        console.log("发送高亮行命令:", this.currentRow);
+
         // 使用 highlight_row 命令
         await ws.send({
-          cmd: 'highlight_row',
-          row: this.currentRow
-        })
-        
+          cmd: "highlight_row",
+          row: this.currentRow,
+        });
+
         // 记录当前同步的行
-        this.lastSyncedRow = this.currentRow
+        this.lastSyncedRow = this.currentRow;
       } catch (err) {
-        console.error('更新行亮度失败:', err)
+        console.error("更新行亮度失败:", err);
         // 任何错误都尝试完整同步（可能是画布未初始化）
-        console.log('回退到完整同步')
-        await this.syncToDevice()
+        console.log("回退到完整同步");
+        await this.syncToDevice();
       }
     },
-    
+
     // 快速更新高亮颜色亮度（仅颜色模式）
     async updateHighlightBrightness(previousColor, newColor) {
       if (!this.deviceConnected) {
-        console.log('设备未连接，跳过高亮更新')
-        return
+        console.log("设备未连接，跳过高亮更新");
+        return;
       }
-      
-      if (this.assistMode !== 'color') {
-        console.log('不在颜色模式，跳过高亮更新')
-        return
+
+      if (this.assistMode !== "color") {
+        console.log("不在颜色模式，跳过高亮更新");
+        return;
       }
-      
+
       try {
-        const ws = this.deviceStore.getWebSocket()
+        const ws = this.deviceStore.getWebSocket();
         if (!ws) {
-          console.error('WebSocket 未初始化')
-          return
+          console.error("WebSocket 未初始化");
+          return;
         }
-        
+
         // hex 转 RGB 的辅助函数
         const hexToRgb = (hex) => {
-          const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex)
-          return result ? {
-            r: parseInt(result[1], 16),
-            g: parseInt(result[2], 16),
-            b: parseInt(result[3], 16)
-          } : null
-        }
-        
+          const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+          return result
+            ? {
+                r: parseInt(result[1], 16),
+                g: parseInt(result[2], 16),
+                b: parseInt(result[3], 16),
+              }
+            : null;
+        };
+
         // 如果有新颜色，发送高亮命令
         if (newColor) {
-          const colorObj = ARTKAL_COLORS_FULL.find(c => c.hex.toLowerCase() === newColor.toLowerCase())
+          const colorObj = ARTKAL_COLORS_FULL.find(
+            (c) => c.hex.toLowerCase() === newColor.toLowerCase(),
+          );
           if (colorObj) {
-            const rgb = hexToRgb(colorObj.hex)
+            const rgb = hexToRgb(colorObj.hex);
             if (rgb) {
-              console.log('发送高亮颜色命令:', colorObj.code, rgb)
+              console.log("发送高亮颜色命令:", colorObj.code, rgb);
               await ws.send({
-                cmd: 'highlight_color',
-                color: rgb
-              })
+                cmd: "highlight_color",
+                color: rgb,
+              });
             }
           }
         } else {
           // 取消高亮
-          console.log('发送取消高亮命令')
+          console.log("发送取消高亮命令");
           await ws.send({
-            cmd: 'highlight_color',
-            color: null
-          })
+            cmd: "highlight_color",
+            color: null,
+          });
         }
       } catch (err) {
-        console.error('更新高亮亮度失败:', err)
+        console.error("更新高亮亮度失败:", err);
         // 任何错误都尝试完整同步（可能是画布未初始化）
-        console.log('回退到完整同步')
-        await this.syncToDevice()
+        console.log("回退到完整同步");
+        await this.syncToDevice();
       }
     },
-    
+
     // ========== 原有方法 ==========
     handlePan(dx, dy) {
-      this.pan = { x: this.pan.x + dx, y: this.pan.y + dy }
+      this.pan = { x: this.pan.x + dx, y: this.pan.y + dy };
     },
 
     handlePinchZoom(delta, centerX, centerY) {
-      const newZoom = Math.max(1, Math.min(50, this.zoom + delta))
-      const scaleFactor = newZoom / this.zoom
+      const newZoom = Math.max(1, Math.min(50, this.zoom + delta));
+      const scaleFactor = newZoom / this.zoom;
 
       this.pan = {
         x: centerX - (centerX - this.pan.x) * scaleFactor,
-        y: centerY - (centerY - this.pan.y) * scaleFactor
-      }
-      this.zoom = newZoom
+        y: centerY - (centerY - this.pan.y) * scaleFactor,
+      };
+      this.zoom = newZoom;
     },
 
     handleFit() {
       if (this.canvasWidth > 0 && this.canvasHeight > 0) {
-        const maxW = this.canvasWidth - 26
-        const maxH = this.canvasHeight - 26
-        
-        const zoomW = maxW / 64
-        const zoomH = maxH / 64
+        const maxW = this.canvasWidth - 26;
+        const maxH = this.canvasHeight - 26;
 
-        const newZoom = Math.max(1, Math.min(zoomW, zoomH, 10))
-        this.zoom = newZoom
+        const zoomW = maxW / 64;
+        const zoomH = maxH / 64;
 
-        const contentW = 64 * newZoom
-        const contentH = 64 * newZoom
+        const newZoom = Math.max(1, Math.min(zoomW, zoomH, 10));
+        this.zoom = newZoom;
+
+        const contentW = 64 * newZoom;
+        const contentH = 64 * newZoom;
         this.pan = {
           x: (this.canvasWidth - contentW) / 2,
-          y: (this.canvasHeight - contentH) / 2
-        }
+          y: (this.canvasHeight - contentH) / 2,
+        };
       }
     },
-    
+
     loadPixels() {
-      this.pixels = this.projectStore.getProjectPixels(this.projectId)
-      
+      this.pixels = this.projectStore.getProjectPixels(this.projectId);
+
       // 提取当前画布的像素
-      const local = new Map()
+      const local = new Map();
       this.pixels.forEach((color, key) => {
-        const [px, py] = key.split(',').map(Number)
-        if (px >= this.boardX && px < this.boardX + 64 &&
-            py >= this.boardY && py < this.boardY + 64) {
-          local.set(`${px - this.boardX},${py - this.boardY}`, color)
+        const [px, py] = key.split(",").map(Number);
+        if (
+          px >= this.boardX &&
+          px < this.boardX + 64 &&
+          py >= this.boardY &&
+          py < this.boardY + 64
+        ) {
+          local.set(`${px - this.boardX},${py - this.boardY}`, color);
         }
-      })
-      this.localPixels = local
+      });
+      this.localPixels = local;
     },
 
     loadProgress() {
-      const progress = this.projectStore.getBoardProgress(this.projectId, this.boardId)
+      const progress = this.projectStore.getBoardProgress(
+        this.projectId,
+        this.boardId,
+      );
       if (progress) {
-        this.completedRows = new Set(progress.completedRows || [])
-        this.completedColors = new Set(progress.completedColors || [])
+        this.completedRows = new Set(progress.completedRows || []);
+        this.completedColors = new Set(progress.completedColors || []);
         if (progress.lastMode) {
-          this.assistMode = progress.lastMode
+          this.assistMode = progress.lastMode;
         }
       }
     },
 
     saveProgress() {
-      const pixelProgress = this.calculatePixelProgress()
-      const rowProgress = this.completedRows.size / 64
-      const completion = Math.max(pixelProgress, rowProgress)
-      
+      const pixelProgress = this.calculatePixelProgress();
+      const rowProgress = this.completedRows.size / 64;
+      const completion = Math.max(pixelProgress, rowProgress);
+
       const progress = {
         boardId: this.boardId,
         completion,
         lastMode: this.assistMode,
         completedRows: Array.from(this.completedRows),
-        completedColors: Array.from(this.completedColors)
-      }
-      
-      this.projectStore.saveBoardProgress(this.projectId, this.boardId, progress)
-      this.projectStore.updateProjectProgress(this.projectId)
+        completedColors: Array.from(this.completedColors),
+      };
+
+      this.projectStore.saveBoardProgress(
+        this.projectId,
+        this.boardId,
+        progress,
+      );
+      this.projectStore.updateProjectProgress(this.projectId);
     },
 
     calculatePixelProgress() {
-      if (this.localPixels.size === 0) return 0
-      let completedPixels = 0
+      if (this.localPixels.size === 0) return 0;
+      let completedPixels = 0;
       this.localPixels.forEach((color, key) => {
-        const [, ly] = key.split(',').map(Number)
+        const [, ly] = key.split(",").map(Number);
         if (this.completedColors.has(`${ly}:${color}`)) {
-          completedPixels++
+          completedPixels++;
         }
-      })
-      return completedPixels / this.localPixels.size
+      });
+      return completedPixels / this.localPixels.size;
     },
 
     getColorCode(hex) {
-      const code = colorCodeMap.get(hex.toLowerCase())
-      return code || '?'
+      const code = colorCodeMap.get(hex.toLowerCase());
+      return code || "?";
     },
 
     setHighlightColor(color) {
-      const previousColor = this.highlightColor
-      this.highlightColor = color
-      
+      const previousColor = this.highlightColor;
+      this.highlightColor = color;
+
       // 如果设备已连接，智能更新
       if (this.deviceConnected) {
         // 颜色模式：使用 highlight_color 命令
-        if (this.assistMode === 'color') {
-          this.updateHighlightBrightness(previousColor, color)
+        if (this.assistMode === "color") {
+          this.updateHighlightBrightness(previousColor, color);
         } else {
           // 逐行模式：完整同步
-          this.syncToDevice()
+          this.syncToDevice();
         }
       }
     },
-    
+
     setAssistMode(mode) {
       if (this.assistMode !== mode) {
-        const oldMode = this.assistMode
-        this.assistMode = mode
-        this.highlightColor = null
-        
+        const oldMode = this.assistMode;
+        this.assistMode = mode;
+        this.highlightColor = null;
+
         // 切换模式后智能更新设备
         if (this.deviceConnected) {
-          if (mode === 'row') {
+          if (mode === "row") {
             // 切换到逐行模式：使用 highlight_row 命令
-            this.updateRowBrightness()
-          } else if (mode === 'color') {
+            this.updateRowBrightness();
+          } else if (mode === "color") {
             // 切换到颜色模式：取消高亮
-            this.updateHighlightBrightness(null, null)
+            this.updateHighlightBrightness(null, null);
           }
         }
       }
     },
 
     isColorCompleted(color) {
-      if (this.assistMode === 'row') {
-        return this.completedColors.has(`${this.currentRow}:${color}`)
+      if (this.assistMode === "row") {
+        return this.completedColors.has(`${this.currentRow}:${color}`);
       } else {
-        const rows = this.colorRowsMap.get(color)
-        if (!rows || rows.size === 0) return false
+        const rows = this.colorRowsMap.get(color);
+        if (!rows || rows.size === 0) return false;
         for (const r of rows) {
-          if (!this.completedColors.has(`${r}:${color}`)) return false
+          if (!this.completedColors.has(`${r}:${color}`)) return false;
         }
-        return true
+        return true;
       }
     },
 
     toggleColorComplete(color) {
-      const newSet = new Set(this.completedColors)
+      const newSet = new Set(this.completedColors);
 
-      if (this.assistMode === 'row') {
-        const key = `${this.currentRow}:${color}`
+      if (this.assistMode === "row") {
+        const key = `${this.currentRow}:${color}`;
         if (newSet.has(key)) {
-          newSet.delete(key)
+          newSet.delete(key);
         } else {
-          newSet.add(key)
+          newSet.add(key);
         }
       } else {
-        const rows = this.colorRowsMap.get(color)
-        if (!rows || rows.size === 0) return
-        
-        let allChecked = true
+        const rows = this.colorRowsMap.get(color);
+        if (!rows || rows.size === 0) return;
+
+        let allChecked = true;
         for (const r of rows) {
           if (!newSet.has(`${r}:${color}`)) {
-            allChecked = false
-            break
+            allChecked = false;
+            break;
           }
         }
 
         if (allChecked) {
           for (const r of rows) {
-            newSet.delete(`${r}:${color}`)
+            newSet.delete(`${r}:${color}`);
           }
         } else {
           for (const r of rows) {
-            newSet.add(`${r}:${color}`)
+            newSet.add(`${r}:${color}`);
           }
         }
       }
 
-      this.completedColors = newSet
+      this.completedColors = newSet;
     },
 
     toggleRowComplete() {
-      const newSet = new Set(this.completedRows)
-      const newColorSet = new Set(this.completedColors)
-      const isCompleting = !newSet.has(this.currentRow)
+      const newSet = new Set(this.completedRows);
+      const newColorSet = new Set(this.completedColors);
+      const isCompleting = !newSet.has(this.currentRow);
 
       if (isCompleting) {
-        newSet.add(this.currentRow)
-        const rowColors = this.rowColorsMap.get(this.currentRow)
+        newSet.add(this.currentRow);
+        const rowColors = this.rowColorsMap.get(this.currentRow);
         if (rowColors) {
-          rowColors.forEach(c => newColorSet.add(`${this.currentRow}:${c}`))
+          rowColors.forEach((c) => newColorSet.add(`${this.currentRow}:${c}`));
         }
       } else {
-        newSet.delete(this.currentRow)
-        const rowColors = this.rowColorsMap.get(this.currentRow)
+        newSet.delete(this.currentRow);
+        const rowColors = this.rowColorsMap.get(this.currentRow);
         if (rowColors) {
-          rowColors.forEach(c => newColorSet.delete(`${this.currentRow}:${c}`))
+          rowColors.forEach((c) =>
+            newColorSet.delete(`${this.currentRow}:${c}`),
+          );
         }
       }
-      
-      this.completedRows = newSet
-      this.completedColors = newColorSet
+
+      this.completedRows = newSet;
+      this.completedColors = newColorSet;
 
       // 同步板子亮度（逐行模式下已完成的行变暗）
-      if (this.deviceConnected && this.assistMode === 'row') {
-        this.syncToDevice()
+      if (this.deviceConnected && this.assistMode === "row") {
+        this.syncToDevice();
       }
     },
 
     prevRow() {
       if (this.currentRow > 0) {
-        this.currentRow--
+        this.currentRow--;
         // 逐行模式下，使用快速更新
-        if (this.deviceConnected && this.assistMode === 'row') {
-          this.updateRowBrightness()
+        if (this.deviceConnected && this.assistMode === "row") {
+          this.updateRowBrightness();
         }
       }
     },
 
     nextRow() {
       if (this.currentRow < 51) {
-        this.currentRow++
+        this.currentRow++;
         // 逐行模式下，使用快速更新
-        if (this.deviceConnected && this.assistMode === 'row') {
-          this.updateRowBrightness()
+        if (this.deviceConnected && this.assistMode === "row") {
+          this.updateRowBrightness();
         }
       }
     },
-    
+
     handleRowListSelect(row) {
-      this.currentRow = row
-      this.isRowListOpen = false
+      this.currentRow = row;
+      this.isRowListOpen = false;
       // 逐行模式下，使用快速更新
-      if (this.deviceConnected && this.assistMode === 'row') {
-        this.updateRowBrightness()
+      if (this.deviceConnected && this.assistMode === "row") {
+        this.updateRowBrightness();
       }
     },
 
     // 字母索引相关方法
     scrollToColorLetter(letter) {
-      this.currentVisibleLetter = letter
-      
+      this.currentVisibleLetter = letter;
+
       // 如果是A，直接滚到顶部
-      if (letter === 'A') {
+      if (letter === "A") {
         // 先清空 scrollIntoView，然后设置 scrollTop 为 0
-        this.scrollIntoView = ''
+        this.scrollIntoView = "";
         this.$nextTick(() => {
-          this.colorListScrollTop = 0
-        })
+          this.colorListScrollTop = 0;
+        });
       } else {
         // 其他字母使用 scroll-into-view
-        this.colorListScrollTop = -1 // 重置 scrollTop，让 scroll-into-view 生效
+        this.colorListScrollTop = -1; // 重置 scrollTop，让 scroll-into-view 生效
         this.$nextTick(() => {
-          this.scrollIntoView = 'letter-' + letter
-        })
+          this.scrollIntoView = "letter-" + letter;
+        });
       }
     },
-    
+
     handleColorScroll(e) {
       // 更新当前可见字母（简化版，uni-app 中较难实现精确的滚动监听）
       // 可以根据需要进一步优化
     },
-    
+
     handleIndexTouchStart(e) {
-      this.isIndexTouching = true
-      this.showLetterBubble = true
-      
-      const touch = e.touches[0]
-      this.handleIndexTouch(touch)
+      this.isIndexTouching = true;
+      this.showLetterBubble = true;
+
+      const touch = e.touches[0];
+      this.handleIndexTouch(touch);
     },
-    
+
     handleIndexTouchMove(e) {
-      if (!this.isIndexTouching) return
-      
-      const touch = e.touches[0]
-      this.handleIndexTouch(touch)
+      if (!this.isIndexTouching) return;
+
+      const touch = e.touches[0];
+      this.handleIndexTouch(touch);
     },
-    
+
     handleIndexTouchEnd() {
-      this.isIndexTouching = false
-      this.showLetterBubble = false
-      this.currentTouchLetter = ''
+      this.isIndexTouching = false;
+      this.showLetterBubble = false;
+      this.currentTouchLetter = "";
     },
-    
+
     handleIndexTouch(touch) {
-      const letters = this.availableColorLetters
-      if (letters.length === 0) return
-      
+      const letters = this.availableColorLetters;
+      if (letters.length === 0) return;
+
       // 获取索引条的位置信息
-      const query = uni.createSelectorQuery().in(this)
-      query.select('.index-bar').boundingClientRect((rect) => {
-        if (!rect) return
-        
-        // 计算相对位置
-        const relativeY = touch.pageY - rect.top
-        const itemHeight = rect.height / letters.length
-        const index = Math.max(0, Math.min(Math.floor(relativeY / itemHeight), letters.length - 1))
-        
-        const letter = letters[index]
-        
-        // 更新气泡位置和字母
-        this.bubblePosition = { x: touch.pageX - 64, y: touch.pageY }
-        
-        // 只有当字母改变时才滚动
-        if (letter !== this.currentTouchLetter) {
-          this.currentTouchLetter = letter
-          this.scrollToColorLetter(letter)
-        }
-      }).exec()
+      const query = uni.createSelectorQuery().in(this);
+      query
+        .select(".index-bar")
+        .boundingClientRect((rect) => {
+          if (!rect) return;
+
+          // 计算相对位置
+          const relativeY = touch.pageY - rect.top;
+          const itemHeight = rect.height / letters.length;
+          const index = Math.max(
+            0,
+            Math.min(Math.floor(relativeY / itemHeight), letters.length - 1),
+          );
+
+          const letter = letters[index];
+
+          // 更新气泡位置和字母
+          this.bubblePosition = { x: touch.pageX - 64, y: touch.pageY };
+
+          // 只有当字母改变时才滚动
+          if (letter !== this.currentTouchLetter) {
+            this.currentTouchLetter = letter;
+            this.scrollToColorLetter(letter);
+          }
+        })
+        .exec();
     },
 
     goToOverview() {
-      this.saveProgress()
-      uni.navigateBack()
+      this.saveProgress();
+      uni.navigateBack();
     },
-
-    goBack() {
-      this.saveProgress()
-      uni.navigateBack()
-    }
-  }
-}
+  },
+};
 </script>
 
 <style scoped>
@@ -1341,15 +1456,50 @@ export default {
   color: var(--text-secondary);
 }
 
+.navbar {
+  height: 88rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 32rpx;
+  background-color: var(--color-card-background);
+  border-bottom: 2rpx solid var(--border-primary);
+  position: relative;
+}
+
+.nav-left {
+  position: absolute;
+  left: 32rpx;
+  width: 80rpx;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.nav-right {
+  position: absolute;
+  right: 32rpx;
+  width: 80rpx;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.nav-title {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
 /* 头部 */
 .header {
-  height: 112rpx;
+  height: 88rpx;
   display: flex;
   align-items: center;
   padding: 0 30rpx;
   border-bottom: 2rpx solid var(--border-primary);
   background-color: var(--bg-elevated);
   z-index: 20;
+  display: none;
 }
 
 .header-left {
@@ -1447,7 +1597,7 @@ export default {
   box-shadow: 0 0 8rpx rgba(0, 243, 255, 0.3);
 }
 
-.cont-color-dot{
+.cont-color-dot {
   width: 28rpx;
   height: 28rpx;
   border-radius: 50%;
@@ -1547,8 +1697,13 @@ export default {
 }
 
 @keyframes pulse-glow {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.6; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
 }
 
 .color-list {
@@ -1894,6 +2049,4 @@ export default {
 .row-complete-btn.completed .complete-text {
   color: var(--text-inverse);
 }
-
 </style>
-

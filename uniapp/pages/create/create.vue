@@ -4,36 +4,33 @@
     <!-- #ifdef MP-WEIXIN -->
     <view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
     <!-- #endif -->
-    
+
     <!-- 顶部栏 -->
-    <view class="header">
+    <view class="navbar">
       <view class="header-content">
-        <view class="back-btn" @click="handleBack">
-          <text class="back-icon">‹</text>
+        <view class="nav-left" @click="handleBack">
+          <Icon
+            name="direction-left"
+            :size="32"
+            color="var(--color-text-primary)"
+          />
         </view>
-        <text class="header-title">新建画布</text>
+        <text class="nav-title">新建画布</text>
       </view>
     </view>
 
     <!-- 创建向导 -->
     <view class="wizard-container">
       <!-- 步骤 0: 名称 -->
-      <scroll-view 
-        v-if="step === 0"
-        scroll-y 
-        class="content-area"
-      >
-        <view 
-          class="step-content step-name"
-          :class="stepAnimationClass"
-        >
+      <scroll-view v-if="step === 0" scroll-y class="content-area">
+        <view class="step-content step-name" :class="stepAnimationClass">
           <view class="input-group">
             <text class="input-label">画布名称</text>
-            <view 
+            <view
               class="name-input-wrapper"
-              :class="{ 'focused': isNameFocused }"
+              :class="{ focused: isNameFocused }"
             >
-              <input 
+              <input
                 v-model="name"
                 type="text"
                 class="name-input"
@@ -45,19 +42,23 @@
               />
             </view>
           </view>
-          
+
           <view class="step-hint">
-            <text class="hint-text">为您的创作赋予独特的身份。这将帮助您稍后在画布库中找到它。</text>
+            <text class="hint-text"
+              >为您的创作赋予独特的身份。这将帮助您稍后在画布库中找到它。</text
+            >
           </view>
         </view>
       </scroll-view>
       <!-- 步骤 1: 尺寸选择（仅新建画布模式） 或 步骤 1:图片上传 尺寸选择（导入图片模式） -->
-      <scroll-view 
-        v-if="(step === 1 && mode === 'blank') || (step === 1 && mode === 'image')"
-        scroll-y 
+      <scroll-view
+        v-if="
+          (step === 1 && mode === 'blank') || (step === 1 && mode === 'image')
+        "
+        scroll-y
         class="content-area"
       >
-      <view 
+        <view
           class="step-content step-image"
           :class="stepAnimationClass"
           v-if="step === 1 && mode === 'image'"
@@ -71,7 +72,7 @@
               <text class="upload-text">点击上传图片</text>
               <text class="upload-hint">支持 JPG, PNG</text>
             </view>
-            
+
             <view v-else class="preview-area">
               <image :src="previewUrl" mode="aspectFit" class="preview-image" />
               <view class="preview-actions">
@@ -84,33 +85,52 @@
               </view>
             </view>
           </view>
+
+          <!-- 推荐尺寸提示 -->
+          <view
+            v-if="recommendedSize && mode === 'image'"
+            class="recommend-tip"
+            @click="applyRecommendedSize"
+          >
+            <text class="recommend-text"
+              ><Icon name="prompt" :size="24" color="var(--accent-color)" />
+              检测到内容尺寸，推荐 {{ recommendedSize.width }}×{{
+                recommendedSize.height
+              }}</text
+            >
+            <text class="recommend-btn-text">点击应用</text>
+          </view>
         </view>
-        <view 
-          class="step-content step-size"
-          :class="stepAnimationClass"
-        >
+        <view class="step-content step-size" :class="stepAnimationClass">
           <!-- 尺寸选择 -->
           <view class="size-section">
             <view class="size-header">
               <Icon name="3column" :size="32" />
-              <text class="size-title">{{ mode === 'image' ? '目标尺寸 (像素化)' : '画布尺寸' }}</text>
+              <text class="size-title">{{
+                mode === "image" ? "目标尺寸 (像素化)" : "画布尺寸"
+              }}</text>
             </view>
-            
+
             <view class="size-grid">
               <!-- 自定义尺寸输入 -->
               <view class="size-column full-width">
                 <view class="size-column-header">
                   <text class="size-label">自定义尺寸</text>
-                  <view v-if="customWidth > 0 && customHeight > 0" class="size-preview-inline">
-                    <text class="size-preview-value">{{ customWidth }}×{{ customHeight }}</text>
+                  <view
+                    v-if="customWidth > 0 && customHeight > 0"
+                    class="size-preview-inline"
+                  >
+                    <text class="size-preview-value"
+                      >{{ customWidth }}×{{ customHeight }}</text
+                    >
                   </view>
                   <text v-else class="size-hint">最大640×640像素</text>
                 </view>
-                
+
                 <view class="custom-size-inputs">
                   <view class="size-input-group">
                     <text class="size-input-label">宽度</text>
-                    <input 
+                    <input
                       v-model.number="customWidth"
                       type="number"
                       class="size-input"
@@ -121,7 +141,7 @@
                   <text class="size-separator">×</text>
                   <view class="size-input-group">
                     <text class="size-input-label">高度</text>
-                    <input 
+                    <input
                       v-model.number="customHeight"
                       type="number"
                       class="size-input"
@@ -131,264 +151,317 @@
                   </view>
                 </view>
               </view>
-              
+
               <!-- 快捷尺寸选择 -->
               <view class="size-column full-width">
                 <view class="size-column-header">
-                  <text class="size-label">快捷尺寸 (正方形)</text>
-                  <text class="size-hint">64的倍数标准尺寸</text>
+                  <text class="size-label">{{
+                    contentRatio
+                      ? `快捷尺寸 (${contentRatio.w}:${contentRatio.h})`
+                      : "快捷尺寸 (正方形)"
+                  }}</text>
+                  <text class="size-hint">{{
+                    contentRatio ? "按图片内容比例" : "64的倍数标准尺寸"
+                  }}</text>
                 </view>
-                
+
                 <view class="size-options">
-                  <view 
+                  <view
                     v-for="preset in sizePresets"
                     :key="`preset-${preset.width}-${preset.height}`"
                     class="size-option"
-                    :class="{ 'active': customWidth === preset.width && customHeight === preset.height }"
+                    :class="{
+                      active:
+                        customWidth === preset.width &&
+                        customHeight === preset.height,
+                    }"
                     @click="selectPresetSize(preset.width, preset.height)"
                   >
-                    <text class="size-option-text">{{ preset.width }}×{{ preset.height }}</text>
+                    <text class="size-option-text"
+                      >{{ preset.width }}×{{ preset.height }}</text
+                    >
                   </view>
                 </view>
               </view>
             </view>
           </view>
-          
+
           <!-- 统计信息 -->
           <view v-if="customWidth > 0 && customHeight > 0" class="stats-card">
             <view class="stat-row">
               <text class="stat-label">板子布局</text>
-              <text class="stat-value">{{ boardsX }}×{{ boardsY }} ({{ totalBoards }}块)</text>
+              <text class="stat-value"
+                >{{ boardsX }}×{{ boardsY }} ({{ totalBoards }}块)</text
+              >
             </view>
             <view class="stat-row">
               <text class="stat-label">总像素数</text>
-              <text class="stat-value">{{ (customWidth * customHeight).toLocaleString() }}</text>
+              <text class="stat-value">{{
+                (customWidth * customHeight).toLocaleString()
+              }}</text>
             </view>
           </view>
         </view>
       </scroll-view>
-      
+
       <!-- 步骤 2: 颜色选择（新建画布模式） 或 步骤 3: 颜色选择（导入图片模式） -->
-      <scroll-view 
-        v-if="(step === 2 && mode === 'blank') || (step === 2 && mode === 'image')"
-        scroll-y 
+      <scroll-view
+        v-if="
+          (step === 2 && mode === 'blank') || (step === 2 && mode === 'image')
+        "
+        scroll-y
         class="content-area"
       >
-        <view 
-          class="step-content step-colors"
-          :class="stepAnimationClass"
-        >
+        <view class="step-content step-colors" :class="stepAnimationClass">
           <view class="colors-header">
-          <Icon name="picture" :size="32" />
-          <text class="colors-title">选择 Artkal 拼豆套装</text>
-        </view>
-        
-        <view class="preset-grid">
-          <view 
-            v-for="preset in presets"
-            :key="preset.key"
-            class="preset-card"
-            :class="{ 'active': selectedPreset === preset.key }"
-            @click="handlePresetChange(preset.key)"
-          >
-            <text class="preset-name">{{ preset.name }}</text>
-            <text class="preset-count">{{ preset.count }} 种颜色</text>
+            <Icon name="picture" :size="32" />
+            <text class="colors-title">选择 Artkal 拼豆套装</text>
           </view>
-        </view>
-        
-        <view class="selected-info">
-          <view class="info-row">
-            <text class="info-label">已选择套装</text>
-            <text class="info-value">{{ selectedColors.size }} 种颜色</text>
-          </view>
-          <text class="info-hint">套装包含精心挑选的 Artkal 拼豆颜色，适合各种创作需求</text>
-        </view>
-      </view>
-    </scroll-view>
-    
-    <!-- 步骤 3: 预览确认 (仅图片模式) -->
-    <scroll-view 
-      v-if="step === 3 && mode === 'image'"
-      scroll-y 
-      class="content-area"
-    >
-      <view 
-        class="step-content step-preview"
-        :class="stepAnimationClass"
-      >
-        <view class="preview-header">
-          <text class="preview-title">预览效果</text>
-          <text class="preview-subtitle">确认后将创建画布</text>
-        </view>
-        
-        <!-- 预览图 -->
-        <view class="preview-canvas-wrapper">
-          <!-- #ifdef H5 -->
-          <canvas 
-            canvas-id="previewDisplayCanvas" 
-            id="previewDisplayCanvas"
-            type="2d"
-            class="preview-canvas"
-          ></canvas>
-          <!-- #endif -->
-          
-          <!-- #ifdef MP-WEIXIN -->
-          <image 
-            v-if="previewImageUrl"
-            :src="previewImageUrl"
-            class="preview-image"
-            mode="aspectFit"
-          />
-          <canvas 
-            v-else
-            canvas-id="previewDisplayCanvas" 
-            id="previewDisplayCanvas"
-            type="2d"
-            class="preview-canvas"
-            style="position: absolute; left: -9999px; opacity: 0;"
-          ></canvas>
-          <!-- #endif -->
-        </view>
-        
-        <!-- 统计信息 -->
-        <view class="preview-stats">
-          <view class="preview-stat-card">
-            <text class="preview-stat-label">画布尺寸</text>
-            <text class="preview-stat-value">{{ customWidth }}×{{ customHeight }}</text>
-          </view>
-          
-          <view class="preview-stat-card">
-            <text class="preview-stat-label">板子数量</text>
-            <text class="preview-stat-value">{{ totalBoards }} 块</text>
-          </view>
-          
-          <view class="preview-stat-card">
-            <text class="preview-stat-label">使用颜色</text>
-            <text class="preview-stat-value">{{ usedColors.length }} 种</text>
-          </view>
-        </view>
-        
-        <!-- 使用的颜色列表 -->
-        <view class="used-colors-section">
-          <view class="used-colors-header">
-            <text class="used-colors-title">使用的颜色</text>
-            <text class="used-colors-total">共 {{ usedColors.reduce((sum, c) => sum + c.count, 0) }} 个</text>
-          </view>
-          <view class="used-colors-grid">
-            <view 
-              v-for="color in usedColors"
-              :key="color.code"
-              class="used-color-item"
+
+          <view class="preset-grid">
+            <view
+              v-for="preset in presets"
+              :key="preset.key"
+              class="preset-card"
+              :class="{ active: selectedPreset === preset.key }"
+              @click="handlePresetChange(preset.key)"
             >
-              <view class="color-swatch" :style="{ backgroundColor: color.hex }"></view>
-              <text class="color-code">{{ color.code }}</text>
-              <text class="color-count">{{ color.count }}</text>
+              <text class="preset-name">{{ preset.name }}</text>
+              <text class="preset-count">{{ preset.count }} 种颜色</text>
+            </view>
+          </view>
+
+          <view class="selected-info">
+            <view class="info-row">
+              <text class="info-label">已选择套装</text>
+              <text class="info-value">{{ selectedColors.size }} 种颜色</text>
+            </view>
+            <text class="info-hint"
+              >套装包含精心挑选的 Artkal 拼豆颜色，适合各种创作需求</text
+            >
+          </view>
+        </view>
+      </scroll-view>
+
+      <!-- 步骤 3: 预览确认 (仅图片模式) -->
+      <scroll-view
+        v-if="step === 3 && mode === 'image'"
+        scroll-y
+        class="content-area"
+      >
+        <view class="step-content step-preview" :class="stepAnimationClass">
+          <view class="preview-header">
+            <text class="preview-title">预览效果</text>
+            <text class="preview-subtitle">确认后将创建画布</text>
+          </view>
+
+          <!-- 预览图 -->
+          <view class="preview-canvas-wrapper">
+            <!-- #ifdef H5 -->
+            <canvas
+              canvas-id="previewDisplayCanvas"
+              id="previewDisplayCanvas"
+              type="2d"
+              class="preview-canvas"
+            ></canvas>
+            <!-- #endif -->
+
+            <!-- #ifdef MP-WEIXIN -->
+            <image
+              v-if="previewImageUrl"
+              :src="previewImageUrl"
+              class="preview-image"
+              mode="aspectFit"
+            />
+            <canvas
+              v-else
+              canvas-id="previewDisplayCanvas"
+              id="previewDisplayCanvas"
+              type="2d"
+              class="preview-canvas"
+              style="position: absolute; left: -9999px; opacity: 0"
+            ></canvas>
+            <!-- #endif -->
+          </view>
+
+          <!-- 统计信息 -->
+          <view class="preview-stats">
+            <view class="preview-stat-card">
+              <text class="preview-stat-label">画布尺寸</text>
+              <text class="preview-stat-value"
+                >{{ customWidth }}×{{ customHeight }}</text
+              >
+            </view>
+
+            <view class="preview-stat-card">
+              <text class="preview-stat-label">板子数量</text>
+              <text class="preview-stat-value">{{ totalBoards }} 块</text>
+            </view>
+
+            <view class="preview-stat-card">
+              <text class="preview-stat-label">使用颜色</text>
+              <text class="preview-stat-value">{{ usedColors.length }} 种</text>
+            </view>
+          </view>
+
+          <!-- 使用的颜色列表 -->
+          <view class="used-colors-section">
+            <view class="used-colors-header">
+              <text class="used-colors-title">使用的颜色</text>
+              <text class="used-colors-total"
+                >共
+                {{ usedColors.reduce((sum, c) => sum + c.count, 0) }} 个</text
+              >
+            </view>
+            <view class="used-colors-grid">
+              <view
+                v-for="color in usedColors"
+                :key="color.code"
+                class="used-color-item"
+              >
+                <view
+                  class="color-swatch"
+                  :style="{ backgroundColor: color.hex }"
+                ></view>
+                <text class="color-code">{{ color.code }}</text>
+                <text class="color-count">{{ color.count }}</text>
+              </view>
             </view>
           </view>
         </view>
-      </view>
-    </scroll-view>
+      </scroll-view>
     </view>
 
     <!-- 底部按钮 -->
     <view class="footer">
       <view
         class="next-btn"
-        :class="{ 'disabled': !canProceed || isProcessing }"
+        :class="{ disabled: !canProceed || isProcessing }"
         @click="handleNext"
       >
         <text class="next-btn-text">{{ buttonText }}</text>
         <text class="next-icon">›</text>
       </view>
     </view>
-    
+
     <!-- 隐藏的 Canvas 用于图片导入 -->
     <!-- #ifdef MP-WEIXIN -->
-    <canvas 
-      v-if="mode === 'image'" 
-      canvas-id="importCanvas" 
+    <canvas
+      v-if="mode === 'image'"
+      canvas-id="importCanvas"
       id="importCanvas"
       type="2d"
-      style="position: fixed; left: -9999px; top: -9999px; width: 1px; height: 1px;"
+      style="
+        position: fixed;
+        left: -9999px;
+        top: -9999px;
+        width: 1px;
+        height: 1px;
+      "
     />
     <!-- #endif -->
-    
+
     <!-- #ifdef H5 -->
-    <canvas 
-      v-if="mode === 'image'" 
-      canvas-id="importCanvas" 
-      id="importCanvas" 
-      style="position: fixed; left: -9999px; top: -9999px; width: 1px; height: 1px;"
+    <canvas
+      v-if="mode === 'image'"
+      canvas-id="importCanvas"
+      id="importCanvas"
+      style="
+        position: fixed;
+        left: -9999px;
+        top: -9999px;
+        width: 1px;
+        height: 1px;
+      "
     />
     <!-- #endif -->
-    
+
     <!-- 隐藏的 Canvas 用于保存缩略图 -->
-    <canvas 
-      canvas-id="thumbnailSaveCanvas" 
+    <canvas
+      canvas-id="thumbnailSaveCanvas"
       id="thumbnailSaveCanvas"
       type="2d"
-      style="position: fixed; left: -9999px; top: -9999px; width: 100px; height: 100px; opacity: 0; pointer-events: none;"
+      style="
+        position: fixed;
+        left: -9999px;
+        top: -9999px;
+        width: 100px;
+        height: 100px;
+        opacity: 0;
+        pointer-events: none;
+      "
     />
-    
+
     <!-- 隐藏的临时处理canvas（仅小程序使用） -->
     <!-- #ifdef MP-WEIXIN -->
-    <canvas 
-      canvas-id="tempProcessCanvas" 
+    <canvas
+      canvas-id="tempProcessCanvas"
       id="tempProcessCanvas"
       type="2d"
-      style="position: absolute; left: -9999px; top: -9999px; width: 640px; height: 640px; opacity: 0; pointer-events: none;"
+      style="
+        position: absolute;
+        left: -9999px;
+        top: -9999px;
+        width: 640px;
+        height: 640px;
+        opacity: 0;
+        pointer-events: none;
+      "
     />
     <!-- #endif -->
-    
+
     <!-- 自定义 Toast 组件 -->
     <Toast ref="toastRef" />
-    
-
   </view>
 </template>
 
 <script>
-import { useProjectStore } from '../../store/project.js'
-import { useToast } from '../../composables/useToast.js'
-import { ARTKAL_COLORS_FULL, ARTKAL_OFFICIAL_SETS, ARTKAL_PRESETS } from '../../data/artkal-colors-full.js'
-import statusBarMixin from '../../mixins/statusBar.js'
-import Icon from '../../components/Icon.vue'
-import Toast from '../../components/Toast.vue'
-import ProjectCard from '../../components/ProjectCard.vue'
+import { useProjectStore } from "../../store/project.js";
+import { useToast } from "../../composables/useToast.js";
+import {
+  ARTKAL_COLORS_FULL,
+  ARTKAL_OFFICIAL_SETS,
+  ARTKAL_PRESETS,
+} from "../../data/artkal-colors-full.js";
+import statusBarMixin from "../../mixins/statusBar.js";
+import Icon from "../../components/Icon.vue";
+import Toast from "../../components/Toast.vue";
+import ProjectCard from "../../components/ProjectCard.vue";
 
 export default {
   mixins: [statusBarMixin],
   components: {
     Icon,
     Toast,
-    ProjectCard
+    ProjectCard,
   },
   data() {
     return {
       projectStore: null,
       toast: null,
 
-      name: '',
+      name: "",
       customWidth: 64,
       customHeight: 64,
-      selectedPreset: 'set24',
+      selectedPreset: "set24",
       selectedColors: new Set(ARTKAL_OFFICIAL_SETS.set24.colors),
       step: 0,
-      mode: 'blank',
+      mode: "blank",
       templateId: null, // 模板ID
       challengeId: null, // 挑战ID
       imageFile: null,
       previewUrl: null,
+      recommendedSize: null, // 根据图片内容推荐的尺寸 { width, height }
       previewPixels: null, // 预览的像素数据
       previewCanvas: null, // 预览用的canvas
-      previewImageUrl: '', // 小程序预览图片URL
+      previewImageUrl: "", // 小程序预览图片URL
       usedColors: [], // 使用的颜色列表
       isProcessing: false,
-      stepAnimationClass: 'step-enter',
+      stepAnimationClass: "step-enter",
       isNameFocused: false,
-      
+
       presets: ARTKAL_PRESETS,
-      sizePresets: [
+      defaultSizePresets: [
         { width: 64, height: 64 },
         { width: 128, height: 128 },
         { width: 192, height: 192 },
@@ -398,495 +471,724 @@ export default {
         { width: 448, height: 448 },
         { width: 512, height: 512 },
         { width: 576, height: 576 },
-        { width: 640, height: 640 }
+        { width: 640, height: 640 },
       ],
-
-    }
+      contentRatio: null, // 图片内容宽高比 { w, h }（最简比例）
+    };
   },
-  
+
   computed: {
+    // 动态快捷尺寸：图片模式下按内容宽高比生成，空白模式下用默认正方形
+    sizePresets() {
+      if (this.mode === "image" && this.contentRatio) {
+        const { w, h } = this.contentRatio;
+        const presets = [];
+        for (let multiplier = 1; multiplier <= 20; multiplier++) {
+          const pw = w * multiplier;
+          const ph = h * multiplier;
+          if (pw > 640 || ph > 640) break;
+          presets.push({ width: pw, height: ph });
+        }
+        return presets.length > 0 ? presets : this.defaultSizePresets;
+      }
+      return this.defaultSizePresets;
+    },
+
     // 计算填充后的宽度（向上取整到64的倍数）
     paddedWidth() {
-      return Math.ceil(this.customWidth / 64) * 64
+      return Math.ceil(this.customWidth / 64) * 64;
     },
 
     // 计算填充后的高度（向上取整到64的倍数）
     paddedHeight() {
-      return Math.ceil(this.customHeight / 64) * 64
+      return Math.ceil(this.customHeight / 64) * 64;
     },
 
     // 计算横向板子数量
     boardsX() {
-      return Math.ceil(this.customWidth / 64)
+      return Math.ceil(this.customWidth / 64);
     },
 
     // 计算纵向板子数量
     boardsY() {
-      return Math.ceil(this.customHeight / 64)
+      return Math.ceil(this.customHeight / 64);
     },
-    
+
     // 总板子数量
     totalBoards() {
-      return this.boardsX * this.boardsY
+      return this.boardsX * this.boardsY;
     },
-    
+
     // 过滤后的项目列表
     filteredProjects() {
       if (!this.projectStore || !this.projectStore.projects) {
-        return []
+        return [];
       }
-      return this.projectStore.projects
+      return this.projectStore.projects;
     },
-    
+
     canProceed() {
-      if (this.step === 0) return this.name.trim().length > 0
+      if (this.step === 0) return this.name.trim().length > 0;
       if (this.step === 1) {
-        if (this.mode === 'image') {
+        if (this.mode === "image") {
           // 图片模式第1步：需要上传图片和设置尺寸
-          return this.imageFile &&
-                 this.customWidth > 0 &&
-                 this.customHeight > 0 &&
-                 this.paddedWidth <= 640 &&
-                 this.paddedHeight <= 640
+          return (
+            this.imageFile &&
+            this.customWidth > 0 &&
+            this.customHeight > 0 &&
+            this.paddedWidth <= 640 &&
+            this.paddedHeight <= 640
+          );
         } else {
           // 空白画布第1步：需要设置尺寸
-          return this.customWidth > 0 &&
-                 this.customHeight > 0 &&
-                 this.paddedWidth <= 640 &&
-                 this.paddedHeight <= 640
+          return (
+            this.customWidth > 0 &&
+            this.customHeight > 0 &&
+            this.paddedWidth <= 640 &&
+            this.paddedHeight <= 640
+          );
         }
       }
       if (this.step === 2) {
         // 两种模式的颜色选择步骤，总是可以进行
-        return true
+        return true;
       }
-      if (this.step === 3) return true // 图片模式的预览步骤
-      return true
+      if (this.step === 3) return true; // 图片模式的预览步骤
+      return true;
     },
 
     buttonText() {
-      if (this.step === 0) return '下一步'
+      if (this.step === 0) return "下一步";
       if (this.step === 1) {
-        if (this.mode === 'image') {
-          return '选择颜色'
+        if (this.mode === "image") {
+          return "选择颜色";
         } else {
-          return '选择颜色'
+          return "选择颜色";
         }
       }
       if (this.step === 2) {
-        if (this.mode === 'image') {
-          if (this.isProcessing) return '正在生成中...'
-          return '生成预览'
+        if (this.mode === "image") {
+          if (this.isProcessing) return "正在生成中...";
+          return "生成预览";
         } else {
           // 空白画布直接创建
-          return '创建画布'
+          return "创建画布";
         }
       }
       if (this.step === 3) {
-        if (this.mode === 'image') {
-          if (this.isProcessing) return '生成中...'
-          return '确认创建'
+        if (this.mode === "image") {
+          if (this.isProcessing) return "生成中...";
+          return "确认创建";
         }
       }
-      return '下一步'
-    }
+      return "下一步";
+    },
   },
 
   onLoad(options) {
-    this.projectStore = useProjectStore()
-    this.toast = useToast()
+    this.projectStore = useProjectStore();
+    this.toast = useToast();
 
     // 根据 URL 参数自动进入对应模式
     if (options && options.mode) {
-      this.mode = options.mode
-      this.step = 0
-      this.resetForm()
+      this.mode = options.mode;
+      this.step = 0;
+      this.resetForm();
     }
     // 检查是否从模板创建
     else if (options && options.templateId) {
-      this.mode = 'template'
-      this.templateId = options.templateId
+      this.mode = "template";
+      this.templateId = options.templateId;
       // TODO: 加载模板数据
       uni.showToast({
-        title: '正在加载模板...',
-        icon: 'loading'
-      })
+        title: "正在加载模板...",
+        icon: "loading",
+      });
     }
     // 检查是否从挑战创建
     else if (options && options.challengeId) {
-      this.mode = 'challenge'
-      this.challengeId = options.challengeId
+      this.mode = "challenge";
+      this.challengeId = options.challengeId;
       // TODO: 加载挑战信息
       uni.showToast({
-        title: '正在加载挑战...',
-        icon: 'loading'
-      })
+        title: "正在加载挑战...",
+        icon: "loading",
+      });
     }
 
     // 注册自定义 Toast 实例
     this.$nextTick(() => {
       if (this.$refs.toastRef) {
-        this.toast.setToastInstance(this.$refs.toastRef)
+        this.toast.setToastInstance(this.$refs.toastRef);
       }
-    })
+    });
   },
-  
+
   onShow() {
     // 页面显示时的处理
   },
-  
+
   methods: {
     resetForm() {
-      this.name = ''
-      this.customWidth = 64
-      this.customHeight = 64
-      this.selectedPreset = 'set24'
-      this.selectedColors = new Set(ARTKAL_OFFICIAL_SETS.set24.colors)
-      this.imageFile = null
-      this.previewUrl = null
-      this.previewPixels = null
-      this.previewImageUrl = ''
-      this.usedColors = []
-      this.isProcessing = false
-      this.stepAnimationClass = 'step-enter'
-      this.isNameFocused = false
+      this.name = "";
+      this.customWidth = 64;
+      this.customHeight = 64;
+      this.selectedPreset = "set24";
+      this.selectedColors = new Set(ARTKAL_OFFICIAL_SETS.set24.colors);
+      this.imageFile = null;
+      this.previewUrl = null;
+      this.previewPixels = null;
+      this.recommendedSize = null;
+      this.contentRatio = null;
+      this.previewImageUrl = "";
+      this.usedColors = [];
+      this.isProcessing = false;
+      this.stepAnimationClass = "step-enter";
+      this.isNameFocused = false;
     },
-    
 
-    
     // 检测图片是否可能是像素画
     detectPixelArt(imageData, width, height) {
-      const data = imageData.data
-      const colorSet = new Set()
-      let totalPixels = 0
-      
+      const data = imageData.data;
+      const colorSet = new Set();
+      let totalPixels = 0;
+
       // 采样检测（不需要检查所有像素）
-      const sampleRate = Math.max(1, Math.floor(width * height / 10000))
-      
+      const sampleRate = Math.max(1, Math.floor((width * height) / 10000));
+
       for (let i = 0; i < data.length; i += 4 * sampleRate) {
-        const a = data[i + 3]
-        if (a < 128) continue // 跳过透明像素
-        
-        const r = data[i]
-        const g = data[i + 1]
-        const b = data[i + 2]
-        const color = `${r},${g},${b}`
-        colorSet.add(color)
-        totalPixels++
+        const a = data[i + 3];
+        if (a < 128) continue; // 跳过透明像素
+
+        const r = data[i];
+        const g = data[i + 1];
+        const b = data[i + 2];
+        const color = `${r},${g},${b}`;
+        colorSet.add(color);
+        totalPixels++;
       }
-      
+
       // 像素画特征：颜色数量相对较少
-      const uniqueColors = colorSet.size
-      const colorRatio = uniqueColors / totalPixels
-      
+      const uniqueColors = colorSet.size;
+      const colorRatio = uniqueColors / totalPixels;
+
       // 如果颜色种类占比小于30%，很可能是像素画
-      return colorRatio < 0.3 && uniqueColors < 256
+      return colorRatio < 0.3 && uniqueColors < 256;
     },
-    
+
     handleSizeInput() {
       // 验证尺寸
-      if (this.customWidth < 1) this.customWidth = 1
-      if (this.customHeight < 1) this.customHeight = 1
-      
+      if (this.customWidth < 1) this.customWidth = 1;
+      if (this.customHeight < 1) this.customHeight = 1;
+
       // 检查是否超过最大限制
       if (this.paddedWidth > 640) {
-        this.customWidth = 640
-        this.toast.showError('宽度最大为640像素（10块板子）')
+        this.customWidth = 640;
+        this.toast.showError("宽度最大为640像素（10块板子）");
       }
       if (this.paddedHeight > 640) {
-        this.customHeight = 640
-        this.toast.showError('高度最大为640像素（10块板子）')
+        this.customHeight = 640;
+        this.toast.showError("高度最大为640像素（10块板子）");
       }
     },
-    
+
     selectPresetSize(width, height) {
-      this.customWidth = width
-      this.customHeight = height
+      this.customWidth = width;
+      this.customHeight = height;
     },
-    
+
     handleBack() {
       // 如果正在处理，禁止返回
       if (this.isProcessing) {
-        return
+        return;
       }
 
       if (this.step === 0) {
         // 在向导第一步，返回到 workspace 页面
-        uni.navigateBack()
+        uni.navigateBack();
       } else {
         // 在向导其他步骤，返回上一步
-        this.stepAnimationClass = 'step-exit-reverse'
+        this.stepAnimationClass = "step-exit-reverse";
         setTimeout(() => {
-          this.step--
-          this.stepAnimationClass = 'step-enter-reverse'
-        }, 150)
+          this.step--;
+          this.stepAnimationClass = "step-enter-reverse";
+        }, 150);
       }
     },
-    
+
     handlePresetChange(preset) {
-      this.selectedPreset = preset
-      this.selectedColors = new Set(ARTKAL_OFFICIAL_SETS[preset].colors)
+      this.selectedPreset = preset;
+      this.selectedColors = new Set(ARTKAL_OFFICIAL_SETS[preset].colors);
     },
-    
+
     chooseImage() {
       uni.chooseImage({
         count: 1,
-        sizeType: ['compressed'],
-        sourceType: ['album', 'camera'],
+        sizeType: ["compressed"],
+        sourceType: ["album", "camera"],
         success: (res) => {
-          this.imageFile = res.tempFilePaths[0]
-          this.previewUrl = res.tempFilePaths[0]
+          this.imageFile = res.tempFilePaths[0];
+          this.previewUrl = res.tempFilePaths[0];
+          this.recommendedSize = null;
+          this._detectImageContentSize(res.tempFilePaths[0]);
+        },
+      });
+    },
+
+    // 检测图片有效内容尺寸，推荐合适的画布大小
+    _detectImageContentSize(filePath) {
+      // #ifdef H5
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0);
+        const data = ctx.getImageData(0, 0, img.width, img.height).data;
+
+        let minX = img.width,
+          minY = img.height,
+          maxX = 0,
+          maxY = 0;
+        let hasContent = false;
+        for (let y = 0; y < img.height; y++) {
+          for (let x = 0; x < img.width; x++) {
+            if (data[(y * img.width + x) * 4 + 3] >= 128) {
+              hasContent = true;
+              if (x < minX) minX = x;
+              if (x > maxX) maxX = x;
+              if (y < minY) minY = y;
+              if (y > maxY) maxY = y;
+            }
+          }
         }
-      })
+
+        if (hasContent) {
+          const contentW = maxX - minX + 1;
+          const contentH = maxY - minY + 1;
+          this._applyRecommendedSize(contentW, contentH);
+        }
+      };
+      img.src = filePath;
+      // #endif
+
+      // #ifdef MP-WEIXIN
+      uni.getImageInfo({
+        src: filePath,
+        success: (info) => {
+          // 小程序无法直接读像素，用图片原始尺寸推荐
+          this._applyRecommendedSize(info.width, info.height);
+        },
+      });
+      // #endif
     },
-    
+
+    // 计算最大公约数
+    _gcd(a, b) {
+      while (b) {
+        [a, b] = [b, a % b];
+      }
+      return a;
+    },
+
+    // 根据内容尺寸计算宽高比并推荐尺寸
+    _applyRecommendedSize(contentW, contentH) {
+      // 计算最简宽高比
+      const g = this._gcd(contentW, contentH);
+      const ratioW = contentW / g;
+      const ratioH = contentH / g;
+      this.contentRatio = { w: ratioW, h: ratioH };
+      this.recommendedSize = { width: contentW, height: contentH };
+      console.log(
+        `内容尺寸: ${contentW}x${contentH}，宽高比: ${ratioW}:${ratioH}`,
+      );
+    },
+
+    applyRecommendedSize() {
+      if (this.recommendedSize) {
+        this.customWidth = this.recommendedSize.width;
+        this.customHeight = this.recommendedSize.height;
+        this.toast.showSuccess(
+          `已应用原始尺寸 ${this.recommendedSize.width}×${this.recommendedSize.height}`,
+        );
+      }
+    },
+
     clearImage() {
-      this.imageFile = null
-      this.previewUrl = null
+      this.imageFile = null;
+      this.previewUrl = null;
+      this.recommendedSize = null;
+      this.contentRatio = null;
     },
-    
+
     async generatePreview() {
-      if (!this.imageFile) return
-      
-      this.isProcessing = true
-      this.previewImageUrl = '' // 清空之前的预览图
-      this.toast.showInfo('正在生成预览...')
-      
+      if (!this.imageFile) return;
+
+      this.isProcessing = true;
+      this.previewImageUrl = ""; // 清空之前的预览图
+      this.toast.showInfo("正在生成预览...");
+
       try {
         // 使用已导入的 ARTKAL_COLORS_FULL
         const selectedArtkalColors = Array.from(this.selectedColors)
-          .map(code => ARTKAL_COLORS_FULL.find(c => c.code === code))
-          .filter(c => c !== undefined)
-        
-        const artkalPalette = selectedArtkalColors.map(c => c.hex)
-        
+          .map((code) => ARTKAL_COLORS_FULL.find((c) => c.code === code))
+          .filter((c) => c !== undefined);
+
+        const artkalPalette = selectedArtkalColors.map((c) => c.hex);
+
         // #ifdef H5
         // H5环境：使用Image和document
-        const img = new Image()
-        img.crossOrigin = 'anonymous'
-        
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+
         img.onload = () => {
           // 先绘制原始尺寸以检测是否为像素画
-          const tempCanvas = document.createElement('canvas')
-          tempCanvas.width = img.width
-          tempCanvas.height = img.height
-          const tempCtx = tempCanvas.getContext('2d')
-          tempCtx.drawImage(img, 0, 0)
-          const detectData = tempCtx.getImageData(0, 0, img.width, img.height)
-          
+          const tempCanvas = document.createElement("canvas");
+          tempCanvas.width = img.width;
+          tempCanvas.height = img.height;
+          const tempCtx = tempCanvas.getContext("2d");
+          tempCtx.drawImage(img, 0, 0);
+          const detectData = tempCtx.getImageData(0, 0, img.width, img.height);
+
           // 检测是否为像素画
-          const isPixelArt = this.detectPixelArt(detectData, img.width, img.height)
-          console.log('检测到像素画:', isPixelArt, '原图尺寸:', img.width, 'x', img.height, '目标尺寸:', this.customWidth, 'x', this.customHeight)
-          
+          const isPixelArt = this.detectPixelArt(
+            detectData,
+            img.width,
+            img.height,
+          );
+          console.log(
+            "检测到像素画:",
+            isPixelArt,
+            "原图尺寸:",
+            img.width,
+            "x",
+            img.height,
+            "目标尺寸:",
+            this.customWidth,
+            "x",
+            this.customHeight,
+          );
+
           if (isPixelArt) {
-            this.toast.showSuccess('检测到像素画，已自动优化处理')
+            this.toast.showSuccess("检测到像素画，已自动优化处理");
           }
-          
+
           // 创建最终canvas
-          const canvas = document.createElement('canvas')
-          canvas.width = this.customWidth
-          canvas.height = this.customHeight
-          const ctx = canvas.getContext('2d')
+          const canvas = document.createElement("canvas");
+          canvas.width = this.customWidth;
+          canvas.height = this.customHeight;
+          const ctx = canvas.getContext("2d");
           if (!ctx) {
-            this.toast.showError('Canvas 初始化失败')
-            this.isProcessing = false
-            return
+            this.toast.showError("Canvas 初始化失败");
+            this.isProcessing = false;
+            return;
           }
-          
+
           if (isPixelArt) {
-            // 像素画模式：使用整数倍缩放策略
-            ctx.imageSmoothingEnabled = false
-            ctx.mozImageSmoothingEnabled = false
-            ctx.webkitImageSmoothingEnabled = false
-            ctx.msImageSmoothingEnabled = false
-            
-            // 计算最接近的整数缩放比例
-            const scaleX = this.customWidth / img.width
-            const scaleY = this.customHeight / img.height
-            const scale = Math.max(scaleX, scaleY)
-            
-            // 如果需要放大，使用向上取整；如果缩小，使用向下取整
-            let integerScale
-            if (scale >= 1) {
-              integerScale = Math.ceil(scale)
-            } else {
-              // 缩小时，找最接近的整数分数（1/2, 1/3, 1/4...）
-              integerScale = 1 / Math.ceil(1 / scale)
+            // 像素画模式：先检测内容边界，再整数倍缩放
+            ctx.imageSmoothingEnabled = false;
+            ctx.mozImageSmoothingEnabled = false;
+            ctx.webkitImageSmoothingEnabled = false;
+            ctx.msImageSmoothingEnabled = false;
+
+            // 先绘制原图到临时canvas，检测有内容的边界框
+            const boundsCanvas = document.createElement("canvas");
+            boundsCanvas.width = img.width;
+            boundsCanvas.height = img.height;
+            const boundsCtx = boundsCanvas.getContext("2d");
+            boundsCtx.drawImage(img, 0, 0);
+            const boundsData = boundsCtx.getImageData(
+              0,
+              0,
+              img.width,
+              img.height,
+            ).data;
+
+            let minX = img.width,
+              minY = img.height,
+              maxX = 0,
+              maxY = 0;
+            for (let py = 0; py < img.height; py++) {
+              for (let px = 0; px < img.width; px++) {
+                if (boundsData[(py * img.width + px) * 4 + 3] >= 128) {
+                  if (px < minX) minX = px;
+                  if (px > maxX) maxX = px;
+                  if (py < minY) minY = py;
+                  if (py > maxY) maxY = py;
+                }
+              }
             }
-            
-            // 计算中间尺寸
-            const intermediateWidth = Math.round(img.width * integerScale)
-            const intermediateHeight = Math.round(img.height * integerScale)
-            
-            // 创建中间canvas进行整数倍缩放
-            const intermediateCanvas = document.createElement('canvas')
-            intermediateCanvas.width = intermediateWidth
-            intermediateCanvas.height = intermediateHeight
-            const intermediateCtx = intermediateCanvas.getContext('2d')
-            intermediateCtx.imageSmoothingEnabled = false
-            intermediateCtx.mozImageSmoothingEnabled = false
-            intermediateCtx.webkitImageSmoothingEnabled = false
-            intermediateCtx.msImageSmoothingEnabled = false
-            
-            // 整数倍缩放
-            intermediateCtx.drawImage(img, 0, 0, intermediateWidth, intermediateHeight)
-            
-            // 居中裁剪到目标尺寸
-            const offsetX = Math.floor((intermediateWidth - this.customWidth) / 2)
-            const offsetY = Math.floor((intermediateHeight - this.customHeight) / 2)
-            
+
+            // 用内容区域的尺寸来计算缩放比例
+            const contentW = maxX - minX + 1;
+            const contentH = maxY - minY + 1;
+            console.log(
+              "内容边界:",
+              minX,
+              minY,
+              maxX,
+              maxY,
+              "内容尺寸:",
+              contentW,
+              "x",
+              contentH,
+            );
+
+            ctx.imageSmoothingEnabled = false;
+            // 直接把内容区域缩放到目标尺寸
             ctx.drawImage(
-              intermediateCanvas,
-              Math.max(0, offsetX),
-              Math.max(0, offsetY),
-              Math.min(intermediateWidth, this.customWidth),
-              Math.min(intermediateHeight, this.customHeight),
-              Math.max(0, -offsetX),
-              Math.max(0, -offsetY),
-              Math.min(intermediateWidth, this.customWidth),
-              Math.min(intermediateHeight, this.customHeight)
-            )
-            
-            console.log('像素画模式：整数倍缩放', integerScale, '中间尺寸:', intermediateWidth, 'x', intermediateHeight)
+              boundsCanvas,
+              minX,
+              minY,
+              contentW,
+              contentH,
+              0,
+              0,
+              this.customWidth,
+              this.customHeight,
+            );
           } else {
-            // 普通图片模式：直接高质量缩放
-            ctx.imageSmoothingEnabled = true
-            ctx.imageSmoothingQuality = 'high'
-            ctx.drawImage(img, 0, 0, this.customWidth, this.customHeight)
+            // 普通图片模式：先裁剪有内容的区域，再高质量缩放
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = "high";
+
+            // 检测有内容的边界框
+            const boundsData = tempCtx.getImageData(
+              0,
+              0,
+              img.width,
+              img.height,
+            ).data;
+            let minX = img.width,
+              minY = img.height,
+              maxX = 0,
+              maxY = 0;
+            let hasContent = false;
+            for (let py = 0; py < img.height; py++) {
+              for (let px = 0; px < img.width; px++) {
+                if (boundsData[(py * img.width + px) * 4 + 3] >= 128) {
+                  hasContent = true;
+                  if (px < minX) minX = px;
+                  if (px > maxX) maxX = px;
+                  if (py < minY) minY = py;
+                  if (py > maxY) maxY = py;
+                }
+              }
+            }
+
+            if (
+              hasContent &&
+              (minX > 0 ||
+                minY > 0 ||
+                maxX < img.width - 1 ||
+                maxY < img.height - 1)
+            ) {
+              const contentW = maxX - minX + 1;
+              const contentH = maxY - minY + 1;
+              console.log("普通图片裁剪内容区域:", contentW, "x", contentH);
+              ctx.drawImage(
+                tempCanvas,
+                minX,
+                minY,
+                contentW,
+                contentH,
+                0,
+                0,
+                this.customWidth,
+                this.customHeight,
+              );
+            } else {
+              ctx.drawImage(img, 0, 0, this.customWidth, this.customHeight);
+            }
           }
-          
-          const imageData = ctx.getImageData(0, 0, this.customWidth, this.customHeight)
-          const data = imageData.data
-          
-          this.processImageData(data, artkalPalette, selectedArtkalColors)
-        }
-        
+
+          const imageData = ctx.getImageData(
+            0,
+            0,
+            this.customWidth,
+            this.customHeight,
+          );
+          const data = imageData.data;
+
+          this.processImageData(data, artkalPalette, selectedArtkalColors);
+        };
+
         img.onerror = () => {
-          this.toast.showError('图片加载失败')
-          this.isProcessing = false
-        }
-        
-        img.src = this.imageFile
+          this.toast.showError("图片加载失败");
+          this.isProcessing = false;
+        };
+
+        img.src = this.imageFile;
         // #endif
-        
+
         // #ifdef MP-WEIXIN
         // 小程序环境：使用uni.getImageInfo和canvas
-        console.log('小程序环境：开始处理图片')
-        
+        console.log("小程序环境：开始处理图片");
+
         const imageInfo = await new Promise((resolve, reject) => {
           uni.getImageInfo({
             src: this.imageFile,
             success: resolve,
-            fail: reject
-          })
-        })
-        
-        console.log('图片信息获取成功:', imageInfo)
-        
+            fail: reject,
+          });
+        });
+
+        console.log("图片信息获取成功:", imageInfo);
+
         // 延迟等待canvas准备好
-        await new Promise(resolve => setTimeout(resolve, 500))
-        
+        await new Promise((resolve) => setTimeout(resolve, 500));
+
         // 创建临时canvas处理图片
-        const query = uni.createSelectorQuery().in(this)
-        query.select('#tempProcessCanvas')
+        const query = uni.createSelectorQuery().in(this);
+        query
+          .select("#tempProcessCanvas")
           .fields({ node: true, size: true })
           .exec((res) => {
-            console.log('Canvas查询结果:', res)
-            
+            console.log("Canvas查询结果:", res);
+
             if (!res || !res[0] || !res[0].node) {
-              console.error('Canvas节点未找到')
-              this.toast.showError('Canvas 初始化失败，请重试')
-              this.isProcessing = false
-              return
+              console.error("Canvas节点未找到");
+              this.toast.showError("Canvas 初始化失败，请重试");
+              this.isProcessing = false;
+              return;
             }
-            
-            const canvas = res[0].node
-            const ctx = canvas.getContext('2d', { willReadFrequently: true })
-            
+
+            const canvas = res[0].node;
+            const ctx = canvas.getContext("2d", { willReadFrequently: true });
+
             if (!ctx) {
-              console.error('Canvas context 获取失败')
-              this.toast.showError('Canvas context 初始化失败')
-              this.isProcessing = false
-              return
+              console.error("Canvas context 获取失败");
+              this.toast.showError("Canvas context 初始化失败");
+              this.isProcessing = false;
+              return;
             }
-            
-            console.log('Canvas初始化成功，开始绘制')
-            
-            canvas.width = this.customWidth
-            canvas.height = this.customHeight
-            
-            const img = canvas.createImage()
+
+            console.log("Canvas初始化成功，开始绘制");
+
+            canvas.width = this.customWidth;
+            canvas.height = this.customHeight;
+
+            const img = canvas.createImage();
             img.onload = () => {
-              console.log('图片加载成功，开始处理像素')
-              
+              console.log("图片加载成功，开始处理像素");
+
               // 先绘制原始尺寸以检测是否为像素画
-              const tempCanvas = canvas
-              const tempCtx = ctx
-              tempCanvas.width = img.width
-              tempCanvas.height = img.height
-              tempCtx.drawImage(img, 0, 0)
-              const detectData = tempCtx.getImageData(0, 0, img.width, img.height)
-              
+              const tempCanvas = canvas;
+              const tempCtx = ctx;
+              tempCanvas.width = img.width;
+              tempCanvas.height = img.height;
+              tempCtx.drawImage(img, 0, 0);
+              const detectData = tempCtx.getImageData(
+                0,
+                0,
+                img.width,
+                img.height,
+              );
+
               // 检测是否为像素画
-              const isPixelArt = this.detectPixelArt(detectData, img.width, img.height)
-              console.log('检测到像素画:', isPixelArt, '原图尺寸:', img.width, 'x', img.height, '目标尺寸:', this.customWidth, 'x', this.customHeight)
-              
+              const isPixelArt = this.detectPixelArt(
+                detectData,
+                img.width,
+                img.height,
+              );
+              console.log(
+                "检测到像素画:",
+                isPixelArt,
+                "原图尺寸:",
+                img.width,
+                "x",
+                img.height,
+                "目标尺寸:",
+                this.customWidth,
+                "x",
+                this.customHeight,
+              );
+
               if (isPixelArt) {
-                this.toast.showSuccess('检测到像素画，已自动优化处理')
+                this.toast.showSuccess("检测到像素画，已自动优化处理");
               }
-              
+
               // 重置canvas为目标尺寸
-              canvas.width = this.customWidth
-              canvas.height = this.customHeight
-              
+              canvas.width = this.customWidth;
+              canvas.height = this.customHeight;
+
               if (isPixelArt) {
                 // 像素画模式：使用整数倍缩放策略
-                ctx.imageSmoothingEnabled = false
-                
+                ctx.imageSmoothingEnabled = false;
+
                 // 计算最接近的整数缩放比例
-                const scaleX = this.customWidth / img.width
-                const scaleY = this.customHeight / img.height
-                const scale = Math.max(scaleX, scaleY)
-                
+                const scaleX = this.customWidth / img.width;
+                const scaleY = this.customHeight / img.height;
+                const scale = Math.max(scaleX, scaleY);
+
                 // 如果需要放大，使用向上取整；如果缩小，使用向下取整
-                let integerScale
+                let integerScale;
                 if (scale >= 1) {
-                  integerScale = Math.ceil(scale)
+                  integerScale = Math.ceil(scale);
                 } else {
                   // 缩小时，找最接近的整数分数（1/2, 1/3, 1/4...）
-                  integerScale = 1 / Math.ceil(1 / scale)
+                  integerScale = 1 / Math.ceil(1 / scale);
                 }
-                
+
                 // 计算中间尺寸
-                const intermediateWidth = Math.round(img.width * integerScale)
-                const intermediateHeight = Math.round(img.height * integerScale)
-                
+                const intermediateWidth = Math.round(img.width * integerScale);
+                const intermediateHeight = Math.round(
+                  img.height * integerScale,
+                );
+
                 // 创建临时canvas进行整数倍缩放
-                const query2 = uni.createSelectorQuery().in(this)
-                query2.select('#importCanvas')
+                const query2 = uni.createSelectorQuery().in(this);
+                query2
+                  .select("#importCanvas")
                   .fields({ node: true })
                   .exec((res2) => {
                     if (!res2 || !res2[0] || !res2[0].node) {
                       // 如果获取不到临时canvas，直接缩放
-                      ctx.drawImage(img, 0, 0, this.customWidth, this.customHeight)
-                      const imageData = ctx.getImageData(0, 0, this.customWidth, this.customHeight)
-                      this.processImageData(imageData.data, artkalPalette, selectedArtkalColors)
-                      return
+                      ctx.drawImage(
+                        img,
+                        0,
+                        0,
+                        this.customWidth,
+                        this.customHeight,
+                      );
+                      const imageData = ctx.getImageData(
+                        0,
+                        0,
+                        this.customWidth,
+                        this.customHeight,
+                      );
+                      this.processImageData(
+                        imageData.data,
+                        artkalPalette,
+                        selectedArtkalColors,
+                      );
+                      return;
                     }
-                    
-                    const intermediateCanvas = res2[0].node
-                    const intermediateCtx = intermediateCanvas.getContext('2d')
-                    intermediateCanvas.width = intermediateWidth
-                    intermediateCanvas.height = intermediateHeight
-                    intermediateCtx.imageSmoothingEnabled = false
-                    
+
+                    const intermediateCanvas = res2[0].node;
+                    const intermediateCtx = intermediateCanvas.getContext("2d");
+                    intermediateCanvas.width = intermediateWidth;
+                    intermediateCanvas.height = intermediateHeight;
+                    intermediateCtx.imageSmoothingEnabled = false;
+
                     // 整数倍缩放
-                    intermediateCtx.drawImage(img, 0, 0, intermediateWidth, intermediateHeight)
-                    
+                    intermediateCtx.drawImage(
+                      img,
+                      0,
+                      0,
+                      intermediateWidth,
+                      intermediateHeight,
+                    );
+
                     // 居中裁剪到目标尺寸
-                    const offsetX = Math.floor((intermediateWidth - this.customWidth) / 2)
-                    const offsetY = Math.floor((intermediateHeight - this.customHeight) / 2)
-                    
+                    const offsetX = Math.floor(
+                      (intermediateWidth - this.customWidth) / 2,
+                    );
+                    const offsetY = Math.floor(
+                      (intermediateHeight - this.customHeight) / 2,
+                    );
+
                     ctx.drawImage(
                       intermediateCanvas,
                       Math.max(0, offsetX),
@@ -896,297 +1198,418 @@ export default {
                       Math.max(0, -offsetX),
                       Math.max(0, -offsetY),
                       Math.min(intermediateWidth, this.customWidth),
-                      Math.min(intermediateHeight, this.customHeight)
-                    )
-                    
-                    console.log('像素画模式：整数倍缩放', integerScale, '中间尺寸:', intermediateWidth, 'x', intermediateHeight)
-                    
-                    const imageData = ctx.getImageData(0, 0, this.customWidth, this.customHeight)
-                    this.processImageData(imageData.data, artkalPalette, selectedArtkalColors)
-                  })
+                      Math.min(intermediateHeight, this.customHeight),
+                    );
+
+                    console.log(
+                      "像素画模式：整数倍缩放",
+                      integerScale,
+                      "中间尺寸:",
+                      intermediateWidth,
+                      "x",
+                      intermediateHeight,
+                    );
+
+                    const imageData = ctx.getImageData(
+                      0,
+                      0,
+                      this.customWidth,
+                      this.customHeight,
+                    );
+                    this.processImageData(
+                      imageData.data,
+                      artkalPalette,
+                      selectedArtkalColors,
+                    );
+                  });
               } else {
-                // 普通图片模式：直接高质量缩放
-                ctx.imageSmoothingEnabled = true
-                ctx.drawImage(img, 0, 0, this.customWidth, this.customHeight)
-                const imageData = ctx.getImageData(0, 0, this.customWidth, this.customHeight)
-                this.processImageData(imageData.data, artkalPalette, selectedArtkalColors)
+                // 普通图片模式：先裁剪有内容的区域，再高质量缩放
+                ctx.imageSmoothingEnabled = true;
+
+                // 用 detectData 检测有内容的边界框
+                const bData = detectData.data;
+                let minX = img.width,
+                  minY = img.height,
+                  maxX = 0,
+                  maxY = 0;
+                let hasContent = false;
+                for (let py = 0; py < img.height; py++) {
+                  for (let px = 0; px < img.width; px++) {
+                    if (bData[(py * img.width + px) * 4 + 3] >= 128) {
+                      hasContent = true;
+                      if (px < minX) minX = px;
+                      if (px > maxX) maxX = px;
+                      if (py < minY) minY = py;
+                      if (py > maxY) maxY = py;
+                    }
+                  }
+                }
+
+                canvas.width = this.customWidth;
+                canvas.height = this.customHeight;
+
+                if (
+                  hasContent &&
+                  (minX > 0 ||
+                    minY > 0 ||
+                    maxX < img.width - 1 ||
+                    maxY < img.height - 1)
+                ) {
+                  const contentW = maxX - minX + 1;
+                  const contentH = maxY - minY + 1;
+                  console.log(
+                    "小程序普通图片裁剪内容区域:",
+                    contentW,
+                    "x",
+                    contentH,
+                  );
+                  ctx.drawImage(
+                    img,
+                    minX,
+                    minY,
+                    contentW,
+                    contentH,
+                    0,
+                    0,
+                    this.customWidth,
+                    this.customHeight,
+                  );
+                } else {
+                  ctx.drawImage(img, 0, 0, this.customWidth, this.customHeight);
+                }
+
+                const imageData = ctx.getImageData(
+                  0,
+                  0,
+                  this.customWidth,
+                  this.customHeight,
+                );
+                this.processImageData(
+                  imageData.data,
+                  artkalPalette,
+                  selectedArtkalColors,
+                );
               }
-            }
-            
+            };
+
             img.onerror = (err) => {
-              console.error('图片加载失败:', err)
-              this.toast.showError('图片加载失败')
-              this.isProcessing = false
-            }
-            
-            img.src = this.imageFile
-          })
+              console.error("图片加载失败:", err);
+              this.toast.showError("图片加载失败");
+              this.isProcessing = false;
+            };
+
+            img.src = this.imageFile;
+          });
         // #endif
-        
       } catch (error) {
-        console.error('生成预览失败:', error)
-        this.toast.showError('生成预览失败，请重试')
-        this.isProcessing = false
+        console.error("生成预览失败:", error);
+        this.toast.showError("生成预览失败，请重试");
+        this.isProcessing = false;
       }
     },
-    
+
+    // 计算图片中有内容的边界框
+    calculateContentBounds(imageData) {
+      const data = imageData.data;
+      const width = imageData.width;
+      const height = imageData.height;
+
+      let minX = width,
+        minY = height,
+        maxX = 0,
+        maxY = 0;
+      let hasContent = false;
+
+      for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+          const idx = (y * width + x) * 4;
+          const alpha = data[idx + 3];
+
+          // 有不透明像素
+          if (alpha >= 128) {
+            hasContent = true;
+            if (x < minX) minX = x;
+            if (x > maxX) maxX = x;
+            if (y < minY) minY = y;
+            if (y > maxY) maxY = y;
+          }
+        }
+      }
+
+      return hasContent ? { minX, minY, maxX, maxY } : null;
+    },
+
     processImageData(data, artkalPalette, selectedArtkalColors) {
       // 计算偏移量（居中）
-      const offsetX = Math.floor((this.paddedWidth - this.customWidth) / 2)
-      const offsetY = Math.floor((this.paddedHeight - this.customHeight) / 2)
-      
-      const artkalPixels = new Map()
-      const colorUsage = new Map() // 统计颜色使用次数
-      
+      const offsetX = Math.floor((this.paddedWidth - this.customWidth) / 2);
+      const offsetY = Math.floor((this.paddedHeight - this.customHeight) / 2);
+
+      const artkalPixels = new Map();
+      const colorUsage = new Map(); // 统计颜色使用次数
+
       // 将每个像素映射到最接近的 Artkal 颜色
       for (let y = 0; y < this.customHeight; y++) {
         for (let x = 0; x < this.customWidth; x++) {
-          const idx = (y * this.customWidth + x) * 4
-          const alpha = data[idx + 3]
-          
+          const idx = (y * this.customWidth + x) * 4;
+          const alpha = data[idx + 3];
+
           // 跳过透明像素
-          if (alpha < 128) continue
-          
-          const r = data[idx]
-          const g = data[idx + 1]
-          const b = data[idx + 2]
-          
+          if (alpha < 128) continue;
+
+          const r = data[idx];
+          const g = data[idx + 1];
+          const b = data[idx + 2];
+
           // 找到最接近的 Artkal 颜色
-          let minDist = Infinity
-          let closestColor = artkalPalette[0]
-          
+          let minDist = Infinity;
+          let closestColor = artkalPalette[0];
+
           for (const artkalHex of artkalPalette) {
-            const artkalRgb = this.hexToRgb(artkalHex)
+            const artkalRgb = this.hexToRgb(artkalHex);
             const dist = Math.sqrt(
               Math.pow(r - artkalRgb[0], 2) +
-              Math.pow(g - artkalRgb[1], 2) +
-              Math.pow(b - artkalRgb[2], 2)
-            )
+                Math.pow(g - artkalRgb[1], 2) +
+                Math.pow(b - artkalRgb[2], 2),
+            );
             if (dist < minDist) {
-              minDist = dist
-              closestColor = artkalHex
+              minDist = dist;
+              closestColor = artkalHex;
             }
           }
-          
+
           // 使用偏移后的坐标
-          artkalPixels.set(`${x + offsetX},${y + offsetY}`, closestColor)
-          
+          artkalPixels.set(`${x + offsetX},${y + offsetY}`, closestColor);
+
           // 统计颜色使用次数
-          colorUsage.set(closestColor, (colorUsage.get(closestColor) || 0) + 1)
+          colorUsage.set(closestColor, (colorUsage.get(closestColor) || 0) + 1);
         }
       }
-      
+
       // 保存预览数据
-      this.previewPixels = artkalPixels
-      
+      this.previewPixels = artkalPixels;
+
       // 生成使用的颜色列表
       this.usedColors = Array.from(colorUsage.entries())
         .map(([hex, count]) => {
-          const colorInfo = selectedArtkalColors.find(c => c.hex === hex)
+          const colorInfo = selectedArtkalColors.find((c) => c.hex === hex);
           return {
             hex,
-            code: colorInfo?.code || '',
-            name: colorInfo?.name || '',
-            count
-          }
+            code: colorInfo?.code || "",
+            name: colorInfo?.name || "",
+            count,
+          };
         })
-        .sort((a, b) => b.count - a.count) // 按使用次数排序
-      
+        .sort((a, b) => b.count - a.count); // 按使用次数排序
+
       // 绘制预览
-      this.drawPreview(artkalPixels)
-      
+      this.drawPreview(artkalPixels);
+
       // 进入预览步骤
-      this.isProcessing = false
-      this.stepAnimationClass = 'step-exit'
+      this.isProcessing = false;
+      this.stepAnimationClass = "step-exit";
       setTimeout(() => {
-        this.step = 3  // 图片模式的预览是第4步
-        this.stepAnimationClass = 'step-enter'
-      }, 150)
+        this.step = 3; // 图片模式的预览是第4步
+        this.stepAnimationClass = "step-enter";
+      }, 150);
     },
-    
+
     drawPreview(pixels) {
       setTimeout(() => {
-        const query = uni.createSelectorQuery().in(this)
-        query.select('#previewDisplayCanvas')
+        const query = uni.createSelectorQuery().in(this);
+        query
+          .select("#previewDisplayCanvas")
           .fields({ node: true, size: true })
           .exec((res) => {
             if (!res || !res[0]) {
-              console.error('Canvas not found, 重试中...')
+              console.error("Canvas not found, 重试中...");
               // 重试一次
               setTimeout(() => {
-                this.drawPreview(pixels)
-              }, 500)
-              return
+                this.drawPreview(pixels);
+              }, 500);
+              return;
             }
-            
-            const canvas = res[0].node
+
+            const canvas = res[0].node;
             if (!canvas) {
-              console.error('Canvas node is null')
-              return
+              console.error("Canvas node is null");
+              return;
             }
-            
-            const ctx = canvas.getContext('2d')
+
+            const ctx = canvas.getContext("2d");
             if (!ctx) {
-              console.error('Canvas context is null')
-              return
+              console.error("Canvas context is null");
+              return;
             }
-            
-            const containerWidth = res[0].width
-            const containerHeight = res[0].height
-            
+
+            const containerWidth = res[0].width;
+            const containerHeight = res[0].height;
+
             // canvas 物理尺寸 = 容器尺寸
-            canvas.width = containerWidth
-            canvas.height = containerHeight
-            
+            canvas.width = containerWidth;
+            canvas.height = containerHeight;
+
             // 清空背景（透明，视觉背景通过CSS容器实现）
-            ctx.clearRect(0, 0, containerWidth, containerHeight)
-            
+            ctx.clearRect(0, 0, containerWidth, containerHeight);
+
             // 使用最大边作为正方形基准
-            const maxDimension = Math.max(this.paddedWidth, this.paddedHeight)
-            
+            const maxDimension = Math.max(this.paddedWidth, this.paddedHeight);
+
             // 根据项目大小选择倍数
             // #ifdef H5
-            const multiplier = (maxDimension > 64) ? 3 : 2
+            const multiplier = maxDimension > 64 ? 3 : 2;
             // #endif
-            
+
             // #ifdef MP-WEIXIN
-            const multiplier = (maxDimension > 64) ? 1.5 : 1
+            const multiplier = maxDimension > 64 ? 1.5 : 1;
             // #endif
-            
+
             let scale = Math.min(
-              containerWidth / (maxDimension * multiplier), 
-              containerHeight / (maxDimension * multiplier)
-            )
+              containerWidth / (maxDimension * multiplier),
+              containerHeight / (maxDimension * multiplier),
+            );
             // scale >= 1 取整，scale < 1 保留两位小数
             if (scale >= 4) {
               // #ifdef H5
-              scale = 1.65
+              scale = 1.65;
               // #endif
-              
+
               // #ifdef MP-WEIXIN
-              scale = 4
+              scale = 4;
               // #endif
             } else {
               // #ifdef H5
-              scale = (Math.round(scale * 100) / 100)
+              scale = Math.round(scale * 100) / 100;
               // #endif
-              
+
               // #ifdef MP-WEIXIN
-              scale = (Math.round(scale * 100) / 100) * 1.5
+              scale = (Math.round(scale * 100) / 100) * 1.5;
               // #endif
-              
             }
             // 计算画布内容的实际尺寸
-            const contentWidth = this.paddedWidth * scale
-            const contentHeight = this.paddedHeight * scale
-            
+            const contentWidth = this.paddedWidth * scale;
+            const contentHeight = this.paddedHeight * scale;
+
             // 计算居中偏移量（让整个画布内容在canvas中居中）
-            const canvasCenterOffsetX = (containerWidth - contentWidth) / 2
-            const canvasCenterOffsetY = (containerHeight - contentHeight) / 2
-            
+            const canvasCenterOffsetX = (containerWidth - contentWidth) / 2;
+            const canvasCenterOffsetY = (containerHeight - contentHeight) / 2;
+
             // 计算图形在画布内的居中偏移量
-            const centerOffsetX = (maxDimension - this.paddedWidth) / 2
-            const centerOffsetY = (maxDimension - this.paddedHeight) / 2
-            
+            const centerOffsetX = (maxDimension - this.paddedWidth) / 2;
+            const centerOffsetY = (maxDimension - this.paddedHeight) / 2;
+
             // 绘制像素（加上两层偏移）
             pixels.forEach((color, key) => {
-              const [x, y] = key.split(',').map(Number)
-              ctx.fillStyle = color
+              const [x, y] = key.split(",").map(Number);
+              ctx.fillStyle = color;
               ctx.fillRect(
-                canvasCenterOffsetX + (x + centerOffsetX) * scale, 
-                canvasCenterOffsetY + (y + centerOffsetY) * scale, 
-                scale, 
-                scale
-              )
-            })
-            
-            console.log('Preview drawn:', pixels.size, 'pixels', 'scale:', scale, 'canvasOffset:', canvasCenterOffsetX, canvasCenterOffsetY)
-            
+                canvasCenterOffsetX + (x + centerOffsetX) * scale,
+                canvasCenterOffsetY + (y + centerOffsetY) * scale,
+                scale,
+                scale,
+              );
+            });
+
+            console.log(
+              "Preview drawn:",
+              pixels.size,
+              "pixels",
+              "scale:",
+              scale,
+              "canvasOffset:",
+              canvasCenterOffsetX,
+              canvasCenterOffsetY,
+            );
+
             // #ifdef MP-WEIXIN
             // 小程序：将canvas转为图片
             setTimeout(() => {
-              uni.canvasToTempFilePath({
-                canvas: canvas,
-                success: (res) => {
-                  this.previewImageUrl = res.tempFilePath
-                  console.log('Canvas转图片成功:', res.tempFilePath)
+              uni.canvasToTempFilePath(
+                {
+                  canvas: canvas,
+                  success: (res) => {
+                    this.previewImageUrl = res.tempFilePath;
+                    console.log("Canvas转图片成功:", res.tempFilePath);
+                  },
+                  fail: (err) => {
+                    console.error("Canvas转图片失败:", err);
+                  },
                 },
-                fail: (err) => {
-                  console.error('Canvas转图片失败:', err)
-                }
-              }, this)
-            }, 100)
+                this,
+              );
+            }, 100);
             // #endif
-          })
-      }, 500)
+          });
+      }, 500);
     },
-    
-    clearImage() {
-      this.imageFile = null
-      this.previewUrl = null
-      this.previewPixels = null
-      this.usedColors = []
-    },
-    
-    handleNext() {
-      if (!this.canProceed || this.isProcessing) return
 
-      if (this.mode === 'blank') {
+    clearImage() {
+      this.imageFile = null;
+      this.previewUrl = null;
+      this.previewPixels = null;
+      this.usedColors = [];
+      this.recommendedSize = null;
+      this.contentRatio = null;
+    },
+
+    handleNext() {
+      if (!this.canProceed || this.isProcessing) return;
+
+      if (this.mode === "blank") {
         // 空白画布流程：名称(0) → 尺寸(1) → 颜色(2) → 创建
         if (this.step === 0 || this.step === 1) {
-          this.stepAnimationClass = 'step-exit'
+          this.stepAnimationClass = "step-exit";
           setTimeout(() => {
-            this.step++
-            this.stepAnimationClass = 'step-enter'
-          }, 150)
+            this.step++;
+            this.stepAnimationClass = "step-enter";
+          }, 150);
         } else if (this.step === 2) {
           // 空白画布直接创建
-          this.handleCreate()
+          this.handleCreate();
         }
-      } else if (this.mode === 'image') {
+      } else if (this.mode === "image") {
         // 图片导入流程：名称(0) → 图片+尺寸(1) → 颜色(2) → 预览(3) → 创建
         if (this.step === 0 || this.step === 1) {
-          this.stepAnimationClass = 'step-exit'
+          this.stepAnimationClass = "step-exit";
           setTimeout(() => {
-            this.step++
-            this.stepAnimationClass = 'step-enter'
-          }, 150)
+            this.step++;
+            this.stepAnimationClass = "step-enter";
+          }, 150);
         } else if (this.step === 2) {
           // 生成预览
-          this.generatePreview()
+          this.generatePreview();
         } else if (this.step === 3) {
           // 确认创建
-          this.handleCreate()
+          this.handleCreate();
         }
       }
     },
-    
+
     async handleCreate() {
-      if (this.mode === 'image' && this.previewPixels) {
+      if (this.mode === "image" && this.previewPixels) {
         // 使用预览数据创建项目
-        this.isProcessing = true
+        this.isProcessing = true;
 
         try {
           // 将临时文件转为base64，避免临时文件被系统清理
-          let thumbnailBase64 = null
-          const tempPath = this.previewImageUrl || this.previewUrl
+          let thumbnailBase64 = null;
+          const tempPath = this.previewImageUrl || this.previewUrl;
           if (tempPath) {
             try {
               // #ifdef MP-WEIXIN
-              const fs = uni.getFileSystemManager()
-              const base64Data = fs.readFileSync(tempPath, 'base64')
-              thumbnailBase64 = 'data:image/png;base64,' + base64Data
+              const fs = uni.getFileSystemManager();
+              const base64Data = fs.readFileSync(tempPath, "base64");
+              thumbnailBase64 = "data:image/png;base64," + base64Data;
               // #endif
               // #ifdef H5
-              thumbnailBase64 = tempPath
+              thumbnailBase64 = tempPath;
               // #endif
             } catch (e) {
-              console.error('缩略图转base64失败:', e)
+              console.error("缩略图转base64失败:", e);
             }
           }
 
           // 创建项目（未发布状态）
-          const palette = Array.from(this.selectedColors)
+          const palette = Array.from(this.selectedColors);
           const projectId = this.projectStore.addProject(
             this.name,
             this.customWidth,
@@ -1195,37 +1618,36 @@ export default {
             palette,
             this.customWidth,
             this.customHeight,
-            thumbnailBase64
-          )
+            thumbnailBase64,
+          );
 
           if (!projectId) {
-            this.toast.showError('创建项目失败')
-            this.isProcessing = false
-            return
+            this.toast.showError("创建项目失败");
+            this.isProcessing = false;
+            return;
           }
 
           // 将预览像素数据保存到本地存储
           if (this.previewPixels) {
-            this.projectStore.saveProjectPixels(projectId, this.previewPixels)
+            this.projectStore.saveProjectPixels(projectId, this.previewPixels);
           }
 
-          this.toast.showSuccess('项目创建成功！')
-          this.isProcessing = false
+          this.toast.showSuccess("项目创建成功！");
+          this.isProcessing = false;
 
           // 返回 workspace 页面
           setTimeout(() => {
-            uni.navigateBack()
-          }, 500)
-
+            uni.navigateBack();
+          }, 500);
         } catch (error) {
-          console.error('创建项目失败:', error)
-          this.toast.showError('创建项目失败，请重试')
-          this.isProcessing = false
+          console.error("创建项目失败:", error);
+          this.toast.showError("创建项目失败，请重试");
+          this.isProcessing = false;
         }
-      } else if (this.mode === 'blank') {
+      } else if (this.mode === "blank") {
         // 空白画布创建项目（未发布状态）
         try {
-          const palette = Array.from(this.selectedColors)
+          const palette = Array.from(this.selectedColors);
           const projectId = this.projectStore.addProject(
             this.name,
             this.customWidth,
@@ -1234,145 +1656,176 @@ export default {
             palette,
             this.customWidth,
             this.customHeight,
-            null
-          )
+            null,
+          );
 
           if (!projectId) {
-            this.toast.showError('创建项目失败')
-            return
+            this.toast.showError("创建项目失败");
+            return;
           }
 
-          this.toast.showSuccess('项目创建成功！')
+          this.toast.showSuccess("项目创建成功！");
 
           // 返回 workspace 页面
           setTimeout(() => {
-            uni.navigateBack()
-          }, 500)
-
+            uni.navigateBack();
+          }, 500);
         } catch (error) {
-          console.error('创建项目失败:', error)
-          this.toast.showError('创建项目失败，请重试')
+          console.error("创建项目失败:", error);
+          this.toast.showError("创建项目失败，请重试");
         }
       }
     },
-    
+
     saveThumbnailForProject(projectId, pixels, callback) {
-      console.log('开始生成缩略图，projectId:', projectId, '像素数量:', pixels.size)
-      
-      const query = uni.createSelectorQuery().in(this)
-      query.select('#thumbnailSaveCanvas')
+      console.log(
+        "开始生成缩略图，projectId:",
+        projectId,
+        "像素数量:",
+        pixels.size,
+      );
+
+      const query = uni.createSelectorQuery().in(this);
+      query
+        .select("#thumbnailSaveCanvas")
         .fields({ node: true, size: true })
         .exec((res) => {
           if (!res || !res[0] || !res[0].node) {
-            console.error('Thumbnail canvas not found')
-            if (callback) callback()
-            return
+            console.error("Thumbnail canvas not found");
+            if (callback) callback();
+            return;
           }
-          
-          const canvas = res[0].node
-          const ctx = canvas.getContext('2d')
+
+          const canvas = res[0].node;
+          const ctx = canvas.getContext("2d");
           if (!ctx) {
-            console.error('Canvas context is null')
-            if (callback) callback()
-            return
+            console.error("Canvas context is null");
+            if (callback) callback();
+            return;
           }
-          
+
           // 缩小到 100x100 节省存储空间
-          const thumbSize = 100
-          canvas.width = thumbSize
-          canvas.height = thumbSize
-          
-          ctx.clearRect(0, 0, thumbSize, thumbSize)
-          
+          const thumbSize = 100;
+          canvas.width = thumbSize;
+          canvas.height = thumbSize;
+
+          ctx.clearRect(0, 0, thumbSize, thumbSize);
+
           // 计算缩放比例，让图片尽可能填充画布
-          const scale = Math.min(thumbSize / this.paddedWidth, thumbSize / this.paddedHeight) * 0.9
-          
+          const scale =
+            Math.min(
+              thumbSize / this.paddedWidth,
+              thumbSize / this.paddedHeight,
+            ) * 0.9;
+
           // 计算居中偏移
-          const scaledWidth = this.paddedWidth * scale
-          const scaledHeight = this.paddedHeight * scale
-          const offsetX = (thumbSize - scaledWidth) / 2
-          const offsetY = (thumbSize - scaledHeight) / 2
-          
+          const scaledWidth = this.paddedWidth * scale;
+          const scaledHeight = this.paddedHeight * scale;
+          const offsetX = (thumbSize - scaledWidth) / 2;
+          const offsetY = (thumbSize - scaledHeight) / 2;
+
           // 绘制像素
           pixels.forEach((color, key) => {
-            const [x, y] = key.split(',').map(Number)
-            ctx.fillStyle = color
+            const [x, y] = key.split(",").map(Number);
+            ctx.fillStyle = color;
             ctx.fillRect(
-              offsetX + x * scale, 
-              offsetY + y * scale, 
-              scale, 
-              scale
-            )
-          })
-          
+              offsetX + x * scale,
+              offsetY + y * scale,
+              scale,
+              scale,
+            );
+          });
+
           // 等待绘制完成后转换为 Base64
           setTimeout(() => {
-            uni.canvasToTempFilePath({
-              canvas: canvas,
-              x: 0,
-              y: 0,
-              width: thumbSize,
-              height: thumbSize,
-              destWidth: thumbSize,
-              destHeight: thumbSize,
-              fileType: 'png',
-              quality: 0.8,
-              success: (res) => {
-                // #ifdef MP-WEIXIN
-                // 小程序：转为 Base64
-                const fs = uni.getFileSystemManager()
-                fs.readFile({
-                  filePath: res.tempFilePath,
-                  encoding: 'base64',
-                  success: (fileRes) => {
-                    const base64 = 'data:image/png;base64,' + fileRes.data
-                    console.log('缩略图生成成功 (Base64):', Math.round(base64.length / 1024), 'KB')
-                    this.projectStore.updateProjectThumbnail(projectId, base64)
-                    if (callback) callback()
-                  },
-                  fail: (err) => {
-                    console.error('读取缩略图文件失败:', err)
+            uni.canvasToTempFilePath(
+              {
+                canvas: canvas,
+                x: 0,
+                y: 0,
+                width: thumbSize,
+                height: thumbSize,
+                destWidth: thumbSize,
+                destHeight: thumbSize,
+                fileType: "png",
+                quality: 0.8,
+                success: (res) => {
+                  // #ifdef MP-WEIXIN
+                  // 小程序：转为 Base64
+                  const fs = uni.getFileSystemManager();
+                  fs.readFile({
+                    filePath: res.tempFilePath,
+                    encoding: "base64",
+                    success: (fileRes) => {
+                      const base64 = "data:image/png;base64," + fileRes.data;
+                      console.log(
+                        "缩略图生成成功 (Base64):",
+                        Math.round(base64.length / 1024),
+                        "KB",
+                      );
+                      this.projectStore.updateProjectThumbnail(
+                        projectId,
+                        base64,
+                      );
+                      if (callback) callback();
+                    },
+                    fail: (err) => {
+                      console.error("读取缩略图文件失败:", err);
+                      // 降级：保存临时文件路径
+                      this.projectStore.updateProjectThumbnail(
+                        projectId,
+                        res.tempFilePath,
+                      );
+                      if (callback) callback();
+                    },
+                  });
+                  // #endif
+
+                  // #ifdef H5
+                  // H5：直接使用 canvas.toDataURL
+                  try {
+                    const base64 = canvas.toDataURL("image/png", 0.8);
+                    console.log(
+                      "缩略图生成成功 (Base64):",
+                      Math.round(base64.length / 1024),
+                      "KB",
+                    );
+                    this.projectStore.updateProjectThumbnail(projectId, base64);
+                    if (callback) callback();
+                  } catch (err) {
+                    console.error("生成 Base64 失败:", err);
                     // 降级：保存临时文件路径
-                    this.projectStore.updateProjectThumbnail(projectId, res.tempFilePath)
-                    if (callback) callback()
+                    this.projectStore.updateProjectThumbnail(
+                      projectId,
+                      res.tempFilePath,
+                    );
+                    if (callback) callback();
                   }
-                })
-                // #endif
-                
-                // #ifdef H5
-                // H5：直接使用 canvas.toDataURL
-                try {
-                  const base64 = canvas.toDataURL('image/png', 0.8)
-                  console.log('缩略图生成成功 (Base64):', Math.round(base64.length / 1024), 'KB')
-                  this.projectStore.updateProjectThumbnail(projectId, base64)
-                  if (callback) callback()
-                } catch (err) {
-                  console.error('生成 Base64 失败:', err)
-                  // 降级：保存临时文件路径
-                  this.projectStore.updateProjectThumbnail(projectId, res.tempFilePath)
-                  if (callback) callback()
-                }
-                // #endif
+                  // #endif
+                },
+                fail: (err) => {
+                  console.error("保存项目缩略图失败:", err);
+                  if (callback) callback();
+                },
               },
-              fail: (err) => {
-                console.error('保存项目缩略图失败:', err)
-                if (callback) callback()
-              }
-            }, this)
-          }, 300)
-        })
+              this,
+            );
+          }, 300);
+        });
     },
-    
+
     hexToRgb(hex) {
-      const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex)
-      return result ? [
-        parseInt(result[1], 16),
-        parseInt(result[2], 16),
-        parseInt(result[3], 16)
-      ] : [0, 0, 0]
-    }
-  }
-}
+      const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+      return result
+        ? [
+            parseInt(result[1], 16),
+            parseInt(result[2], 16),
+            parseInt(result[3], 16),
+          ]
+        : [0, 0, 0];
+    },
+  },
+};
 </script>
 
 <style scoped>
@@ -1544,7 +1997,7 @@ export default {
 .empty-btn-text {
   font-size: 28rpx;
   font-weight: 600;
-  color: #FFFFFF;
+  color: #ffffff;
 }
 
 /* 状态栏占位 */
@@ -1564,27 +2017,40 @@ export default {
 }
 
 /* 顶部导航 */
-.header {
-  flex-shrink: 0;
-  height: 112rpx;
+.navbar {
+  height: 88rpx;
   display: flex;
   align-items: center;
-  padding: 0 48rpx;
+  justify-content: center;
+  padding: 0 32rpx;
+  background-color: var(--color-card-background);
   border-bottom: 2rpx solid var(--border-primary);
-  background-color: var(--bg-elevated);
+  position: relative;
 }
 
-.header-content {
+.nav-left {
+  position: absolute;
+  left: 32rpx;
+  width: 80rpx;
   display: flex;
   align-items: center;
+  justify-content: flex-start;
 }
 
-.header-title {
-  font-size: 36rpx;
-  font-weight: 700;
+.nav-right {
+  position: absolute;
+  right: 32rpx;
+  width: 80rpx;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.nav-title {
+  font-size: 32rpx;
+  font-weight: 600;
   color: var(--color-text-primary);
 }
-
 .content-area {
   flex: 1;
   padding: 0 32rpx 32rpx;
@@ -1865,6 +2331,30 @@ export default {
   background-color: rgba(255, 51, 51, 0.1);
 }
 
+.recommend-tip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20rpx 24rpx;
+  margin-top: 16rpx;
+  background: rgba(0, 243, 255, 0.08);
+  border: 1rpx solid rgba(0, 243, 255, 0.2);
+  border-radius: 16rpx;
+}
+
+.recommend-text {
+  font-size: 24rpx;
+  color: var(--accent-primary);
+}
+
+.recommend-btn-text {
+  font-size: 24rpx;
+  color: var(--accent-primary);
+  font-weight: bold;
+  white-space: nowrap;
+  margin-left: 16rpx;
+}
+
 .preview-btn-text {
   font-size: 28rpx;
   color: var(--text-primary);
@@ -2129,14 +2619,14 @@ export default {
 .preset-card.active {
   background-color: var(--create-preset-card-bg);
   border-color: var(--create-preset-card-border-color);
-  color:var(--create-preset-name);
-}
-
-.preset-card.active .preset-name{
   color: var(--create-preset-name);
 }
 
-.preset-card.active .preset-count{
+.preset-card.active .preset-name {
+  color: var(--create-preset-name);
+}
+
+.preset-card.active .preset-count {
   color: var(--create-preset-count);
 }
 
@@ -2351,7 +2841,11 @@ export default {
 
 .next-btn {
   padding: 32rpx;
-  background: linear-gradient(135deg, var(--text-primary) 0%, var(--text-secondary) 100%);
+  background: linear-gradient(
+    135deg,
+    var(--text-primary) 0%,
+    var(--text-secondary) 100%
+  );
   color: var(--text-inverse);
   border-radius: 24rpx;
   display: flex;
@@ -2367,7 +2861,11 @@ export default {
 }
 
 .next-btn.disabled {
-  background: linear-gradient(135deg, var(--text-primary) 0%, var(--text-secondary) 100%);
+  background: linear-gradient(
+    135deg,
+    var(--text-primary) 0%,
+    var(--text-secondary) 100%
+  );
   box-shadow: none;
   opacity: 1;
   pointer-events: none;

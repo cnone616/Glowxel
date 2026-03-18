@@ -8,6 +8,7 @@ int DisplayManager::currentBrightness = 50;
 bool DisplayManager::clientConnected = false;
 uint8_t DisplayManager::canvasBuffer[64][64][3];
 bool DisplayManager::canvasInitialized = false;
+bool DisplayManager::isCanvasMode = false;
 DisplayManager::BlackPixel* DisplayManager::blackPixels = nullptr;
 int DisplayManager::blackPixelCount = 0;
 
@@ -33,7 +34,7 @@ void DisplayManager::setupMatrix() {
   dma_display->clearScreen();
 
   Serial.println("显示开机Logo...");
-  drawLogo(false);  // 开机 logo 在上半部分
+  drawLogo(12, 7);  // 开机 logo 偏上
   // 开机 logo 额外显示品牌名
   dma_display->setTextSize(1);
   dma_display->setTextColor(dma_display->color565(220, 220, 220));
@@ -43,15 +44,12 @@ void DisplayManager::setupMatrix() {
   Serial.println("LED灯板初始化完成");
 }
 
-void DisplayManager::drawLogo(bool centered) {
+void DisplayManager::drawLogo(int x, int y) {
   uint16_t orange = dma_display->color565(249, 115, 22);
   uint16_t blue   = dma_display->color565(59, 130, 246);
   uint16_t pink   = dma_display->color565(236, 72, 153);
 
   int bs = 11, gap = 3, step = bs + gap;
-  int totalW = bs * 3 + gap * 2;
-  int sx = (64 - totalW) / 2;
-  int sy = centered ? 18 : 7;  // 闹钟背景=18, 开机=7
 
   uint16_t grid[3][3] = {
     { orange, orange, blue },
@@ -61,51 +59,69 @@ void DisplayManager::drawLogo(bool centered) {
 
   for (int row = 0; row < 3; row++)
     for (int col = 0; col < 3; col++)
-      dma_display->fillRect(sx + col * step, sy + row * step, bs, bs, grid[row][col]);
+      dma_display->fillRect(x + col * step, y + row * step, bs, bs, grid[row][col]);
 }
 
 // 前向声明（定义在后面）
 static void _eraseClockRegion();
 static int clockConfig_timeY();
 
-void DisplayManager::displayClock() {
-  bool hasCustomImage = ConfigManager::clockConfig.image.show &&
-                        ConfigManager::imagePixels != nullptr &&
-                        ConfigManager::imagePixelCount > 0;
+void DisplayManager::displayClock(bool force) {
+  // 根据当前模式选择对应的时钟配置和像素数据
+  ClockConfig& cfg = (currentMode == MODE_ANIMATION)
+    ? ConfigManager::animClockConfig
+    : ConfigManager::clockConfig;
+
+  PixelData* imagePixels = (currentMode == MODE_ANIMATION)
+    ? ConfigManager::animImagePixels
+    : ConfigManager::staticImagePixels;
+
+  int imagePixelCount = (currentMode == MODE_ANIMATION)
+    ? ConfigManager::animImagePixelCount
+    : ConfigManager::staticImagePixelCount;
+
+  bool hasCustomImage = cfg.image.show &&
+                        imagePixels != nullptr &&
+                        imagePixelCount > 0;
 
   struct tm timeinfo;
   if (!getLocalTime(&timeinfo)) {
-    // 时间未同步：擦除时钟区域，画默认背景，显示白色 "--:--"
-    _eraseClockRegion();
+    // 时间未同步：清屏后画默认背景，显示白色 "--:--"
+    dma_display->clearScreen();
     if (currentMode == MODE_CANVAS && !hasCustomImage) {
-      drawLogo(true);  // 没有自定义图片时，Logo作为默认背景
+      drawLogo(12, 18);  // 时钟背景，给时间留空间
     }
     drawTinyTextCentered("--:--", clockConfig_timeY(), dma_display->color565(255, 255, 255));
     return;
   }
 
-  // 只在分钟变化时刷新，避免不必要的重绘
+  // 只在分钟变化时刷新，避免不必要的重绘（force=true 时跳过）
   static int s_lastMin = -1;
-  if (timeinfo.tm_min == s_lastMin) return;
+  if (!force && timeinfo.tm_min == s_lastMin) return;
   s_lastMin = timeinfo.tm_min;
 
-  // 擦除上一次时钟文字区域（不 clearScreen，不影响背景）
-  _eraseClockRegion();
+  // 强制模式：先清屏再重绘全部
+  if (force) {
+    dma_display->clearScreen();
+  } else {
+    // 普通模式：只擦除时钟文字区域
+    _eraseClockRegion();
+  }
 
   // 绘制背景
   if (currentMode == MODE_CANVAS) {
     if (hasCustomImage) {
       // 有自定义图片，画图片
-      for (int i = 0; i < ConfigManager::imagePixelCount; i++) {
-        PixelData& pixel = ConfigManager::imagePixels[i];
+      for (int i = 0; i < imagePixelCount; i++) {
+        PixelData& pixel = imagePixels[i];
         if (pixel.x < PANEL_RES_X && pixel.y < PANEL_RES_Y) {
           dma_display->drawPixelRGB888(pixel.x, pixel.y, pixel.r, pixel.g, pixel.b);
         }
         if (i % 100 == 0) yield();
       }
     } else {
-      // 没有自定义图片，画Logo九宫格作为默认背景
-      drawLogo(true);
+      // 没有自定义图片，画Logo九宫格作为时钟背景（偏上，给时间留空间）
+      drawLogo(12, 18);
     }
   }
 
@@ -116,67 +132,77 @@ void DisplayManager::displayClock() {
 // 擦除时钟文字区域，然后恢复该区域的背景像素（避免黑条覆盖背景图）
 static void _eraseClockRegion() {
   auto* d = DisplayManager::dma_display;
-  auto& c = ConfigManager::clockConfig;
-  bool hasImage = c.image.show && ConfigManager::imagePixels != nullptr && ConfigManager::imagePixelCount > 0;
+  auto& c = (DisplayManager::currentMode == MODE_ANIMATION)
+    ? ConfigManager::animClockConfig
+    : ConfigManager::clockConfig;
 
-  // 每行文字高度：fontSize * 6px（3x5字体+间距），宽度按最长文字估算
+  PixelData* imagePixels = (DisplayManager::currentMode == MODE_ANIMATION)
+    ? ConfigManager::animImagePixels
+    : ConfigManager::staticImagePixels;
+
+  int imagePixelCount = (DisplayManager::currentMode == MODE_ANIMATION)
+    ? ConfigManager::animImagePixelCount
+    : ConfigManager::staticImagePixelCount;
+
+  bool hasImage = c.image.show && imagePixels != nullptr && imagePixelCount > 0;
+
   auto eraseRow = [&](int y, int fontSize) {
     int h = fontSize * 6;
     int startY = y - 1;
     if (startY < 0) startY = 0;
     int endY = startY + h;
     if (endY > 64) endY = 64;
-    // 先涂黑
     for (int py = startY; py < endY; py++) {
       for (int px = 0; px < 64; px++) {
         d->drawPixelRGB888(px, py, 0, 0, 0);
       }
     }
-    // 再恢复该区域的背景像素
     if (hasImage) {
-      for (int i = 0; i < ConfigManager::imagePixelCount; i++) {
-        PixelData& pixel = ConfigManager::imagePixels[i];
+      for (int i = 0; i < imagePixelCount; i++) {
+        PixelData& pixel = imagePixels[i];
         if (pixel.y >= startY && pixel.y < endY && pixel.x < 64) {
           d->drawPixelRGB888(pixel.x, pixel.y, pixel.r, pixel.g, pixel.b);
         }
       }
     }
   };
-  // 时间始终显示，擦除时间行
   eraseRow(c.time.y, c.time.fontSize > 0 ? c.time.fontSize : 1);
   if (c.date.show) eraseRow(c.date.y, c.date.fontSize > 0 ? c.date.fontSize : 1);
   if (c.week.show) eraseRow(c.week.y, 1);
 }
 
 static int clockConfig_timeY() {
-  return ConfigManager::clockConfig.time.y;
+  return (DisplayManager::currentMode == MODE_ANIMATION)
+    ? ConfigManager::animClockConfig.time.y
+    : ConfigManager::clockConfig.time.y;
 }
 
 void DisplayManager::drawClockOverlay() {
   struct tm timeinfo;
   if (!getLocalTime(&timeinfo)) return;
 
-  // 显示时间 HH:MM（水平居中，与 displayClock 保持一致）
+  auto& c = (currentMode == MODE_ANIMATION)
+    ? ConfigManager::animClockConfig
+    : ConfigManager::clockConfig;
+
   char timeStr[6];
   sprintf(timeStr, "%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min);
-  drawTinyTextCentered(timeStr, ConfigManager::clockConfig.time.y,
-    dma_display->color565(ConfigManager::clockConfig.time.r, ConfigManager::clockConfig.time.g, ConfigManager::clockConfig.time.b),
-    ConfigManager::clockConfig.time.fontSize);
+  drawTinyTextCentered(timeStr, c.time.y,
+    dma_display->color565(c.time.r, c.time.g, c.time.b),
+    c.time.fontSize);
 
-  // 显示日期 MM-DD
-  if (ConfigManager::clockConfig.date.show) {
+  if (c.date.show) {
     char dateStr[6];
     sprintf(dateStr, "%02d-%02d", timeinfo.tm_mon + 1, timeinfo.tm_mday);
-    drawTinyTextCentered(dateStr, ConfigManager::clockConfig.date.y,
-      dma_display->color565(ConfigManager::clockConfig.date.r, ConfigManager::clockConfig.date.g, ConfigManager::clockConfig.date.b),
-      ConfigManager::clockConfig.date.fontSize);
+    drawTinyTextCentered(dateStr, c.date.y,
+      dma_display->color565(c.date.r, c.date.g, c.date.b),
+      c.date.fontSize);
   }
 
-  // 显示星期
-  if (ConfigManager::clockConfig.week.show) {
+  if (c.week.show) {
     const char* weekDays[] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
-    drawTinyTextCentered(weekDays[timeinfo.tm_wday], ConfigManager::clockConfig.week.y,
-      dma_display->color565(ConfigManager::clockConfig.week.r, ConfigManager::clockConfig.week.g, ConfigManager::clockConfig.week.b));
+    drawTinyTextCentered(weekDays[timeinfo.tm_wday], c.week.y,
+      dma_display->color565(c.week.r, c.week.g, c.week.b));
   }
 }
 

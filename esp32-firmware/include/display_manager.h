@@ -15,9 +15,9 @@ class DisplayManager {
 public:
   static void init();
   static void setupMatrix();
-  static void displayClock();
+  static void displayClock(bool force = false);
   static void drawClockOverlay();  // 不清屏，只叠加时钟文字
-  static void drawLogo(bool centered = true);  // 画九宫格 logo
+  static void drawLogo(int x, int y);  // 画九宫格 logo 到指定坐标
   static void displayImage(uint8_t* data, size_t len, int width, int height);
   static void clearScreen();
   static void setBrightness(int brightness);
@@ -34,6 +34,7 @@ public:
   // 画板模式相关
   static uint8_t canvasBuffer[64][64][3]; // [y][x][rgb]
   static bool canvasInitialized;
+  static bool isCanvasMode;  // true=纯画板（不画时钟），false=静态时钟
   
   // 黑色像素坐标存储
   struct BlackPixel {

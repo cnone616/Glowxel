@@ -7,6 +7,7 @@
 #include "websocket_handler.h"
 #include "web_server.h"
 #include "ota_manager.h"
+#include "tetris_effect.h"
 
 void setup() {
   Serial.begin(115200);
@@ -71,16 +72,28 @@ void loop() {
   if (WebSocketHandler::binaryDataPending && millis() - WebSocketHandler::lastBinaryReceiveTime > 500) {
     WebSocketHandler::binaryDataPending = false;
 
-    if (ConfigManager::imagePixels != nullptr && ConfigManager::imagePixelCount > 0) {
-      Serial.printf("=== 开始保存像素数据到 Preferences: %d 个像素 ===\n", ConfigManager::imagePixelCount);
+    // 根据当前模式选择对应的像素数据
+    PixelData*& imagePixels = (DisplayManager::currentMode == MODE_ANIMATION)
+      ? ConfigManager::animImagePixels
+      : ConfigManager::staticImagePixels;
+    int& imagePixelCount = (DisplayManager::currentMode == MODE_ANIMATION)
+      ? ConfigManager::animImagePixelCount
+      : ConfigManager::staticImagePixelCount;
 
-      ConfigManager::saveImagePixels();
+    if (imagePixels != nullptr && imagePixelCount > 0) {
+      Serial.printf("=== 开始保存像素数据到 Preferences: %d 个像素 ===\n", imagePixelCount);
+
+      if (DisplayManager::currentMode == MODE_ANIMATION) {
+        ConfigManager::saveAnimImagePixels();
+      } else {
+        ConfigManager::saveStaticImagePixels();
+      }
 
       // 发送确认消息给客户端
       StaticJsonDocument<128> confirmDoc;
       confirmDoc["status"] = "ok";
       confirmDoc["message"] = "pixels_received";
-      confirmDoc["count"] = ConfigManager::imagePixelCount;
+      confirmDoc["count"] = imagePixelCount;
 
       String confirmMsg;
       serializeJson(confirmDoc, confirmMsg);
@@ -93,35 +106,53 @@ void loop() {
     }
   }
 
+  // 心跳超时检测：15秒没收到消息认为客户端已断开
+  if (DisplayManager::clientConnected &&
+      millis() - WebSocketHandler::lastMessageTime > 15000) {
+    Serial.println("心跳超时，客户端已断开");
+    DisplayManager::clientConnected = false;
+  }
+
   // 根据当前模式执行不同的逻辑
   if (DisplayManager::currentMode == MODE_CANVAS) {
-    // 画布模式：每分钟更新一次时钟
-    static unsigned long lastClockUpdate = 0;
-    static int lastMinute = -1;
-    static unsigned long lastNtpRetry = 0;
-
-    struct tm timeinfo;
-    if (getLocalTime(&timeinfo)) {
-      if (timeinfo.tm_min != lastMinute) {
-        lastMinute = timeinfo.tm_min;
-        DisplayManager::displayClock();
-      }
+    if (DisplayManager::isCanvasMode) {
+      // 纯画板模式：不画时钟，不干预显示
+    } else if (DisplayManager::clientConnected) {
+      // 有客户端连接时（拼豆模式），不自动刷新时钟
     } else {
-      // 时间未同步：每60秒重试一次 NTP
-      if (millis() - lastNtpRetry > 60000) {
-        lastNtpRetry = millis();
-        Serial.println("NTP 未同步，重试...");
-        configTime(8 * 3600, 0, "pool.ntp.org");
-      }
-      // 每10秒刷新一次显示
-      if (millis() - lastClockUpdate > 10000) {
-        lastClockUpdate = millis();
-        DisplayManager::displayClock();
+      // 静态时钟模式，无客户端：每分钟更新一次时钟
+      static unsigned long lastClockUpdate = 0;
+      static int lastMinute = -1;
+      static unsigned long lastNtpRetry = 0;
+
+      struct tm timeinfo;
+      if (getLocalTime(&timeinfo)) {
+        if (timeinfo.tm_min != lastMinute) {
+          lastMinute = timeinfo.tm_min;
+          DisplayManager::displayClock();
+        }
+      } else {
+        if (millis() - lastNtpRetry > 60000) {
+          lastNtpRetry = millis();
+          Serial.println("NTP 未同步，重试...");
+          configTime(8 * 3600, 0, "pool.ntp.org");
+        }
+        if (millis() - lastClockUpdate > 10000) {
+          lastClockUpdate = millis();
+          DisplayManager::displayClock();
+        }
       }
     }
   } else if (DisplayManager::currentMode == MODE_ANIMATION) {
-    // 动画模式：持续更新 GIF 动画
-    AnimationManager::updateGIFAnimation();
+    // 动画模式
+    if (TetrisEffect::isActive) {
+      // 俄罗斯方块屏保
+      TetrisEffect::update();
+      TetrisEffect::render(DisplayManager::dma_display);
+    } else {
+      // GIF 动画
+      AnimationManager::updateGIFAnimation();
+    }
   }
 
   // 清理WebSocket，防止内存泄漏

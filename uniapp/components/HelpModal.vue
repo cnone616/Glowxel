@@ -11,17 +11,21 @@
           <Icon name="close" :size="32" />
         </view>
       </view>
-      
+
       <!-- Content -->
       <scroll-view scroll-y class="modal-content">
         <view class="help-items">
-          <view 
-            v-for="(item, index) in items" 
-            :key="index" 
-            class="help-item"
-          >
+          <view v-for="(item, index) in items" :key="index" class="help-item">
             <view class="item-icon">
-              <text class="item-icon-text">{{ item.iconText || '•' }}</text>
+              <Icon
+                v-if="item.iconName"
+                :name="item.iconName"
+                :size="32"
+                color="var(--accent-color)"
+              />
+              <text v-else class="item-icon-text">{{
+                item.iconText || "•"
+              }}</text>
             </view>
             <view class="item-content">
               <text class="item-title">{{ item.title }}</text>
@@ -30,7 +34,7 @@
           </view>
         </view>
       </scroll-view>
-      
+
       <!-- Footer -->
       <view class="modal-footer">
         <view class="confirm-btn" @click="handleClose">
@@ -42,34 +46,34 @@
 </template>
 
 <script>
-import Icon from './Icon.vue'
+import Icon from "./Icon.vue";
 
 export default {
   components: {
-    Icon
+    Icon,
   },
-  
+
   props: {
     isOpen: {
       type: Boolean,
-      default: false
+      default: false,
     },
     title: {
       type: String,
-      default: '帮助'
+      default: "帮助",
     },
     items: {
       type: Array,
-      default: () => []
-    }
+      default: () => [],
+    },
   },
-  
+
   methods: {
     handleClose() {
-      this.$emit('close')
-    }
-  }
-}
+      this.$emit("close");
+    },
+  },
+};
 </script>
 
 <style scoped>

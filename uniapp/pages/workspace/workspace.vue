@@ -69,68 +69,68 @@
 </template>
 
 <script>
-import { useProjectStore } from '../../store/project.js'
-import { useToast } from '../../composables/useToast.js'
-import statusBarMixin from '../../mixins/statusBar.js'
-import Icon from '../../components/Icon.vue'
-import Toast from '../../components/Toast.vue'
-import ProjectCard from '../../components/ProjectCard.vue'
+import { useProjectStore } from "../../store/project.js";
+import { useToast } from "../../composables/useToast.js";
+import statusBarMixin from "../../mixins/statusBar.js";
+import Icon from "../../components/Icon.vue";
+import Toast from "../../components/Toast.vue";
+import ProjectCard from "../../components/ProjectCard.vue";
 
 export default {
   mixins: [statusBarMixin],
   components: {
     Icon,
     Toast,
-    ProjectCard
+    ProjectCard,
   },
 
   data() {
     return {
       projectStore: null,
-      toast: null
-    }
+      toast: null,
+    };
   },
 
   computed: {
     filteredProjects() {
-      if (!this.projectStore) return []
-      return this.projectStore.projects || []
-    }
+      if (!this.projectStore) return [];
+      return this.projectStore.projects || [];
+    },
   },
 
   onLoad() {
-    this.projectStore = useProjectStore()
-    this.toast = useToast()
+    this.projectStore = useProjectStore();
+    this.toast = useToast();
 
     // 注册自定义 Toast 实例
     this.$nextTick(() => {
       if (this.$refs.toastRef) {
-        this.toast.setToastInstance(this.$refs.toastRef)
+        this.toast.setToastInstance(this.$refs.toastRef);
       }
-    })
+    });
   },
 
   onShow() {
     // 页面显示时刷新项目列表
     if (this.projectStore) {
-      this.projectStore.loadProjects()
+      this.projectStore.loadProjects();
     }
   },
 
   methods: {
     startBlankCanvas() {
       uni.navigateTo({
-        url: '/pages/create/create?mode=blank'
-      })
+        url: "/pages/create/create?mode=blank",
+      });
     },
 
     startImageImport() {
       uni.navigateTo({
-        url: '/pages/create/create?mode=image'
-      })
-    }
-  }
-}
+        url: "/pages/create/create?mode=image",
+      });
+    },
+  },
+};
 </script>
 
 <style scoped>
@@ -152,7 +152,7 @@ export default {
   height: 88rpx;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
 }
 
 .header-title {
@@ -304,6 +304,6 @@ export default {
 .empty-btn-text {
   font-size: 28rpx;
   font-weight: 600;
-  color: #FFFFFF;
+  color: #ffffff;
 }
 </style>
