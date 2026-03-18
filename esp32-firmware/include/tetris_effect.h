@@ -34,6 +34,9 @@ private:
   // 时间控制
   static unsigned long lastDropTime;
   static bool needsRender;  // update() 后标记需要渲染
+
+  // 增量渲染：上一帧的合成状态（board + 当前方块）
+  static uint8_t prevDisplay[TETRIS_MAX][TETRIS_MAX];
   
   // 方块定义：7种标准俄罗斯方块，4种旋转
   static const uint16_t pieces[7][4]; // 每个旋转状态用 16bit 编码 4x4 格子

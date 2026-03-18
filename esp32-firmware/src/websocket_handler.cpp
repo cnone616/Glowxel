@@ -556,6 +556,7 @@ void WebSocketHandler::handleJsonCommand(AsyncWebSocketClient *client, JsonDocum
       AnimationManager::currentGIF->isPlaying = true;
       AnimationManager::currentGIF->currentFrame = 0;
       AnimationManager::currentGIF->lastFrameTime = millis();
+      DisplayManager::dma_display->clearScreen();  // 清掉 loading 圈
       AnimationManager::renderGIFFrame(0);
 
       // 保存动画到 LittleFS，重启后可恢复

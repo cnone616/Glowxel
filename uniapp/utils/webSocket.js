@@ -353,15 +353,10 @@ class WebSocket {
    * @param {number} height - 高度
    */
   async showImage(pixels, width, height) {
-    // 计算居中偏移（板子是64x64，数据是52x52）
-    const offsetX = Math.floor((64 - width) / 2);
-    const offsetY = Math.floor((64 - height) / 2);
-
     // 先清屏
     await this.send({ cmd: "clear" });
 
-    // 只收集非空白的像素数据（包括黑色，但排除空白）
-    // 需要从原始的 localPixels 判断哪些位置有数据
+    // 收集像素数据，坐标直接使用前端传入的位置
     const sparseData = [];
     let idx = 0;
 
@@ -371,9 +366,7 @@ class WebSocket {
         const g = pixels[idx++];
         const b = pixels[idx++];
 
-        // 发送所有像素数据（包括处理后的黑色/暗色）
-        // 注意：这里的 pixels 数组已经包含了亮度调整
-        sparseData.push(x + offsetX, y + offsetY, r, g, b);
+        sparseData.push(x, y, r, g, b);
       }
     }
 

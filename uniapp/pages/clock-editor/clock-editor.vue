@@ -505,7 +505,7 @@
 
             <!-- GIF 播放控制 -->
             <view
-              v-if="gifRenderedFrameMaps && gifRenderedFrameMaps.length > 1"
+              v-if="gifAnimationData && gifAnimationData.frameCount > 1"
               class="setting-item-row"
             >
               <text class="setting-label">预览</text>
@@ -1606,44 +1606,60 @@ export default {
 
       const targetW = this.config.image.width || 64;
       const targetH = this.config.image.height || 64;
-      const esp32Data = parser.generateESP32Data(
+
+      // 只渲染一次，复用结果
+      const renderedFrames = parser.renderFrames(targetW, targetH);
+
+      // 生成 ESP32 数据，复用已渲染帧，避免重复渲染
+      this.gifAnimationData = parser.generateESP32Data(
         targetW,
         targetH,
         20,
-        this.getClockExcludePixels(),
+        null,
         this.config.image.x || 0,
         this.config.image.y || 0,
+        renderedFrames,
       );
-      this.gifAnimationData = esp32Data;
-      console.log(`GIF 动画数据: ${esp32Data.frameCount} 帧`);
+      console.log(`GIF 动画数据: ${this.gifAnimationData.frameCount} 帧`);
 
-      const renderedFrames = parser.renderFrames(targetW, targetH);
-      this.gifRenderedFrameMaps = renderedFrames.map((frame) => {
-        const pixelMap = new Map();
-        for (let y = 0; y < targetH; y++) {
-          for (let x = 0; x < targetW; x++) {
-            const idx = (y * targetW + x) * 4;
-            const r = frame.rgba[idx],
-              g = frame.rgba[idx + 1],
-              b = frame.rgba[idx + 2],
-              a = frame.rgba[idx + 3];
-            if (a > 10 && (r > 0 || g > 0 || b > 0)) {
-              pixelMap.set(
-                `${x},${y}`,
-                `#${[r, g, b].map((v) => v.toString(16).padStart(2, "0")).join("")}`,
-              );
-            }
-          }
-        }
-        return { pixels: pixelMap, delay: frame.delay || 100 };
-      });
+      // 存储渲染帧（用 Uint8Array 替代 Map，内存更小）
+      this.gifRenderedFrameMaps = renderedFrames.map((frame) => ({
+        rgba: frame.rgba, // Uint8Array，直接复用
+        delay: frame.delay || 100,
+        width: targetW,
+        height: targetH,
+      }));
 
       if (this.gifRenderedFrameMaps.length > 0) {
-        this.imagePixels = this.gifRenderedFrameMaps[0].pixels;
+        this.imagePixels = this._rgbaFrameToPixelMap(
+          this.gifRenderedFrameMaps[0],
+        );
         this.gifIsPlaying = false;
         this.gifFrameIndex = 0;
       }
-      console.log("GIF 帧 Map 已生成:", this.gifRenderedFrameMaps.length, "帧");
+      console.log("GIF 帧已生成:", this.gifRenderedFrameMaps.length, "帧");
+    },
+
+    // 将 rgba 帧转为 canvas 用的 Map（只在需要显示时转换）
+    _rgbaFrameToPixelMap(frame) {
+      const { rgba, width, height } = frame;
+      const pixelMap = new Map();
+      for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+          const idx = (y * width + x) * 4;
+          const r = rgba[idx],
+            g = rgba[idx + 1],
+            b = rgba[idx + 2],
+            a = rgba[idx + 3];
+          if (a > 10 && (r > 0 || g > 0 || b > 0)) {
+            pixelMap.set(
+              `${x},${y}`,
+              `#${[r, g, b].map((v) => v.toString(16).padStart(2, "0")).join("")}`,
+            );
+          }
+        }
+      }
+      return pixelMap;
     },
 
     // 保存 GIF 二进制到本地持久目录
@@ -1961,35 +1977,22 @@ export default {
         const targetW = this.config.image.width || 64;
         const targetH = this.config.image.height || 64;
         const renderedFrames = this._gifParser.renderFrames(targetW, targetH);
-        this.gifRenderedFrameMaps = renderedFrames.map((frame) => {
-          const pixelMap = new Map();
-          for (let y = 0; y < targetH; y++) {
-            for (let x = 0; x < targetW; x++) {
-              const idx = (y * targetW + x) * 4;
-              const r = frame.rgba[idx],
-                g = frame.rgba[idx + 1],
-                b = frame.rgba[idx + 2];
-              if (r > 0 || g > 0 || b > 0) {
-                pixelMap.set(
-                  `${x},${y}`,
-                  "#" +
-                    ((1 << 24) + (r << 16) + (g << 8) + b)
-                      .toString(16)
-                      .slice(1),
-                );
-              }
-            }
-          }
-          return { pixels: pixelMap, delay: frame.delay || 100 };
-        });
+        this.gifRenderedFrameMaps = renderedFrames.map((frame) => ({
+          rgba: frame.rgba,
+          delay: frame.delay || 100,
+          width: targetW,
+          height: targetH,
+        }));
         this.gifFrameIndex = 0;
-        this.imagePixels = this.gifRenderedFrameMaps[0].pixels;
+        this.imagePixels = this._rgbaFrameToPixelMap(
+          this.gifRenderedFrameMaps[0],
+        );
       }
 
       if (!this.gifRenderedFrameMaps || this.gifRenderedFrameMaps.length <= 1)
         return;
 
-      // 播放时重新计算 ESP32 数据（应用当前宽高和偏移）
+      // 播放时重新计算 ESP32 数据（应用当前宽高和偏移，复用已渲染帧）
       if (this._gifParser) {
         const targetW = this.config.image.width || 64;
         const targetH = this.config.image.height || 64;
@@ -1997,9 +2000,10 @@ export default {
           targetW,
           targetH,
           20,
-          this.getClockExcludePixels(),
+          null,
           this.config.image.x || 0,
           this.config.image.y || 0,
+          this.gifRenderedFrameMaps,
         );
       }
 
@@ -2011,7 +2015,7 @@ export default {
         this.gifFrameIndex =
           (this.gifFrameIndex + 1) % this.gifRenderedFrameMaps.length;
         const frameData = this.gifRenderedFrameMaps[this.gifFrameIndex];
-        this.imagePixels = frameData.pixels;
+        this.imagePixels = this._rgbaFrameToPixelMap(frameData);
         this.drawGIFFrame();
 
         const delay = Math.max(
@@ -2356,6 +2360,20 @@ export default {
           this.gifAnimationData &&
           this.gifAnimationData.frameCount > 0
         ) {
+          // 发送前用最新的 x/y/width/height 重新生成帧数据，避免偏移缓存旧值
+          if (this._gifParser) {
+            const targetW = this.config.image.width || 64;
+            const targetH = this.config.image.height || 64;
+            this.gifAnimationData = this._gifParser.generateESP32Data(
+              targetW,
+              targetH,
+              20,
+              null,
+              this.config.image.x || 0,
+              this.config.image.y || 0,
+              this.gifRenderedFrameMaps,
+            );
+          }
           console.log(`发送 GIF 动画: ${this.gifAnimationData.frameCount} 帧`);
 
           // 不要提前切换到动画模式——animation_end 会自动切换并播放
@@ -2383,8 +2401,8 @@ export default {
             const frame = frames[i]; // [type, delay, count, pixels]
             const type = frame[0];
             const delay = frame[1];
-            const pixels = frame[3];
-            const totalPixels = pixels.length;
+            const totalPixels = frame[2]; // 像素数量
+            const pixels = frame[3]; // Uint8Array，每像素5字节
 
             // 所有帧都走 frame_begin + 二进制 chunk
             resp = await sendAndWait({
@@ -2403,18 +2421,10 @@ export default {
               return;
             }
 
-            // 二进制分片发送像素数据
+            // 二进制分片发送像素数据（pixels 是 Uint8Array，每像素5字节）
             for (let offset = 0; offset < totalPixels; offset += CHUNK_SIZE) {
-              const chunk = pixels.slice(offset, offset + CHUNK_SIZE);
-              const binaryData = new Uint8Array(chunk.length * 5);
-              for (let j = 0; j < chunk.length; j++) {
-                const p = chunk[j]; // [x, y, r, g, b]
-                binaryData[j * 5] = p[0];
-                binaryData[j * 5 + 1] = p[1];
-                binaryData[j * 5 + 2] = p[2];
-                binaryData[j * 5 + 3] = p[3];
-                binaryData[j * 5 + 4] = p[4];
-              }
+              const end = Math.min(offset + CHUNK_SIZE, totalPixels);
+              const binaryData = pixels.subarray(offset * 5, end * 5);
 
               // 发送二进制并等待ESP32文本回复确认
               resp = await new Promise((resolve, reject) => {
