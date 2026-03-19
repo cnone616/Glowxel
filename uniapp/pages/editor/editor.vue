@@ -130,7 +130,7 @@
             :class="{ active: gridVisible }"
             @click="gridVisible = !gridVisible"
           >
-            <Icon name="3column" :size="36" />
+            <Icon name="a-Grid-ninejiugongge" :size="36" />
           </view>
           <view class="divider"></view>
           <view class="action-btn" @click="handleFit">

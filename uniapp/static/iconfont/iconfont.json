@@ -6,6 +6,13 @@
   "description": "",
   "glyphs": [
     {
+      "icon_id": "46532820",
+      "name": "Grid-nine (九宫格)",
+      "font_class": "a-Grid-ninejiugongge",
+      "unicode": "e92a",
+      "unicode_decimal": 59690
+    },
+    {
       "icon_id": "15838530",
       "name": "select",
       "font_class": "select",
