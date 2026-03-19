@@ -105,7 +105,7 @@
           <!-- 尺寸选择 -->
           <view class="size-section">
             <view class="size-header">
-              <Icon name="3column" :size="32" />
+              <Icon name="a-Grid-ninejiugongge" :size="32" />
               <text class="size-title">{{
                 mode === "image" ? "目标尺寸 (像素化)" : "画布尺寸"
               }}</text>

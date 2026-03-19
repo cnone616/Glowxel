@@ -48,8 +48,15 @@
             <Icon name="direction-right" :size="28" color="#C0C0C0" />
           </view>
         </view>
+        <view class="action-row" @click="editClock">
+          <Icon name="edit" :size="36" color="#4F7FFF" />
+          <view class="action-info">
+            <text class="action-label">自定义时钟样式</text>
+            <text class="action-desc">编辑时钟字体、颜色和背景</text>
+          </view>
+          <Icon name="direction-right" :size="28" color="#C0C0C0" />
+        </view>
       </view>
-
       <!-- 已连接：显示设备功能 -->
       <template v-if="connectionStatus === 'connected'">
         <!-- 设备模式 -->
@@ -117,7 +124,7 @@
                 :class="{ active: deviceMode === 'tetris' }"
               >
                 <Icon
-                  name="3column"
+                  name="a-Grid-ninejiugongge"
                   :size="40"
                   :color="deviceMode === 'tetris' ? '#4F7FFF' : '#999'"
                 />

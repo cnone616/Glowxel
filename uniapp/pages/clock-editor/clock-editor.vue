@@ -33,17 +33,90 @@
     </view>
 
     <!-- Canvas 预览区域 -->
-    <view class="canvas-section" v-show="!canvasHidden">
-      <view class="canvas-wrapper">
-        <canvas
-          type="2d"
+    <view class="canvas-section">
+      <view
+        class="canvas-container"
+        v-show="!canvasHidden"
+        ref="canvasContainer"
+      >
+        <PixelCanvas
+          v-if="canvasReady"
+          :width="64"
+          :height="64"
+          :pixels="allPixelsForPreview"
+          :zoom="zoom"
+          :offset-x="pan.x"
+          :offset-y="pan.y"
+          :canvas-width="containerSize.width"
+          :canvas-height="containerSize.height"
+          :grid-visible="gridVisible"
+          :allow-single-touch-pan="currentTool === 'move'"
+          :is-dark-mode="false"
           canvas-id="clockCanvas"
-          id="clockCanvas"
-          class="clock-canvas"
-          @touchstart="handleTouchStart"
-          @touchmove="handleTouchMove"
-          @touchend="handleTouchEnd"
-        ></canvas>
+          @pixel-click="handlePixelClick"
+          @pan="handlePan"
+          @zoom="handlePinchZoom"
+        />
+      </view>
+      <!-- 紧凑工具栏 -->
+      <view class="canvas-toolbar">
+        <view class="toolbar-group">
+          <view
+            class="tb-btn"
+            :class="{ disabled: historyIndex <= 0 }"
+            @click="handleUndo"
+          >
+            <Icon name="back" :size="32" />
+          </view>
+          <view
+            class="tb-btn"
+            :class="{ disabled: historyIndex >= history.length - 1 }"
+            @click="handleRedo"
+          >
+            <Icon name="forward" :size="32" />
+          </view>
+        </view>
+        <view class="toolbar-group">
+          <view
+            class="tb-btn"
+            :class="{ active: currentTool === 'pencil' }"
+            @click="currentTool = 'pencil'"
+          >
+            <Icon name="edit" :size="32" />
+          </view>
+          <view
+            class="tb-btn"
+            :class="{ active: currentTool === 'eraser' }"
+            @click="currentTool = 'eraser'"
+          >
+            <Icon name="ashbin" :size="32" />
+          </view>
+          <view
+            class="tb-btn"
+            :class="{ active: currentTool === 'move' }"
+            @click="currentTool = 'move'"
+          >
+            <Icon name="move" :size="32" />
+          </view>
+        </view>
+        <view class="toolbar-group">
+          <view class="tb-btn" @click="handleZoom(-1)"
+            ><Icon name="zoom-out" :size="32"
+          /></view>
+          <view class="tb-btn" @click="handleZoom(1)"
+            ><Icon name="zoom-in" :size="32"
+          /></view>
+          <view class="tb-btn" @click="handleFit"
+            ><Icon name="fullscreen-expand" :size="32"
+          /></view>
+          <view
+            class="tb-btn"
+            :class="{ active: gridVisible }"
+            @click="gridVisible = !gridVisible"
+          >
+            <Icon name="a-Grid-ninejiugongge" :size="32" />
+          </view>
+        </view>
       </view>
     </view>
 
@@ -559,95 +632,12 @@
         </view>
 
         <!-- 绘制工具 -->
-        <view v-show="currentTab === 1" class="settings-card">
-          <view class="card-title-section">
-            <Icon name="edit" :size="32" />
-            <text class="card-title">绘制工具</text>
-          </view>
-
-          <!-- 工具选择 -->
-          <view class="tool-selection">
-            <view
-              class="tool-option"
-              :class="{ active: currentTool === 'pencil' }"
-              @click="currentTool = 'pencil'"
-            >
-              <Icon name="edit" :size="48" />
-              <text class="tool-name">画笔</text>
-            </view>
-            <view
-              class="tool-option"
-              :class="{ active: currentTool === 'eraser' }"
-              @click="currentTool = 'eraser'"
-            >
-              <Icon name="ashbin" :size="48" />
-              <text class="tool-name">橡皮擦</text>
-            </view>
-          </view>
-
-          <!-- 当前颜色显示 -->
-          <view class="current-color-section">
-            <text class="setting-label">当前颜色</text>
-            <view class="current-color-display">
-              <view
-                class="current-color-box"
-                :style="{ backgroundColor: selectedColor }"
-              ></view>
-              <text class="current-color-hex">{{ selectedColor }}</text>
-            </view>
-          </view>
-
-          <!-- 常用颜色 -->
-          <view class="setting-item">
-            <text class="setting-label">常用颜色</text>
-            <view class="color-picker">
-              <view
-                v-for="color in commonColors"
-                :key="color.hex"
-                class="color-item"
-                :class="{ active: selectedColor === color.hex }"
-                :style="{ backgroundColor: color.hex }"
-                @click="selectedColor = color.hex"
-              ></view>
-            </view>
-          </view>
-
-          <!-- 完整调色板切换 -->
-          <view
-            class="palette-toggle"
-            @click="showColorPicker = !showColorPicker"
-          >
-            <text class="palette-toggle-text">
-              {{ showColorPicker ? "收起" : "展开" }}完整调色板 (221色)
-            </text>
-            <text class="palette-toggle-icon">{{
-              showColorPicker ? "▲" : "▼"
-            }}</text>
-          </view>
-
-          <!-- 完整调色板 -->
-          <view v-if="showColorPicker" class="full-color-palette">
-            <view
-              v-for="color in allColors"
-              :key="color.hex"
-              class="palette-color-item"
-              :class="{ active: selectedColor === color.hex }"
-              :style="{ backgroundColor: color.hex }"
-              @click="selectedColor = color.hex"
-            ></view>
-          </view>
-
-          <!-- 操作按钮 -->
-          <view class="action-buttons">
-            <view class="action-button" @click="togglePreview">
-              <Icon :name="showPreview ? 'eye-close' : 'eye'" :size="40" />
-              <text>{{ showPreview ? "隐藏预览" : "显示预览" }}</text>
-            </view>
-            <view class="action-button danger" @click="clearCanvas">
-              <Icon name="delete" :size="40" />
-              <text>清空画布</text>
-            </view>
-          </view>
+        <view v-show="currentTab === 1" class="settings-card draw-card">
+          <ColorPalette
+            :colors="paletteColors"
+            :selected-color="selectedColor"
+            @select-color="selectedColor = $event"
+          />
         </view>
       </view>
     </scroll-view>
@@ -689,14 +679,12 @@ import { useToast } from "../../composables/useToast.js";
 import statusBarMixin from "../../mixins/statusBar.js";
 import Icon from "../../components/Icon.vue";
 import Toast from "../../components/Toast.vue";
+import PixelCanvas from "../../components/PixelCanvas.vue";
+import ColorPalette from "../../components/ColorPalette.vue";
+import { ARTKAL_COLORS_FULL } from "../../data/artkal-colors-full.js";
 import {
-  font5x7,
-  hexToRgb,
-  drawCharToPixels,
-  drawTextToPixels,
   drawTinyTextToPixels,
   getTinyTextWidth,
-  getTextWidth,
   getCurrentTimeText,
   getCurrentDateText,
   getCurrentWeekText,
@@ -709,6 +697,8 @@ export default {
   components: {
     Icon,
     Toast,
+    PixelCanvas,
+    ColorPalette,
   },
   data() {
     return {
@@ -728,15 +718,26 @@ export default {
       contentHeight: "calc(100vh - 112rpx - 120rpx - 80rpx)",
 
       // Canvas 相关
-      canvasHidden: false, // 弹窗显示时隐藏 canvas（微信小程序原生组件层级问题）
+      canvasHidden: false,
       canvasNode: null,
       canvasCtx: null,
-      canvasPixels: new Map(), // 用户手绘的像素数据
-      imagePixels: null, // 背景图片的像素数据
-      currentTool: "pencil", // pencil, eraser
+      canvasPixels: new Map(),
+      imagePixels: null,
+      currentTool: "pencil", // pencil, eraser, move
       selectedColor: "#64c8ff",
-      showPreview: true, // 是否显示时间日期等预览
-      showColorPicker: false, // 是否显示完整调色板
+      showPreview: true,
+      showColorPicker: false,
+
+      // PixelCanvas 视图控制
+      zoom: 4,
+      pan: { x: 0, y: 0 },
+      gridVisible: true,
+      containerSize: { width: 320, height: 320 },
+      canvasReady: false,
+
+      // 历史记录（撤回/重做）
+      history: [],
+      historyIndex: -1,
 
       // 调色板
       allColors: COLOR_PALETTE_221,
@@ -790,6 +791,7 @@ export default {
         { name: "白色", hex: "#ffffff" },
         { name: "灰色", hex: "#787878" },
       ],
+      paletteColors: ARTKAL_COLORS_FULL,
       presetColors: [
         { name: "青色", hex: "#64c8ff" },
         { name: "绿色", hex: "#00ff9d" },
@@ -829,6 +831,28 @@ export default {
     accentColor() {
       return "#4F7FFF";
     },
+    allPixelsForPreview() {
+      const m = new Map();
+      // 背景图片
+      if (this.imagePixels) {
+        const ox = this.config.image.x || 0;
+        const oy = this.config.image.y || 0;
+        this.imagePixels.forEach((color, key) => {
+          const [rx, ry] = key.split(",").map(Number);
+          const fx = rx + ox,
+            fy = ry + oy;
+          if (fx >= 0 && fx < 64 && fy >= 0 && fy < 64)
+            m.set(`${fx},${fy}`, color);
+        });
+      }
+      // 手绘像素
+      this.canvasPixels.forEach((color, key) => m.set(key, color));
+      // 时钟预览
+      if (this.showPreview) {
+        this.getPreviewPixels().forEach((color, key) => m.set(key, color));
+      }
+      return m;
+    },
   },
 
   onUnload() {
@@ -859,28 +883,38 @@ export default {
     const systemInfo = uni.getSystemInfoSync();
     const statusBarHeight = systemInfo.statusBarHeight || 0;
     const headerHeight = 56;
-    this.contentHeight = `${systemInfo.windowHeight - statusBarHeight - headerHeight - 300}px`;
+    this.contentHeight = `${systemInfo.windowHeight - statusBarHeight - headerHeight - 360}px`;
 
-    // 延迟初始化 canvas，确保 DOM 已渲染
+    // 初始化 PixelCanvas 容器尺寸
     this.$nextTick(() => {
       setTimeout(() => {
-        this.initCanvas()
-          .then(() => {
-            this.$nextTick(() => {
-              if (this.$refs.toastRef) {
-                this.toast.setToastInstance(this.$refs.toastRef);
-              }
-              this.isReady = true;
-              console.log(
-                "页面初始化完成，Canvas 已就绪，模式:",
-                this.clockMode,
-              );
-            });
+        const query = uni.createSelectorQuery().in(this);
+        query
+          .select(".canvas-container")
+          .boundingClientRect((data) => {
+            if (data && data.width > 0) {
+              this.containerSize = { width: data.width, height: data.width };
+              const fitZoom = Math.floor((data.width * 0.9) / 64);
+              this.zoom = Math.max(2, fitZoom);
+              this.pan = {
+                x: (data.width - 64 * this.zoom) / 2,
+                y: (data.width - 64 * this.zoom) / 2,
+              };
+            } else {
+              this.zoom = 4;
+              this.pan = { x: 16, y: 16 };
+            }
+            this.canvasReady = true;
+            // 初始化历史记录
+            this.history = [new Map(this.canvasPixels)];
+            this.historyIndex = 0;
+            if (this.$refs.toastRef) {
+              this.toast.setToastInstance(this.$refs.toastRef);
+            }
+            this.isReady = true;
           })
-          .catch((err) => {
-            console.error("Canvas 初始化失败:", err);
-          });
-      }, 100);
+          .exec();
+      }, 150);
     });
   },
 
@@ -889,6 +923,70 @@ export default {
   },
 
   methods: {
+    // ========== PixelCanvas 交互方法 ==========
+    handlePixelClick(x, y) {
+      if (this.currentTool === "move") return;
+      const key = `${x},${y}`;
+      const newPixels = new Map(this.canvasPixels);
+      if (this.currentTool === "eraser") {
+        if (!newPixels.has(key)) return;
+        newPixels.delete(key);
+      } else {
+        if (newPixels.get(key) === this.selectedColor) return;
+        newPixels.set(key, this.selectedColor);
+      }
+      this.canvasPixels = newPixels;
+      const newHistory = this.history.slice(0, this.historyIndex + 1);
+      newHistory.push(new Map(newPixels));
+      if (newHistory.length > 50) newHistory.shift();
+      this.history = newHistory;
+      this.historyIndex = newHistory.length - 1;
+    },
+    handleUndo() {
+      if (this.historyIndex > 0) {
+        this.historyIndex--;
+        this.canvasPixels = new Map(this.history[this.historyIndex]);
+      }
+    },
+    handleRedo() {
+      if (this.historyIndex < this.history.length - 1) {
+        this.historyIndex++;
+        this.canvasPixels = new Map(this.history[this.historyIndex]);
+      }
+    },
+    handleZoom(delta) {
+      const cx = this.containerSize.width / 2;
+      const cy = this.containerSize.height / 2;
+      const newZoom = Math.max(1, Math.min(20, this.zoom + delta));
+      const scale = newZoom / this.zoom;
+      this.pan = {
+        x: cx - (cx - this.pan.x) * scale,
+        y: cy - (cy - this.pan.y) * scale,
+      };
+      this.zoom = newZoom;
+    },
+    handlePan(dx, dy) {
+      this.pan = { x: this.pan.x + dx, y: this.pan.y + dy };
+    },
+    handlePinchZoom(delta, cx, cy) {
+      const newZoom = Math.max(1, Math.min(20, this.zoom + delta));
+      const scale = newZoom / this.zoom;
+      this.pan = {
+        x: cx - (cx - this.pan.x) * scale,
+        y: cy - (cy - this.pan.y) * scale,
+      };
+      this.zoom = newZoom;
+    },
+    handleFit() {
+      const size = this.containerSize.width;
+      const fitZoom = Math.floor((size * 0.9) / 64);
+      this.zoom = Math.max(2, fitZoom);
+      this.pan = {
+        x: (size - 64 * this.zoom) / 2,
+        y: (size - 64 * this.zoom) / 2,
+      };
+    },
+
     // ========== Canvas 相关方法 ==========
     initCanvas() {
       return new Promise((resolve, reject) => {
@@ -1258,7 +1356,7 @@ export default {
       }
     },
 
-    handleTouchEnd(e) {
+    handleTouchEnd() {
       // 触摸结束
     },
 
@@ -2731,9 +2829,52 @@ export default {
 }
 
 .canvas-section {
-  background-color: var(--bg-elevated);
-  border-bottom: 2rpx solid var(--border-primary);
-  padding: 24rpx;
+  display: flex;
+  flex-direction: column;
+  background: #000;
+}
+
+.canvas-container {
+  width: 100%;
+  aspect-ratio: 1;
+  position: relative;
+  overflow: hidden;
+}
+
+.canvas-toolbar {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8rpx 16rpx;
+  background: var(--bg-tertiary);
+  border-bottom: 1rpx solid var(--border-color);
+}
+
+.toolbar-group {
+  display: flex;
+  flex-direction: row;
+  gap: 4rpx;
+}
+
+.tb-btn {
+  width: 64rpx;
+  height: 64rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12rpx;
+  background: transparent;
+  color: var(--text-secondary);
+}
+
+.tb-btn.active {
+  background: var(--accent-color, #4f7fff);
+  color: white;
+}
+
+.tb-btn.disabled {
+  opacity: 0.3;
 }
 
 .canvas-wrapper {
@@ -3007,7 +3148,7 @@ export default {
 }
 
 .content-wrapper {
-  padding: 24rpx;
+  /* padding: 24rpx; */
   padding-bottom: 48rpx;
 }
 
@@ -3052,10 +3193,10 @@ export default {
 .settings-card {
   background-color: var(--bg-tertiary);
   border: 2rpx solid var(--border-primary);
-  border-radius: 16rpx;
+  /* border-radius: 16rpx; */
   padding: 20rpx;
   margin-bottom: 16rpx;
-  box-shadow: var(--shadow-md);
+  /* box-shadow: var(--shadow-md); */
 }
 
 .card-title-section {
