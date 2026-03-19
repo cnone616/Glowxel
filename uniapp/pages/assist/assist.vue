@@ -383,7 +383,7 @@
     <!-- 连接弹窗 -->
     <ConnectModal
       :visible.sync="showConnectModal"
-      title="连接 Glowxel 设备"
+      title="连接 RenLight 设备"
       description="请输入设备 IP 地址"
       :placeholder="deviceStore.deviceIp || '192.168.31.84'"
       :defaultValue="deviceStore.deviceIp"

@@ -1,4 +1,4 @@
-## Glowxel 项目导览（仓库级）
+## RenLight 项目导览（仓库级）
 
 本仓库是一个面向“拼豆/LED 点阵像素画”的创作工具集合，包含：
 
@@ -13,7 +13,7 @@
 ## 目录结构
 
 ```
-Glowxel/
+RenLight/
 ├── esp32-firmware/          # ESP32 固件 + 本地LED模拟器
 ├── uniapp/           # uni-app 多端应用（小程序/H5/App）
 ├── website/    # 官网/在线设计站点（Vite）
@@ -33,6 +33,7 @@ npm run dev
 ```
 
 说明：
+
 - 当前站点主要用于在线设计、预览与导出（项目内有 Mock 数据）；与 ESP32 的 WebSocket 直连在代码中尚未看到完整落地实现（文档有提及）。
 
 ---
@@ -40,6 +41,7 @@ npm run dev
 ### 2) `uniapp/`（小程序 / H5 / App）
 
 推荐方式（官方工作流）：
+
 - 使用 **HBuilderX** 导入 `uniapp/` 运行到微信开发者工具 / 浏览器 / 模拟器。
 
 也提供 npm scripts（依赖于 uni-app CLI 环境）：
@@ -52,6 +54,7 @@ npm run dev:h5
 ```
 
 关键实现入口：
+
 - **像素画布**：`uniapp/components/PixelCanvas.vue`
 - **设备控制页**：`uniapp/pages/control/control.vue`
 - **闹钟编辑器**：`uniapp/pages/clock-editor/clock-editor.vue`
@@ -79,7 +82,7 @@ python3 -m platformio run --target upload
 
 - **优先 STA 模式**：若曾保存 WiFi（`Preferences` 命名空间 `"wifi"`），则尝试连接并通过 NTP 同步时间。
 - **否则 AP 配网模式**：
-  - **热点名（SSID）**：`Glowxel-Setup`
+  - **热点名（SSID）**：`RenLight-Setup`
   - **热点密码**：`12345678`
   - **配置页**：连接热点后访问 `http://192.168.4.1/`
   - **DNS 劫持**：固件会启动 DNS 服务将任意域名解析到配网页（便于手机系统弹出“需要登录”式页面）。
@@ -87,6 +90,7 @@ python3 -m platformio run --target upload
 ### 显示模式
 
 固件有两个模式（WebSocket 可切换）：
+
 - **clock**：闹钟模式（默认）；支持时间/日期/星期的布局与颜色配置，支持背景像素图
 - **canvas**：画板模式；接收并绘制像素（并在内存中维护 64×64 缓冲）
 
@@ -97,6 +101,7 @@ python3 -m platformio run --target upload
 ### HTTP（端口 80）
 
 固件提供了一组 HTTP 路由（用于健康检查、状态查询、配网、简单控制）：
+
 - `GET /status`：JSON 状态（ip、width/height、brightness、heap、uptime 等）
 - `GET /test`：简单测试字符串
 - `GET /`：配网页面（AP 模式下用于填 SSID/Password）
@@ -107,10 +112,12 @@ python3 -m platformio run --target upload
 ### WebSocket（路径 `/ws`）
 
 连接地址：
+
 - `ws://<设备IP>/ws`
 
 连接后，固件会发送一条文本消息，包含当前模式：
-- `{"status":"connected","device":"Glowxel","mode":"clock|canvas"}`
+
+- `{"status":"connected","device":"RenLight","mode":"clock|canvas"}`
 
 #### 1) JSON 命令（文本帧）
 
@@ -121,6 +128,7 @@ python3 -m platformio run --target upload
 ```
 
 固件支持的命令（以 `src/main.cpp` 为准，下面列出最核心的）：
+
 - `ping`：心跳
 - `status`：查询设备状态（包含当前 mode）
 - `set_mode`：切换模式
@@ -141,10 +149,12 @@ python3 -m platformio run --target upload
 - 一帧可携带多个像素，固件按 5 字节步进解析
 
 uni-app 侧的实现参考：
+
 - `uniapp/utils/webSocket.js` 的 `showImage()` / `sendPartialUpdate()`
 - `uniapp/pages/control/control.vue` 中的“发送像素并等待确认”逻辑
 
 固件确认机制（闹钟模式背景图场景）：
+
 - 若接收像素后超过约 500ms 没再继续接收，会将像素数据保存到 `Preferences`，并广播：
   - `{"status":"ok","message":"pixels_received","count":<实际接收像素数>}`
 
@@ -153,11 +163,13 @@ uni-app 侧的实现参考：
 ## 本地 LED 模拟器（可选）
 
 在 `esp32-firmware/` 下有一个本地模拟器页面：
+
 - `led-simulator.html`
 - `simulator-script.js`
 - `simulator-style.css`
 
 主要用途：
+
 - 在电脑上模拟 64×64 LED 面板，做闹钟布局/图片预览的交互验证（不依赖真实硬件）。
 
 ---
@@ -167,4 +179,3 @@ uni-app 侧的实现参考：
 - **像素画布数据结构**：在整体设计文档中倾向稀疏存储（例如 `Map<"x,y", "#rrggbb">`），以优化大画布性能。
 - **小程序 Canvas 2D 差异**：需要关注 DPR、canvas 原生尺寸与逻辑尺寸对齐等问题（见根目录`项目说明.md`“当前问题”）。
 - **ESP32 写 Flash 频率**：闹钟配置/像素持久化使用 `Preferences`；频繁写入会影响 Flash 寿命，建议在上层做节流/批量提交。
-

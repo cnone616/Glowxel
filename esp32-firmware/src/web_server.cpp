@@ -77,7 +77,7 @@ void WebServer::setupConfigRoutes() {
     Serial.println("收到根路径请求");
     String html = "<!DOCTYPE html><html><head><meta charset='UTF-8'>";
     html += "<meta name='viewport' content='width=device-width,initial-scale=1'>";
-    html += "<title>Glowxel 配置</title>";
+    html += "<title>RenLight 配置</title>";
     html += "<style>body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;padding:20px;max-width:400px;margin:0 auto;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);min-height:100vh}";
     html += ".card{background:white;padding:24px;border-radius:16px;box-shadow:0 8px 32px rgba(0,0,0,0.2)}";
     html += "h2{color:#333;margin-top:0;text-align:center;font-size:24px}";
@@ -97,7 +97,7 @@ void WebServer::setupConfigRoutes() {
     html += ".manual-link{color:#667eea;text-decoration:none;font-size:13px;cursor:pointer}";
     html += ".manual-link:hover{text-decoration:underline}";
     html += "</style></head><body>";
-    html += "<div class='card'><h2>Glowxel 配置</h2>";
+    html += "<div class='card'><h2>RenLight 配置</h2>";
     html += "<div class='subtitle'>连接到您的 WiFi 网络</div>";
     html += "<div id='status'></div>";
     html += "<div id='scan-mode'>";

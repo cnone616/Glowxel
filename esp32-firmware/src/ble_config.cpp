@@ -15,7 +15,7 @@ String BLEConfig::receivedPassword = "";
 class BLEConfigServerCallbacks : public BLEServerCallbacks {
   void onConnect(BLEServer* pServer) {
     BLEConfig::deviceConnected = true;
-    Serial.println("[BLE] 客户端已连接");
+    Serial.println("客户端已连接");
     // 发送状态通知
     if (BLEConfig::pStatusChar) {
       BLEConfig::pStatusChar->setValue("ready");
@@ -25,7 +25,7 @@ class BLEConfigServerCallbacks : public BLEServerCallbacks {
 
   void onDisconnect(BLEServer* pServer) {
     BLEConfig::deviceConnected = false;
-    Serial.println("[BLE] 客户端已断开");
+    Serial.println("客户端已断开");
     // 重新开始广播
     pServer->startAdvertising();
   }
@@ -38,12 +38,12 @@ class WiFiConfigCallbacks : public BLECharacteristicCallbacks {
     if (value.length() == 0) return;
 
     String data = String(value.c_str());
-    Serial.println("[BLE] 收到数据: " + data);
+    Serial.println("收到数据: " + data);
 
     // 格式: "SSID\nPASSWORD"
     int separatorIndex = data.indexOf('\n');
     if (separatorIndex <= 0) {
-      Serial.println("[BLE] 数据格式错误，需要 SSID\\nPASSWORD");
+      Serial.println("数据格式错误，需要 SSID\\nPASSWORD");
       if (BLEConfig::pStatusChar) {
         BLEConfig::pStatusChar->setValue("error:format");
         BLEConfig::pStatusChar->notify();
@@ -54,8 +54,8 @@ class WiFiConfigCallbacks : public BLECharacteristicCallbacks {
     BLEConfig::receivedSSID = data.substring(0, separatorIndex);
     BLEConfig::receivedPassword = data.substring(separatorIndex + 1);
 
-    Serial.println("[BLE] SSID: " + BLEConfig::receivedSSID);
-    Serial.println("[BLE] Password: ***");
+    Serial.println("SSID: " + BLEConfig::receivedSSID);
+    Serial.println("Password: ***");
 
     // 保存到 Preferences
     ConfigManager::preferences.begin("wifi", false);
@@ -63,7 +63,7 @@ class WiFiConfigCallbacks : public BLECharacteristicCallbacks {
     ConfigManager::preferences.putString("password", BLEConfig::receivedPassword);
     ConfigManager::preferences.end();
 
-    Serial.println("[BLE] WiFi 配置已保存");
+    Serial.println("WiFi 配置已保存");
 
     // 通知客户端配置已保存
     if (BLEConfig::pStatusChar) {
@@ -89,9 +89,9 @@ class WiFiConfigCallbacks : public BLECharacteristicCallbacks {
 };
 
 void BLEConfig::init() {
-  Serial.println("[BLE] 初始化蓝牙配网服务...");
+  Serial.println("初始化蓝牙配网服务...");
 
-  BLEDevice::init("Glowxel-Setup");
+  BLEDevice::init("RenLight-Setup");
   pServer = BLEDevice::createServer();
   pServer->setCallbacks(new BLEConfigServerCallbacks());
 
@@ -123,14 +123,14 @@ void BLEConfig::init() {
   pAdvertising->setMinPreferred(0x12);
   BLEDevice::startAdvertising();
 
-  Serial.println("[BLE] 蓝牙配网服务已启动，设备名: Glowxel-Setup");
+  Serial.println("蓝牙配网服务已启动，设备名: RenLight-Setup");
 }
 
 void BLEConfig::stop() {
   if (pServer) {
     BLEDevice::deinit(true);
     pServer = nullptr;
-    Serial.println("[BLE] 蓝牙服务已关闭");
+    Serial.println("蓝牙服务已关闭");
   }
 }
 

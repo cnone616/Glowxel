@@ -12,7 +12,7 @@
 - **Differential_Data**: 相邻帧之间变化像素的差分数据
 - **ESP32_Optimizer**: 针对 ESP32 内存和处理能力优化数据格式的组件
 - **Animation_Controller**: 控制动画播放、暂停、循环的组件
-- **Pixel_Glowxel**: 64x64 像素显示矩阵
+- **Pixel_RenLight**: 64x64 像素显示矩阵
 
 ## Requirements
 

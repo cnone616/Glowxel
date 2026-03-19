@@ -32,7 +32,7 @@ void WebSocketHandler::onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *c
     if (DisplayManager::currentMode == MODE_ANIMATION) {
       modeStr = "animation";
     }
-    String response = "{\"status\":\"connected\",\"device\":\"Glowxel\",\"mode\":\"" + modeStr + "\"}";
+    String response = "{\"status\":\"connected\",\"device\":\"RenLight\",\"mode\":\"" + modeStr + "\"}";
     client->text(response);
   }
   else if (type == WS_EVT_DISCONNECT) {
@@ -165,6 +165,8 @@ void WebSocketHandler::handleBinaryData(AsyncWebSocketClient *client, uint8_t *d
         imagePixels = nullptr;
       }
       imagePixelCount = 0;
+      // 清屏，擦除旧 Logo 或残留像素
+      DisplayManager::dma_display->clearScreen();
     }
 
     // 追加数据

@@ -1,289 +1,518 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-CN">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>64x64 Glowxel 像素模拟器</title>
-  <link rel="stylesheet" href="simulator-style.css">
-  <!-- 完整的 GIF 解析器 -->
-  <script src="gif-parser.js"></script>
-</head>
-<body>
-  <h1>64×64 Glowxel 像素模拟器</h1>
-  
-  <div class="container">
-    <div class="led-panel-wrapper">
-      <div class="axis-container">
-        <div class="y-axis">
-          <div>0</div>
-          <div>16</div>
-          <div>32</div>
-          <div>48</div>
-          <div>63</div>
-        </div>
-        <div>
-          <div class="led-panel">
-            <canvas id="ledCanvas" width="640" height="640"></canvas>
-          </div>
-          <div class="x-axis">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>64x64 RenLight 像素模拟器</title>
+    <link rel="stylesheet" href="simulator-style.css" />
+    <!-- 完整的 GIF 解析器 -->
+    <script src="gif-parser.js"></script>
+  </head>
+  <body>
+    <h1>64×64 RenLight 像素模拟器</h1>
+
+    <div class="container">
+      <div class="led-panel-wrapper">
+        <div class="axis-container">
+          <div class="y-axis">
             <div>0</div>
             <div>16</div>
             <div>32</div>
             <div>48</div>
             <div>63</div>
           </div>
-        </div>
-      </div>
-    </div>
-    
-    <div class="controls">
-      <div class="tabs">
-        <button class="tab active" onclick="switchTab('time')">时间</button>
-        <button class="tab" onclick="switchTab('date')">日期</button>
-        <button class="tab" onclick="switchTab('week')">星期</button>
-        <button class="tab" onclick="switchTab('image')">图片</button>
-      </div>
-      
-      <!-- 时间设置 -->
-      <div id="timeTab" class="tab-content active">
-        <div class="control-group">
-          <label>当前时间</label>
-          <input type="time" id="timeInput" value="14:30" oninput="updateDisplay()">
-        </div>
-        
-        <div class="control-group">
-          <label>字体大小 (1-3)</label>
-          <div class="number-input-group">
-            <button class="num-btn" onclick="adjustValue('timeFontSize', -1)">-</button>
-            <input type="number" id="timeFontSize" min="1" max="3" value="1" oninput="updateDisplay()">
-            <button class="num-btn" onclick="adjustValue('timeFontSize', 1)">+</button>
-          </div>
-        </div>
-        
-        <div class="control-group">
-          <label>X 位置</label>
-          <div class="number-input-group">
-            <button class="num-btn" onclick="adjustValue('timeX', -1)">-</button>
-            <input type="number" id="timeX" min="0" max="60" value="17" oninput="updateDisplay()">
-            <button class="num-btn" onclick="adjustValue('timeX', 1)">+</button>
-          </div>
-        </div>
-        
-        <div class="control-group">
-          <label>Y 位置</label>
-          <div class="number-input-group">
-            <button class="num-btn" onclick="adjustValue('timeY', -1)">-</button>
-            <input type="number" id="timeY" min="0" max="60" value="18" oninput="updateDisplay()">
-            <button class="num-btn" onclick="adjustValue('timeY', 1)">+</button>
-          </div>
-        </div>
-        
-        <div class="control-group">
-          <label>颜色</label>
-          <div class="color-picker" id="timeColorPicker"></div>
-        </div>
-        
-        <button onclick="showCurrentTime()">显示当前时间</button>
-      </div>
-      
-      <!-- 日期设置 -->
-      <div id="dateTab" class="tab-content">
-        <div class="control-group">
-          <label class="checkbox-label">
-            <input type="checkbox" id="showDate" checked onchange="updateDisplay()">
-            显示日期
-          </label>
-        </div>
-        
-        <div class="control-group">
-          <label>当前日期</label>
-          <input type="date" id="dateInput" onchange="updateDisplay()">
-        </div>
-        
-        <div class="control-group">
-          <label>字体大小 (1-2)</label>
-          <div class="number-input-group">
-            <button class="num-btn" onclick="adjustValue('dateFontSize', -1)">-</button>
-            <input type="number" id="dateFontSize" min="1" max="2" value="1" oninput="updateDisplay()">
-            <button class="num-btn" onclick="adjustValue('dateFontSize', 1)">+</button>
-          </div>
-        </div>
-        
-        <div class="control-group">
-          <label>X 位置</label>
-          <div class="number-input-group">
-            <button class="num-btn" onclick="adjustValue('dateX', -1)">-</button>
-            <input type="number" id="dateX" min="0" max="60" value="3" oninput="updateDisplay()">
-            <button class="num-btn" onclick="adjustValue('dateX', 1)">+</button>
-          </div>
-        </div>
-        
-        <div class="control-group">
-          <label>Y 位置</label>
-          <div class="number-input-group">
-            <button class="num-btn" onclick="adjustValue('dateY', -1)">-</button>
-            <input type="number" id="dateY" min="0" max="60" value="30" oninput="updateDisplay()">
-            <button class="num-btn" onclick="adjustValue('dateY', 1)">+</button>
-          </div>
-        </div>
-        
-        <div class="control-group">
-          <label>颜色</label>
-          <div class="color-picker" id="dateColorPicker"></div>
-        </div>
-      </div>
-      
-      <!-- 星期设置 -->
-      <div id="weekTab" class="tab-content">
-        <div class="control-group">
-          <label class="checkbox-label">
-            <input type="checkbox" id="showWeek" checked onchange="updateDisplay()">
-            显示星期
-          </label>
-        </div>
-        
-        <div class="control-group">
-          <label>X 位置</label>
-          <div class="number-input-group">
-            <button class="num-btn" onclick="adjustValue('weekX', -1)">-</button>
-            <input type="number" id="weekX" min="0" max="60" value="23" oninput="updateDisplay()">
-            <button class="num-btn" onclick="adjustValue('weekX', 1)">+</button>
-          </div>
-        </div>
-        
-        <div class="control-group">
-          <label>Y 位置</label>
-          <div class="number-input-group">
-            <button class="num-btn" onclick="adjustValue('weekY', -1)">-</button>
-            <input type="number" id="weekY" min="0" max="60" value="44" oninput="updateDisplay()">
-            <button class="num-btn" onclick="adjustValue('weekY', 1)">+</button>
-          </div>
-        </div>
-        
-        <div class="control-group">
-          <label>颜色</label>
-          <div class="color-picker" id="weekColorPicker"></div>
-        </div>
-      </div>
-      
-      <!-- 图片设置 -->
-      <div id="imageTab" class="tab-content">
-        <div class="control-group">
-          <label class="checkbox-label">
-            <input type="checkbox" id="showImage" onchange="updateDisplay()">
-            显示图片
-          </label>
-        </div>
-        
-        <!-- GIF 动画控制面板 -->
-        <div id="gifControls" style="display: none;">
-          <div class="control-group">
-            <label>GIF 动画控制</label>
-            <div class="gif-control-buttons">
-              <button id="playBtn" onclick="playGif()">播放</button>
-              <button id="pauseBtn" onclick="pauseGif()" style="display: none;">暂停</button>
-              <button onclick="stopGif()">停止</button>
+          <div>
+            <div class="led-panel">
+              <canvas id="ledCanvas" width="640" height="640"></canvas>
+            </div>
+            <div class="x-axis">
+              <div>0</div>
+              <div>16</div>
+              <div>32</div>
+              <div>48</div>
+              <div>63</div>
             </div>
           </div>
-          
+        </div>
+      </div>
+
+      <div class="controls">
+        <div class="tabs">
+          <button class="tab active" onclick="switchTab('time')">时间</button>
+          <button class="tab" onclick="switchTab('date')">日期</button>
+          <button class="tab" onclick="switchTab('week')">星期</button>
+          <button class="tab" onclick="switchTab('image')">图片</button>
+        </div>
+
+        <!-- 时间设置 -->
+        <div id="timeTab" class="tab-content active">
           <div class="control-group">
-            <label>播放速度</label>
+            <label>当前时间</label>
+            <input
+              type="time"
+              id="timeInput"
+              value="14:30"
+              oninput="updateDisplay()"
+            />
+          </div>
+
+          <div class="control-group">
+            <label>字体大小 (1-3)</label>
             <div class="number-input-group">
-              <button class="num-btn" onclick="adjustGifSpeed(-0.1)">-</button>
-              <input type="number" id="gifSpeed" min="0.1" max="3" step="0.1" value="1" onchange="updateGifSpeed()">
-              <button class="num-btn" onclick="adjustGifSpeed(0.1)">+</button>
+              <button class="num-btn" onclick="adjustValue('timeFontSize', -1)">
+                -
+              </button>
+              <input
+                type="number"
+                id="timeFontSize"
+                min="1"
+                max="3"
+                value="1"
+                oninput="updateDisplay()"
+              />
+              <button class="num-btn" onclick="adjustValue('timeFontSize', 1)">
+                +
+              </button>
             </div>
-            <div style="font-size: 11px; color: #666; margin-top: 2px;">倍速 (0.1x - 3x)</div>
           </div>
-          
+
           <div class="control-group">
-            <label>当前帧</label>
-            <div class="frame-info">
-              <span id="currentFrame">1</span> / <span id="totalFrames">1</span>
-              <div class="frame-controls">
-                <button onclick="prevFrame()">⏮️</button>
-                <button onclick="nextFrame()">⏭️</button>
+            <label>X 位置</label>
+            <div class="number-input-group">
+              <button class="num-btn" onclick="adjustValue('timeX', -1)">
+                -
+              </button>
+              <input
+                type="number"
+                id="timeX"
+                min="0"
+                max="60"
+                value="17"
+                oninput="updateDisplay()"
+              />
+              <button class="num-btn" onclick="adjustValue('timeX', 1)">
+                +
+              </button>
+            </div>
+          </div>
+
+          <div class="control-group">
+            <label>Y 位置</label>
+            <div class="number-input-group">
+              <button class="num-btn" onclick="adjustValue('timeY', -1)">
+                -
+              </button>
+              <input
+                type="number"
+                id="timeY"
+                min="0"
+                max="60"
+                value="18"
+                oninput="updateDisplay()"
+              />
+              <button class="num-btn" onclick="adjustValue('timeY', 1)">
+                +
+              </button>
+            </div>
+          </div>
+
+          <div class="control-group">
+            <label>颜色</label>
+            <div class="color-picker" id="timeColorPicker"></div>
+          </div>
+
+          <button onclick="showCurrentTime()">显示当前时间</button>
+        </div>
+
+        <!-- 日期设置 -->
+        <div id="dateTab" class="tab-content">
+          <div class="control-group">
+            <label class="checkbox-label">
+              <input
+                type="checkbox"
+                id="showDate"
+                checked
+                onchange="updateDisplay()"
+              />
+              显示日期
+            </label>
+          </div>
+
+          <div class="control-group">
+            <label>当前日期</label>
+            <input type="date" id="dateInput" onchange="updateDisplay()" />
+          </div>
+
+          <div class="control-group">
+            <label>字体大小 (1-2)</label>
+            <div class="number-input-group">
+              <button class="num-btn" onclick="adjustValue('dateFontSize', -1)">
+                -
+              </button>
+              <input
+                type="number"
+                id="dateFontSize"
+                min="1"
+                max="2"
+                value="1"
+                oninput="updateDisplay()"
+              />
+              <button class="num-btn" onclick="adjustValue('dateFontSize', 1)">
+                +
+              </button>
+            </div>
+          </div>
+
+          <div class="control-group">
+            <label>X 位置</label>
+            <div class="number-input-group">
+              <button class="num-btn" onclick="adjustValue('dateX', -1)">
+                -
+              </button>
+              <input
+                type="number"
+                id="dateX"
+                min="0"
+                max="60"
+                value="3"
+                oninput="updateDisplay()"
+              />
+              <button class="num-btn" onclick="adjustValue('dateX', 1)">
+                +
+              </button>
+            </div>
+          </div>
+
+          <div class="control-group">
+            <label>Y 位置</label>
+            <div class="number-input-group">
+              <button class="num-btn" onclick="adjustValue('dateY', -1)">
+                -
+              </button>
+              <input
+                type="number"
+                id="dateY"
+                min="0"
+                max="60"
+                value="30"
+                oninput="updateDisplay()"
+              />
+              <button class="num-btn" onclick="adjustValue('dateY', 1)">
+                +
+              </button>
+            </div>
+          </div>
+
+          <div class="control-group">
+            <label>颜色</label>
+            <div class="color-picker" id="dateColorPicker"></div>
+          </div>
+        </div>
+
+        <!-- 星期设置 -->
+        <div id="weekTab" class="tab-content">
+          <div class="control-group">
+            <label class="checkbox-label">
+              <input
+                type="checkbox"
+                id="showWeek"
+                checked
+                onchange="updateDisplay()"
+              />
+              显示星期
+            </label>
+          </div>
+
+          <div class="control-group">
+            <label>X 位置</label>
+            <div class="number-input-group">
+              <button class="num-btn" onclick="adjustValue('weekX', -1)">
+                -
+              </button>
+              <input
+                type="number"
+                id="weekX"
+                min="0"
+                max="60"
+                value="23"
+                oninput="updateDisplay()"
+              />
+              <button class="num-btn" onclick="adjustValue('weekX', 1)">
+                +
+              </button>
+            </div>
+          </div>
+
+          <div class="control-group">
+            <label>Y 位置</label>
+            <div class="number-input-group">
+              <button class="num-btn" onclick="adjustValue('weekY', -1)">
+                -
+              </button>
+              <input
+                type="number"
+                id="weekY"
+                min="0"
+                max="60"
+                value="44"
+                oninput="updateDisplay()"
+              />
+              <button class="num-btn" onclick="adjustValue('weekY', 1)">
+                +
+              </button>
+            </div>
+          </div>
+
+          <div class="control-group">
+            <label>颜色</label>
+            <div class="color-picker" id="weekColorPicker"></div>
+          </div>
+        </div>
+
+        <!-- 图片设置 -->
+        <div id="imageTab" class="tab-content">
+          <div class="control-group">
+            <label class="checkbox-label">
+              <input
+                type="checkbox"
+                id="showImage"
+                onchange="updateDisplay()"
+              />
+              显示图片
+            </label>
+          </div>
+
+          <!-- GIF 动画控制面板 -->
+          <div id="gifControls" style="display: none">
+            <div class="control-group">
+              <label>GIF 动画控制</label>
+              <div class="gif-control-buttons">
+                <button id="playBtn" onclick="playGif()">播放</button>
+                <button
+                  id="pauseBtn"
+                  onclick="pauseGif()"
+                  style="display: none"
+                >
+                  暂停
+                </button>
+                <button onclick="stopGif()">停止</button>
+              </div>
+            </div>
+
+            <div class="control-group">
+              <label>播放速度</label>
+              <div class="number-input-group">
+                <button class="num-btn" onclick="adjustGifSpeed(-0.1)">
+                  -
+                </button>
+                <input
+                  type="number"
+                  id="gifSpeed"
+                  min="0.1"
+                  max="3"
+                  step="0.1"
+                  value="1"
+                  onchange="updateGifSpeed()"
+                />
+                <button class="num-btn" onclick="adjustGifSpeed(0.1)">+</button>
+              </div>
+              <div style="font-size: 11px; color: #666; margin-top: 2px">
+                倍速 (0.1x - 3x)
+              </div>
+            </div>
+
+            <div class="control-group">
+              <label>当前帧</label>
+              <div class="frame-info">
+                <span id="currentFrame">1</span> /
+                <span id="totalFrames">1</span>
+                <div class="frame-controls">
+                  <button onclick="prevFrame()">⏮️</button>
+                  <button onclick="nextFrame()">⏭️</button>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-        
-        <div class="upload-area" id="uploadArea" onclick="document.getElementById('imageInput').click()">
-          <div id="uploadPlaceholder">
-            <div class="upload-icon">📁</div>
-            <div class="upload-text">点击上传图片或 GIF</div>
-            <div class="upload-text" style="font-size: 11px; margin-top: 5px;">建议尺寸 64x64 像素</div>
+
+          <div
+            class="upload-area"
+            id="uploadArea"
+            onclick="document.getElementById('imageInput').click()"
+          >
+            <div id="uploadPlaceholder">
+              <div class="upload-icon">📁</div>
+              <div class="upload-text">点击上传图片或 GIF</div>
+              <div class="upload-text" style="font-size: 11px; margin-top: 5px">
+                建议尺寸 64x64 像素
+              </div>
+            </div>
+            <div id="imagePreviewContainer" style="display: none">
+              <img id="imagePreview" class="image-preview" />
+              <div class="image-actions">
+                <button
+                  class="secondary"
+                  onclick="
+                    event.stopPropagation();
+                    document.getElementById('imageInput').click();
+                  "
+                >
+                  更换
+                </button>
+                <button
+                  class="secondary"
+                  onclick="
+                    event.stopPropagation();
+                    removeImage();
+                  "
+                >
+                  删除
+                </button>
+              </div>
+            </div>
           </div>
-          <div id="imagePreviewContainer" style="display: none;">
-            <img id="imagePreview" class="image-preview" />
-            <div class="image-actions">
-              <button class="secondary" onclick="event.stopPropagation(); document.getElementById('imageInput').click()">更换</button>
-              <button class="secondary" onclick="event.stopPropagation(); removeImage()">删除</button>
+          <input
+            type="file"
+            id="imageInput"
+            accept="image/*,image/gif"
+            style="display: none"
+            onchange="handleImageUpload(event)"
+          />
+
+          <div class="control-group">
+            <div class="control-header">
+              <label>尺寸设置</label>
+              <button class="small secondary" onclick="setSquareSize()">
+                长宽一致
+              </button>
+            </div>
+          </div>
+
+          <div class="control-group">
+            <label>宽度 (最大64)</label>
+            <div class="number-input-group">
+              <button class="num-btn" onclick="adjustValue('imageWidth', -1)">
+                -
+              </button>
+              <input
+                type="number"
+                id="imageWidth"
+                min="8"
+                max="128"
+                value="64"
+                oninput="
+                  checkImageSize('width', this.value);
+                  updateDisplay();
+                "
+              />
+              <button class="num-btn" onclick="adjustValue('imageWidth', 1)">
+                +
+              </button>
+            </div>
+            <div id="widthWarning" class="warning-text" style="display: none">
+              注意: 宽度超过64可能显示不完整
+            </div>
+          </div>
+
+          <div class="control-group">
+            <label>高度 (最大64)</label>
+            <div class="number-input-group">
+              <button class="num-btn" onclick="adjustValue('imageHeight', -1)">
+                -
+              </button>
+              <input
+                type="number"
+                id="imageHeight"
+                min="8"
+                max="128"
+                value="64"
+                oninput="
+                  checkImageSize('height', this.value);
+                  updateDisplay();
+                "
+              />
+              <button class="num-btn" onclick="adjustValue('imageHeight', 1)">
+                +
+              </button>
+            </div>
+            <div id="heightWarning" class="warning-text" style="display: none">
+              注意: 高度超过64可能显示不完整
+            </div>
+          </div>
+
+          <div class="control-group">
+            <label>X 位置</label>
+            <div class="number-input-group">
+              <button class="num-btn" onclick="adjustValue('imageX', -1)">
+                -
+              </button>
+              <input
+                type="number"
+                id="imageX"
+                min="-32"
+                max="64"
+                value="0"
+                oninput="updateDisplay()"
+              />
+              <button class="num-btn" onclick="adjustValue('imageX', 1)">
+                +
+              </button>
+            </div>
+          </div>
+
+          <div class="control-group">
+            <label>Y 位置</label>
+            <div class="number-input-group">
+              <button class="num-btn" onclick="adjustValue('imageY', -1)">
+                -
+              </button>
+              <input
+                type="number"
+                id="imageY"
+                min="-32"
+                max="64"
+                value="0"
+                oninput="updateDisplay()"
+              />
+              <button class="num-btn" onclick="adjustValue('imageY', 1)">
+                +
+              </button>
             </div>
           </div>
         </div>
-        <input type="file" id="imageInput" accept="image/*,image/gif" style="display: none;" onchange="handleImageUpload(event)">
-        
-        <div class="control-group">
-          <div class="control-header">
-            <label>尺寸设置</label>
-            <button class="small secondary" onclick="setSquareSize()">长宽一致</button>
-          </div>
-        </div>
-        
-        <div class="control-group">
-          <label>宽度 (最大64)</label>
-          <div class="number-input-group">
-            <button class="num-btn" onclick="adjustValue('imageWidth', -1)">-</button>
-            <input type="number" id="imageWidth" min="8" max="128" value="64" oninput="checkImageSize('width', this.value); updateDisplay()">
-            <button class="num-btn" onclick="adjustValue('imageWidth', 1)">+</button>
-          </div>
-          <div id="widthWarning" class="warning-text" style="display: none;">注意: 宽度超过64可能显示不完整</div>
-        </div>
-        
-        <div class="control-group">
-          <label>高度 (最大64)</label>
-          <div class="number-input-group">
-            <button class="num-btn" onclick="adjustValue('imageHeight', -1)">-</button>
-            <input type="number" id="imageHeight" min="8" max="128" value="64" oninput="checkImageSize('height', this.value); updateDisplay()">
-            <button class="num-btn" onclick="adjustValue('imageHeight', 1)">+</button>
-          </div>
-          <div id="heightWarning" class="warning-text" style="display: none;">注意: 高度超过64可能显示不完整</div>
-        </div>
-        
-        <div class="control-group">
-          <label>X 位置</label>
-          <div class="number-input-group">
-            <button class="num-btn" onclick="adjustValue('imageX', -1)">-</button>
-            <input type="number" id="imageX" min="-32" max="64" value="0" oninput="updateDisplay()">
-            <button class="num-btn" onclick="adjustValue('imageX', 1)">+</button>
-          </div>
-        </div>
-        
-        <div class="control-group">
-          <label>Y 位置</label>
-          <div class="number-input-group">
-            <button class="num-btn" onclick="adjustValue('imageY', -1)">-</button>
-            <input type="number" id="imageY" min="-32" max="64" value="0" oninput="updateDisplay()">
-            <button class="num-btn" onclick="adjustValue('imageY', 1)">+</button>
-          </div>
-        </div>
-      </div>
-      
-      <hr>
-      
-      <button class="secondary" onclick="saveConfig()">保存配置</button>
-      <button onclick="copyFullJSON()">复制完整 JSON</button>
-      <button class="secondary" onclick="copyPixelData()">仅复制像素数据</button>
-      <button id="copyESP32AnimBtn" onclick="copyESP32AnimationData()" style="display: none;">复制 ESP32 动画数据</button>
-      <button id="copyCompressedAnimBtn" onclick="copyCompressedAnimationData()" style="display: none;" class="secondary">复制超压缩版本</button>
-      
-      <div class="info">💡 提示：调整参数后点击"更新显示"查看效果</div>
-      
-      <div id="configOutput" class="config-output" style="display: none;"></div>
-    </div>
-  </div>
 
-  <script src="simulator-script.js"></script>
-</body>
+        <hr />
+
+        <button class="secondary" onclick="saveConfig()">保存配置</button>
+        <button onclick="copyFullJSON()">复制完整 JSON</button>
+        <button class="secondary" onclick="copyPixelData()">
+          仅复制像素数据
+        </button>
+        <button
+          id="copyESP32AnimBtn"
+          onclick="copyESP32AnimationData()"
+          style="display: none"
+        >
+          复制 ESP32 动画数据
+        </button>
+        <button
+          id="copyCompressedAnimBtn"
+          onclick="copyCompressedAnimationData()"
+          style="display: none"
+          class="secondary"
+        >
+          复制超压缩版本
+        </button>
+
+        <div class="info">💡 提示：调整参数后点击"更新显示"查看效果</div>
+
+        <div
+          id="configOutput"
+          class="config-output"
+          style="display: none"
+        ></div>
+      </div>
+    </div>
+
+    <script src="simulator-script.js"></script>
+  </body>
 </html>

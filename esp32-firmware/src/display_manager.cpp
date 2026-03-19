@@ -39,22 +39,24 @@ void DisplayManager::setupMatrix() {
   dma_display->setTextSize(1);
   dma_display->setTextColor(dma_display->color565(220, 220, 220));
   dma_display->setCursor(11, 52);
-  dma_display->print("Glowxel");
+  dma_display->print("RenLight");
   delay(2000);
   Serial.println("LED灯板初始化完成");
 }
 
 void DisplayManager::drawLogo(int x, int y) {
+  // RenLight 品牌色：orange → red → yellow → blue
   uint16_t orange = dma_display->color565(249, 115, 22);
+  uint16_t red    = dma_display->color565(239, 68, 68);
+  uint16_t yellow = dma_display->color565(251, 191, 36);
   uint16_t blue   = dma_display->color565(59, 130, 246);
-  uint16_t pink   = dma_display->color565(236, 72, 153);
 
   int bs = 11, gap = 3, step = bs + gap;
 
   uint16_t grid[3][3] = {
-    { orange, orange, blue },
-    { orange, blue,   pink },
-    { orange, orange, blue }
+    { orange, orange, red    },
+    { orange, yellow, yellow },
+    { orange, blue,   blue   }
   };
 
   for (int row = 0; row < 3; row++)
@@ -132,6 +134,106 @@ static int clockConfig_timeY() {
     : ConfigManager::clockConfig.time.y;
 }
 
+// 3x5 微型字体 (每字符5行，每行3bit: bit2=左, bit1=中, bit0=右)
+static const uint8_t FONT3X5[][5] = {
+  // 0-9 (index 0-9)
+  {7,5,5,5,7},{2,6,2,2,7},{7,1,7,4,7},{7,1,7,1,7},{5,5,7,1,1},
+  {7,4,7,1,7},{7,4,7,5,7},{7,1,1,1,1},{7,5,7,5,7},{7,5,7,1,7},
+  // . (10), : (11), - (12), space (13)
+  {0,0,0,0,2},{0,2,0,2,0},{0,0,7,0,0},{0,0,0,0,0},
+  // A-Z (index 14-39)
+  {2,5,7,5,5},{6,5,6,5,6},{7,4,4,4,7},{6,5,5,5,6},{7,4,7,4,7},
+  {7,4,7,4,4},{7,4,5,5,7},{5,5,7,5,5},{7,2,2,2,7},{3,1,1,5,7},
+  {5,6,4,6,5},{4,4,4,4,7},{5,7,5,5,5},{5,7,7,5,5},{7,5,5,5,7},
+  {7,5,7,4,4},{7,5,5,7,1},{7,5,7,6,5},{7,4,7,1,7},{7,2,2,2,2},
+  {5,5,5,5,7},{5,5,5,2,2},{5,5,5,7,5},{5,5,2,5,5},{5,5,2,2,2},{7,1,2,4,7},
+};
+
+static int fontIndex(char c) {
+  if (c >= '0' && c <= '9') return c - '0';
+  if (c == '.') return 10;
+  if (c == ':') return 11;
+  if (c == '-') return 12;
+  if (c == ' ') return 13;
+  if (c >= 'A' && c <= 'Z') return 14 + (c - 'A');
+  if (c >= 'a' && c <= 'z') return 14 + (c - 'a');
+  return 13;
+}
+
+// 擦除文字中亮像素（只擦亮的点，不影响背景）
+static void eraseTinyTextCentered(const char* text, int y, int size) {
+  int len = strlen(text);
+  int w = len * 4 * size - size;
+  int x = (64 - w) / 2;
+  if (x < 0) x = 0;
+  int cx = x;
+  for (int i = 0; text[i]; i++) {
+    int idx = fontIndex(text[i]);
+    const uint8_t* glyph = FONT3X5[idx];
+    for (int row = 0; row < 5; row++) {
+      uint8_t bits = glyph[row];
+      for (int sy = 0; sy < size; sy++) {
+        for (int sx = 0; sx < size; sx++) {
+          int py = y + row * size + sy;
+          if (bits & 4) DisplayManager::dma_display->drawPixel(cx + sx, py, 0);
+          if (bits & 2) DisplayManager::dma_display->drawPixel(cx + size + sx, py, 0);
+          if (bits & 1) DisplayManager::dma_display->drawPixel(cx + size*2 + sx, py, 0);
+        }
+      }
+    }
+    cx += 4 * size;
+  }
+}
+
+// Diff 绘制：比较新旧字模，只清除"旧有新无"的像素，始终重绘新文字像素
+static void drawTinyTextCenteredDiff(
+    const char* oldText, int oldY, int oldSize,
+    const char* newText, int newY, int newSize,
+    uint16_t color) {
+  int newLen = strlen(newText);
+  int newW = newLen * 4 * newSize - newSize;
+  int newX = (64 - newW) / 2;
+  if (newX < 0) newX = 0;
+
+  // 位置或大小变了：擦旧位置亮像素，画新位置
+  if (oldText[0] && (oldY != newY || oldSize != newSize)) {
+    eraseTinyTextCentered(oldText, oldY, oldSize);
+    DisplayManager::drawTinyText(newText, newX, newY, color, newSize);
+    return;
+  }
+
+  // 逐字符 diff
+  int oldLen = strlen(oldText);
+  int cx = newX;
+  for (int i = 0; i < newLen; i++) {
+    char oldCh = (i < oldLen) ? oldText[i] : ' ';
+    char newCh = newText[i];
+    const uint8_t* oldGlyph = FONT3X5[fontIndex(oldCh)];
+    const uint8_t* newGlyph = FONT3X5[fontIndex(newCh)];
+
+    for (int row = 0; row < 5; row++) {
+      uint8_t oldBits = oldGlyph[row];
+      uint8_t newBits = newGlyph[row];
+      uint8_t clearBits = oldBits & ~newBits; // 旧有新无，需清除
+
+      for (int sy = 0; sy < newSize; sy++) {
+        for (int sx = 0; sx < newSize; sx++) {
+          int py = newY + row * newSize + sy;
+          // 清除旧有新无的像素
+          if (clearBits & 4) DisplayManager::dma_display->drawPixel(cx + sx, py, 0);
+          if (clearBits & 2) DisplayManager::dma_display->drawPixel(cx + newSize + sx, py, 0);
+          if (clearBits & 1) DisplayManager::dma_display->drawPixel(cx + newSize*2 + sx, py, 0);
+          // 始终重绘新文字像素（GIF 帧可能覆盖了文字）
+          if (newBits & 4) DisplayManager::dma_display->drawPixel(cx + sx, py, color);
+          if (newBits & 2) DisplayManager::dma_display->drawPixel(cx + newSize + sx, py, color);
+          if (newBits & 1) DisplayManager::dma_display->drawPixel(cx + newSize*2 + sx, py, color);
+        }
+      }
+    }
+    cx += 4 * newSize;
+  }
+}
+
 void DisplayManager::drawClockOverlay() {
   struct tm timeinfo;
   if (!getLocalTime(&timeinfo)) return;
@@ -140,24 +242,63 @@ void DisplayManager::drawClockOverlay() {
     ? ConfigManager::animClockConfig
     : ConfigManager::clockConfig;
 
+  static char s_prevTime[6] = "";
+  static int s_prevTimeY = -1, s_prevTimeSize = 0;
+  static char s_prevDate[6] = "";
+  static int s_prevDateY = -1, s_prevDateSize = 0;
+  static char s_prevWeek[4] = "";
+  static int s_prevWeekY = -1;
+  static DeviceMode s_prevMode = MODE_CANVAS;
+
+  // 模式切换时重置缓存，避免跨模式擦除错误位置
+  if (currentMode != s_prevMode) {
+    s_prevTime[0] = '\0';
+    s_prevDate[0] = '\0';
+    s_prevWeek[0] = '\0';
+    s_prevTimeY = -1;
+    s_prevDateY = -1;
+    s_prevWeekY = -1;
+    s_prevMode = currentMode;
+  }
+
+  // 时间
   char timeStr[6];
   sprintf(timeStr, "%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min);
-  drawTinyTextCentered(timeStr, c.time.y,
-    dma_display->color565(c.time.r, c.time.g, c.time.b),
-    c.time.fontSize);
+  drawTinyTextCenteredDiff(s_prevTime, s_prevTimeY, s_prevTimeSize,
+    timeStr, c.time.y, c.time.fontSize,
+    dma_display->color565(c.time.r, c.time.g, c.time.b));
+  strcpy(s_prevTime, timeStr);
+  s_prevTimeY = c.time.y;
+  s_prevTimeSize = c.time.fontSize;
 
+  // 日期
   if (c.date.show) {
     char dateStr[6];
     sprintf(dateStr, "%02d-%02d", timeinfo.tm_mon + 1, timeinfo.tm_mday);
-    drawTinyTextCentered(dateStr, c.date.y,
-      dma_display->color565(c.date.r, c.date.g, c.date.b),
-      c.date.fontSize);
+    drawTinyTextCenteredDiff(s_prevDate, s_prevDateY, s_prevDateSize,
+      dateStr, c.date.y, c.date.fontSize,
+      dma_display->color565(c.date.r, c.date.g, c.date.b));
+    strcpy(s_prevDate, dateStr);
+    s_prevDateY = c.date.y;
+    s_prevDateSize = c.date.fontSize;
+  } else if (s_prevDate[0]) {
+    eraseTinyTextCentered(s_prevDate, s_prevDateY, s_prevDateSize);
+    s_prevDate[0] = '\0';
   }
 
+  // 星期
   if (c.week.show) {
     const char* weekDays[] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
-    drawTinyTextCentered(weekDays[timeinfo.tm_wday], c.week.y,
+    const char* weekStr = weekDays[timeinfo.tm_wday];
+    drawTinyTextCenteredDiff(s_prevWeek, s_prevWeekY, 1,
+      weekStr, c.week.y, 1,
       dma_display->color565(c.week.r, c.week.g, c.week.b));
+    strncpy(s_prevWeek, weekStr, 3);
+    s_prevWeek[3] = '\0';
+    s_prevWeekY = c.week.y;
+  } else if (s_prevWeek[0]) {
+    eraseTinyTextCentered(s_prevWeek, s_prevWeekY, 1);
+    s_prevWeek[0] = '\0';
   }
 }
 
@@ -186,32 +327,6 @@ void DisplayManager::setBrightness(int brightness) {
     currentBrightness = brightness;
     dma_display->setBrightness8(brightness);
   }
-}
-
-// 3x5 微型字体 (每字符5行，每行3bit: bit2=左, bit1=中, bit0=右)
-static const uint8_t FONT3X5[][5] = {
-  // 0-9 (index 0-9)
-  {7,5,5,5,7},{2,6,2,2,7},{7,1,7,4,7},{7,1,7,1,7},{5,5,7,1,1},
-  {7,4,7,1,7},{7,4,7,5,7},{7,1,1,1,1},{7,5,7,5,7},{7,5,7,1,7},
-  // . (10), : (11), - (12), space (13)
-  {0,0,0,0,2},{0,2,0,2,0},{0,0,7,0,0},{0,0,0,0,0},
-  // A-Z (index 14-39)
-  {2,5,7,5,5},{6,5,6,5,6},{7,4,4,4,7},{6,5,5,5,6},{7,4,7,4,7},
-  {7,4,7,4,4},{7,4,5,5,7},{5,5,7,5,5},{7,2,2,2,7},{3,1,1,5,7},
-  {5,6,4,6,5},{4,4,4,4,7},{5,7,5,5,5},{5,7,7,5,5},{7,5,5,5,7},
-  {7,5,7,4,4},{7,5,5,7,1},{7,5,7,6,5},{7,4,7,1,7},{7,2,2,2,2},
-  {5,5,5,5,7},{5,5,5,2,2},{5,5,5,7,5},{5,5,2,5,5},{5,5,2,2,2},{7,1,2,4,7},
-};
-
-static int fontIndex(char c) {
-  if (c >= '0' && c <= '9') return c - '0';
-  if (c == '.') return 10;
-  if (c == ':') return 11;
-  if (c == '-') return 12;
-  if (c == ' ') return 13;
-  if (c >= 'A' && c <= 'Z') return 14 + (c - 'A');
-  if (c >= 'a' && c <= 'z') return 14 + (c - 'a');
-  return 13;
 }
 
 void DisplayManager::drawTinyText(const char* text, int x, int y, uint16_t color, int size) {
