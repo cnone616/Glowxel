@@ -95,6 +95,11 @@
             placeholder="请输入 WiFi 名称"
           />
         </view>
+        <view class="tip-box">
+          <text class="tip-text"
+            >⚠️ 设备仅支持 2.4GHz 频段，请勿使用 5GHz WiFi</text
+          >
+        </view>
 
         <view class="form-group">
           <text class="form-label">WiFi 密码</text>
@@ -572,6 +577,18 @@ export default {
 
 .form-group {
   margin-bottom: 24rpx;
+}
+.tip-box {
+  background-color: #fff7e6;
+  border: 1rpx solid #ffd591;
+  border-radius: 8rpx;
+  padding: 16rpx 20rpx;
+  margin-bottom: 24rpx;
+}
+.tip-text {
+  font-size: 22rpx;
+  color: #d46b08;
+  line-height: 1.5;
 }
 .form-label {
   font-size: 24rpx;

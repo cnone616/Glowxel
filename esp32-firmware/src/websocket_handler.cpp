@@ -79,7 +79,7 @@ void WebSocketHandler::handleBinaryData(AsyncWebSocketClient *client, uint8_t *d
     }
 
     // 画板模式：保存到 canvasBuffer（64x64完整画布）
-    if (DisplayManager::currentMode == MODE_CANVAS) {
+    if (DisplayManager::currentMode == MODE_CANVAS && DisplayManager::isCanvasMode) {
       
       // 第一次接收时初始化画布（清空）
       if (!DisplayManager::canvasInitialized) {
@@ -148,8 +148,7 @@ void WebSocketHandler::handleBinaryData(AsyncWebSocketClient *client, uint8_t *d
       return;
     }
     
-    // 闹钟模式：保存到对应模式的 imagePixels（背景图）
-    // 根据当前模式选择对应的像素存储
+    // 静态时钟背景模式：保存到 staticImagePixels
     PixelData*& imagePixels = (DisplayManager::currentMode == MODE_ANIMATION)
       ? ConfigManager::animImagePixels
       : ConfigManager::staticImagePixels;
@@ -165,8 +164,8 @@ void WebSocketHandler::handleBinaryData(AsyncWebSocketClient *client, uint8_t *d
         imagePixels = nullptr;
       }
       imagePixelCount = 0;
-      // 清屏，擦除旧 Logo 或残留像素
       DisplayManager::dma_display->clearScreen();
+      DisplayManager::receivingPixels = true;  // 阻止 displayClock 在接收期间画 Logo
     }
 
     // 追加数据
@@ -334,12 +333,12 @@ void WebSocketHandler::handleJsonCommand(AsyncWebSocketClient *client, JsonDocum
     if (mode == "clock") {
       // 静态时钟模式
       DisplayManager::isCanvasMode = false;
-      DisplayManager::currentMode = MODE_CANVAS;
+      DisplayManager::currentMode = MODE_CLOCK;
       ConfigManager::saveClockConfig();
-      DisplayManager::displayClock(true);  // 强制重绘
+      DisplayManager::displayClock(true);
       response["message"] = "switched to static clock mode";
     } else if (mode == "canvas") {
-      // 画板模式（不画时钟）
+      // 画板模式
       DisplayManager::isCanvasMode = true;
       DisplayManager::currentMode = MODE_CANVAS;
       ConfigManager::saveClockConfig();
@@ -465,11 +464,8 @@ void WebSocketHandler::handleJsonCommand(AsyncWebSocketClient *client, JsonDocum
       ConfigManager::saveClockConfig();
     }
 
-    // 立即刷新显示
-    if (DisplayManager::currentMode == MODE_CANVAS) {
-      DisplayManager::displayClock(true);
-    }
-
+    // 只保存配置，不碰屏幕
+    // 背景由像素传完后统一刷新，避免此时画 Logo 叠加在后续像素上
     response["message"] = "clock config updated";
   }
   else if (cmd == "set_gif_animation") {

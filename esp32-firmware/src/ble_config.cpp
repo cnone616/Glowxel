@@ -73,18 +73,12 @@ class WiFiConfigCallbacks : public BLECharacteristicCallbacks {
 
     BLEConfig::wifiConfigReceived = true;
 
-    // 清除旧的闹钟/像素配置，恢复默认
-    ConfigManager::resetToDefault();
-
     // 显示提示（3x5小字体）
     auto* d = DisplayManager::dma_display;
     d->clearScreen();
     DisplayManager::drawTinyTextCentered("WIFI SAVED", 26, d->color565(100, 255, 100));
     DisplayManager::drawTinyTextCentered("REBOOTING..", 36, d->color565(150, 150, 150));
-
-    // 延迟后重启
-    delay(2000);
-    ESP.restart();
+    // 重启由 main loop 处理，避免在 BLE 回调里 delay/restart 导致 watchdog
   }
 };
 
