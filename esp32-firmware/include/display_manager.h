@@ -5,16 +5,18 @@
 #include <ESP32-HUB75-MatrixPanel-I2S-DMA.h>
 #include "config_manager.h"
 
-// 设备模式
+// 设备模式（枚举值不能改，NVS 里存的是数字）
 enum DeviceMode {
-  MODE_CANVAS,     // 画板/静态背景模式（默认，时钟叠加）
-  MODE_ANIMATION   // 动态壁纸模式（时钟叠加）
+  MODE_CLOCK,      // 0: 静态时钟背景模式（默认）
+  MODE_ANIMATION,  // 1: 动态壁纸模式
+  MODE_CANVAS      // 2: 画板模式
 };
 
 class DisplayManager {
 public:
   static void init();
   static void setupMatrix();
+  static void drawBackground();       // 独立：清屏+画像素背景或Logo
   static void displayClock(bool force = false);
   static void drawClockOverlay();  // 不清屏，只叠加时钟文字
   static void drawLogo(int x, int y);  // 画九宫格 logo 到指定坐标
@@ -34,7 +36,8 @@ public:
   // 画板模式相关
   static uint8_t canvasBuffer[64][64][3]; // [y][x][rgb]
   static bool canvasInitialized;
-  static bool isCanvasMode;  // true=纯画板（不画时钟），false=静态时钟
+  static bool isCanvasMode;
+  static bool receivingPixels;  // true=纯画板（不画时钟），false=静态时钟
   
   // 黑色像素坐标存储
   struct BlackPixel {

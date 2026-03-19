@@ -752,14 +752,16 @@ export default {
         success: async (res) => {
           if (!res.confirm) return;
           try {
+            // 先断开，防止 ESP32 重启后触发自动重连
+            this.deviceStore.disconnect();
+            this.connectionStatus = "disconnected";
+
             const url = `http://${this.deviceIp}/clear-wifi`;
             uni.request({
               url,
               method: "GET",
               success: () => {
                 this.toast.showSuccess("网络已重置，设备重启中...");
-                this.deviceStore.disconnect();
-                this.connectionStatus = "disconnected";
               },
               fail: () => {
                 this.toast.showError("重置失败，请检查设备连接");

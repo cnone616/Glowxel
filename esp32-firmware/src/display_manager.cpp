@@ -9,6 +9,7 @@ bool DisplayManager::clientConnected = false;
 uint8_t DisplayManager::canvasBuffer[64][64][3];
 bool DisplayManager::canvasInitialized = false;
 bool DisplayManager::isCanvasMode = false;
+bool DisplayManager::receivingPixels = false;
 DisplayManager::BlackPixel* DisplayManager::blackPixels = nullptr;
 int DisplayManager::blackPixelCount = 0;
 
@@ -67,7 +68,32 @@ void DisplayManager::drawLogo(int x, int y) {
 // 前向声明
 static int clockConfig_timeY();
 
+// 独立背景绘制：清屏 + 画像素背景或 Logo，不涉及时钟文字
+void DisplayManager::drawBackground() {
+  PixelData* imagePixels = (currentMode == MODE_ANIMATION)
+    ? ConfigManager::animImagePixels
+    : ConfigManager::staticImagePixels;
+  int imagePixelCount = (currentMode == MODE_ANIMATION)
+    ? ConfigManager::animImagePixelCount
+    : ConfigManager::staticImagePixelCount;
+
+  dma_display->clearScreen();
+
+  if (imagePixels != nullptr && imagePixelCount > 0) {
+    for (int i = 0; i < imagePixelCount; i++) {
+      PixelData& p = imagePixels[i];
+      if (p.x < PANEL_RES_X && p.y < PANEL_RES_Y)
+        dma_display->drawPixelRGB888(p.x, p.y, p.r, p.g, p.b);
+      if (i % 100 == 0) yield();
+    }
+  } else {
+    drawLogo(12, 18);
+  }
+}
+
 void DisplayManager::displayClock(bool force) {
+  // 正在接收像素，不碰屏幕
+  if (receivingPixels) return;
   // 根据当前模式选择对应的时钟配置和像素数据
   ClockConfig& cfg = (currentMode == MODE_ANIMATION)
     ? ConfigManager::animClockConfig
@@ -81,44 +107,33 @@ void DisplayManager::displayClock(bool force) {
     ? ConfigManager::animImagePixelCount
     : ConfigManager::staticImagePixelCount;
 
-  bool hasCustomImage = cfg.image.show &&
-                        imagePixels != nullptr &&
-                        imagePixelCount > 0;
+  bool hasCustomImage = imagePixels != nullptr && imagePixelCount > 0;
 
   struct tm timeinfo;
   if (!getLocalTime(&timeinfo)) {
-    // 时间未同步：清屏后画默认背景，显示白色 "--:--"
     dma_display->clearScreen();
-    if (currentMode == MODE_CANVAS && !hasCustomImage) {
-      drawLogo(12, 18);  // 时钟背景，给时间留空间
+    if (currentMode == MODE_CLOCK && !hasCustomImage) {
+      drawLogo(12, 18);
     }
     drawTinyTextCentered("--:--", clockConfig_timeY(), dma_display->color565(255, 255, 255));
     return;
   }
 
-  // 只在分钟变化时刷新，避免不必要的重绘（force=true 时跳过）
   static int s_lastMin = -1;
   if (!force && timeinfo.tm_min == s_lastMin) return;
   s_lastMin = timeinfo.tm_min;
 
-  // 强制模式：先清屏（清掉 loading 圈等残留）
-  if (force) {
-    dma_display->clearScreen();
-  }
+  if (force) dma_display->clearScreen();
 
-  // 绘制背景
-  if (currentMode == MODE_CANVAS) {
+  if (currentMode == MODE_CLOCK || currentMode == MODE_ANIMATION) {
     if (hasCustomImage) {
-      // 有自定义图片，画图片
       for (int i = 0; i < imagePixelCount; i++) {
         PixelData& pixel = imagePixels[i];
-        if (pixel.x < PANEL_RES_X && pixel.y < PANEL_RES_Y) {
+        if (pixel.x < PANEL_RES_X && pixel.y < PANEL_RES_Y)
           dma_display->drawPixelRGB888(pixel.x, pixel.y, pixel.r, pixel.g, pixel.b);
-        }
         if (i % 100 == 0) yield();
       }
-    } else {
-      // 没有自定义图片，画Logo九宫格作为时钟背景（偏上，给时间留空间）
+    } else if (currentMode == MODE_CLOCK) {
       drawLogo(12, 18);
     }
   }

@@ -8,6 +8,7 @@
 #include "web_server.h"
 #include "ota_manager.h"
 #include "tetris_effect.h"
+#include "ble_config.h"
 
 void setup() {
   Serial.begin(115200);
@@ -44,7 +45,7 @@ void setup() {
     DisplayManager::clearScreen();
 
     // 立即渲染首帧：画布模式画时钟，动画模式由 AnimationManager::init() 已处理
-    if (DisplayManager::currentMode == MODE_CANVAS) {
+    if (DisplayManager::currentMode == MODE_CLOCK) {
       DisplayManager::displayClock();
     }
   }
@@ -64,6 +65,11 @@ void setup() {
 void loop() {
   // 配网模式下只等待 BLE 配网，不做其他事
   if (WiFiManager::isConfigMode()) {
+    // WiFi 配置已收到，延迟后重启
+    if (BLEConfig::wifiConfigReceived) {
+      delay(2000);
+      ESP.restart();
+    }
     delay(100);
     return;
   }
@@ -99,9 +105,11 @@ void loop() {
       serializeJson(confirmDoc, confirmMsg);
       WebSocketHandler::ws.textAll(confirmMsg);
 
-      // 保存完成后，如果是画布模式，刷新显示
-      if (DisplayManager::currentMode == MODE_CANVAS) {
-        DisplayManager::displayClock();
+      // 保存完成后刷新显示
+      if (DisplayManager::currentMode == MODE_CLOCK) {
+        DisplayManager::receivingPixels = false;
+        DisplayManager::drawBackground();
+        DisplayManager::drawClockOverlay();
       }
     }
   }
@@ -114,11 +122,11 @@ void loop() {
   }
 
   // 根据当前模式执行不同的逻辑
-  if (DisplayManager::currentMode == MODE_CANVAS) {
-    if (DisplayManager::isCanvasMode) {
+  if (DisplayManager::currentMode == MODE_CANVAS || DisplayManager::currentMode == MODE_CLOCK) {
+    if (DisplayManager::currentMode == MODE_CANVAS) {
       // 纯画板模式：不画时钟，不干预显示
     } else if (DisplayManager::clientConnected) {
-      // 有客户端连接时（拼豆模式），不自动刷新时钟
+      // 有客户端连接时，不自动刷新时钟
     } else {
       // 静态时钟模式，无客户端：每分钟更新一次时钟
       static unsigned long lastClockUpdate = 0;

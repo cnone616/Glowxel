@@ -59,9 +59,10 @@ void ConfigManager::loadClockConfig() {
   }
 
   // 恢复上次的显示模式
-  int savedMode = preferences.getInt("dispMode", 0);
+  int savedMode = preferences.getInt("dispMode", (int)MODE_CLOCK);
   DisplayManager::currentMode = (DeviceMode)savedMode;
-  Serial.printf("恢复显示模式: %s\n", savedMode == MODE_ANIMATION ? "ANIMATION" : "CANVAS");
+  const char* modeStr = savedMode == MODE_ANIMATION ? "ANIMATION" : (savedMode == MODE_CLOCK ? "CLOCK" : "CANVAS");
+  Serial.printf("恢复显示模式: %s\n", modeStr);
 
   preferences.end();
 }
