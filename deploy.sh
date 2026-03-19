@@ -1,5 +1,5 @@
 #!/bin/bash
-# Glowxel 一键更新部署脚本
+# 一键更新部署脚本
 # 本地执行: bash deploy.sh
 # 可选参数: bash deploy.sh --skip-website  跳过官网构建
 #           bash deploy.sh --skip-admin    跳过后台构建
@@ -21,7 +21,7 @@ for arg in "$@"; do
   esac
 done
 
-echo "🚀 Glowxel 一键部署"
+echo "一键部署"
 echo "================================"
 
 # ── 1. 推送代码 ──────────────────────────────────────────────

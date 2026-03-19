@@ -5,7 +5,7 @@
 
 // 当前固件版本号，每次发布新版本递增
 #define FIRMWARE_VERSION "1.0.0"
-#define DEVICE_TYPE "glowxel-64"
+#define DEVICE_TYPE "renlight-64"
 
 class OTAManager {
 public:

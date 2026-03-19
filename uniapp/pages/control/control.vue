@@ -196,7 +196,7 @@
     <ConnectModal
       :visible="showConnectModal"
       title="连接设备"
-      description="请输入 Glowxel 设备的 IP 地址"
+      description="请输入 RenLight 设备的 IP 地址"
       :placeholder="deviceIp || '192.168.31.84'"
       :defaultValue="deviceIp"
       ref="connectModal"
@@ -376,7 +376,7 @@ export default {
           }
 
           this.$refs.connectModal.onSuccess();
-          this.toast.showSuccess("已连接到 Glowxel 设备");
+          this.toast.showSuccess("已连接到 RenLight 设备");
         } else {
           this.$refs.connectModal.onError("连接失败，请检查 IP 地址");
         }

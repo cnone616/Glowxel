@@ -90,7 +90,7 @@ static void drawStatusBadge(int cx, int cy, bool success) {
 }
 
 // 静态成员初始化
-const char* WiFiManager::ap_ssid = "Glowxel-Setup";
+const char* WiFiManager::ap_ssid = "RenLight-Setup";
 const char* WiFiManager::ap_password = "12345678";
 bool WiFiManager::config_mode = false;
 String WiFiManager::saved_ssid = "";
@@ -178,7 +178,7 @@ void WiFiManager::setupWiFi() {
 
   Serial.println("\n=================================");
   Serial.println("BLE 配网模式已启动");
-  Serial.println("设备名称: Glowxel-Setup");
+  Serial.println("设备名称: RenLight-Setup");
   Serial.println("请使用小程序蓝牙配网");
   Serial.println("=================================");
 

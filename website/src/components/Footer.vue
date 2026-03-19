@@ -3,7 +3,7 @@
     <div class="container">
       <div class="footer-content">
         <div class="footer-brand">
-          <span class="brand-name">Glowxel</span>
+          <span class="brand-name">RenLight</span>
           <p class="brand-desc">像素创作平台 · 光格科技</p>
         </div>
         <div class="footer-links">
@@ -14,7 +14,7 @@
         </div>
       </div>
       <div class="footer-bottom">
-        <p>&copy; 2026 Glowxel 光格科技. All rights reserved.</p>
+        <p>&copy; 2026 RenLight 仁光数字科技. All rights reserved.</p>
       </div>
     </div>
   </footer>

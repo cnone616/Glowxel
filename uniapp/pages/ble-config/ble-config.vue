@@ -37,7 +37,7 @@
       <!-- Step 1: 扫描设备 -->
       <view v-if="step === 1" class="card">
         <view class="card-title-section">
-          <text class="card-title">搜索 Glowxel 设备</text>
+          <text class="card-title">搜索 RenLight 设备</text>
           <text class="card-subtitle">请确保设备已开机且处于配网模式</text>
         </view>
 
@@ -67,7 +67,7 @@
         <view v-if="!scanning && devices.length === 0" class="empty-state">
           <text class="empty-text">未找到设备</text>
           <text class="empty-hint"
-            >请确保 Glowxel 处于配网模式（WiFi 未配置状态）</text
+            >请确保 RenLight 处于配网模式（WiFi 未配置状态）</text
           >
         </view>
 
@@ -193,7 +193,7 @@ export default {
             success: () => {
               uni.onBluetoothDeviceFound((res) => {
                 res.devices.forEach((device) => {
-                  if (device.name && device.name.includes("Glowxel")) {
+                  if (device.name && device.name.includes("RenLight")) {
                     const exists = this.devices.find(
                       (d) => d.deviceId === device.deviceId,
                     );
@@ -286,7 +286,7 @@ export default {
               null,
               new Uint8Array(res.value),
             );
-            console.log("[BLE] 状态通知:", value);
+            console.log("状态通知:", value);
             if (value === "saved") {
               this.sending = false;
               this.step = 3;
@@ -320,7 +320,7 @@ export default {
         characteristicId: BLE_WIFI_CHAR_UUID,
         value: buffer,
         success: () => {
-          console.log("[BLE] WiFi 配置已发送");
+          console.log("WiFi 配置已发送");
           // 等待设备通知 saved，如果 3 秒没收到就直接跳转
           setTimeout(() => {
             if (this.step !== 3) {

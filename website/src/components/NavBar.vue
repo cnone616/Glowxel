@@ -2,8 +2,8 @@
   <nav class="navbar">
     <div class="nav-container">
       <router-link to="/" class="logo">
-        <img :src="iconUrl" alt="Glowxel" class="logo-icon" />
-        <img :src="logoUrl" alt="Glowxel" class="logo-logo" />
+        <img :src="iconUrl" alt="RenLight" class="logo-icon" />
+        <img :src="logoUrl" alt="RenLight" class="logo-logo" />
       </router-link>
 
       <div class="nav-links" :class="{ active: mobileMenuOpen }">
@@ -76,8 +76,8 @@
 
 <script setup>
 import { ref } from "vue";
-import iconUrl from "@/assets/images/glowxel-icon.svg";
-import logoUrl from "@/assets/images/glowxel-logo.png";
+import iconUrl from "@/assets/images/RenLight-logo.png";
+import logoUrl from "@/assets/images/RenLight-logo.png";
 
 const mobileMenuOpen = ref(false);
 const toggleMobileMenu = () => {
