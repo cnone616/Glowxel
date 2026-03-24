@@ -356,6 +356,10 @@ bool AnimationManager::beginFrame(int index, int type, int delay, int totalPixel
     return false;
   }
 
+  // 打印可用内存
+  Serial.printf("可用内存: %d bytes, 需要分配: %d bytes\n",
+    ESP.getFreeHeap(), sizeof(PixelData) * totalPixels);
+
   AnimationFrame& frame = currentGIF->frames[index];
 
   // 释放旧像素数据
@@ -448,10 +452,12 @@ bool AnimationManager::addFrameChunkBinary(int index, uint8_t *data, int pixelCo
       frame.pixelCount++;
       added++;
     }
+
+    // 每处理 50 个像素让出 CPU，防止看门狗超时
+    if (j % 50 == 0) yield();
   }
 
   Serial.printf("帧 %d binary chunk: +%d 像素, 累计 %d\n", index, added, frame.pixelCount);
-  yield();
   return true;
 }
 

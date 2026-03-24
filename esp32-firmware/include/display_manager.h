@@ -7,9 +7,10 @@
 
 // 设备模式（枚举值不能改，NVS 里存的是数字）
 enum DeviceMode {
-  MODE_CLOCK,      // 0: 静态时钟背景模式（默认）
-  MODE_ANIMATION,  // 1: 动态壁纸模式
-  MODE_CANVAS      // 2: 画板模式
+  MODE_CLOCK,        // 0: 静态时钟背景模式（默认）
+  MODE_ANIMATION,    // 1: 动态壁纸模式
+  MODE_CANVAS,       // 2: 画板模式
+  MODE_TRANSFERRING  // 3: 传输模式（临时状态，不保存到 NVS）
 };
 
 class DisplayManager {
@@ -27,6 +28,11 @@ public:
   // 3x5 微型字体渲染
   static void drawTinyText(const char* text, int x, int y, uint16_t color, int size = 1);
   static void drawTinyTextCentered(const char* text, int y, uint16_t color, int size = 1);
+
+  // Loading 动画控制
+  static void startLoadingAnimation();
+  static void stopLoadingAnimation();
+  static void updateLoadingAnimation();
 
   static MatrixPanel_I2S_DMA* dma_display;
   static DeviceMode currentMode;
@@ -46,7 +52,12 @@ public:
   };
   static BlackPixel* blackPixels;
   static int blackPixelCount;
-  
+
+  // Loading 动画状态
+  static bool isLoadingActive;
+  static int loadingStep;
+  static unsigned long lastLoadingUpdate;
+
   // 常量定义
   static const int PANEL_RES_X;
   static const int PANEL_RES_Y;

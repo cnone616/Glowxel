@@ -166,5 +166,8 @@ void loop() {
   // 清理WebSocket，防止内存泄漏
   WebSocketHandler::ws.cleanupClients();
 
+  // 更新 Loading 动画
+  DisplayManager::updateLoadingAnimation();
+
   yield();
 }

@@ -119,7 +119,7 @@ void WiFiManager::setupWiFi() {
     WiFi.begin(saved_ssid.c_str(), saved_password.c_str());
     
     int attempts = 0;
-    while (WiFi.status() != WL_CONNECTED && attempts < 3) {
+    while (WiFi.status() != WL_CONNECTED && attempts < 10) {
       delay(500);
       Serial.print(".");
       attempts++;
