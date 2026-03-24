@@ -13,6 +13,11 @@ bool DisplayManager::receivingPixels = false;
 DisplayManager::BlackPixel* DisplayManager::blackPixels = nullptr;
 int DisplayManager::blackPixelCount = 0;
 
+// Loading 动画状态
+bool DisplayManager::isLoadingActive = false;
+int DisplayManager::loadingStep = 0;
+unsigned long DisplayManager::lastLoadingUpdate = 0;
+
 // 常量定义
 const int DisplayManager::PANEL_RES_X = 64;
 const int DisplayManager::PANEL_RES_Y = 64;
@@ -63,6 +68,72 @@ void DisplayManager::drawLogo(int x, int y) {
   for (int row = 0; row < 3; row++)
     for (int col = 0; col < 3; col++)
       dma_display->fillRect(x + col * step, y + row * step, bs, bs, grid[row][col]);
+}
+
+// Loading 动画控制
+void DisplayManager::startLoadingAnimation() {
+  isLoadingActive = true;
+  loadingStep = 0;
+  lastLoadingUpdate = millis();
+  Serial.println("Loading 动画已启动");
+}
+
+void DisplayManager::stopLoadingAnimation() {
+  isLoadingActive = false;
+  Serial.println("Loading 动画已停止");
+}
+
+void DisplayManager::updateLoadingAnimation() {
+  if (!isLoadingActive) return;
+
+  unsigned long now = millis();
+  if (now - lastLoadingUpdate < 200) return;  // 每 200ms 更新一次
+
+  lastLoadingUpdate = now;
+  loadingStep = (loadingStep + 1) % 8;
+
+  // 九宫格 Logo 参数（与 drawLogo 一致）
+  int x = 12;  // 水平居中
+  int y = 12;  // 上下居中
+  int bs = 11, gap = 3, step = bs + gap;
+
+  // 品牌色
+  uint16_t orange = dma_display->color565(249, 115, 22);
+  uint16_t red    = dma_display->color565(239, 68, 68);
+  uint16_t yellow = dma_display->color565(251, 191, 36);
+  uint16_t blue   = dma_display->color565(59, 130, 246);
+
+  uint16_t grid[3][3] = {
+    { orange, orange, red    },
+    { orange, yellow, yellow },
+    { orange, blue,   blue   }
+  };
+
+  // 清屏
+  dma_display->clearScreen();
+
+  // 绘制暗色底（所有格子 30% 亮度）
+  for (int row = 0; row < 3; row++) {
+    for (int col = 0; col < 3; col++) {
+      uint8_t r = ((grid[row][col] >> 11) & 0x1F) * 255 / 31 * 0.3;
+      uint8_t g = ((grid[row][col] >> 5) & 0x3F) * 255 / 63 * 0.3;
+      uint8_t b = (grid[row][col] & 0x1F) * 255 / 31 * 0.3;
+      uint16_t dimColor = dma_display->color565(r, g, b);
+      dma_display->fillRect(x + col * step, y + row * step, bs, bs, dimColor);
+    }
+  }
+
+  // 外圈顺序：1→2→3→6→9→8→7→4
+  int outer[8][2] = {
+    {0, 0}, {0, 1}, {0, 2}, {1, 2},
+    {2, 2}, {2, 1}, {2, 0}, {1, 0}
+  };
+
+  int row = outer[loadingStep][0];
+  int col = outer[loadingStep][1];
+
+  // 高亮当前格子
+  dma_display->fillRect(x + col * step, y + row * step, bs, bs, grid[row][col]);
 }
 
 // 前向声明

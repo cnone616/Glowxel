@@ -33,90 +33,17 @@
     </view>
 
     <!-- Canvas 预览区域 -->
-    <view class="canvas-section">
-      <view
-        class="canvas-container"
-        v-show="!canvasHidden"
-        ref="canvasContainer"
-      >
-        <PixelCanvas
-          v-if="canvasReady"
-          :width="64"
-          :height="64"
-          :pixels="allPixelsForPreview"
-          :zoom="zoom"
-          :offset-x="pan.x"
-          :offset-y="pan.y"
-          :canvas-width="containerSize.width"
-          :canvas-height="containerSize.height"
-          :grid-visible="gridVisible"
-          :allow-single-touch-pan="currentTool === 'move'"
-          :is-dark-mode="false"
+    <view class="canvas-section" v-show="!canvasHidden">
+      <view class="canvas-wrapper">
+        <canvas
+          type="2d"
           canvas-id="clockCanvas"
-          @pixel-click="handlePixelClick"
-          @pan="handlePan"
-          @zoom="handlePinchZoom"
-        />
-      </view>
-      <!-- 紧凑工具栏 -->
-      <view class="canvas-toolbar">
-        <view class="toolbar-group">
-          <view
-            class="tb-btn"
-            :class="{ disabled: historyIndex <= 0 }"
-            @click="handleUndo"
-          >
-            <Icon name="back" :size="32" />
-          </view>
-          <view
-            class="tb-btn"
-            :class="{ disabled: historyIndex >= history.length - 1 }"
-            @click="handleRedo"
-          >
-            <Icon name="forward" :size="32" />
-          </view>
-        </view>
-        <view class="toolbar-group">
-          <view
-            class="tb-btn"
-            :class="{ active: currentTool === 'pencil' }"
-            @click="currentTool = 'pencil'"
-          >
-            <Icon name="edit" :size="32" />
-          </view>
-          <view
-            class="tb-btn"
-            :class="{ active: currentTool === 'eraser' }"
-            @click="currentTool = 'eraser'"
-          >
-            <Icon name="ashbin" :size="32" />
-          </view>
-          <view
-            class="tb-btn"
-            :class="{ active: currentTool === 'move' }"
-            @click="currentTool = 'move'"
-          >
-            <Icon name="move" :size="32" />
-          </view>
-        </view>
-        <view class="toolbar-group">
-          <view class="tb-btn" @click="handleZoom(-1)"
-            ><Icon name="zoom-out" :size="32"
-          /></view>
-          <view class="tb-btn" @click="handleZoom(1)"
-            ><Icon name="zoom-in" :size="32"
-          /></view>
-          <view class="tb-btn" @click="handleFit"
-            ><Icon name="fullscreen-expand" :size="32"
-          /></view>
-          <view
-            class="tb-btn"
-            :class="{ active: gridVisible }"
-            @click="gridVisible = !gridVisible"
-          >
-            <Icon name="a-Grid-ninejiugongge" :size="32" />
-          </view>
-        </view>
+          id="clockCanvas"
+          class="clock-canvas"
+          @touchstart="handleTouchStart"
+          @touchmove="handleTouchMove"
+          @touchend="handleTouchEnd"
+        ></canvas>
       </view>
     </view>
 
@@ -578,7 +505,7 @@
 
             <!-- GIF 播放控制 -->
             <view
-              v-if="gifAnimationData && gifAnimationData.frameCount > 1"
+              v-if="gifRenderedFrameMaps && gifRenderedFrameMaps.length > 1"
               class="setting-item-row"
             >
               <text class="setting-label">预览</text>
@@ -632,12 +559,95 @@
         </view>
 
         <!-- 绘制工具 -->
-        <view v-show="currentTab === 1" class="settings-card draw-card">
-          <ColorPalette
-            :colors="paletteColors"
-            :selected-color="selectedColor"
-            @select-color="selectedColor = $event"
-          />
+        <view v-show="currentTab === 1" class="settings-card">
+          <view class="card-title-section">
+            <Icon name="edit" :size="32" />
+            <text class="card-title">绘制工具</text>
+          </view>
+
+          <!-- 工具选择 -->
+          <view class="tool-selection">
+            <view
+              class="tool-option"
+              :class="{ active: currentTool === 'pencil' }"
+              @click="currentTool = 'pencil'"
+            >
+              <Icon name="edit" :size="48" />
+              <text class="tool-name">画笔</text>
+            </view>
+            <view
+              class="tool-option"
+              :class="{ active: currentTool === 'eraser' }"
+              @click="currentTool = 'eraser'"
+            >
+              <Icon name="ashbin" :size="48" />
+              <text class="tool-name">橡皮擦</text>
+            </view>
+          </view>
+
+          <!-- 当前颜色显示 -->
+          <view class="current-color-section">
+            <text class="setting-label">当前颜色</text>
+            <view class="current-color-display">
+              <view
+                class="current-color-box"
+                :style="{ backgroundColor: selectedColor }"
+              ></view>
+              <text class="current-color-hex">{{ selectedColor }}</text>
+            </view>
+          </view>
+
+          <!-- 常用颜色 -->
+          <view class="setting-item">
+            <text class="setting-label">常用颜色</text>
+            <view class="color-picker">
+              <view
+                v-for="color in commonColors"
+                :key="color.hex"
+                class="color-item"
+                :class="{ active: selectedColor === color.hex }"
+                :style="{ backgroundColor: color.hex }"
+                @click="selectedColor = color.hex"
+              ></view>
+            </view>
+          </view>
+
+          <!-- 完整调色板切换 -->
+          <view
+            class="palette-toggle"
+            @click="showColorPicker = !showColorPicker"
+          >
+            <text class="palette-toggle-text">
+              {{ showColorPicker ? "收起" : "展开" }}完整调色板 (221色)
+            </text>
+            <text class="palette-toggle-icon">{{
+              showColorPicker ? "▲" : "▼"
+            }}</text>
+          </view>
+
+          <!-- 完整调色板 -->
+          <view v-if="showColorPicker" class="full-color-palette">
+            <view
+              v-for="color in allColors"
+              :key="color.hex"
+              class="palette-color-item"
+              :class="{ active: selectedColor === color.hex }"
+              :style="{ backgroundColor: color.hex }"
+              @click="selectedColor = color.hex"
+            ></view>
+          </view>
+
+          <!-- 操作按钮 -->
+          <view class="action-buttons">
+            <view class="action-button" @click="togglePreview">
+              <Icon :name="showPreview ? 'eye-close' : 'eye'" :size="40" />
+              <text>{{ showPreview ? "隐藏预览" : "显示预览" }}</text>
+            </view>
+            <view class="action-button danger" @click="clearCanvas">
+              <Icon name="delete" :size="40" />
+              <text>清空画布</text>
+            </view>
+          </view>
         </view>
       </view>
     </scroll-view>
@@ -669,19 +679,6 @@
       </view>
     </view>
 
-    <!-- 隐藏的 canvas，用于图片处理 -->
-    <canvas
-      id="imageProcessCanvas"
-      type="2d"
-      style="
-        position: fixed;
-        left: -9999px;
-        top: -9999px;
-        width: 64px;
-        height: 64px;
-      "
-    ></canvas>
-
     <Toast ref="toastRef" @show="canvasHidden = true" @hide="onToastHide" />
   </view>
 </template>
@@ -692,12 +689,14 @@ import { useToast } from "../../composables/useToast.js";
 import statusBarMixin from "../../mixins/statusBar.js";
 import Icon from "../../components/Icon.vue";
 import Toast from "../../components/Toast.vue";
-import PixelCanvas from "../../components/PixelCanvas.vue";
-import ColorPalette from "../../components/ColorPalette.vue";
-import { ARTKAL_COLORS_FULL } from "../../data/artkal-colors-full.js";
 import {
+  font5x7,
+  hexToRgb,
+  drawCharToPixels,
+  drawTextToPixels,
   drawTinyTextToPixels,
   getTinyTextWidth,
+  getTextWidth,
   getCurrentTimeText,
   getCurrentDateText,
   getCurrentWeekText,
@@ -710,8 +709,6 @@ export default {
   components: {
     Icon,
     Toast,
-    PixelCanvas,
-    ColorPalette,
   },
   data() {
     return {
@@ -731,29 +728,15 @@ export default {
       contentHeight: "calc(100vh - 112rpx - 120rpx - 80rpx)",
 
       // Canvas 相关
-      canvasHidden: false,
+      canvasHidden: false, // 弹窗显示时隐藏 canvas（微信小程序原生组件层级问题）
       canvasNode: null,
       canvasCtx: null,
-      canvasPixels: new Map(),
-      imagePixels: null,
-      currentTool: "pencil", // pencil, eraser, move
+      canvasPixels: new Map(), // 用户手绘的像素数据
+      imagePixels: null, // 背景图片的像素数据
+      currentTool: "pencil", // pencil, eraser
       selectedColor: "#64c8ff",
-      showPreview: true,
-      showColorPicker: false,
-
-      // PixelCanvas 视图控制
-      zoom: 4,
-      pan: { x: 0, y: 0 },
-      gridVisible: true,
-      containerSize: { width: 320, height: 320 },
-      canvasReady: false,
-
-      // 历史记录（撤回/重做）
-      history: [],
-      historyIndex: -1,
-
-      // loading 动画定时器（实例变量，方便清理）
-      loadingTimer: null,
+      showPreview: true, // 是否显示时间日期等预览
+      showColorPicker: false, // 是否显示完整调色板
 
       // 调色板
       allColors: COLOR_PALETTE_221,
@@ -807,7 +790,6 @@ export default {
         { name: "白色", hex: "#ffffff" },
         { name: "灰色", hex: "#787878" },
       ],
-      paletteColors: ARTKAL_COLORS_FULL,
       presetColors: [
         { name: "青色", hex: "#64c8ff" },
         { name: "绿色", hex: "#00ff9d" },
@@ -847,33 +829,10 @@ export default {
     accentColor() {
       return "#4F7FFF";
     },
-    allPixelsForPreview() {
-      const m = new Map();
-      // 背景图片
-      if (this.imagePixels) {
-        const ox = this.config.image.x || 0;
-        const oy = this.config.image.y || 0;
-        this.imagePixels.forEach((color, key) => {
-          const [rx, ry] = key.split(",").map(Number);
-          const fx = rx + ox,
-            fy = ry + oy;
-          if (fx >= 0 && fx < 64 && fy >= 0 && fy < 64)
-            m.set(`${fx},${fy}`, color);
-        });
-      }
-      // 手绘像素
-      this.canvasPixels.forEach((color, key) => m.set(key, color));
-      // 时钟预览
-      if (this.showPreview) {
-        this.getPreviewPixels().forEach((color, key) => m.set(key, color));
-      }
-      return m;
-    },
   },
 
   onUnload() {
     this.stopGifAnimation();
-    this.stopLoading();
   },
 
   onLoad(options) {
@@ -900,38 +859,28 @@ export default {
     const systemInfo = uni.getSystemInfoSync();
     const statusBarHeight = systemInfo.statusBarHeight || 0;
     const headerHeight = 56;
-    this.contentHeight = `${systemInfo.windowHeight - statusBarHeight - headerHeight - 360}px`;
+    this.contentHeight = `${systemInfo.windowHeight - statusBarHeight - headerHeight - 300}px`;
 
-    // 初始化 PixelCanvas 容器尺寸
+    // 延迟初始化 canvas，确保 DOM 已渲染
     this.$nextTick(() => {
       setTimeout(() => {
-        const query = uni.createSelectorQuery().in(this);
-        query
-          .select(".canvas-container")
-          .boundingClientRect((data) => {
-            if (data && data.width > 0) {
-              this.containerSize = { width: data.width, height: data.width };
-              const fitZoom = Math.floor((data.width * 0.9) / 64);
-              this.zoom = Math.max(2, fitZoom);
-              this.pan = {
-                x: (data.width - 64 * this.zoom) / 2,
-                y: (data.width - 64 * this.zoom) / 2,
-              };
-            } else {
-              this.zoom = 4;
-              this.pan = { x: 16, y: 16 };
-            }
-            this.canvasReady = true;
-            // 初始化历史记录
-            this.history = [new Map(this.canvasPixels)];
-            this.historyIndex = 0;
-            if (this.$refs.toastRef) {
-              this.toast.setToastInstance(this.$refs.toastRef);
-            }
-            this.isReady = true;
+        this.initCanvas()
+          .then(() => {
+            this.$nextTick(() => {
+              if (this.$refs.toastRef) {
+                this.toast.setToastInstance(this.$refs.toastRef);
+              }
+              this.isReady = true;
+              console.log(
+                "页面初始化完成，Canvas 已就绪，模式:",
+                this.clockMode,
+              );
+            });
           })
-          .exec();
-      }, 150);
+          .catch((err) => {
+            console.error("Canvas 初始化失败:", err);
+          });
+      }, 100);
     });
   },
 
@@ -940,87 +889,6 @@ export default {
   },
 
   methods: {
-    // ========== Loading 动画控制 ==========
-    startLoading() {
-      this.stopLoading();
-      const ws = this.deviceStore.getWebSocket();
-      // 只发一次命令，ESP32 自己循环显示 loading
-      ws.send({ cmd: "start_loading" }).catch(() => {});
-    },
-
-    stopLoading() {
-      const ws = this.deviceStore.getWebSocket();
-      ws.send({ cmd: "stop_loading" }).catch(() => {});
-      if (this.loadingTimer) {
-        clearInterval(this.loadingTimer);
-        this.loadingTimer = null;
-      }
-    },
-
-    // ========== PixelCanvas 交互方法 ==========
-    handlePixelClick(x, y) {
-      if (this.currentTool === "move") return;
-      const key = `${x},${y}`;
-      const newPixels = new Map(this.canvasPixels);
-      if (this.currentTool === "eraser") {
-        if (!newPixels.has(key)) return;
-        newPixels.delete(key);
-      } else {
-        if (newPixels.get(key) === this.selectedColor) return;
-        newPixels.set(key, this.selectedColor);
-      }
-      this.canvasPixels = newPixels;
-      const newHistory = this.history.slice(0, this.historyIndex + 1);
-      newHistory.push(new Map(newPixels));
-      if (newHistory.length > 50) newHistory.shift();
-      this.history = newHistory;
-      this.historyIndex = newHistory.length - 1;
-    },
-    handleUndo() {
-      if (this.historyIndex > 0) {
-        this.historyIndex--;
-        this.canvasPixels = new Map(this.history[this.historyIndex]);
-      }
-    },
-    handleRedo() {
-      if (this.historyIndex < this.history.length - 1) {
-        this.historyIndex++;
-        this.canvasPixels = new Map(this.history[this.historyIndex]);
-      }
-    },
-    handleZoom(delta) {
-      const cx = this.containerSize.width / 2;
-      const cy = this.containerSize.height / 2;
-      const newZoom = Math.max(1, Math.min(20, this.zoom + delta));
-      const scale = newZoom / this.zoom;
-      this.pan = {
-        x: cx - (cx - this.pan.x) * scale,
-        y: cy - (cy - this.pan.y) * scale,
-      };
-      this.zoom = newZoom;
-    },
-    handlePan(dx, dy) {
-      this.pan = { x: this.pan.x + dx, y: this.pan.y + dy };
-    },
-    handlePinchZoom(delta, cx, cy) {
-      const newZoom = Math.max(1, Math.min(20, this.zoom + delta));
-      const scale = newZoom / this.zoom;
-      this.pan = {
-        x: cx - (cx - this.pan.x) * scale,
-        y: cy - (cy - this.pan.y) * scale,
-      };
-      this.zoom = newZoom;
-    },
-    handleFit() {
-      const size = this.containerSize.width;
-      const fitZoom = Math.floor((size * 0.9) / 64);
-      this.zoom = Math.max(2, fitZoom);
-      this.pan = {
-        x: (size - 64 * this.zoom) / 2,
-        y: (size - 64 * this.zoom) / 2,
-      };
-    },
-
     // ========== Canvas 相关方法 ==========
     initCanvas() {
       return new Promise((resolve, reject) => {
@@ -1390,7 +1258,7 @@ export default {
       }
     },
 
-    handleTouchEnd() {
+    handleTouchEnd(e) {
       // 触摸结束
     },
 
@@ -1738,75 +1606,44 @@ export default {
 
       const targetW = this.config.image.width || 64;
       const targetH = this.config.image.height || 64;
-
-      // 只渲染一次，复用结果
-      const renderedFrames = parser.renderFrames(targetW, targetH);
-
-      // 生成 ESP32 数据，复用已渲染帧，避免重复渲染
-      console.log(
-        `GIF 配置: width=${targetW}, height=${targetH}, offsetX=${this.config.image.x || 0}, offsetY=${this.config.image.y || 0}`,
-      );
-
-      // 验证配置是否会导致越界
-      const offsetX = this.config.image.x || 0;
-      const offsetY = this.config.image.y || 0;
-      if (targetW + offsetX > 64 || targetH + offsetY > 64) {
-        console.error(
-          `⚠️ 配置错误：图片尺寸 ${targetW}x${targetH} + 偏移 (${offsetX},${offsetY}) 超出 64x64 屏幕！`,
-        );
-        this.toast.showError(`图片尺寸 + 偏移超出屏幕范围，请调整配置`);
-        return;
-      }
-
-      this.gifAnimationData = parser.generateESP32Data(
+      const esp32Data = parser.generateESP32Data(
         targetW,
         targetH,
         20,
-        null,
-        offsetX,
-        offsetY,
-        renderedFrames,
+        this.getClockExcludePixels(),
+        this.config.image.x || 0,
+        this.config.image.y || 0,
       );
-      console.log(`GIF 动画数据: ${this.gifAnimationData.frameCount} 帧`);
+      this.gifAnimationData = esp32Data;
+      console.log(`GIF 动画数据: ${esp32Data.frameCount} 帧`);
 
-      // 存储渲染帧（用 Uint8Array 替代 Map，内存更小）
-      this.gifRenderedFrameMaps = renderedFrames.map((frame) => ({
-        rgba: frame.rgba, // Uint8Array，直接复用
-        delay: frame.delay || 100,
-        width: targetW,
-        height: targetH,
-      }));
+      const renderedFrames = parser.renderFrames(targetW, targetH);
+      this.gifRenderedFrameMaps = renderedFrames.map((frame) => {
+        const pixelMap = new Map();
+        for (let y = 0; y < targetH; y++) {
+          for (let x = 0; x < targetW; x++) {
+            const idx = (y * targetW + x) * 4;
+            const r = frame.rgba[idx],
+              g = frame.rgba[idx + 1],
+              b = frame.rgba[idx + 2],
+              a = frame.rgba[idx + 3];
+            if (a > 10 && (r > 0 || g > 0 || b > 0)) {
+              pixelMap.set(
+                `${x},${y}`,
+                `#${[r, g, b].map((v) => v.toString(16).padStart(2, "0")).join("")}`,
+              );
+            }
+          }
+        }
+        return { pixels: pixelMap, delay: frame.delay || 100 };
+      });
 
       if (this.gifRenderedFrameMaps.length > 0) {
-        this.imagePixels = this._rgbaFrameToPixelMap(
-          this.gifRenderedFrameMaps[0],
-        );
+        this.imagePixels = this.gifRenderedFrameMaps[0].pixels;
         this.gifIsPlaying = false;
         this.gifFrameIndex = 0;
       }
-      console.log("GIF 帧已生成:", this.gifRenderedFrameMaps.length, "帧");
-    },
-
-    // 将 rgba 帧转为 canvas 用的 Map（只在需要显示时转换）
-    _rgbaFrameToPixelMap(frame) {
-      const { rgba, width, height } = frame;
-      const pixelMap = new Map();
-      for (let y = 0; y < height; y++) {
-        for (let x = 0; x < width; x++) {
-          const idx = (y * width + x) * 4;
-          const r = rgba[idx],
-            g = rgba[idx + 1],
-            b = rgba[idx + 2],
-            a = rgba[idx + 3];
-          if (a > 10 && (r > 0 || g > 0 || b > 0)) {
-            pixelMap.set(
-              `${x},${y}`,
-              `#${[r, g, b].map((v) => v.toString(16).padStart(2, "0")).join("")}`,
-            );
-          }
-        }
-      }
-      return pixelMap;
+      console.log("GIF 帧 Map 已生成:", this.gifRenderedFrameMaps.length, "帧");
     },
 
     // 保存 GIF 二进制到本地持久目录
@@ -1863,7 +1700,7 @@ export default {
       }
     },
 
-    async convertImageToPixels(imageData) {
+    convertImageToPixels(imageData) {
       const targetWidth = this.config.image.width;
       const targetHeight = this.config.image.height;
 
@@ -1874,14 +1711,14 @@ export default {
         targetHeight,
       );
 
-      // 查询隐藏的图片处理 canvas
+      // 重新查询 canvas 节点
       const query = uni.createSelectorQuery().in(this);
       query
-        .select("#imageProcessCanvas")
+        .select("#clockCanvas")
         .fields({ node: true, size: true })
         .exec((res) => {
           if (!res || !res[0] || !res[0].node) {
-            console.error("图片处理 Canvas 查询失败");
+            console.error("Canvas 节点查询失败");
             this.toast.showError("Canvas 未就绪");
             return;
           }
@@ -2124,22 +1961,35 @@ export default {
         const targetW = this.config.image.width || 64;
         const targetH = this.config.image.height || 64;
         const renderedFrames = this._gifParser.renderFrames(targetW, targetH);
-        this.gifRenderedFrameMaps = renderedFrames.map((frame) => ({
-          rgba: frame.rgba,
-          delay: frame.delay || 100,
-          width: targetW,
-          height: targetH,
-        }));
+        this.gifRenderedFrameMaps = renderedFrames.map((frame) => {
+          const pixelMap = new Map();
+          for (let y = 0; y < targetH; y++) {
+            for (let x = 0; x < targetW; x++) {
+              const idx = (y * targetW + x) * 4;
+              const r = frame.rgba[idx],
+                g = frame.rgba[idx + 1],
+                b = frame.rgba[idx + 2];
+              if (r > 0 || g > 0 || b > 0) {
+                pixelMap.set(
+                  `${x},${y}`,
+                  "#" +
+                    ((1 << 24) + (r << 16) + (g << 8) + b)
+                      .toString(16)
+                      .slice(1),
+                );
+              }
+            }
+          }
+          return { pixels: pixelMap, delay: frame.delay || 100 };
+        });
         this.gifFrameIndex = 0;
-        this.imagePixels = this._rgbaFrameToPixelMap(
-          this.gifRenderedFrameMaps[0],
-        );
+        this.imagePixels = this.gifRenderedFrameMaps[0].pixels;
       }
 
       if (!this.gifRenderedFrameMaps || this.gifRenderedFrameMaps.length <= 1)
         return;
 
-      // 播放时重新计算 ESP32 数据（应用当前宽高和偏移，复用已渲染帧）
+      // 播放时重新计算 ESP32 数据（应用当前宽高和偏移）
       if (this._gifParser) {
         const targetW = this.config.image.width || 64;
         const targetH = this.config.image.height || 64;
@@ -2147,10 +1997,9 @@ export default {
           targetW,
           targetH,
           20,
-          null,
+          this.getClockExcludePixels(),
           this.config.image.x || 0,
           this.config.image.y || 0,
-          this.gifRenderedFrameMaps,
         );
       }
 
@@ -2162,7 +2011,7 @@ export default {
         this.gifFrameIndex =
           (this.gifFrameIndex + 1) % this.gifRenderedFrameMaps.length;
         const frameData = this.gifRenderedFrameMaps[this.gifFrameIndex];
-        this.imagePixels = this._rgbaFrameToPixelMap(frameData);
+        this.imagePixels = frameData.pixels;
         this.drawGIFFrame();
 
         const delay = Math.max(
@@ -2382,8 +2231,12 @@ export default {
             let resolved = false;
             const handler = (msg) => {
               if (resolved) return;
-
-              // 先解析消息
+              // 过滤掉 show_loading 的回复，避免干扰正常命令的等待
+              if (msg && msg.message === "loading displayed") return;
+              resolved = true;
+              ws.offMessage(handler);
+              clearTimeout(timer);
+              // 检查 ESP32 返回的错误响应
               try {
                 const resp =
                   typeof msg === "string"
@@ -2391,24 +2244,7 @@ export default {
                     : msg.data
                       ? JSON.parse(msg.data)
                       : msg;
-
-                // 过滤掉异步消息，避免干扰命令等待
-                const message = resp.message || "";
-                if (
-                  message === "loading displayed" ||
-                  message === "loading started" ||
-                  message === "loading stopped" ||
-                  message === "pong" ||
-                  message === "pixels_received"
-                ) {
-                  return; // 忽略，继续等待真正的回复
-                }
-
-                // 检查 ESP32 返回的错误响应
                 if (resp.error) {
-                  resolved = true;
-                  ws.offMessage(handler);
-                  clearTimeout(timer);
                   reject(
                     new Error(
                       `ESP32 错误: ${resp.error}${resp.details ? " - " + resp.details : ""}`,
@@ -2416,17 +2252,9 @@ export default {
                   );
                   return;
                 }
-
-                // 收到真正的回复
-                resolved = true;
-                ws.offMessage(handler);
-                clearTimeout(timer);
                 resolve(resp);
               } catch (e) {
                 // 非 JSON 响应，直接 resolve
-                resolved = true;
-                ws.offMessage(handler);
-                clearTimeout(timer);
                 resolve(msg);
               }
             };
@@ -2528,63 +2356,35 @@ export default {
           this.gifAnimationData &&
           this.gifAnimationData.frameCount > 0
         ) {
-          // 发送前用最新的 x/y/width/height 重新生成帧数据，避免偏移缓存旧值
-          if (this._gifParser) {
-            const targetW = this.config.image.width || 64;
-            const targetH = this.config.image.height || 64;
-            this.gifAnimationData = this._gifParser.generateESP32Data(
-              targetW,
-              targetH,
-              20,
-              null,
-              this.config.image.x || 0,
-              this.config.image.y || 0,
-              this.gifRenderedFrameMaps,
-            );
-          }
           console.log(`发送 GIF 动画: ${this.gifAnimationData.frameCount} 帧`);
 
-          // 进入传输模式，ESP32 清屏并拒绝其他命令
-          console.log("进入传输模式");
-          let resp = await sendAndWait({
-            cmd: "set_mode",
-            mode: "transferring",
-          });
-          if (resp.status !== "ok") {
-            this.toast.showError("进入传输模式失败");
-            return;
-          }
+          // 不要提前切换到动画模式——animation_end 会自动切换并播放
+          // 如果提前切换，ESP32 发现没有已加载的动画会直接清屏导致黑屏
 
           // 传输期间在板子上显示旋转 loading 动画
-          console.log("启动 loading 动画");
-          this.startLoading();
+          let loadingAngle = 0;
+          const loadingTimer = setInterval(() => {
+            ws.send({ cmd: "show_loading", angle: loadingAngle }).catch(
+              () => {},
+            );
+            loadingAngle = (loadingAngle + 45) % 360;
+          }, 300);
+          const stopLoading = () => clearInterval(loadingTimer);
 
           // 逐帧发送——每条命令发送后等待 ESP32 回复确认再发下一条
           const { frameCount, frames } = this.gifAnimationData;
 
-          console.log("准备发送 animation_begin, frameCount:", frameCount);
-          resp = await sendAndWait({ cmd: "animation_begin", frameCount });
+          let resp = await sendAndWait({ cmd: "animation_begin", frameCount });
           console.log("animation_begin 回复:", JSON.stringify(resp));
 
-          // 动态调整 chunk 大小：小图案用小chunk，减少往返次数
+          const CHUNK_SIZE = 200; // 二进制每批200像素 = 1000字节，很轻松
           // 注意：不要重新声明 ws，复用外层的 ws 实例
           for (let i = 0; i < frames.length; i++) {
             const frame = frames[i]; // [type, delay, count, pixels]
             const type = frame[0];
             const delay = frame[1];
-            const totalPixels = frame[2]; // 像素数量
-            const pixels = frame[3]; // Uint8Array，每像素5字节
-
-            // 根据像素数量动态调整chunk大小
-            // 关键：chunk 字节数必须 < 1500，避免 WebSocket 自动拆分
-            let CHUNK_SIZE;
-            if (totalPixels <= 100) {
-              CHUNK_SIZE = totalPixels; // 小图案一次发完
-            } else if (totalPixels <= 500) {
-              CHUNK_SIZE = 200; // 200 像素 = 1000 字节，安全
-            } else {
-              CHUNK_SIZE = 200; // 大图案也用 200 像素/chunk，避免拆分
-            }
+            const pixels = frame[3];
+            const totalPixels = pixels.length;
 
             // 所有帧都走 frame_begin + 二进制 chunk
             resp = await sendAndWait({
@@ -2595,7 +2395,7 @@ export default {
               totalPixels,
             });
             console.log(
-              `帧 ${i + 1}/${frameCount} 开始二进制传输 (${totalPixels} 像素, chunk=${CHUNK_SIZE}):`,
+              `帧 ${i + 1}/${frameCount} 开始二进制传输 (${totalPixels} 像素):`,
               resp.status,
             );
             if (resp.status === "error") {
@@ -2603,115 +2403,70 @@ export default {
               return;
             }
 
-            // 二进制分片发送像素数据（pixels 是 Uint8Array，每像素5字节）
-            // 注意：ESP32 每 5 个 chunk 才回复一次，所以不等待每个 chunk 的回复
-            const totalChunks = Math.ceil(totalPixels / CHUNK_SIZE);
-
-            // 确保 pixels 是 Uint8Array
-            const pixelsArray =
-              pixels instanceof Uint8Array ? pixels : new Uint8Array(pixels);
-            console.log(
-              `  pixels 类型: ${pixels.constructor.name}, 长度: ${pixels.length || pixels.byteLength}`,
-            );
-
+            // 二进制分片发送像素数据
             for (let offset = 0; offset < totalPixels; offset += CHUNK_SIZE) {
-              const end = Math.min(offset + CHUNK_SIZE, totalPixels);
-              const chunkIndex = Math.floor(offset / CHUNK_SIZE);
+              const chunk = pixels.slice(offset, offset + CHUNK_SIZE);
+              const binaryData = new Uint8Array(chunk.length * 5);
+              for (let j = 0; j < chunk.length; j++) {
+                const p = chunk[j]; // [x, y, r, g, b]
+                binaryData[j * 5] = p[0];
+                binaryData[j * 5 + 1] = p[1];
+                binaryData[j * 5 + 2] = p[2];
+                binaryData[j * 5 + 3] = p[3];
+                binaryData[j * 5 + 4] = p[4];
+              }
 
-              // 创建独立的数组副本，避免 subarray 的 offset 问题
-              const binaryData = new Uint8Array(
-                pixelsArray.subarray(offset * 5, end * 5),
-              );
-
-              // 关键修复：创建真正独立的 ArrayBuffer，避免 byteOffset 问题
-              const independentBuffer = binaryData.buffer.slice(
-                binaryData.byteOffset,
-                binaryData.byteOffset + binaryData.byteLength,
-              );
-
-              // 调试：验证 buffer 的完整性
-              console.log(
-                `  [Buffer] byteOffset=${binaryData.byteOffset}, byteLength=${binaryData.byteLength}, independentBuffer.byteLength=${independentBuffer.byteLength}`,
-              );
-
-              // 调试：打印发送的数据详情
-              const pixelCount = end - offset;
-              const byteCount = binaryData.length;
-
-              // 验证坐标是否越界
-              let invalidCount = 0;
-              for (let p = 0; p < pixelCount; p++) {
-                const px = binaryData[p * 5];
-                const py = binaryData[p * 5 + 1];
-                if (px >= 64 || py >= 64) {
-                  invalidCount++;
-                  if (invalidCount <= 3) {
-                    console.warn(`  ⚠️ 越界像素: [${px},${py}]`);
+              // 发送二进制并等待ESP32文本回复确认
+              resp = await new Promise((resolve, reject) => {
+                let resolved = false;
+                const timeout = setTimeout(() => {
+                  if (!resolved) {
+                    resolved = true;
+                    ws.offMessage(handler);
+                    reject(new Error("binary chunk timeout"));
                   }
-                }
-              }
-
-              console.log(
-                `  [发送] chunk ${chunkIndex + 1}/${totalChunks}: ${pixelCount} 像素, ${byteCount} 字节` +
-                  (invalidCount > 0 ? ` ⚠️ ${invalidCount} 个越界` : ""),
-              );
-
-              // 打印前3个像素的数据用于对比
-              if (offset === 0 && binaryData.length >= 15) {
-                console.log(
-                  `  [前端] 前3像素: ` +
-                    `[${binaryData[0]},${binaryData[1]},${binaryData[2]},${binaryData[3]},${binaryData[4]}] ` +
-                    `[${binaryData[5]},${binaryData[6]},${binaryData[7]},${binaryData[8]},${binaryData[9]}] ` +
-                    `[${binaryData[10]},${binaryData[11]},${binaryData[12]},${binaryData[13]},${binaryData[14]}]`,
-                );
-              }
-
-              // 发送二进制，不等待回复（与静态传输一致）
-              await new Promise((resolve, reject) => {
+                }, 15000);
+                const handler = (msg) => {
+                  if (resolved) return;
+                  // 过滤掉 show_loading 的回复，避免干扰二进制 chunk 确认
+                  if (msg && msg.message === "loading displayed") return;
+                  resolved = true;
+                  clearTimeout(timeout);
+                  ws.offMessage(handler);
+                  resolve(msg); // ws.onMessage 已经 JSON.parse 过了
+                };
+                ws.onMessage(handler);
                 ws.socket.send({
-                  data: independentBuffer, // 使用真正独立的 ArrayBuffer
-                  success: () => {
-                    resolve();
-                  },
+                  data: binaryData.buffer,
                   fail: (err) => {
-                    console.error(`chunk ${chunkIndex + 1} 发送失败:`, err);
-                    reject(err);
+                    if (!resolved) {
+                      resolved = true;
+                      ws.offMessage(handler);
+                      clearTimeout(timeout);
+                      reject(err);
+                    }
                   },
                 });
               });
-
-              // 每个 chunk 之间延迟，避免 ESP32 缓冲区溢出
-              // 延迟时间根据 chunk 大小动态调整
-              if (offset + CHUNK_SIZE < totalPixels) {
-                const delayMs = pixelCount > 500 ? 200 : 100; // 大chunk延迟更久
-                await new Promise((resolve) => setTimeout(resolve, delayMs));
+              console.log(
+                `  chunk ${Math.floor(offset / CHUNK_SIZE) + 1}: ${chunk.length} 像素, ${resp.status}`,
+              );
+              if (resp.status === "error") {
+                this.toast.showError(`帧 ${i} chunk 发送失败: ${resp.message}`);
+                return;
               }
             }
 
-            // 所有 chunks 发送完成后，额外等待一下让ESP32处理完
-            await new Promise((resolve) => setTimeout(resolve, 300));
-
-            // 所有 chunks 发送完成后，等待 ESP32 确认（发送一个查询命令）
-            console.log(`  帧 ${i} 所有 chunks 已发送，等待确认...`);
-            resp = await sendAndWait({
-              cmd: "frame_status",
-              index: i,
-            });
-            console.log(
-              `  [确认] 帧 ${i}: ${resp.status}, 累计像素: ${resp.count || 0}`,
-            );
             if (resp.status === "error") {
-              this.toast.showError(`帧 ${i} 接收失败: ${resp.message}`);
+              console.error(`帧 ${i} 发送失败:`, resp.message);
+              this.toast.showError(`帧 ${i} 发送失败: ${resp.message}`);
               return;
             }
-
-            // 帧发送完成，打印日志
-            console.log(`✅ 帧 ${i + 1}/${frameCount} 完成`);
           }
 
           resp = await sendAndWait({ cmd: "animation_end" });
           console.log("animation_end 回复:", JSON.stringify(resp));
-          this.stopLoading();
+          stopLoading();
           this.toast.showSuccess(`GIF 动画已发送！${frameCount} 帧`);
         } else {
           // 4. 如果有像素数据（手绘 + 图片），使用二进制方式发送
@@ -2761,9 +2516,9 @@ export default {
         console.error("发送失败:", err);
         this.toast.showError("发送失败: " + err.message);
       } finally {
-        this.stopLoading();
+        if (typeof stopLoading === "function") stopLoading();
         this.isSending = false;
-        this.canvasHidden = false;
+        this.canvasHidden = false; // 恢复 canvas 显示
       }
     },
 
@@ -2966,52 +2721,9 @@ export default {
 }
 
 .canvas-section {
-  display: flex;
-  flex-direction: column;
-  background: #000;
-}
-
-.canvas-container {
-  width: 100%;
-  aspect-ratio: 1;
-  position: relative;
-  overflow: hidden;
-}
-
-.canvas-toolbar {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8rpx 16rpx;
-  background: var(--bg-tertiary);
-  border-bottom: 1rpx solid var(--border-color);
-}
-
-.toolbar-group {
-  display: flex;
-  flex-direction: row;
-  gap: 4rpx;
-}
-
-.tb-btn {
-  width: 64rpx;
-  height: 64rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 12rpx;
-  background: transparent;
-  color: var(--text-secondary);
-}
-
-.tb-btn.active {
-  background: var(--accent-color, #4f7fff);
-  color: white;
-}
-
-.tb-btn.disabled {
-  opacity: 0.3;
+  background-color: var(--bg-elevated);
+  border-bottom: 2rpx solid var(--border-primary);
+  padding: 24rpx;
 }
 
 .canvas-wrapper {
@@ -3285,7 +2997,7 @@ export default {
 }
 
 .content-wrapper {
-  /* padding: 24rpx; */
+  padding: 24rpx;
   padding-bottom: 48rpx;
 }
 
@@ -3330,10 +3042,10 @@ export default {
 .settings-card {
   background-color: var(--bg-tertiary);
   border: 2rpx solid var(--border-primary);
-  /* border-radius: 16rpx; */
+  border-radius: 16rpx;
   padding: 20rpx;
   margin-bottom: 16rpx;
-  /* box-shadow: var(--shadow-md); */
+  box-shadow: var(--shadow-md);
 }
 
 .card-title-section {

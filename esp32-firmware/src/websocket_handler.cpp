@@ -16,6 +16,7 @@ unsigned long WebSocketHandler::lastMessageTime = 0;
 
 void WebSocketHandler::init() {
   ws.onEvent(onWsEvent);
+  Serial.println("WebSocket 已初始化");
 }
 
 void WebSocketHandler::onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, 
@@ -63,18 +64,61 @@ void WebSocketHandler::onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *c
 
 void WebSocketHandler::handleBinaryData(AsyncWebSocketClient *client, uint8_t *data, size_t len) {
   // 二进制格式：每5字节一个像素 (x, y, r, g, b)
+
+  // 数据完整性检查
+  if (len % 5 != 0) {
+    Serial.printf("⚠️ 数据长度错误: %d 字节不能被5整除！\n", len);
+    client->text("{\"status\":\"error\",\"message\":\"invalid data length\"}");
+    return;
+  }
+
   int pixelCount = len / 5;
 
   if (pixelCount > 0) {
     // 动画帧二进制数据：如果正在接收动画帧，追加到对应帧
     if (AnimationManager::receivingFrameIndex >= 0) {
       int idx = AnimationManager::receivingFrameIndex;
+
+      // 调试：打印接收到的数据详情
+      static int chunkCount = 0;
+      static int lastFrameIndex = -1;
+
+      // 检测帧切换，重置计数器
+      if (idx != lastFrameIndex) {
+        chunkCount = 0;
+        lastFrameIndex = idx;
+      }
+
+      chunkCount++;
+      Serial.printf("[ESP32] 帧 %d chunk %d: 接收 %d 字节, %d 像素\n", idx, chunkCount, len, pixelCount);
+
+      // 打印前3个像素用于对比
+      if (chunkCount == 1 && len >= 15) {
+        Serial.printf("[ESP32] 前3像素: [%d,%d,%d,%d,%d] [%d,%d,%d,%d,%d] [%d,%d,%d,%d,%d]\n",
+          data[0], data[1], data[2], data[3], data[4],
+          data[5], data[6], data[7], data[8], data[9],
+          data[10], data[11], data[12], data[13], data[14]);
+      }
+
       bool ok = AnimationManager::addFrameChunkBinary(idx, data, pixelCount);
-      // 发送确认回复（前端等待）
-      String resp = ok ?
-        "{\"status\":\"success\",\"message\":\"binary chunk received\",\"index\":" + String(idx) + "}" :
-        "{\"status\":\"error\",\"message\":\"binary chunk failed\",\"index\":" + String(idx) + "}";
-      client->text(resp);
+
+      // 减少回复频率，避免队列溢出（但现在前端不等回复了，这个可以去掉）
+      // 注释掉回复逻辑，因为前端改为用 frame_status 查询
+      /*
+      if (chunkCount % 5 == 0) {
+        AnimationFrame& frame = AnimationManager::currentGIF->frames[idx];
+        static char respBuf[128];
+        if (ok) {
+          snprintf(respBuf, sizeof(respBuf),
+            "{\"status\":\"success\",\"message\":\"binary chunk received\",\"index\":%d,\"count\":%d}",
+            idx, frame.pixelCount);
+        } else {
+          snprintf(respBuf, sizeof(respBuf),
+            "{\"status\":\"error\",\"message\":\"binary chunk failed\",\"index\":%d}", idx);
+        }
+        client->text(respBuf);
+      }
+      */
       return;
     }
 
@@ -379,6 +423,14 @@ void WebSocketHandler::handleJsonCommand(AsyncWebSocketClient *client, JsonDocum
         DisplayManager::displayClock(true);
         response["message"] = "switched to animation mode (no GIF)";
       }
+    } else if (mode == "transferring") {
+      // 传输模式：清屏，显示 loading，拒绝其他命令
+      DisplayManager::isCanvasMode = false;
+      DisplayManager::currentMode = MODE_TRANSFERRING;
+      // 不保存到 NVS，这是临时状态
+      DisplayManager::dma_display->clearScreen();
+      Serial.println("进入传输模式，准备接收动画数据");
+      response["message"] = "entered transferring mode";
     } else if (mode == "tetris") {
       // 俄罗斯方块屏保
       DisplayManager::isCanvasMode = false;
@@ -528,6 +580,24 @@ void WebSocketHandler::handleJsonCommand(AsyncWebSocketClient *client, JsonDocum
     } else {
       response["status"] = "error";
       response["message"] = "frame init failed";
+      response["index"] = index;
+    }
+  }
+  else if (cmd == "frame_status") {
+    // 查询帧接收状态（用于二进制传输完成后确认）
+    int index = doc["index"] | -1;
+    if (AnimationManager::currentGIF != nullptr &&
+        index >= 0 &&
+        index < AnimationManager::currentGIF->frameCount) {
+      AnimationFrame& frame = AnimationManager::currentGIF->frames[index];
+      response["status"] = "success";
+      response["message"] = "frame status";
+      response["index"] = index;
+      response["count"] = frame.pixelCount;
+      Serial.printf("帧 %d 状态查询: %d 像素已接收\n", index, frame.pixelCount);
+    } else {
+      response["status"] = "error";
+      response["message"] = "frame not found";
       response["index"] = index;
     }
   }
@@ -709,29 +779,72 @@ void WebSocketHandler::handleJsonCommand(AsyncWebSocketClient *client, JsonDocum
       response["message"] = "not in canvas mode or canvas not initialized";
     }
   }
+  else if (cmd == "start_loading") {
+    DisplayManager::startLoadingAnimation();
+    response["status"] = "ok";
+    response["message"] = "loading started";
+  }
+  else if (cmd == "stop_loading") {
+    DisplayManager::stopLoadingAnimation();
+    DisplayManager::dma_display->clearScreen();
+    response["status"] = "ok";
+    response["message"] = "loading stopped";
+  }
   else if (cmd == "show_loading") {
     DisplayManager::dma_display->clearScreen();
-    int cx = DisplayManager::PANEL_RES_X / 2;
-    int cy = DisplayManager::PANEL_RES_Y / 2;
-    int r = 12;
-    // 暗色底圆（更亮的灰色）
-    for (int deg = 0; deg < 360; deg += 20) {
-      float rad = deg * 3.14159f / 180.0f;
-      int x = cx + (int)(r * cos(rad));
-      int y = cy + (int)(r * sin(rad));
-      if (x >= 1 && x < DisplayManager::PANEL_RES_X-1 && y >= 1 && y < DisplayManager::PANEL_RES_Y-1)
-        DisplayManager::dma_display->fillRect(x-1, y-1, 3, 3, DisplayManager::dma_display->color565(60, 60, 60));
+
+    // 九宫格 Logo 参数（与 drawLogo 一致）
+    int x = 12, y = 18;  // 居中位置
+    int bs = 11, gap = 3, step = bs + gap;
+
+    // 品牌色
+    uint16_t orange = DisplayManager::dma_display->color565(249, 115, 22);
+    uint16_t red    = DisplayManager::dma_display->color565(239, 68, 68);
+    uint16_t yellow = DisplayManager::dma_display->color565(251, 191, 36);
+    uint16_t blue   = DisplayManager::dma_display->color565(59, 130, 246);
+
+    // 九宫格颜色（暗色版本，作为底色）
+    uint16_t grid[3][3] = {
+      { orange, orange, red    },
+      { orange, yellow, yellow },
+      { orange, blue,   blue   }
+    };
+
+    // 先绘制暗色底（所有格子都是暗色）
+    for (int row = 0; row < 3; row++) {
+      for (int col = 0; col < 3; col++) {
+        // 提取原色的 RGB，降低亮度到 30%
+        uint8_t r = ((grid[row][col] >> 11) & 0x1F) * 255 / 31 * 0.3;
+        uint8_t g = ((grid[row][col] >> 5) & 0x3F) * 255 / 63 * 0.3;
+        uint8_t b = (grid[row][col] & 0x1F) * 255 / 31 * 0.3;
+        uint16_t dimColor = DisplayManager::dma_display->color565(r, g, b);
+        DisplayManager::dma_display->fillRect(x + col * step, y + row * step, bs, bs, dimColor);
+      }
     }
-    // 亮弧（白蓝渐变，更大更亮）
-    int startDeg = doc["angle"] | 0;
-    for (int i = 0; i < 5; i++) {
-      float rad = (startDeg + i * 25) * 3.14159f / 180.0f;
-      int x = cx + (int)(r * cos(rad));
-      int y = cy + (int)(r * sin(rad));
-      uint8_t bright = (i == 4) ? 255 : (i == 3 ? 220 : (i == 2 ? 160 : (i == 1 ? 100 : 50)));
-      if (x >= 1 && x < DisplayManager::PANEL_RES_X-1 && y >= 1 && y < DisplayManager::PANEL_RES_Y-1)
-        DisplayManager::dma_display->fillRect(x-1, y-1, 3, 3, DisplayManager::dma_display->color565(bright, bright, 255));
-    }
+
+    // 根据 step 参数高亮外圈的一个格子
+    // 外圈顺序：1→2→3→6→9→8→7→4（对应 step 0-7）
+    int step_index = doc["step"] | 0;
+    step_index = step_index % 8;  // 确保在 0-7 范围内
+
+    // 外圈格子的坐标映射（row, col）
+    int outer[8][2] = {
+      {0, 0}, // 1: 左上
+      {0, 1}, // 2: 上中
+      {0, 2}, // 3: 右上
+      {1, 2}, // 6: 右中
+      {2, 2}, // 9: 右下
+      {2, 1}, // 8: 下中
+      {2, 0}, // 7: 左下
+      {1, 0}  // 4: 左中
+    };
+
+    int row = outer[step_index][0];
+    int col = outer[step_index][1];
+
+    // 高亮当前格子（使用原色）
+    DisplayManager::dma_display->fillRect(x + col * step, y + row * step, bs, bs, grid[row][col]);
+
     response["message"] = "loading displayed";
   }
   else if (cmd == "text") {

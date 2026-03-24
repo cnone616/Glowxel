@@ -382,11 +382,7 @@ export class GIFParser {
    * @param {number} targetW
    * @param {number} targetH
    * @param {number} maxFrames - 最大帧数
-   * @param {Set|null} excludePixels - 排除的像素坐标集合（已废弃，传 null 即可）
-   * @param {number} offsetX - X 偏移
-   * @param {number} offsetY - Y 偏移
-   * @param {Array|null} preRendered - 已渲染帧数组，传入可避免重复渲染
-   * @returns {{ frameCount, frames: Array<[type,delay,count,Uint8Array]> }}
+   * @returns {{ frameCount, frames: Array<[type,delay,count,pixels]> }}
    */
   generateESP32Data(
     targetW = 64,
@@ -414,6 +410,7 @@ export class GIFParser {
           const fx = x + offsetX,
             fy = y + offsetY;
           if (fx < 0 || fx >= 64 || fy < 0 || fy >= 64) continue;
+          if (excludePixels && excludePixels.has(`${fx},${fy}`)) continue;
           const idx = (y * targetW + x) * 4;
           const r = rgba[idx],
             g = rgba[idx + 1],
@@ -442,6 +439,7 @@ export class GIFParser {
             const fx = x + offsetX,
               fy = y + offsetY;
             if (fx < 0 || fx >= 64 || fy < 0 || fy >= 64) continue;
+            if (excludePixels && excludePixels.has(`${fx},${fy}`)) continue;
             const idx = (y * targetW + x) * 4;
             const cr = rgba[idx],
               cg = rgba[idx + 1],
