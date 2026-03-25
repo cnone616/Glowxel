@@ -7,8 +7,9 @@ DeviceMode DisplayManager::currentMode = MODE_CANVAS;
 int DisplayManager::currentBrightness = 50;
 bool DisplayManager::clientConnected = false;
 uint8_t DisplayManager::canvasBuffer[64][64][3];
+uint16_t DisplayManager::backgroundBuffer[64][64];
 bool DisplayManager::canvasInitialized = false;
-bool DisplayManager::isCanvasMode = false;
+bool DisplayManager::backgroundValid = false;
 bool DisplayManager::receivingPixels = false;
 DisplayManager::BlackPixel* DisplayManager::blackPixels = nullptr;
 int DisplayManager::blackPixelCount = 0;
@@ -138,6 +139,253 @@ void DisplayManager::updateLoadingAnimation() {
 
 // 前向声明
 static int clockConfig_timeY();
+static void writeBackgroundPixel(int x, int y, uint8_t r, uint8_t g, uint8_t b);
+static void restoreBackgroundRect(int x, int y, int w, int h);
+static int centeredTextWidth(const char* text, int size);
+static void centeredTextBounds(const char* text, int y, int size, int& x, int& w, int& h);
+static void drawStaticClockOverlayDirty(const ClockConfig& c, const struct tm& timeinfo);
+static void cacheLogoBackground(int x, int y);
+
+static void writeBackgroundPixel(int x, int y, uint8_t r, uint8_t g, uint8_t b) {
+  if (x < 0 || x >= DisplayManager::PANEL_RES_X || y < 0 || y >= DisplayManager::PANEL_RES_Y) {
+    return;
+  }
+  DisplayManager::backgroundBuffer[y][x] = DisplayManager::dma_display->color565(r, g, b);
+}
+
+static void restoreBackgroundRect(int x, int y, int w, int h) {
+  if (!DisplayManager::backgroundValid || w <= 0 || h <= 0) {
+    return;
+  }
+
+  int startX = x < 0 ? 0 : x;
+  int startY = y < 0 ? 0 : y;
+  int endX = x + w;
+  int endY = y + h;
+  if (endX > DisplayManager::PANEL_RES_X) endX = DisplayManager::PANEL_RES_X;
+  if (endY > DisplayManager::PANEL_RES_Y) endY = DisplayManager::PANEL_RES_Y;
+
+  for (int py = startY; py < endY; py++) {
+    for (int px = startX; px < endX; px++) {
+      DisplayManager::dma_display->drawPixel(px, py, DisplayManager::backgroundBuffer[py][px]);
+    }
+  }
+}
+
+static void cacheLogoBackground(int x, int y) {
+  uint8_t grid[3][3][3] = {
+    { {249, 115, 22}, {249, 115, 22}, {239, 68, 68} },
+    { {249, 115, 22}, {251, 191, 36}, {251, 191, 36} },
+    { {249, 115, 22}, {59, 130, 246}, {59, 130, 246} }
+  };
+
+  int bs = 11;
+  int gap = 3;
+  int step = bs + gap;
+
+  for (int row = 0; row < 3; row++) {
+    for (int col = 0; col < 3; col++) {
+      for (int dy = 0; dy < bs; dy++) {
+        for (int dx = 0; dx < bs; dx++) {
+          writeBackgroundPixel(
+            x + col * step + dx,
+            y + row * step + dy,
+            grid[row][col][0],
+            grid[row][col][1],
+            grid[row][col][2]
+          );
+        }
+      }
+    }
+  }
+}
+
+static int centeredTextWidth(const char* text, int size) {
+  int len = strlen(text);
+  return len > 0 ? (len * 4 * size - size) : 0;
+}
+
+static void centeredTextBounds(const char* text, int y, int size, int& x, int& w, int& h) {
+  w = centeredTextWidth(text, size);
+  h = 5 * size;
+  x = (DisplayManager::PANEL_RES_X - w) / 2;
+  if (x < 0) x = 0;
+}
+
+void DisplayManager::drawPixels(const PixelData* pixels, int pixelCount, bool clearFirst) {
+  if (clearFirst) {
+    dma_display->clearScreen();
+  }
+
+  if (pixels == nullptr || pixelCount <= 0) {
+    return;
+  }
+
+  for (int i = 0; i < pixelCount; i++) {
+    const PixelData& p = pixels[i];
+    if (p.x < PANEL_RES_X && p.y < PANEL_RES_Y) {
+      dma_display->drawPixelRGB888(p.x, p.y, p.r, p.g, p.b);
+      writeBackgroundPixel(p.x, p.y, p.r, p.g, p.b);
+    }
+    if (i % 100 == 0) {
+      yield();
+    }
+  }
+}
+
+void DisplayManager::renderAnimationFrame(const PixelData* pixels, int pixelCount, bool clearFirst) {
+  drawPixels(pixels, pixelCount, clearFirst);
+  drawClockOverlay();
+}
+
+void DisplayManager::renderCanvas() {
+  dma_display->clearScreen();
+
+  if (!canvasInitialized) {
+    drawLogo(12, 12);
+    return;
+  }
+
+  for (int y = 0; y < PANEL_RES_Y; y++) {
+    for (int x = 0; x < PANEL_RES_X; x++) {
+      uint8_t r = canvasBuffer[y][x][0];
+      uint8_t g = canvasBuffer[y][x][1];
+      uint8_t b = canvasBuffer[y][x][2];
+      if (r > 0 || g > 0 || b > 0) {
+        dma_display->drawPixelRGB888(x, y, r, g, b);
+      }
+    }
+    if (y % 8 == 0) {
+      yield();
+    }
+  }
+}
+
+void DisplayManager::clearCanvas() {
+  memset(canvasBuffer, 0, sizeof(canvasBuffer));
+  canvasInitialized = false;
+
+  if (blackPixels != nullptr) {
+    free(blackPixels);
+    blackPixels = nullptr;
+  }
+  blackPixelCount = 0;
+}
+
+void DisplayManager::highlightCanvasColor(int r, int g, int b) {
+  if (!canvasInitialized) {
+    return;
+  }
+
+  dma_display->clearScreen();
+
+  if (r == 0 && g == 0 && b == 0) {
+    for (int i = 0; i < blackPixelCount; i++) {
+      dma_display->drawPixelRGB888(blackPixels[i].x, blackPixels[i].y, 255, 255, 255);
+    }
+    return;
+  }
+
+  for (int y = 0; y < PANEL_RES_Y; y++) {
+    for (int x = 0; x < PANEL_RES_X; x++) {
+      uint8_t cr = canvasBuffer[y][x][0];
+      uint8_t cg = canvasBuffer[y][x][1];
+      uint8_t cb = canvasBuffer[y][x][2];
+      if (cr > 0 || cg > 0 || cb > 0) {
+        bool match = (abs(cr - r) <= 2 && abs(cg - g) <= 2 && abs(cb - b) <= 2);
+        if (match) {
+          dma_display->drawPixelRGB888(x, y, 255, 255, 255);
+        }
+      }
+    }
+    if (y % 8 == 0) {
+      yield();
+    }
+  }
+}
+
+void DisplayManager::highlightCanvasRow(int row) {
+  if (!canvasInitialized) {
+    return;
+  }
+
+  dma_display->clearScreen();
+
+  for (int y = 0; y < PANEL_RES_Y; y++) {
+    for (int x = 0; x < PANEL_RES_X; x++) {
+      uint8_t r = canvasBuffer[y][x][0];
+      uint8_t g = canvasBuffer[y][x][1];
+      uint8_t b = canvasBuffer[y][x][2];
+
+      if (r > 0 || g > 0 || b > 0) {
+        uint8_t displayR = r;
+        uint8_t displayG = g;
+        uint8_t displayB = b;
+
+        if (row >= 0 && y != row) {
+          displayR = r * 0.2;
+          displayG = g * 0.2;
+          displayB = b * 0.2;
+        }
+
+        dma_display->drawPixelRGB888(x, y, displayR, displayG, displayB);
+      }
+    }
+    if (y % 8 == 0) {
+      yield();
+    }
+  }
+}
+
+void DisplayManager::renderAnimationTransition(
+    const PixelData* fromPixels,
+    int fromPixelCount,
+    const PixelData* toPixels,
+    int toPixelCount,
+    uint8_t mix) {
+  static uint8_t blended[PANEL_RES_Y][PANEL_RES_X][3];
+  memset(blended, 0, sizeof(blended));
+
+  int fromWeight = 255 - mix;
+  if (fromPixels != nullptr && fromPixelCount > 0) {
+    for (int i = 0; i < fromPixelCount; i++) {
+      const PixelData& p = fromPixels[i];
+      if (p.x < PANEL_RES_X && p.y < PANEL_RES_Y) {
+        blended[p.y][p.x][0] = (uint16_t)p.r * fromWeight / 255;
+        blended[p.y][p.x][1] = (uint16_t)p.g * fromWeight / 255;
+        blended[p.y][p.x][2] = (uint16_t)p.b * fromWeight / 255;
+      }
+    }
+  }
+
+  if (toPixels != nullptr && toPixelCount > 0) {
+    for (int i = 0; i < toPixelCount; i++) {
+      const PixelData& p = toPixels[i];
+      if (p.x < PANEL_RES_X && p.y < PANEL_RES_Y) {
+        blended[p.y][p.x][0] = blended[p.y][p.x][0] + ((uint16_t)p.r * mix / 255);
+        blended[p.y][p.x][1] = blended[p.y][p.x][1] + ((uint16_t)p.g * mix / 255);
+        blended[p.y][p.x][2] = blended[p.y][p.x][2] + ((uint16_t)p.b * mix / 255);
+      }
+    }
+  }
+
+  dma_display->clearScreen();
+  for (int y = 0; y < PANEL_RES_Y; y++) {
+    for (int x = 0; x < PANEL_RES_X; x++) {
+      dma_display->drawPixelRGB888(
+        x, y,
+        blended[y][x][0],
+        blended[y][x][1],
+        blended[y][x][2]
+      );
+    }
+    if (y % 8 == 0) {
+      yield();
+    }
+  }
+
+  drawClockOverlay();
+}
 
 // 独立背景绘制：清屏 + 画像素背景或 Logo，不涉及时钟文字
 void DisplayManager::drawBackground() {
@@ -149,16 +397,14 @@ void DisplayManager::drawBackground() {
     : ConfigManager::staticImagePixelCount;
 
   dma_display->clearScreen();
+  memset(backgroundBuffer, 0, sizeof(backgroundBuffer));
+  backgroundValid = true;
 
   if (imagePixels != nullptr && imagePixelCount > 0) {
-    for (int i = 0; i < imagePixelCount; i++) {
-      PixelData& p = imagePixels[i];
-      if (p.x < PANEL_RES_X && p.y < PANEL_RES_Y)
-        dma_display->drawPixelRGB888(p.x, p.y, p.r, p.g, p.b);
-      if (i % 100 == 0) yield();
-    }
+    drawPixels(imagePixels, imagePixelCount, false);
   } else {
     drawLogo(12, 18);
+    cacheLogoBackground(12, 18);
   }
 }
 
@@ -194,18 +440,23 @@ void DisplayManager::displayClock(bool force) {
   if (!force && timeinfo.tm_min == s_lastMin) return;
   s_lastMin = timeinfo.tm_min;
 
-  if (force) dma_display->clearScreen();
+  bool rebuildBackground = force;
+  if (currentMode == MODE_CLOCK && !backgroundValid) {
+    rebuildBackground = true;
+  }
+
+  if (rebuildBackground) {
+    dma_display->clearScreen();
+    memset(backgroundBuffer, 0, sizeof(backgroundBuffer));
+    backgroundValid = true;
+  }
 
   if (currentMode == MODE_CLOCK || currentMode == MODE_ANIMATION) {
     if (hasCustomImage) {
-      for (int i = 0; i < imagePixelCount; i++) {
-        PixelData& pixel = imagePixels[i];
-        if (pixel.x < PANEL_RES_X && pixel.y < PANEL_RES_Y)
-          dma_display->drawPixelRGB888(pixel.x, pixel.y, pixel.r, pixel.g, pixel.b);
-        if (i % 100 == 0) yield();
-      }
+      drawPixels(imagePixels, imagePixelCount, false);
     } else if (currentMode == MODE_CLOCK) {
       drawLogo(12, 18);
+      cacheLogoBackground(12, 18);
     }
   }
 
@@ -218,6 +469,121 @@ static int clockConfig_timeY() {
   return (DisplayManager::currentMode == MODE_ANIMATION)
     ? ConfigManager::animClockConfig.time.y
     : ConfigManager::clockConfig.time.y;
+}
+
+static void drawClockOverlayAnimationMode(const ClockConfig& c, const struct tm& timeinfo) {
+  char timeStr[6];
+  sprintf(timeStr, "%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min);
+  DisplayManager::drawTinyTextCentered(
+    timeStr,
+    c.time.y,
+    DisplayManager::dma_display->color565(c.time.r, c.time.g, c.time.b),
+    c.time.fontSize
+  );
+
+  if (c.date.show) {
+    char dateStr[6];
+    sprintf(dateStr, "%02d-%02d", timeinfo.tm_mon + 1, timeinfo.tm_mday);
+    DisplayManager::drawTinyTextCentered(
+      dateStr,
+      c.date.y,
+      DisplayManager::dma_display->color565(c.date.r, c.date.g, c.date.b),
+      c.date.fontSize
+    );
+  }
+
+  if (c.week.show) {
+    const char* weekDays[] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
+    const char* weekStr = weekDays[timeinfo.tm_wday];
+    DisplayManager::drawTinyTextCentered(
+      weekStr,
+      c.week.y,
+      DisplayManager::dma_display->color565(c.week.r, c.week.g, c.week.b),
+      1
+    );
+  }
+}
+
+static void drawStaticClockOverlayDirty(const ClockConfig& c, const struct tm& timeinfo) {
+  static char s_prevTime[6] = "";
+  static int s_prevTimeY = -1, s_prevTimeSize = 0;
+  static char s_prevDate[6] = "";
+  static int s_prevDateY = -1, s_prevDateSize = 0;
+  static char s_prevWeek[4] = "";
+  static int s_prevWeekY = -1;
+  static DeviceMode s_prevMode = MODE_CANVAS;
+
+  if (DisplayManager::currentMode != s_prevMode) {
+    s_prevTime[0] = '\0';
+    s_prevDate[0] = '\0';
+    s_prevWeek[0] = '\0';
+    s_prevTimeY = -1;
+    s_prevDateY = -1;
+    s_prevWeekY = -1;
+    s_prevMode = DisplayManager::currentMode;
+  }
+
+  char timeStr[6];
+  sprintf(timeStr, "%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min);
+  if (strcmp(s_prevTime, timeStr) != 0 || s_prevTimeY != c.time.y || s_prevTimeSize != c.time.fontSize) {
+    int oldX = 0, oldW = 0, oldH = 0;
+    int newX = 0, newW = 0, newH = 0;
+    centeredTextBounds(s_prevTime, s_prevTimeY, s_prevTimeSize, oldX, oldW, oldH);
+    centeredTextBounds(timeStr, c.time.y, c.time.fontSize, newX, newW, newH);
+    restoreBackgroundRect(oldX, s_prevTimeY, oldW, oldH);
+    restoreBackgroundRect(newX, c.time.y, newW, newH);
+    DisplayManager::drawTinyTextCentered(timeStr, c.time.y,
+      DisplayManager::dma_display->color565(c.time.r, c.time.g, c.time.b), c.time.fontSize);
+    strcpy(s_prevTime, timeStr);
+    s_prevTimeY = c.time.y;
+    s_prevTimeSize = c.time.fontSize;
+  }
+
+  if (c.date.show) {
+    char dateStr[6];
+    sprintf(dateStr, "%02d-%02d", timeinfo.tm_mon + 1, timeinfo.tm_mday);
+    if (strcmp(s_prevDate, dateStr) != 0 || s_prevDateY != c.date.y || s_prevDateSize != c.date.fontSize) {
+      int oldX = 0, oldW = 0, oldH = 0;
+      int newX = 0, newW = 0, newH = 0;
+      centeredTextBounds(s_prevDate, s_prevDateY, s_prevDateSize, oldX, oldW, oldH);
+      centeredTextBounds(dateStr, c.date.y, c.date.fontSize, newX, newW, newH);
+      restoreBackgroundRect(oldX, s_prevDateY, oldW, oldH);
+      restoreBackgroundRect(newX, c.date.y, newW, newH);
+      DisplayManager::drawTinyTextCentered(dateStr, c.date.y,
+        DisplayManager::dma_display->color565(c.date.r, c.date.g, c.date.b), c.date.fontSize);
+      strcpy(s_prevDate, dateStr);
+      s_prevDateY = c.date.y;
+      s_prevDateSize = c.date.fontSize;
+    }
+  } else if (s_prevDate[0]) {
+    int oldX = 0, oldW = 0, oldH = 0;
+    centeredTextBounds(s_prevDate, s_prevDateY, s_prevDateSize, oldX, oldW, oldH);
+    restoreBackgroundRect(oldX, s_prevDateY, oldW, oldH);
+    s_prevDate[0] = '\0';
+  }
+
+  if (c.week.show) {
+    const char* weekDays[] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
+    const char* weekStr = weekDays[timeinfo.tm_wday];
+    if (strcmp(s_prevWeek, weekStr) != 0 || s_prevWeekY != c.week.y) {
+      int oldX = 0, oldW = 0, oldH = 0;
+      int newX = 0, newW = 0, newH = 0;
+      centeredTextBounds(s_prevWeek, s_prevWeekY, 1, oldX, oldW, oldH);
+      centeredTextBounds(weekStr, c.week.y, 1, newX, newW, newH);
+      restoreBackgroundRect(oldX, s_prevWeekY, oldW, oldH);
+      restoreBackgroundRect(newX, c.week.y, newW, newH);
+      DisplayManager::drawTinyTextCentered(weekStr, c.week.y,
+        DisplayManager::dma_display->color565(c.week.r, c.week.g, c.week.b), 1);
+      strncpy(s_prevWeek, weekStr, 3);
+      s_prevWeek[3] = '\0';
+      s_prevWeekY = c.week.y;
+    }
+  } else if (s_prevWeek[0]) {
+    int oldX = 0, oldW = 0, oldH = 0;
+    centeredTextBounds(s_prevWeek, s_prevWeekY, 1, oldX, oldW, oldH);
+    restoreBackgroundRect(oldX, s_prevWeekY, oldW, oldH);
+    s_prevWeek[0] = '\0';
+  }
 }
 
 // 3x5 微型字体 (每字符5行，每行3bit: bit2=左, bit1=中, bit0=右)
@@ -246,80 +612,6 @@ static int fontIndex(char c) {
   return 13;
 }
 
-// 擦除文字中亮像素（只擦亮的点，不影响背景）
-static void eraseTinyTextCentered(const char* text, int y, int size) {
-  int len = strlen(text);
-  int w = len * 4 * size - size;
-  int x = (64 - w) / 2;
-  if (x < 0) x = 0;
-  int cx = x;
-  for (int i = 0; text[i]; i++) {
-    int idx = fontIndex(text[i]);
-    const uint8_t* glyph = FONT3X5[idx];
-    for (int row = 0; row < 5; row++) {
-      uint8_t bits = glyph[row];
-      for (int sy = 0; sy < size; sy++) {
-        for (int sx = 0; sx < size; sx++) {
-          int py = y + row * size + sy;
-          if (bits & 4) DisplayManager::dma_display->drawPixel(cx + sx, py, 0);
-          if (bits & 2) DisplayManager::dma_display->drawPixel(cx + size + sx, py, 0);
-          if (bits & 1) DisplayManager::dma_display->drawPixel(cx + size*2 + sx, py, 0);
-        }
-      }
-    }
-    cx += 4 * size;
-  }
-}
-
-// Diff 绘制：比较新旧字模，只清除"旧有新无"的像素，始终重绘新文字像素
-static void drawTinyTextCenteredDiff(
-    const char* oldText, int oldY, int oldSize,
-    const char* newText, int newY, int newSize,
-    uint16_t color) {
-  int newLen = strlen(newText);
-  int newW = newLen * 4 * newSize - newSize;
-  int newX = (64 - newW) / 2;
-  if (newX < 0) newX = 0;
-
-  // 位置或大小变了：擦旧位置亮像素，画新位置
-  if (oldText[0] && (oldY != newY || oldSize != newSize)) {
-    eraseTinyTextCentered(oldText, oldY, oldSize);
-    DisplayManager::drawTinyText(newText, newX, newY, color, newSize);
-    return;
-  }
-
-  // 逐字符 diff
-  int oldLen = strlen(oldText);
-  int cx = newX;
-  for (int i = 0; i < newLen; i++) {
-    char oldCh = (i < oldLen) ? oldText[i] : ' ';
-    char newCh = newText[i];
-    const uint8_t* oldGlyph = FONT3X5[fontIndex(oldCh)];
-    const uint8_t* newGlyph = FONT3X5[fontIndex(newCh)];
-
-    for (int row = 0; row < 5; row++) {
-      uint8_t oldBits = oldGlyph[row];
-      uint8_t newBits = newGlyph[row];
-      uint8_t clearBits = oldBits & ~newBits; // 旧有新无，需清除
-
-      for (int sy = 0; sy < newSize; sy++) {
-        for (int sx = 0; sx < newSize; sx++) {
-          int py = newY + row * newSize + sy;
-          // 清除旧有新无的像素
-          if (clearBits & 4) DisplayManager::dma_display->drawPixel(cx + sx, py, 0);
-          if (clearBits & 2) DisplayManager::dma_display->drawPixel(cx + newSize + sx, py, 0);
-          if (clearBits & 1) DisplayManager::dma_display->drawPixel(cx + newSize*2 + sx, py, 0);
-          // 始终重绘新文字像素（GIF 帧可能覆盖了文字）
-          if (newBits & 4) DisplayManager::dma_display->drawPixel(cx + sx, py, color);
-          if (newBits & 2) DisplayManager::dma_display->drawPixel(cx + newSize + sx, py, color);
-          if (newBits & 1) DisplayManager::dma_display->drawPixel(cx + newSize*2 + sx, py, color);
-        }
-      }
-    }
-    cx += 4 * newSize;
-  }
-}
-
 void DisplayManager::drawClockOverlay() {
   struct tm timeinfo;
   if (!getLocalTime(&timeinfo)) return;
@@ -328,64 +620,14 @@ void DisplayManager::drawClockOverlay() {
     ? ConfigManager::animClockConfig
     : ConfigManager::clockConfig;
 
-  static char s_prevTime[6] = "";
-  static int s_prevTimeY = -1, s_prevTimeSize = 0;
-  static char s_prevDate[6] = "";
-  static int s_prevDateY = -1, s_prevDateSize = 0;
-  static char s_prevWeek[4] = "";
-  static int s_prevWeekY = -1;
-  static DeviceMode s_prevMode = MODE_CANVAS;
-
-  // 模式切换时重置缓存，避免跨模式擦除错误位置
-  if (currentMode != s_prevMode) {
-    s_prevTime[0] = '\0';
-    s_prevDate[0] = '\0';
-    s_prevWeek[0] = '\0';
-    s_prevTimeY = -1;
-    s_prevDateY = -1;
-    s_prevWeekY = -1;
-    s_prevMode = currentMode;
+  // 动态背景每帧都会重画底图，所以这里直接补画前景层，
+  // 不做基于上一帧的擦除，避免文字和动态背景互相打架。
+  if (currentMode == MODE_ANIMATION) {
+    drawClockOverlayAnimationMode(c, timeinfo);
+    return;
   }
 
-  // 时间
-  char timeStr[6];
-  sprintf(timeStr, "%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min);
-  drawTinyTextCenteredDiff(s_prevTime, s_prevTimeY, s_prevTimeSize,
-    timeStr, c.time.y, c.time.fontSize,
-    dma_display->color565(c.time.r, c.time.g, c.time.b));
-  strcpy(s_prevTime, timeStr);
-  s_prevTimeY = c.time.y;
-  s_prevTimeSize = c.time.fontSize;
-
-  // 日期
-  if (c.date.show) {
-    char dateStr[6];
-    sprintf(dateStr, "%02d-%02d", timeinfo.tm_mon + 1, timeinfo.tm_mday);
-    drawTinyTextCenteredDiff(s_prevDate, s_prevDateY, s_prevDateSize,
-      dateStr, c.date.y, c.date.fontSize,
-      dma_display->color565(c.date.r, c.date.g, c.date.b));
-    strcpy(s_prevDate, dateStr);
-    s_prevDateY = c.date.y;
-    s_prevDateSize = c.date.fontSize;
-  } else if (s_prevDate[0]) {
-    eraseTinyTextCentered(s_prevDate, s_prevDateY, s_prevDateSize);
-    s_prevDate[0] = '\0';
-  }
-
-  // 星期
-  if (c.week.show) {
-    const char* weekDays[] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
-    const char* weekStr = weekDays[timeinfo.tm_wday];
-    drawTinyTextCenteredDiff(s_prevWeek, s_prevWeekY, 1,
-      weekStr, c.week.y, 1,
-      dma_display->color565(c.week.r, c.week.g, c.week.b));
-    strncpy(s_prevWeek, weekStr, 3);
-    s_prevWeek[3] = '\0';
-    s_prevWeekY = c.week.y;
-  } else if (s_prevWeek[0]) {
-    eraseTinyTextCentered(s_prevWeek, s_prevWeekY, 1);
-    s_prevWeek[0] = '\0';
-  }
+  drawStaticClockOverlayDirty(c, timeinfo);
 }
 
 void DisplayManager::displayImage(uint8_t* data, size_t len, int width, int height) {

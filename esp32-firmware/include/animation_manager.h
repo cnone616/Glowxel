@@ -9,6 +9,7 @@ struct AnimationFrame {
   String type;           // "full" 或 "diff"
   int delay;            // 延迟时间(毫秒)
   int pixelCount;       // 像素数量
+  int capacity;         // 已分配容量，防止分片写穿内存
   PixelData* pixels;    // 像素数组
 };
 

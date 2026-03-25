@@ -2,7 +2,7 @@
   <div class="login">
     <div class="login-card">
       <h1>登录 RenLight</h1>
-      <p class="subtitle">使用账号密码登录</p>
+      <p class="subtitle">当前 Web 端使用账号密码登录</p>
       <form @submit.prevent="handleLogin">
         <input
           v-model="form.username"
@@ -39,7 +39,7 @@ async function handleLogin() {
   loading.value = true;
   error.value = "";
   try {
-    const res = await userAPI.login(form.value);
+    const res = await userAPI.adminLogin(form.value);
     if (res.success) {
       localStorage.setItem("auth_token", res.data.token);
       localStorage.setItem("user_info", JSON.stringify(res.data.user));

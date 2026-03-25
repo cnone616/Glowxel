@@ -62,17 +62,17 @@
               <text class="user-name">{{ user.name }}</text>
               <text class="user-bio">{{ user.bio || '这个人很懒，什么都没留下' }}</text>
               <view class="user-stats">
-                <text class="stat-text">{{ user.worksCount || 0 }}作品</text>
-                <text class="stat-text">{{ user.followersCount || 0 }}粉丝</text>
+                <text class="stat-text">{{ user.works_count || 0 }}作品</text>
+                <text class="stat-text">{{ user.followers_count || 0 }}粉丝</text>
               </view>
             </view>
             <view 
               class="follow-btn"
-              :class="{ 'following': user.isFollowing }"
+              :class="{ 'following': user.is_following }"
               @click.stop="toggleFollow(user)"
             >
               <text class="follow-text">
-                {{ user.isFollowing ? '已关注' : '关注' }}
+                {{ user.is_following ? '已关注' : '关注' }}
               </text>
             </view>
           </view>
@@ -194,19 +194,19 @@ export default {
         switch (this.listType) {
           case 'followers':
             res = await followAPI.getFollowers(this.userId, this.currentPage, this.pageSize)
-            newUsers = res.success ? (res.data?.list || []) : []
+            newUsers = res.success && res.data ? res.data.list : []
             break
           case 'following':
             res = await followAPI.getFollowing(this.userId, this.currentPage, this.pageSize)
-            newUsers = res.success ? (res.data?.list || []) : []
+            newUsers = res.success && res.data ? res.data.list : []
             break
           case 'recommended':
             res = await userAPI.getRecommendedUsers(this.pageSize)
-            newUsers = res.success ? (res.data || []) : []
+            newUsers = res.success && res.data ? res.data.list : []
             break
           default:
             res = await userAPI.getRecommendedUsers(this.pageSize)
-            newUsers = res.success ? (res.data || []) : []
+            newUsers = res.success && res.data ? res.data.list : []
             break
         }
         
@@ -277,18 +277,17 @@ export default {
       try {
         const result = await followAPI.toggleFollow(user.id)
         
-        if (result.success) {
-          user.isFollowing = result.isFollowing
+        if (result.success && result.data) {
+          user.is_following = result.data.followed
           
-          // 更新粉丝数
-          if (result.isFollowing) {
-            user.followersCount = (user.followersCount || 0) + 1
+          if (result.data.followed) {
+            user.followers_count += 1
           } else {
-            user.followersCount = Math.max(0, (user.followersCount || 0) - 1)
+            user.followers_count -= 1
           }
           
           uni.showToast({
-            title: result.message,
+            title: result.data.followed ? '关注成功' : '取消关注',
             icon: 'success'
           })
         }

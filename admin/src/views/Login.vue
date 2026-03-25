@@ -56,11 +56,9 @@ async function handleLogin() {
       localStorage.setItem("admin_token", res.data.token);
       message.success("登录成功");
       router.push("/dashboard");
-    } else {
-      message.error(res.message || "登录失败");
     }
   } catch (e) {
-    message.error("网络错误");
+    message.error(e?.response?.data?.message || e?.message || "登录失败");
   }
   loading.value = false;
 }

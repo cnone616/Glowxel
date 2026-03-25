@@ -100,10 +100,10 @@
           </view>
 
           <view class="work-info">
-            <text class="work-name">{{ work.name || work.title }}</text>
+              <text class="work-name">{{ work.name || work.title }}</text>
             <view class="work-meta">
               <text class="work-size">{{ work.width }}×{{ work.height }}</text>
-              <text class="work-date">{{ formatDate(work.updatedAt) }}</text>
+              <text class="work-date">{{ formatDate(work.updateTime) }}</text>
             </view>
             <view
               v-if="work.type === 'published' && work.description"
@@ -269,9 +269,9 @@ export default {
         list.map((work) => ({
           ...work,
           type: type,
-          updatedAt: new Date(work.updatedAt || work.createdAt),
-          createdAt: new Date(work.createdAt),
-          progress: work.progress || 0,
+          updateTime: work.updateTime,
+          createTime: work.createTime,
+          progress: work.progress,
         }));
 
       switch (this.currentFilter) {
@@ -312,9 +312,9 @@ export default {
       works.sort((a, b) => {
         switch (this.currentSort) {
           case "updated":
-            return b.updatedAt - a.updatedAt;
+            return new Date(b.updateTime) - new Date(a.updateTime);
           case "created":
-            return b.createdAt - a.createdAt;
+            return new Date(b.createTime) - new Date(a.createTime);
           case "name":
             return (a.name || a.title || "").localeCompare(
               b.name || b.title || "",
@@ -398,7 +398,7 @@ export default {
       // 创建作品详情页面或弹窗显示
       uni.showModal({
         title: work.title || work.name,
-        content: `作品尺寸: ${work.width}×${work.height}\n发布时间: ${this.formatDate(work.createdAt)}\n\n${work.description || "暂无描述"}`,
+        content: `作品尺寸: ${work.width}×${work.height}\n发布时间: ${this.formatDate(work.createTime)}\n\n${work.description || "暂无描述"}`,
         showCancel: false,
         confirmText: "确定",
       });
@@ -441,8 +441,21 @@ export default {
     shareWork() {
       if (!this.selectedWork) return;
 
-      // 分享功能
-      this.toast.showInfo("分享功能开发中");
+      const workName = this.selectedWork.name || this.selectedWork.title;
+      const shareText =
+        this.selectedWork.type === "published"
+          ? `我在 Glowxel 发布了作品《${workName}》`
+          : `我正在 Glowxel 创作《${workName}》`;
+
+      uni.setClipboardData({
+        data: shareText,
+        success: () => {
+          this.toast.showSuccess("分享文案已复制");
+        },
+        fail: () => {
+          this.toast.showError("复制失败");
+        },
+      });
       this.selectedWork = null;
     },
 

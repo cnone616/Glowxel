@@ -3,7 +3,7 @@
     <!-- 用户头像 -->
     <view class="comment-avatar">
       <Avatar 
-        :src="comment.author.avatar" 
+        :src="comment.user_avatar" 
         :size="60"
       />
     </view>
@@ -12,14 +12,8 @@
     <view class="comment-content">
       <!-- 用户信息 -->
       <view class="comment-header">
-        <text class="username">{{ comment.author.name }}</text>
-        <Badge 
-          v-if="comment.author.level" 
-          :text="`Lv.${comment.author.level}`" 
-          variant="secondary" 
-          size="small"
-        />
-        <text class="comment-time">{{ formatTime(comment.createdAt) }}</text>
+        <text class="username">{{ comment.user_name }}</text>
+        <text class="comment-time">{{ formatTime(comment.created_at) }}</text>
       </view>
       
       <!-- 评论文本 -->
@@ -38,10 +32,9 @@
       </view>
       
       <!-- 回复内容 -->
-      <view v-if="comment.replyTo" class="reply-content">
+      <view v-if="comment.reply_to" class="reply-content">
         <text class="reply-prefix">回复 </text>
-        <text class="reply-username">@{{ comment.replyTo.author.name }}</text>
-        <text class="reply-text">: {{ comment.replyTo.content }}</text>
+        <text class="reply-username">#{{ comment.reply_to }}</text>
       </view>
       
       <!-- 评论操作 -->
@@ -98,14 +91,12 @@
 <script>
 import Icon from './Icon.vue'
 import Avatar from './Avatar.vue'
-import Badge from './Badge.vue'
 
 export default {
   name: 'Comment',
   components: {
     Icon,
-    Avatar,
-    Badge
+    Avatar
   },
   props: {
     // 评论数据

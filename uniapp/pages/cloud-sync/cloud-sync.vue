@@ -588,7 +588,26 @@ export default {
     },
 
     viewAllLogs() {
-      this.toast.showInfo("同步日志详情功能开发中");
+      if (!this.syncLogs.length) {
+        this.toast.showInfo("暂无同步日志");
+        return;
+      }
+
+      const content = this.syncLogs
+        .slice(0, 10)
+        .map(
+          (log) =>
+            `${this.formatLogTime(log.timestamp)} ${log.action} ${
+              log.status === "success" ? "成功" : "失败"
+            }${log.error ? `：${log.error}` : ""}`,
+        )
+        .join("\n");
+
+      uni.showModal({
+        title: "同步日志",
+        content,
+        showCancel: false,
+      });
     },
 
     formatLastSync() {

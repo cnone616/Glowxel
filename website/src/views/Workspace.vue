@@ -38,8 +38,8 @@
       <!-- 项目网格 -->
       <div v-else class="project-grid">
         <div class="project-card" v-for="p in filteredProjects" :key="p.id">
-          <div class="project-thumb" :style="p.cover_url ? `background-image:url(${p.cover_url})` : ''">
-            <div v-if="!p.cover_url" class="thumb-placeholder">
+          <div class="project-thumb" :style="p.thumbnail_url ? `background-image:url(${p.thumbnail_url})` : ''">
+            <div v-if="!p.thumbnail_url" class="thumb-placeholder">
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ccc" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
             </div>
             <div class="project-actions">
@@ -66,7 +66,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { artworkAPI } from '@/api/index.js'
+import { projectAPI } from '@/api/index.js'
 
 const router = useRouter()
 const projects = ref([])
@@ -76,7 +76,7 @@ const keyword = ref('')
 const filteredProjects = computed(() => {
   if (!keyword.value) return projects.value
   return projects.value.filter(p =>
-    (p.title || p.name || '').toLowerCase().includes(keyword.value.toLowerCase())
+    (p.name || '').toLowerCase().includes(keyword.value.toLowerCase())
   )
 })
 
@@ -89,8 +89,8 @@ function formatDate(dateStr) {
 function openEditor(p) { router.push(`/editor/${p.id}`) }
 
 async function deleteProject(p) {
-  if (!confirm(`确认删除「${p.title || p.name || '未命名'}」？`)) return
-  const res = await artworkAPI.remove(p.id)
+  if (!confirm(`确认删除「${p.name || '未命名'}」？`)) return
+  const res = await projectAPI.remove(p.id)
   if (res.success || res.code === 0) {
     projects.value = projects.value.filter(x => x.id !== p.id)
   }
@@ -100,10 +100,7 @@ onMounted(async () => {
   try {
     const token = localStorage.getItem('auth_token')
     if (!token) { loading.value = false; return }
-    const res = await artworkAPI.getUserArtworks(
-      JSON.parse(localStorage.getItem('user_info') || '{}').id,
-      { page: 1, limit: 50 }
-    )
+    const res = await projectAPI.getList({ page: 1, limit: 50 })
     if (res.success) projects.value = res.data?.list || []
   } finally { loading.value = false }
 })

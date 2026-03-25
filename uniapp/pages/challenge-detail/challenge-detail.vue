@@ -20,7 +20,7 @@
     <!-- 挑战横幅 -->
     <view class="challenge-banner">
       <image 
-        :src="challenge.banner" 
+        :src="challenge.banner_url" 
         class="banner-image"
         mode="aspectFill"
       />
@@ -28,7 +28,7 @@
       
       <!-- 挑战图标 -->
       <view class="challenge-icon">
-        <Icon :name="challenge.icon" :size="64" color="#FFFFFF" />
+        <Icon name="work" :size="64" color="#FFFFFF" />
       </view>
       
       <!-- 状态标签 -->
@@ -67,11 +67,11 @@
         <view class="time-info">
           <view class="time-item">
             <Icon name="time" :size="28" color="#666666" />
-            <text class="time-text">开始: {{ challenge.startDate }}</text>
+            <text class="time-text">开始: {{ formatDate(challenge.start_date) }}</text>
           </view>
           <view class="time-item">
             <Icon name="time" :size="28" color="#666666" />
-            <text class="time-text">结束: {{ challenge.endDate }}</text>
+            <text class="time-text">结束: {{ formatDate(challenge.end_date) }}</text>
           </view>
         </view>
         
@@ -111,7 +111,7 @@
         </view>
         <view class="criteria-list">
           <view 
-            v-for="(criterion, index) in challenge.judgesCriteria" 
+            v-for="(criterion, index) in challenge.judges_criteria" 
             :key="index"
             class="criterion-item"
           >
@@ -167,7 +167,11 @@ export default {
     return {
       statusBarHeight: 0,
       challengeId: null,
-      challenge: null,
+      challenge: {
+        rules: [],
+        judges_criteria: [],
+        tags: []
+      },
       isJoined: false
     }
   },
@@ -220,17 +224,19 @@ export default {
   methods: {
     async loadChallengeData() {
       const res = await challengeAPI.getChallengeById(this.challengeId)
-      this.challenge = res.success ? res.data : null
-      
-      if (!this.challenge) {
-        uni.showToast({
-          title: '挑战不存在',
-          icon: 'none'
-        })
-        setTimeout(() => {
-          uni.navigateBack()
-        }, 1500)
+      if (res.success && res.data && res.data.challenge) {
+        this.challenge = res.data.challenge
+        this.isJoined = this.challenge.joined
+        return
       }
+
+      uni.showToast({
+        title: '挑战不存在',
+        icon: 'none'
+      })
+      setTimeout(() => {
+        uni.navigateBack()
+      }, 1500)
     },
     
     handleBack() {
@@ -243,7 +249,7 @@ export default {
       })
     },
     
-    handleJoin() {
+    async handleJoin() {
       if (this.challenge.status === 'ended') {
         uni.showToast({
           title: '挑战已结束',
@@ -261,24 +267,50 @@ export default {
       }
       
       if (!this.isJoined) {
-        this.isJoined = true
-        uni.showToast({
-          title: '参与成功！',
-          icon: 'success'
-        })
-        
-        // 跳转到创作页面
-        setTimeout(() => {
-          uni.navigateTo({
-            url: `/pages/create/create?challengeId=${this.challengeId}`
+        try {
+          const res = await challengeAPI.joinChallenge(this.challengeId)
+          if (!(res.success && res.data)) {
+            throw new Error('join failed')
+          }
+
+          this.isJoined = res.data.joined
+          if (res.data.changed) {
+            this.challenge.participants += 1
+          }
+
+          uni.showToast({
+            title: '参与成功！',
+            icon: 'success'
           })
-        }, 1500)
-      } else {
-        uni.showToast({
-          title: '您已参与此挑战',
-          icon: 'none'
-        })
+
+          setTimeout(() => {
+            uni.navigateTo({
+              url: `/pages/create/create?challengeId=${this.challengeId}`
+            })
+          }, 1500)
+        } catch (error) {
+          uni.showToast({
+            title: '参与失败',
+            icon: 'none'
+          })
+        }
+        return
       }
+
+      uni.navigateTo({
+        url: `/pages/create/create?challengeId=${this.challengeId}`
+      })
+    },
+
+    formatDate(dateString) {
+      if (!dateString) {
+        return ''
+      }
+      const date = new Date(dateString)
+      const year = date.getFullYear()
+      const month = `${date.getMonth() + 1}`.padStart(2, '0')
+      const day = `${date.getDate()}`.padStart(2, '0')
+      return `${year}-${month}-${day}`
     }
   }
 }

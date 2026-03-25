@@ -14,6 +14,22 @@ String WebSocketHandler::fragmentBuffer = "";
 bool WebSocketHandler::isReceivingFragments = false;
 unsigned long WebSocketHandler::lastMessageTime = 0;
 
+const char* WebSocketHandler::getCurrentModeString() {
+  if (DisplayManager::currentMode == MODE_CLOCK) {
+    return "clock";
+  }
+  if (DisplayManager::currentMode == MODE_CANVAS) {
+    return "canvas";
+  }
+  if (DisplayManager::currentMode == MODE_ANIMATION) {
+    return "animation";
+  }
+  if (DisplayManager::currentMode == MODE_TRANSFERRING) {
+    return "transferring";
+  }
+  return "";
+}
+
 void WebSocketHandler::init() {
   ws.onEvent(onWsEvent);
   Serial.println("WebSocket 已初始化");
@@ -29,10 +45,7 @@ void WebSocketHandler::onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *c
     // 连接时不切换模式，保持当前状态
 
     // 返回当前实际模式
-    String modeStr = "canvas";
-    if (DisplayManager::currentMode == MODE_ANIMATION) {
-      modeStr = "animation";
-    }
+    String modeStr = getCurrentModeString();
     String response = "{\"status\":\"connected\",\"device\":\"RenLight\",\"mode\":\"" + modeStr + "\"}";
     client->text(response);
   }
@@ -123,19 +136,12 @@ void WebSocketHandler::handleBinaryData(AsyncWebSocketClient *client, uint8_t *d
     }
 
     // 画板模式：保存到 canvasBuffer（64x64完整画布）
-    if (DisplayManager::currentMode == MODE_CANVAS && DisplayManager::isCanvasMode) {
+    if (DisplayManager::currentMode == MODE_CANVAS) {
       
       // 第一次接收时初始化画布（清空）
       if (!DisplayManager::canvasInitialized) {
-        memset(DisplayManager::canvasBuffer, 0, sizeof(DisplayManager::canvasBuffer));
+        DisplayManager::clearCanvas();
         DisplayManager::canvasInitialized = true;
-        
-        // 清空之前的黑色像素记录
-        if (DisplayManager::blackPixels != nullptr) {
-          free(DisplayManager::blackPixels);
-          DisplayManager::blackPixels = nullptr;
-        }
-        DisplayManager::blackPixelCount = 0;
       }
       
       // 先统计本批有效的黑色像素数量（在范围内的）
@@ -347,20 +353,15 @@ void WebSocketHandler::handleJsonCommand(AsyncWebSocketClient *client, JsonDocum
     response["message"] = "pong";
   }
   else if (cmd == "status") {
-    response["ip"] = WiFiManager::isConfigMode() ? WiFiManager::getDeviceIP() : WiFiManager::getDeviceIP();
+    response["ip"] = WiFiManager::getDeviceIP();
     response["width"] = DisplayManager::PANEL_RES_X;
     response["height"] = DisplayManager::PANEL_RES_Y;
     response["brightness"] = DisplayManager::currentBrightness;
-    if (DisplayManager::currentMode == MODE_CANVAS) {
-      // 前端把 canvas 当作 clock 模式显示
-      response["mode"] = "clock";
-    } else if (DisplayManager::currentMode == MODE_ANIMATION) {
-      response["mode"] = "animation";
-      if (AnimationManager::currentGIF != nullptr) {
-        response["animationFrames"] = AnimationManager::currentGIF->frameCount;
-        response["animationPlaying"] = AnimationManager::currentGIF->isPlaying;
-        response["currentFrame"] = AnimationManager::currentGIF->currentFrame;
-      }
+    response["mode"] = getCurrentModeString();
+    if (DisplayManager::currentMode == MODE_ANIMATION && AnimationManager::currentGIF != nullptr) {
+      response["animationFrames"] = AnimationManager::currentGIF->frameCount;
+      response["animationPlaying"] = AnimationManager::currentGIF->isPlaying;
+      response["currentFrame"] = AnimationManager::currentGIF->currentFrame;
     }
   }
   else if (cmd == "set_mode") {
@@ -371,44 +372,24 @@ void WebSocketHandler::handleJsonCommand(AsyncWebSocketClient *client, JsonDocum
     if (AnimationManager::currentGIF != nullptr) {
       AnimationManager::currentGIF->isPlaying = false;
     }
+    DisplayManager::receivingPixels = false;
     // === 统一：清屏，防止残留 ===
     DisplayManager::dma_display->clearScreen();
 
     if (mode == "clock") {
       // 静态时钟模式
-      DisplayManager::isCanvasMode = false;
       DisplayManager::currentMode = MODE_CLOCK;
       ConfigManager::saveClockConfig();
       DisplayManager::displayClock(true);
       response["message"] = "switched to static clock mode";
     } else if (mode == "canvas") {
       // 画板模式
-      DisplayManager::isCanvasMode = true;
       DisplayManager::currentMode = MODE_CANVAS;
       ConfigManager::saveClockConfig();
-
-      if (DisplayManager::canvasInitialized) {
-        // 恢复画布数据
-        for (int y = 0; y < DisplayManager::PANEL_RES_Y; y++) {
-          for (int x = 0; x < DisplayManager::PANEL_RES_X; x++) {
-            uint8_t r = DisplayManager::canvasBuffer[y][x][0];
-            uint8_t g = DisplayManager::canvasBuffer[y][x][1];
-            uint8_t b = DisplayManager::canvasBuffer[y][x][2];
-            if (r > 0 || g > 0 || b > 0) {
-              DisplayManager::dma_display->drawPixelRGB888(x, y, r, g, b);
-            }
-          }
-          if (y % 8 == 0) yield();
-        }
-      } else {
-        // 没有画布数据，显示 Logo 表示画板就绪
-        DisplayManager::drawLogo(12, 12);  // 画板模式居中
-      }
-
+      DisplayManager::renderCanvas();
       response["message"] = "switched to canvas mode";
     } else if (mode == "animation") {
       // 动态时钟模式
-      DisplayManager::isCanvasMode = false;
       DisplayManager::currentMode = MODE_ANIMATION;
       ConfigManager::saveClockConfig();
 
@@ -425,7 +406,6 @@ void WebSocketHandler::handleJsonCommand(AsyncWebSocketClient *client, JsonDocum
       }
     } else if (mode == "transferring") {
       // 传输模式：清屏，显示 loading，拒绝其他命令
-      DisplayManager::isCanvasMode = false;
       DisplayManager::currentMode = MODE_TRANSFERRING;
       // 不保存到 NVS，这是临时状态
       DisplayManager::dma_display->clearScreen();
@@ -433,7 +413,6 @@ void WebSocketHandler::handleJsonCommand(AsyncWebSocketClient *client, JsonDocum
       response["message"] = "entered transferring mode";
     } else if (mode == "tetris") {
       // 俄罗斯方块屏保
-      DisplayManager::isCanvasMode = false;
       DisplayManager::currentMode = MODE_ANIMATION;
       bool clearMode = doc["clearMode"] | true;
       int cellSz = doc["cellSize"] | 2;
@@ -673,7 +652,7 @@ void WebSocketHandler::handleJsonCommand(AsyncWebSocketClient *client, JsonDocum
     // 如果是画板模式，清空画布缓冲区
     if (DisplayManager::currentMode == MODE_CANVAS && DisplayManager::canvasInitialized) {
       Serial.println("清空画布缓冲区");
-      memset(DisplayManager::canvasBuffer, 0, sizeof(DisplayManager::canvasBuffer));
+      DisplayManager::clearCanvas();
     }
     
     response["message"] = "cleared";
@@ -702,43 +681,13 @@ void WebSocketHandler::handleJsonCommand(AsyncWebSocketClient *client, JsonDocum
         
         // 如果是黑色，用存储的坐标亮白灯
         if (highlightR == 0 && highlightG == 0 && highlightB == 0) {
-          DisplayManager::dma_display->clearScreen();
-          for (int i = 0; i < DisplayManager::blackPixelCount; i++) {
-            DisplayManager::dma_display->drawPixelRGB888(DisplayManager::blackPixels[i].x, DisplayManager::blackPixels[i].y, 255, 255, 255);
-          }
+          DisplayManager::highlightCanvasColor(0, 0, 0);
         } else {
-          DisplayManager::dma_display->clearScreen();
-          
-          for (int y = 0; y < DisplayManager::PANEL_RES_Y; y++) {
-            for (int x = 0; x < DisplayManager::PANEL_RES_X; x++) {
-              uint8_t r = DisplayManager::canvasBuffer[y][x][0];
-              uint8_t g = DisplayManager::canvasBuffer[y][x][1];
-              uint8_t b = DisplayManager::canvasBuffer[y][x][2];
-              
-              if (r > 0 || g > 0 || b > 0) {
-                bool isHighlight = (abs(r - highlightR) <= 2 && 
-                                   abs(g - highlightG) <= 2 && 
-                                   abs(b - highlightB) <= 2);
-                
-                if (isHighlight) {
-                  DisplayManager::dma_display->drawPixelRGB888(x, y, 255, 255, 255);
-                }
-              }
-            }
-            if (y % 8 == 0) yield();
-          }
+          DisplayManager::highlightCanvasColor(highlightR, highlightG, highlightB);
         }
       } else {
         // 恢复显示完整的彩色像素图
-        for (int y = 0; y < DisplayManager::PANEL_RES_Y; y++) {
-          for (int x = 0; x < DisplayManager::PANEL_RES_X; x++) {
-            uint8_t r = DisplayManager::canvasBuffer[y][x][0];
-            uint8_t g = DisplayManager::canvasBuffer[y][x][1];
-            uint8_t b = DisplayManager::canvasBuffer[y][x][2];
-            DisplayManager::dma_display->drawPixelRGB888(x, y, r, g, b);
-          }
-          if (y % 8 == 0) yield();
-        }
+        DisplayManager::renderCanvas();
       }
       
       response["message"] = hasHighlight ? "color highlighted" : "highlight cleared";
@@ -751,27 +700,7 @@ void WebSocketHandler::handleJsonCommand(AsyncWebSocketClient *client, JsonDocum
     // 高亮指定行
     if (DisplayManager::currentMode == MODE_CANVAS && DisplayManager::canvasInitialized) {
       int highlightRow = doc["row"] | -1;
-      
-      for (int y = 0; y < DisplayManager::PANEL_RES_Y; y++) {
-        for (int x = 0; x < DisplayManager::PANEL_RES_X; x++) {
-          uint8_t r = DisplayManager::canvasBuffer[y][x][0];
-          uint8_t g = DisplayManager::canvasBuffer[y][x][1];
-          uint8_t b = DisplayManager::canvasBuffer[y][x][2];
-          
-          if (r > 0 || g > 0 || b > 0) {
-            uint8_t displayR = r, displayG = g, displayB = b;
-            
-            if (highlightRow >= 0 && y != highlightRow) {
-              displayR = r * 0.2;
-              displayG = g * 0.2;
-              displayB = b * 0.2;
-            }
-            
-            DisplayManager::dma_display->drawPixelRGB888(x, y, displayR, displayG, displayB);
-          }
-        }
-        if (y % 8 == 0) yield();
-      }
+      DisplayManager::highlightCanvasRow(highlightRow);
       
       response["message"] = (highlightRow >= 0) ? "row highlighted" : "highlight cleared";
     } else {

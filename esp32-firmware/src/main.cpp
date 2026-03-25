@@ -105,11 +105,16 @@ void loop() {
       serializeJson(confirmDoc, confirmMsg);
       WebSocketHandler::ws.textAll(confirmMsg);
 
+      // 保存完成后恢复显示刷新
+      DisplayManager::receivingPixels = false;
+
       // 保存完成后刷新显示
       if (DisplayManager::currentMode == MODE_CLOCK) {
-        DisplayManager::receivingPixels = false;
         DisplayManager::drawBackground();
         DisplayManager::drawClockOverlay();
+      } else if (DisplayManager::currentMode == MODE_ANIMATION &&
+                 AnimationManager::currentGIF == nullptr) {
+        DisplayManager::displayClock(true);
       }
     }
   }

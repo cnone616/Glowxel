@@ -35,13 +35,18 @@
       <div class="container">
         <h2 class="section-title">精选作品</h2>
         <div class="artwork-grid">
-          <div class="artwork-card" v-for="item in artworks" :key="item.id">
-            <div class="artwork-img" :style="{ background: '#f5f5f5' }"></div>
+          <div class="artwork-card" v-for="item in artworks" :key="item.id" @click="$router.push(`/artwork/${item.id}`)">
+            <div
+              class="artwork-img"
+              :style="item.cover_url
+                ? `background-image:url(${item.cover_url});background-size:cover;background-position:center;background-color:#f5f5f5`
+                : 'background:#f5f5f5'"
+            ></div>
             <div class="artwork-info">
               <span class="artwork-title">{{
                 item.title || "未命名作品"
               }}</span>
-              <span class="artwork-author">{{ item.author || "匿名" }}</span>
+              <span class="artwork-author">{{ item.author_name || "匿名" }}</span>
             </div>
           </div>
         </div>
@@ -86,7 +91,7 @@
             >立即购买</a
           >
           <a
-            href="/hardware-guide.pdf"
+            href="/hardware-guide.html"
             target="_blank"
             rel="noopener"
             class="btn btn-outline"

@@ -1,23 +1,15 @@
 const router = require('express').Router();
 const { contentFilter } = require('../middleware/contentFilter');
-const db = require('../config/db');
 const { auth } = require('../middleware/auth');
+const commentService = require('../services/commentService');
 
 // 获取评论列表
 router.get('/:artworkId', async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 20;
-    const offset = (page - 1) * limit;
-    const [list] = await db.query(
-      `SELECT c.id, c.content, c.likes, c.reply_to, c.created_at,
-       u.id as user_id, u.name as user_name, u.avatar as user_avatar
-       FROM comments c JOIN users u ON c.user_id = u.id
-       WHERE c.artwork_id = ? ORDER BY c.created_at DESC LIMIT ? OFFSET ?`,
-      [req.params.artworkId, limit, offset]
-    );
-    const [[{ total }]] = await db.query('SELECT COUNT(*) as total FROM comments WHERE artwork_id = ?', [req.params.artworkId]);
-    res.json({ code: 0, data: { list, total } });
+    const data = await commentService.listComments(req.params.artworkId, page, limit);
+    res.json({ code: 0, data });
   } catch (err) {
     res.json({ code: 500, message: '获取失败' });
   }
@@ -26,27 +18,9 @@ router.get('/:artworkId', async (req, res) => {
 // 发表评论
 router.post('/:artworkId', auth, contentFilter(['content']), async (req, res) => {
   try {
-    const { content, replyTo } = req.body;
-    if (!content) return res.json({ code: 400, message: '评论内容不能为空' });
-    const [result] = await db.query(
-      'INSERT INTO comments (artwork_id, user_id, content, reply_to) VALUES (?, ?, ?, ?)',
-      [req.params.artworkId, req.user.id, content, replyTo || null]
-    );
-    await db.query('UPDATE artworks SET comments_count = comments_count + 1 WHERE id = ?', [req.params.artworkId]);
-    // 写入通知（不通知自己）
-    const [[artwork]] = await db.query('SELECT user_id FROM artworks WHERE id = ?', [req.params.artworkId]);
-    if (artwork && artwork.user_id !== req.user.id) {
-      await db.query(
-        'INSERT INTO notifications (user_id, actor_id, type, artwork_id, comment_id) VALUES (?,?,?,?,?)',
-        [artwork.user_id, req.user.id, 'comment', req.params.artworkId, result.insertId]
-      );
-    }
-    const [rows] = await db.query(
-      `SELECT c.id, c.content, c.likes, c.reply_to, c.created_at,
-       u.id as user_id, u.name as user_name, u.avatar as user_avatar
-       FROM comments c JOIN users u ON c.user_id = u.id WHERE c.id = ?`, [result.insertId]
-    );
-    res.json({ code: 0, data: { comment: rows[0] } });
+    const data = await commentService.createComment(req.params.artworkId, req.user.id, req.body);
+    if (data.invalidContent) return res.json({ code: 400, message: '评论内容不能为空' });
+    res.json({ code: 0, data });
   } catch (err) {
     res.json({ code: 500, message: '评论失败' });
   }
@@ -55,10 +29,8 @@ router.post('/:artworkId', auth, contentFilter(['content']), async (req, res) =>
 // 删除评论
 router.delete('/:id', auth, async (req, res) => {
   try {
-    const [rows] = await db.query('SELECT artwork_id FROM comments WHERE id = ? AND user_id = ?', [req.params.id, req.user.id]);
-    if (rows.length === 0) return res.json({ code: 403, message: '无权删除' });
-    await db.query('DELETE FROM comments WHERE id = ?', [req.params.id]);
-    await db.query('UPDATE artworks SET comments_count = GREATEST(comments_count - 1, 0) WHERE id = ?', [rows[0].artwork_id]);
+    const data = await commentService.removeComment(req.params.id, req.user.id);
+    if (data.forbidden) return res.json({ code: 403, message: '无权删除' });
     res.json({ code: 0, data: { success: true } });
   } catch (err) {
     res.json({ code: 500, message: '删除失败' });
@@ -68,8 +40,8 @@ router.delete('/:id', auth, async (req, res) => {
 // 评论点赞
 router.post('/:id/like', auth, async (req, res) => {
   try {
-    await db.query('UPDATE comments SET likes = likes + 1 WHERE id = ?', [req.params.id]);
-    res.json({ code: 0, data: { success: true } });
+    const data = await commentService.likeComment(req.params.id);
+    res.json({ code: 0, data });
   } catch (err) {
     res.json({ code: 500, message: '操作失败' });
   }

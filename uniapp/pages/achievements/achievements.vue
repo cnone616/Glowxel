@@ -489,7 +489,16 @@ export default {
       this.selectedAchievement = achievement;
     },
     shareAchievements() {
-      this.toast.showInfo("分享功能开发中");
+      const shareText = `我在 Glowxel 已解锁 ${this.unlockedCount} 项成就，当前完成度 ${this.completionRate}%`;
+      uni.setClipboardData({
+        data: shareText,
+        success: () => {
+          this.toast.showSuccess("成就文案已复制");
+        },
+        fail: () => {
+          this.toast.showError("复制失败");
+        },
+      });
     },
 
     getIconColor(achievement) {

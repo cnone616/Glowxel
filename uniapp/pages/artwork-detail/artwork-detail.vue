@@ -24,7 +24,7 @@
       <view class="artwork-section">
         <view class="artwork-container">
           <image
-            :src="artwork.coverUrl"
+            :src="artwork.cover_url"
             class="artwork-image"
             mode="aspectFit"
             @click="previewImage"
@@ -49,11 +49,11 @@
             </view>
             <view class="meta-item">
               <Icon name="picture" :size="28" color="#666666" />
-              <text class="meta-text">{{ artwork.colorCount }}色</text>
+              <text class="meta-text">{{ artwork.color_count }}色</text>
             </view>
             <view class="meta-item">
               <Icon name="calendar" :size="28" color="#666666" />
-              <text class="meta-text">{{ formatDate(artwork.createdAt) }}</text>
+              <text class="meta-text">{{ formatDate(artwork.created_at) }}</text>
             </view>
           </view>
 
@@ -71,21 +71,21 @@
         <!-- 作者信息 -->
         <view class="author-section">
           <view class="author-info" @click="goToUserProfile">
-            <Avatar :src="artwork.author.avatar" :size="80" />
+            <Avatar :src="artwork.author_avatar" :size="80" />
             <view class="author-details">
-              <text class="author-name">{{ artwork.author.name }}</text>
+              <text class="author-name">{{ artwork.author_name }}</text>
               <text class="author-stats"
-                >{{ artwork.author.worksCount }}个作品</text
+                >{{ artwork.author_works_count }}个作品</text
               >
             </view>
           </view>
           <view
             class="follow-btn"
-            :class="{ following: artwork.author.isFollowing }"
+            :class="{ following: artwork.isFollowing }"
             @click="toggleFollow"
           >
             <text class="follow-text">
-              {{ artwork.author.isFollowing ? "已关注" : "关注" }}
+              {{ artwork.isFollowing ? "已关注" : "关注" }}
             </text>
           </view>
         </view>
@@ -122,7 +122,7 @@
 
           <view class="action-btn" @click="showCommentInput">
             <Icon name="comment" :size="40" color="#666666" />
-            <text class="action-text">{{ artwork.comments || 0 }}</text>
+            <text class="action-text">{{ artwork.comments_count || 0 }}</text>
           </view>
 
           <view class="action-btn" @click="shareArtwork">
@@ -222,6 +222,7 @@ import {
   collectionAPI,
   followAPI,
 } from "../../api/index.js";
+import { ARTKAL_COLORS_FULL } from "../../data/artkal-colors-full.js";
 import { useProjectStore } from "../../store/project.js";
 import statusBarMixin from "../../mixins/statusBar.js";
 import Icon from "../../components/Icon.vue";
@@ -274,19 +275,89 @@ export default {
   },
 
   methods: {
+    async saveArtworkImage(imageUrl, fileName) {
+      if (!imageUrl) {
+        throw new Error("image url missing");
+      }
+
+      // #ifdef H5
+      const link = document.createElement("a");
+      link.href = imageUrl;
+      link.download = `${fileName}-${Date.now()}.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      return;
+      // #endif
+
+      // #ifndef H5
+      const downloadRes = await new Promise((resolve, reject) => {
+        uni.downloadFile({
+          url: imageUrl,
+          success: (res) => {
+            if (res.statusCode === 200) {
+              resolve(res);
+              return;
+            }
+            reject(new Error("download failed"));
+          },
+          fail: reject,
+        });
+      });
+
+      await new Promise((resolve, reject) => {
+        uni.saveImageToPhotosAlbum({
+          filePath: downloadRes.tempFilePath,
+          success: resolve,
+          fail: reject,
+        });
+      });
+      // #endif
+    },
+
+    getPaddedSize(value) {
+      return Math.ceil(value / 64) * 64;
+    },
+
+    buildArtworkPixelsMap(pixelList) {
+      if (!Array.isArray(pixelList)) {
+        throw new Error("invalid artwork pixels");
+      }
+
+      return new Map(pixelList);
+    },
+
+    buildArtworkPaletteCodes(pixels) {
+      const hexColors = [...new Set(Array.from(pixels.values()))];
+      return hexColors.map((hex) => {
+        const matchedColor = ARTKAL_COLORS_FULL.find(
+          (color) => color.hex.toUpperCase() === hex.toUpperCase(),
+        );
+        if (!matchedColor) {
+          throw new Error(`unknown artkal color: ${hex}`);
+        }
+        return matchedColor.code;
+      });
+    },
+
     async loadArtworkDetail() {
       try {
         this.isLoading = true;
 
         const artRes = await artworkAPI.getArtworkById(this.artworkId);
-        if (artRes.success) this.artwork = artRes.data;
+        if (artRes.success && artRes.data && artRes.data.artwork) {
+          this.artwork = artRes.data.artwork;
+        }
 
         const cmtRes = await commentAPI.getComments(this.artworkId);
-        if (cmtRes.success) this.comments = cmtRes.data?.list || [];
+        if (cmtRes.success && cmtRes.data) {
+          this.comments = cmtRes.data.list;
+        }
 
         const relRes = await artworkAPI.getRelatedArtworks(this.artworkId);
-        if (relRes.success)
-          this.relatedArtworks = relRes.data?.list || relRes.data || [];
+        if (relRes.success && relRes.data) {
+          this.relatedArtworks = relRes.data.list;
+        }
 
         this.isLiked = await likeAPI.isLiked(this.artworkId);
         this.isCollected = await collectionAPI.isCollected(this.artworkId);
@@ -307,32 +378,27 @@ export default {
 
     previewImage() {
       uni.previewImage({
-        urls: [this.artwork.coverUrl],
-        current: this.artwork.coverUrl,
+        urls: [this.artwork.cover_url],
+        current: this.artwork.cover_url,
       });
     },
 
     goToUserProfile() {
       uni.navigateTo({
-        url: `/pages/user-detail/user-detail?id=${this.artwork.author.id}`,
+        url: `/pages/user-detail/user-detail?id=${this.artwork.author_id}`,
       });
     },
 
     async toggleFollow() {
       try {
-        const isFollowing = !this.artwork.author.isFollowing;
-
-        // 调用关注API
-        if (isFollowing) {
-          await followAPI.followUser(this.artwork.author.id);
-        } else {
-          await followAPI.unfollowUser(this.artwork.author.id);
+        const res = await followAPI.toggleFollow(this.artwork.author_id);
+        if (!(res.success && res.data)) {
+          throw new Error("follow failed");
         }
-
-        this.artwork.author.isFollowing = isFollowing;
+        this.artwork.isFollowing = res.data.followed;
 
         uni.showToast({
-          title: isFollowing ? "关注成功" : "取消关注",
+          title: res.data.followed ? "关注成功" : "取消关注",
           icon: "success",
         });
       } catch (error) {
@@ -348,13 +414,12 @@ export default {
       try {
         const liked = !this.isLiked;
 
-        // 调用点赞API
         if (liked) {
           await likeAPI.likeArtwork(this.artworkId);
-          this.artwork.likes = (this.artwork.likes || 0) + 1;
+          this.artwork.likes += 1;
         } else {
           await likeAPI.unlikeArtwork(this.artworkId);
-          this.artwork.likes = Math.max(0, (this.artwork.likes || 0) - 1);
+          this.artwork.likes -= 1;
         }
 
         this.isLiked = liked;
@@ -371,18 +436,15 @@ export default {
       try {
         const collected = !this.isCollected;
 
-        // 调用收藏API
         if (collected) {
           await collectionAPI.collectArtwork(this.artworkId);
-          this.artwork.collects = (this.artwork.collects || 0) + 1;
+          this.artwork.collects += 1;
 
-          // 收藏时创建只读本地项目
           this._addCollectedProject();
         } else {
           await collectionAPI.uncollectArtwork(this.artworkId);
-          this.artwork.collects = Math.max(0, (this.artwork.collects || 0) - 1);
+          this.artwork.collects -= 1;
 
-          // 取消收藏时删除本地项目
           this._removeCollectedProject();
         }
 
@@ -407,18 +469,16 @@ export default {
       const projectStore = useProjectStore();
       projectStore.addCollectedProject({
         name: this.artwork.title,
-        width: this.artwork.width || 52,
-        height: this.artwork.height || 52,
+        width: this.artwork.width,
+        height: this.artwork.height,
         palette: [],
-        thumbnail: this.artwork.coverUrl || "",
+        thumbnail: this.artwork.cover_url,
         artworkId: this.artwork.id,
-        originalAuthor: this.artwork.author
-          ? {
-              id: this.artwork.author.id,
-              name: this.artwork.author.name,
-              avatar: this.artwork.author.avatar,
-            }
-          : null,
+        originalAuthor: {
+          id: this.artwork.author_id,
+          name: this.artwork.author_name,
+          avatar: this.artwork.author_avatar,
+        },
       });
     },
 
@@ -453,11 +513,12 @@ export default {
           this.artworkId,
           this.commentText.trim(),
         );
-        const newComment = cmtRes.success ? cmtRes.data : null;
+        const newComment =
+          cmtRes.success && cmtRes.data ? cmtRes.data.comment : null;
         if (!newComment) throw new Error("评论失败");
 
         this.comments.unshift(newComment);
-        this.artwork.comments = (this.artwork.comments || 0) + 1;
+        this.artwork.comments_count += 1;
         this.commentText = "";
         this.showCommentBar = false;
 
@@ -475,23 +536,17 @@ export default {
     },
 
     handleReply(comment) {
-      this.commentText = `@${comment.author.name} `;
+      this.commentText = `@${comment.user_name} `;
       this.showCommentInput();
     },
 
     async handleCommentLike(comment) {
       try {
-        const liked = !comment.isLiked;
-
-        if (liked) {
+        if (!comment.isLiked) {
           await commentAPI.likeComment(comment.id);
-          comment.likes = (comment.likes || 0) + 1;
-        } else {
-          await commentAPI.likeComment(comment.id);
-          comment.likes = Math.max(0, (comment.likes || 0) - 1);
+          comment.likes += 1;
+          comment.isLiked = true;
         }
-
-        comment.isLiked = liked;
       } catch (error) {
         console.error("评论点赞失败:", error);
       }
@@ -504,7 +559,7 @@ export default {
         const index = this.comments.findIndex((c) => c.id === comment.id);
         if (index > -1) {
           this.comments.splice(index, 1);
-          this.artwork.comments = Math.max(0, (this.artwork.comments || 0) - 1);
+          this.artwork.comments_count -= 1;
         }
 
         uni.showToast({
@@ -531,26 +586,91 @@ export default {
       this.showMoreModal = true;
     },
 
-    downloadArtwork() {
+    async downloadArtwork() {
       this.showMoreModal = false;
-      uni.showToast({
-        title: "下载功能开发中",
-        icon: "none",
-      });
+      try {
+        await this.saveArtworkImage(this.artwork.cover_url, this.artwork.title);
+        uni.showToast({
+          title: "下载成功",
+          icon: "success",
+        });
+      } catch (error) {
+        console.error("下载作品失败:", error);
+        uni.showToast({
+          title: "下载失败",
+          icon: "error",
+        });
+      }
     },
 
-    useAsTemplate() {
+    async useAsTemplate() {
       this.showMoreModal = false;
-      uni.navigateTo({
-        url: `/pages/create/create?templateId=${this.artworkId}`,
+      uni.showLoading({
+        title: "载入作品...",
       });
+
+      try {
+        const res = await artworkAPI.getArtworkPixels(this.artworkId);
+        if (!(res.success && res.data && Array.isArray(res.data.pixels))) {
+          throw new Error("load artwork pixels failed");
+        }
+
+        const pixels = this.buildArtworkPixelsMap(res.data.pixels);
+        const palette = this.buildArtworkPaletteCodes(pixels);
+        const paddedWidth = this.getPaddedSize(res.data.width);
+        const paddedHeight = this.getPaddedSize(res.data.height);
+        const projectStore = useProjectStore();
+        const projectId = projectStore.addProject(
+          this.artwork.title,
+          res.data.width,
+          res.data.height,
+          palette.length,
+          palette,
+          paddedWidth,
+          paddedHeight,
+          this.artwork.cover_url,
+        );
+
+        if (!projectId) {
+          throw new Error("project create failed");
+        }
+
+        projectStore.saveProjectPixels(projectId, pixels);
+
+        uni.hideLoading();
+        uni.showToast({
+          title: "已创建草稿",
+          icon: "success",
+        });
+        uni.navigateTo({
+          url: `/pages/overview/overview?id=${projectId}`,
+        });
+      } catch (error) {
+        uni.hideLoading();
+        console.error("载入作品失败:", error);
+        uni.showToast({
+          title: "载入失败",
+          icon: "error",
+        });
+      }
     },
 
     reportArtwork() {
       this.showMoreModal = false;
-      uni.showToast({
-        title: "举报功能开发中",
-        icon: "none",
+      uni.setClipboardData({
+        data: `举报作品：${this.artwork.title}（ID: ${this.artwork.id}）`,
+        success: () => {
+          uni.showToast({
+            title: "举报信息已复制",
+            icon: "success",
+          });
+        },
+        fail: () => {
+          uni.showToast({
+            title: "复制失败",
+            icon: "error",
+          });
+        },
       });
     },
 

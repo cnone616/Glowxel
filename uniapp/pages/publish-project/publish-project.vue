@@ -228,6 +228,7 @@
 </template>
 
 <script>
+import { artworkAPI, challengeAPI } from "../../api/index.js";
 import { useProjectStore } from "../../store/project.js";
 import { useToast } from "../../composables/useToast.js";
 import statusBarMixin from "../../mixins/statusBar.js";
@@ -250,6 +251,7 @@ export default {
       canvasData: {
         projectId: "",
         boardId: "",
+        challengeId: null,
         pixels: [],
         width: 0,
         height: 0,
@@ -350,6 +352,71 @@ export default {
   },
 
   methods: {
+    getBoardCount() {
+      const boardsX = Math.ceil(this.canvasData.width / 64);
+      const boardsY = Math.ceil(this.canvasData.height / 64);
+      return boardsX * boardsY;
+    },
+
+    getCurrentProject() {
+      if (!this.canvasData.projectId || !this.projectStore) {
+        throw new Error("项目数据不完整");
+      }
+
+      const project = this.projectStore.projects.find(
+        (item) => item.id === this.canvasData.projectId,
+      );
+      if (!project) {
+        throw new Error("项目不存在");
+      }
+
+      return project;
+    },
+
+    buildPublishPayload(thumbnail) {
+      return {
+        title: this.form.title.trim(),
+        description: this.form.description.trim(),
+        tags: [...this.form.tags],
+        pixelData: this.canvasData.pixels,
+        thumbnail,
+        width: this.canvasData.width,
+        height: this.canvasData.height,
+        colorCount: this.canvasData.colors.length,
+        boardCount: this.getBoardCount(),
+        projectId: this.canvasData.projectId,
+      };
+    },
+
+    syncProjectAfterPublish(project, thumbnail) {
+      project.status = "published";
+      project.name = this.form.title.trim();
+      project.description = this.form.description.trim();
+      project.tags = [...this.form.tags];
+      project.isPublic = this.form.isPublic;
+      if (thumbnail) {
+        project.thumbnail = thumbnail;
+      }
+      project.publishedAt = Date.now();
+      this.projectStore.saveToStorage();
+    },
+
+    async submitChallengeArtwork(artworkId) {
+      if (!this.canvasData.challengeId) {
+        return false;
+      }
+
+      const res = await challengeAPI.submitToChallenge(
+        this.canvasData.challengeId,
+        artworkId,
+      );
+      if (!(res.success && res.data && res.data.success)) {
+        throw new Error("challenge submit failed");
+      }
+
+      return true;
+    },
+
     handleBack() {
       if (this.isPublishing) {
         return;
@@ -529,33 +596,29 @@ export default {
       try {
         // 生成缩略图
         const thumbnail = await this.generateThumbnail();
-
-        // 直接使用 projectStore 更新项目状态为已发布
-        if (!this.canvasData.projectId || !this.projectStore) {
-          throw new Error("项目数据不完整");
-        }
-
-        const project = this.projectStore.projects.find(
-          (p) => p.id === this.canvasData.projectId,
+        const project = this.getCurrentProject();
+        const publishRes = await artworkAPI.publishArtwork(
+          this.buildPublishPayload(thumbnail),
         );
-        if (!project) {
-          throw new Error("项目不存在");
+        if (!(publishRes.success && publishRes.data && publishRes.data.artworkId)) {
+          throw new Error("publish artwork failed");
         }
 
-        // 更新项目信息
-        project.status = "published";
-        project.name = this.form.title.trim();
-        project.description = this.form.description.trim();
-        project.tags = [...this.form.tags];
-        project.isPublic = this.form.isPublic;
-        if (thumbnail) {
-          project.thumbnail = thumbnail;
+        this.syncProjectAfterPublish(project, thumbnail);
+
+        let successMessage = "作品发布成功";
+        if (this.canvasData.challengeId) {
+          try {
+            await this.submitChallengeArtwork(publishRes.data.artworkId);
+            successMessage = "作品发布并已提交挑战";
+          } catch (challengeError) {
+            console.error("挑战投稿失败:", challengeError);
+            successMessage = "作品已发布，挑战投稿失败";
+          }
         }
-        project.publishedAt = Date.now();
-        this.projectStore.saveToStorage();
 
         // 显示成功动画和提示
-        this.showSuccessAnimation();
+        this.showSuccessAnimation(successMessage);
 
         // 延迟跳转到我的作品页面
         setTimeout(() => {
@@ -661,8 +724,8 @@ export default {
     },
 
     // 显示成功动画
-    showSuccessAnimation() {
-      this.toast.showSuccess("🎉 作品发布成功！");
+    showSuccessAnimation(message) {
+      this.toast.showSuccess(message);
 
       // 触觉反馈
       uni.vibrateShort({

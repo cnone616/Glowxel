@@ -1,30 +1,40 @@
-## RenLight 项目导览（仓库级）
+# Glowxel / RenLight 仓库导览
 
-本仓库是一个面向“拼豆/LED 点阵像素画”的创作工具集合，包含：
+这是一个围绕像素创作、社区发布、设备联动和 ESP32 灯板显示的多端仓库，当前主要包含 5 个可运行模块：
 
-- **移动端/多端创作工具**：`uniapp/`（uni-app + Vue3 + Pinia）
-- **ESP32 固件**：`esp32-firmware/`（Arduino + PlatformIO，驱动 HUB75 64×64）
-- **官网/在线设计站点**：`website/`（Vue3 + Vite）
-
-根目录的`项目说明.md`是产品与技术背景文档；本 README 更偏向“如何跑起来 + 模块在哪里 + 三端如何交互”。
-
----
+- `website/`：官网与在线创作站点，已接入真实后端接口
+- `uniapp/`：小程序/H5/App 端，包含创作、社区、设备控制、BLE 配网
+- `server/`：Express + MySQL 后端
+- `admin/`：运营后台
+- `esp32-firmware/`：ESP32 固件，驱动 64x64 HUB75 面板
 
 ## 目录结构
 
+```text
+Glowxel/
+├── admin/                  # 后台管理
+├── docs/                   # 审核与说明文档
+├── esp32-firmware/         # ESP32 固件
+├── server/                 # 后端服务
+├── uniapp/                 # 小程序 / H5 / App
+├── website/                # 官网 / 在线编辑
+├── README.md
+└── DEPLOY.md
 ```
-RenLight/
-├── esp32-firmware/          # ESP32 固件 + 本地LED模拟器
-├── uniapp/           # uni-app 多端应用（小程序/H5/App）
-├── website/    # 官网/在线设计站点（Vite）
-└── 项目说明.md              # 整体技术与规划说明
-```
 
----
+## 当前状态
 
-## 快速上手
+- `website`：主链可构建
+- `admin`：主链可构建
+- `server`：核心入口与路由可做语法检查
+- `esp32-firmware`：已可用 `pio run` 编译
+- `uniapp`：以 HBuilderX / uni 生态为主，本仓当前没有内置 `uni` CLI
 
-### 1) `website/`（官网 / 在线编辑）
+详细收口说明见：[当前仓库状态与收口说明](/Users/aflylong/Desktop/project/Glowxel/docs/当前仓库状态与收口说明.md)
+
+## 快速开始
+
+### `website/`
 
 ```bash
 cd website
@@ -32,150 +42,85 @@ npm install
 npm run dev
 ```
 
-说明：
+### `admin/`
 
-- 当前站点主要用于在线设计、预览与导出（项目内有 Mock 数据）；与 ESP32 的 WebSocket 直连在代码中尚未看到完整落地实现（文档有提及）。
+```bash
+cd admin
+npm install
+npm run dev
+```
 
----
+### `server/`
 
-### 2) `uniapp/`（小程序 / H5 / App）
+```bash
+cd server
+npm install
+npm run dev
+```
 
-推荐方式（官方工作流）：
+### `uniapp/`
 
-- 使用 **HBuilderX** 导入 `uniapp/` 运行到微信开发者工具 / 浏览器 / 模拟器。
+推荐使用 HBuilderX 导入 `uniapp/` 运行。
 
-也提供 npm scripts（依赖于 uni-app CLI 环境）：
+如果本机已安装 `uni` CLI，也可以使用：
 
 ```bash
 cd uniapp
 npm install
 npm run dev:h5
-# 或：npm run dev:mp-weixin
+# 或 npm run dev:mp-weixin
 ```
 
-关键实现入口：
+### `esp32-firmware/`
 
-- **像素画布**：`uniapp/components/PixelCanvas.vue`
-- **设备控制页**：`uniapp/pages/control/control.vue`
-- **闹钟编辑器**：`uniapp/pages/clock-editor/clock-editor.vue`
-- **设备连接状态（Pinia）**：`uniapp/store/device.js`
-- **与 ESP32 的 WebSocket 通信封装**：`uniapp/utils/webSocket.js`
-
----
-
-### 3) `esp32-firmware/`（ESP32 固件：编译/烧录）
+当前环境已可直接使用 `pio`：
 
 ```bash
 cd esp32-firmware
-python3 -m platformio run --target upload
+pio run
+pio run --target upload
+pio device monitor
 ```
 
-更多细节见：`esp32-firmware/开发环境说明.md`。
+更多细节见：[开发环境说明](/Users/aflylong/Desktop/project/Glowxel/esp32-firmware/开发环境说明.md)
 
----
+## ESP32 联动现状
 
-## ESP32 设备行为与网络模式
+固件入口是 [main.cpp](/Users/aflylong/Desktop/project/Glowxel/esp32-firmware/src/main.cpp)。
 
-固件入口：`esp32-firmware/src/main.cpp`。
+### 配网方式
 
-### WiFi 模式
+- 已保存 WiFi 时走 STA 模式
+- 未保存 WiFi 时进入 BLE 配网模式
+- BLE 设备名：`RenLight-Setup`
+- 小程序配网页面：`uniapp/pages/ble-config/ble-config.vue`
+- 小程序仍保留 `GET /clear-wifi` 作为“重置网络并重启”的设备复位入口
 
-- **优先 STA 模式**：若曾保存 WiFi（`Preferences` 命名空间 `"wifi"`），则尝试连接并通过 NTP 同步时间。
-- **否则 AP 配网模式**：
-  - **热点名（SSID）**：`RenLight-Setup`
-  - **热点密码**：`12345678`
-  - **配置页**：连接热点后访问 `http://192.168.4.1/`
-  - **DNS 劫持**：固件会启动 DNS 服务将任意域名解析到配网页（便于手机系统弹出“需要登录”式页面）。
+### 设备模式
 
-### 显示模式
+当前模式为：
 
-固件有两个模式（WebSocket 可切换）：
+- `clock`
+- `animation`
+- `canvas`
+- `transferring`
 
-- **clock**：闹钟模式（默认）；支持时间/日期/星期的布局与颜色配置，支持背景像素图
-- **canvas**：画板模式；接收并绘制像素（并在内存中维护 64×64 缓冲）
+### HTTP / WebSocket
 
----
-
-## 与 ESP32 通信（HTTP + WebSocket）
-
-### HTTP（端口 80）
-
-固件提供了一组 HTTP 路由（用于健康检查、状态查询、配网、简单控制）：
-
-- `GET /status`：JSON 状态（ip、width/height、brightness、heap、uptime 等）
-- `GET /test`：简单测试字符串
-- `GET /`：配网页面（AP 模式下用于填 SSID/Password）
-- `POST /save`：保存 WiFi 并重启
-- `GET /clear-wifi`：清除已保存 WiFi
-- 其他：清屏/亮度/文字等（详见 `src/main.cpp` 的 `setupServer()`）
-
-### WebSocket（路径 `/ws`）
-
-连接地址：
-
-- `ws://<设备IP>/ws`
-
-连接后，固件会发送一条文本消息，包含当前模式：
-
-- `{"status":"connected","device":"RenLight","mode":"clock|canvas"}`
-
-#### 1) JSON 命令（文本帧）
-
-常用命令形态：
+- HTTP 基础接口：`/status`、`/test`、`/upload`、`/brightness`、`/text`、`/clear-wifi`
+- WebSocket 路径：`ws://<设备IP>/ws`
+- 连接后返回当前模式，例如：
 
 ```json
-{ "cmd": "status" }
+{ "status": "connected", "device": "RenLight", "mode": "clock" }
 ```
 
-固件支持的命令（以 `src/main.cpp` 为准，下面列出最核心的）：
+## 文档说明
 
-- `ping`：心跳
-- `status`：查询设备状态（包含当前 mode）
-- `set_mode`：切换模式
-  - `{"cmd":"set_mode","mode":"clock"}` 或 `{"cmd":"set_mode","mode":"canvas"}`
-- `set_clock_config`：设置闹钟布局（并持久化到 Flash）
-- `clear`：清屏（canvas 模式还会清空画布缓冲）
-- `brightness`：设置亮度（0-255）
-- `text`：显示文字
-- `pixel`：设置单个像素
-- `image` / `image_sparse` / `image_chunk`：图片/像素绘制的几种格式（历史兼容与不同传输策略）
+当前建议优先看这些文档：
 
-#### 2) 二进制像素流（Binary 帧，高效）
+- [当前仓库状态与收口说明](/Users/aflylong/Desktop/project/Glowxel/docs/当前仓库状态与收口说明.md)
+- [开发环境说明](/Users/aflylong/Desktop/project/Glowxel/esp32-firmware/开发环境说明.md)
+- [部署文档](/Users/aflylong/Desktop/project/Glowxel/DEPLOY.md)
 
-固件支持在 WebSocket 上接收二进制像素数据，格式：
-
-- **每个像素 5 字节**：`x, y, r, g, b`
-- `x/y/r/g/b` 均为 `uint8`（0-255）
-- 一帧可携带多个像素，固件按 5 字节步进解析
-
-uni-app 侧的实现参考：
-
-- `uniapp/utils/webSocket.js` 的 `showImage()` / `sendPartialUpdate()`
-- `uniapp/pages/control/control.vue` 中的“发送像素并等待确认”逻辑
-
-固件确认机制（闹钟模式背景图场景）：
-
-- 若接收像素后超过约 500ms 没再继续接收，会将像素数据保存到 `Preferences`，并广播：
-  - `{"status":"ok","message":"pixels_received","count":<实际接收像素数>}`
-
----
-
-## 本地 LED 模拟器（可选）
-
-在 `esp32-firmware/` 下有一个本地模拟器页面：
-
-- `led-simulator.html`
-- `simulator-script.js`
-- `simulator-style.css`
-
-主要用途：
-
-- 在电脑上模拟 64×64 LED 面板，做闹钟布局/图片预览的交互验证（不依赖真实硬件）。
-
----
-
-## 备忘：常见开发关注点
-
-- **像素画布数据结构**：在整体设计文档中倾向稀疏存储（例如 `Map<"x,y", "#rrggbb">`），以优化大画布性能。
-- **小程序 Canvas 2D 差异**：需要关注 DPR、canvas 原生尺寸与逻辑尺寸对齐等问题（见根目录`项目说明.md`“当前问题”）。
-- **ESP32 写 Flash 频率**：闹钟配置/像素持久化使用 `Preferences`；频繁写入会影响 Flash 寿命，建议在上层做节流/批量提交。
+`docs/` 下其余审计文档保留为历史过程记录，可能与当前代码不完全同步。

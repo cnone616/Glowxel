@@ -1,6 +1,6 @@
 const router = require('express').Router();
 const db = require('../config/db');
-const { auth } = require('../middleware/auth');
+const { auth, optionalAuth } = require('../middleware/auth');
 
 // 挑战列表
 router.get('/list', async (req, res) => {
@@ -15,7 +15,10 @@ router.get('/list', async (req, res) => {
     sql += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
     params.push(limit, offset);
     const [list] = await db.query(sql, params);
-    const [[{ total }]] = await db.query('SELECT COUNT(*) as total FROM challenges');
+    let countSql = 'SELECT COUNT(*) as total FROM challenges WHERE 1=1';
+    const countParams = [];
+    if (status) { countSql += ' AND status = ?'; countParams.push(status); }
+    const [[{ total }]] = await db.query(countSql, countParams);
     res.json({ code: 0, data: { list, total } });
   } catch (err) { res.json({ code: 500, message: '获取失败' }); }
 });
@@ -34,9 +37,14 @@ router.get('/popular', async (req, res) => {
 // 参加挑战
 router.post('/:id/join', auth, async (req, res) => {
   try {
-    await db.query('INSERT IGNORE INTO challenge_participants (challenge_id, user_id) VALUES (?, ?)', [req.params.id, req.user.id]);
-    await db.query('UPDATE challenges SET participants = participants + 1 WHERE id = ?', [req.params.id]);
-    res.json({ code: 0, data: { success: true } });
+    const [result] = await db.query(
+      'INSERT IGNORE INTO challenge_participants (challenge_id, user_id) VALUES (?, ?)',
+      [req.params.id, req.user.id]
+    );
+    if (result.affectedRows > 0) {
+      await db.query('UPDATE challenges SET participants = participants + 1 WHERE id = ?', [req.params.id]);
+    }
+    res.json({ code: 0, data: { success: true, joined: true, changed: result.affectedRows > 0 } });
   } catch (err) { res.json({ code: 500, message: '操作失败' }); }
 });
 
@@ -44,10 +52,30 @@ router.post('/:id/join', auth, async (req, res) => {
 router.post('/:id/submit', auth, async (req, res) => {
   try {
     const { artworkId } = req.body;
-    await db.query('UPDATE challenge_participants SET artwork_id = ?, submitted_at = NOW() WHERE challenge_id = ? AND user_id = ?',
-      [artworkId, req.params.id, req.user.id]);
-    await db.query('UPDATE challenges SET submissions = submissions + 1 WHERE id = ?', [req.params.id]);
-    res.json({ code: 0, data: { success: true } });
+    if (!artworkId) return res.json({ code: 400, message: '缺少作品 ID' });
+
+    const [[participant]] = await db.query(
+      'SELECT artwork_id FROM challenge_participants WHERE challenge_id = ? AND user_id = ?',
+      [req.params.id, req.user.id]
+    );
+    if (!participant) return res.json({ code: 400, message: '请先参与挑战' });
+
+    const [[artwork]] = await db.query(
+      'SELECT id FROM artworks WHERE id = ? AND user_id = ? AND status = "published"',
+      [artworkId, req.user.id]
+    );
+    if (!artwork) return res.json({ code: 400, message: '作品不存在或无权提交' });
+
+    await db.query(
+      'UPDATE challenge_participants SET artwork_id = ?, submitted_at = NOW() WHERE challenge_id = ? AND user_id = ?',
+      [artworkId, req.params.id, req.user.id]
+    );
+
+    if (!participant.artwork_id) {
+      await db.query('UPDATE challenges SET submissions = submissions + 1 WHERE id = ?', [req.params.id]);
+    }
+
+    res.json({ code: 0, data: { success: true, artworkId } });
   } catch (err) { res.json({ code: 500, message: '提交失败' }); }
 });
 
@@ -71,11 +99,20 @@ router.get('/:id/submissions', async (req, res) => {
 });
 
 // 挑战详情 (/:id 必须在所有静态路由之后)
-router.get('/:id', async (req, res) => {
+router.get('/:id', optionalAuth, async (req, res) => {
   try {
     const [rows] = await db.query('SELECT * FROM challenges WHERE id = ?', [req.params.id]);
     if (rows.length === 0) return res.json({ code: 404, message: '挑战不存在' });
-    res.json({ code: 0, data: { challenge: rows[0] } });
+    const challenge = rows[0];
+    if (req.user) {
+      const [[participant]] = await db.query(
+        'SELECT artwork_id FROM challenge_participants WHERE challenge_id = ? AND user_id = ?',
+        [req.params.id, req.user.id]
+      );
+      challenge.joined = !!participant;
+      challenge.submitted_artwork_id = participant?.artwork_id || null;
+    }
+    res.json({ code: 0, data: { challenge } });
   } catch (err) { res.json({ code: 500, message: '获取失败' }); }
 });
 

@@ -249,7 +249,7 @@ CREATE TABLE IF NOT EXISTS user_devices (
 CREATE TABLE IF NOT EXISTS firmware_versions (
   id            BIGINT PRIMARY KEY AUTO_INCREMENT,
   version       VARCHAR(20) NOT NULL UNIQUE,
-  device_type   VARCHAR(30) DEFAULT 'glowxel-64',
+  device_type   VARCHAR(30) DEFAULT 'renlight-64',
   file_url      VARCHAR(500) NOT NULL,
   file_size     INT DEFAULT 0,
   md5_hash      VARCHAR(32),

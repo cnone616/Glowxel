@@ -36,7 +36,7 @@
               <text class="user-name">{{ userInfo.name }}</text>
               <text class="user-bio">{{ userInfo.bio || '这个人很懒，什么都没留下' }}</text>
               <view class="user-meta">
-                <text class="join-time">{{ formatJoinTime(userInfo.joinTime) }}加入</text>
+                <text class="join-time">{{ formatJoinTime(userInfo.created_at) }}加入</text>
               </view>
             </view>
           </view>
@@ -44,19 +44,19 @@
           <!-- 统计数据 -->
           <view class="user-stats">
             <view class="stat-item" @click="goToUserWorks">
-              <text class="stat-number">{{ userInfo.worksCount || 0 }}</text>
+              <text class="stat-number">{{ userInfo.works_count || 0 }}</text>
               <text class="stat-label">作品</text>
             </view>
             <view class="stat-item" @click="goToFollowers">
-              <text class="stat-number">{{ userInfo.followersCount || 0 }}</text>
+              <text class="stat-number">{{ userInfo.followers_count || 0 }}</text>
               <text class="stat-label">粉丝</text>
             </view>
             <view class="stat-item" @click="goToFollowing">
-              <text class="stat-number">{{ userInfo.followingCount || 0 }}</text>
+              <text class="stat-number">{{ userInfo.following_count || 0 }}</text>
               <text class="stat-label">关注</text>
             </view>
             <view class="stat-item">
-              <text class="stat-number">{{ userInfo.totalLikes || 0 }}</text>
+              <text class="stat-number">{{ userInfo.total_likes || 0 }}</text>
               <text class="stat-label">获赞</text>
             </view>
           </view>
@@ -66,12 +66,12 @@
             <view 
               v-if="!isCurrentUser"
               class="follow-btn"
-              :class="{ 'following': userInfo.isFollowing }"
+              :class="{ 'following': isFollowing }"
               @click="toggleFollow"
             >
-              <Icon :name="userInfo.isFollowing ? 'user-filling' : 'user'" :size="32" :color="userInfo.isFollowing ? '#FFFFFF' : '#4F7FFF'" />
+              <Icon :name="isFollowing ? 'user-filling' : 'user'" :size="32" :color="isFollowing ? '#FFFFFF' : '#4F7FFF'" />
               <text class="follow-text">
-                {{ userInfo.isFollowing ? '已关注' : '关注' }}
+                {{ isFollowing ? '已关注' : '关注' }}
               </text>
             </view>
             
@@ -160,7 +160,7 @@
 </template>
 
 <script>
-import { userAPI, artworkAPI, followAPI } from '../../api/index.js'
+import { userAPI, followAPI } from '../../api/index.js'
 import statusBarMixin from '../../mixins/statusBar.js'
 import Icon from '../../components/Icon.vue'
 import Avatar from '../../components/Avatar.vue'
@@ -182,14 +182,14 @@ export default {
       userInfo: {},
       userWorks: [],
       isCurrentUser: false,
+      isFollowing: false,
       
       // 分类相关
       activeCategory: 'all',
       categories: [
         { key: 'all', name: '全部', count: 0 },
         { key: 'latest', name: '最新', count: 0 },
-        { key: 'popular', name: '最热', count: 0 },
-        { key: 'collected', name: '收藏', count: 0 }
+        { key: 'popular', name: '最热', count: 0 }
       ],
       
       // 数据相关
@@ -210,12 +210,9 @@ export default {
       
       switch (this.activeCategory) {
         case 'latest':
-          return this.userWorks.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+          return [...this.userWorks].sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
         case 'popular':
-          return this.userWorks.sort((a, b) => (b.likes || 0) - (a.likes || 0))
-        case 'collected':
-          // TODO: 获取用户收藏的作品
-          return []
+          return [...this.userWorks].sort((a, b) => b.likes - a.likes)
         default:
           return this.userWorks
       }
@@ -236,13 +233,20 @@ export default {
         
         // 获取用户详情
         const uRes = await userAPI.getUserById(this.userId)
-        if (uRes.success) this.userInfo = uRes.data
+        if (uRes.success && uRes.data && uRes.data.user) {
+          this.userInfo = uRes.data.user
+        }
         
         // 检查是否是当前用户
         const pRes = await userAPI.getProfile()
-        const currentUser = pRes.success ? pRes.data : null
-        this.isCurrentUser = currentUser && currentUser.id == this.userId
-        
+        if (pRes.success && pRes.data && pRes.data.user) {
+          this.isCurrentUser = pRes.data.user.id == this.userId
+          await this.loadFollowState(pRes.data.user.id)
+        } else {
+          this.isCurrentUser = false
+          this.isFollowing = false
+        }
+
         // 获取用户作品
         await this.loadUserWorks()
         
@@ -269,8 +273,8 @@ export default {
         }
         
         // 获取用户作品列表
-        const wRes = await artworkAPI.getArtworks({ page: this.currentPage, limit: this.pageSize })
-        const works = wRes.success ? (wRes.data?.list || []) : []
+        const wRes = await userAPI.getUserArtworks(this.userId, this.currentPage, this.pageSize)
+        const works = wRes.success && wRes.data ? wRes.data.list : []
         
         if (reset) {
           this.userWorks = works
@@ -288,20 +292,32 @@ export default {
     },
     
     updateCategoryCounts() {
-      this.categories = this.categories.map(category => {
-        switch (category.key) {
+        this.categories = this.categories.map(category => {
+          switch (category.key) {
           case 'all':
             return { ...category, count: this.userWorks.length }
           case 'latest':
             return { ...category, count: this.userWorks.length }
           case 'popular':
-            return { ...category, count: this.userWorks.filter(w => (w.likes || 0) > 50).length }
-          case 'collected':
-            return { ...category, count: 0 } // TODO: 实际收藏数
+            return { ...category, count: this.userWorks.filter(w => w.likes > 0).length }
           default:
             return category
         }
       })
+    },
+
+    async loadFollowState(currentUserId) {
+      if (!currentUserId) {
+        this.isFollowing = false
+        return
+      }
+
+      const res = await followAPI.getFollowing(currentUserId, 1, 100)
+      if (res.success && res.data && res.data.list) {
+        this.isFollowing = res.data.list.some((user) => user.id == this.userId)
+      } else {
+        this.isFollowing = false
+      }
     },
     
     async handleRefresh() {
@@ -345,21 +361,20 @@ export default {
       if (this.isCurrentUser) return
       
       try {
-        const isFollowing = !this.userInfo.isFollowing
-        
-        // 调用关注API
-        if (isFollowing) {
-          await followAPI.followUser(this.userId)
-          this.userInfo.followersCount = (this.userInfo.followersCount || 0) + 1
+        const res = await followAPI.toggleFollow(this.userId)
+        if (!(res.success && res.data)) {
+          throw new Error('follow failed')
+        }
+
+        this.isFollowing = res.data.followed
+        if (res.data.followed) {
+          this.userInfo.followers_count += 1
         } else {
-          await followAPI.unfollowUser(this.userId)
-          this.userInfo.followersCount = Math.max(0, (this.userInfo.followersCount || 0) - 1)
+          this.userInfo.followers_count -= 1
         }
         
-        this.userInfo.isFollowing = isFollowing
-        
         uni.showToast({
-          title: isFollowing ? '关注成功' : '取消关注',
+          title: res.data.followed ? '关注成功' : '取消关注',
           icon: 'success'
         })
       } catch (error) {
@@ -372,9 +387,10 @@ export default {
     },
     
     sendMessage() {
-      uni.showToast({
-        title: '私信功能开发中',
-        icon: 'none'
+      uni.showModal({
+        title: '私信说明',
+        content: '当前版本暂未开放站内私信，你可以先通过分享主页或关注对方保持联系。',
+        showCancel: false
       })
     },
     
@@ -391,17 +407,29 @@ export default {
     
     reportUser() {
       this.showMoreModal = false
-      uni.showToast({
-        title: '举报功能开发中',
-        icon: 'none'
+      uni.setClipboardData({
+        data: `举报用户：${this.userInfo.name}（ID: ${this.userInfo.id}）`,
+        success: () => {
+          uni.showToast({
+            title: '举报信息已复制',
+            icon: 'success'
+          })
+        },
+        fail: () => {
+          uni.showToast({
+            title: '复制失败',
+            icon: 'error'
+          })
+        }
       })
     },
     
     blockUser() {
       this.showMoreModal = false
-      uni.showToast({
-        title: '拉黑功能开发中',
-        icon: 'none'
+      uni.showModal({
+        title: '拉黑说明',
+        content: '当前版本暂未提供拉黑能力，如遇恶意内容，可先复制举报信息并联系平台处理。',
+        showCancel: false
       })
     },
     
@@ -445,8 +473,7 @@ export default {
       const titleMap = {
         all: '暂无作品',
         latest: '暂无最新作品',
-        popular: '暂无热门作品',
-        collected: '暂无收藏'
+        popular: '暂无热门作品'
       }
       return titleMap[this.activeCategory] || '暂无内容'
     },
@@ -455,8 +482,7 @@ export default {
       const subtitleMap = {
         all: '快来发布第一个作品吧！',
         latest: '还没有最新作品',
-        popular: '还没有热门作品',
-        collected: '还没有收藏任何作品'
+        popular: '还没有热门作品'
       }
       return subtitleMap[this.activeCategory] || '敬请期待！'
     },

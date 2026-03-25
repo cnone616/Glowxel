@@ -840,13 +840,13 @@ export default {
       try {
         // 先获取云端项目
         const cloudRes = await getCloudProjects();
-        if (cloudRes.success) {
-          const cloudProject = cloudRes.data.find(
+        if (cloudRes.success && cloudRes.data) {
+          const cloudProject = cloudRes.data.list.find(
             (p) => p.id === this.project.id,
           );
-          if (cloudProject && cloudProject._id) {
+          if (cloudProject) {
             // 删除云端项目
-            await deleteCloudProject(cloudProject._id);
+            await deleteCloudProject(cloudProject.id);
           }
         }
 

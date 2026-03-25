@@ -20,6 +20,19 @@ public:
   static void drawBackground();       // 独立：清屏+画像素背景或Logo
   static void displayClock(bool force = false);
   static void drawClockOverlay();  // 不清屏，只叠加时钟文字
+  static void drawPixels(const PixelData* pixels, int pixelCount, bool clearFirst = false);
+  static void renderCanvas();
+  static void clearCanvas();
+  static void highlightCanvasColor(int r, int g, int b);
+  static void highlightCanvasRow(int row);
+  static void renderAnimationFrame(const PixelData* pixels, int pixelCount, bool clearFirst);
+  static void renderAnimationTransition(
+    const PixelData* fromPixels,
+    int fromPixelCount,
+    const PixelData* toPixels,
+    int toPixelCount,
+    uint8_t mix
+  );
   static void drawLogo(int x, int y);  // 画九宫格 logo 到指定坐标
   static void displayImage(uint8_t* data, size_t len, int width, int height);
   static void clearScreen();
@@ -41,9 +54,10 @@ public:
   
   // 画板模式相关
   static uint8_t canvasBuffer[64][64][3]; // [y][x][rgb]
+  static uint16_t backgroundBuffer[64][64]; // 静态背景缓存，用于时钟脏区恢复
   static bool canvasInitialized;
-  static bool isCanvasMode;
-  static bool receivingPixels;  // true=纯画板（不画时钟），false=静态时钟
+  static bool backgroundValid;
+  static bool receivingPixels;  // 正在接收背景像素，暂不刷新时钟
   
   // 黑色像素坐标存储
   struct BlackPixel {

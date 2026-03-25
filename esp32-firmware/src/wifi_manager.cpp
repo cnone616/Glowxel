@@ -89,13 +89,9 @@ static void drawStatusBadge(int cx, int cy, bool success) {
   }
 }
 
-// 静态成员初始化
-const char* WiFiManager::ap_ssid = "RenLight-Setup";
-const char* WiFiManager::ap_password = "12345678";
 bool WiFiManager::config_mode = false;
 String WiFiManager::saved_ssid = "";
 String WiFiManager::saved_password = "";
-DNSServer WiFiManager::dnsServer;
 
 void WiFiManager::init() {
   Serial.println("3. 连接WiFi...");
@@ -198,9 +194,5 @@ bool WiFiManager::isConfigMode() {
 }
 
 String WiFiManager::getDeviceIP() {
-  if (config_mode) {
-    return WiFi.softAPIP().toString();
-  } else {
-    return WiFi.localIP().toString();
-  }
+  return WiFi.localIP().toString();
 }

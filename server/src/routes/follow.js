@@ -1,20 +1,13 @@
 const router = require('express').Router();
-const db = require('../config/db');
-const { auth } = require('../middleware/auth');
+const { auth, optionalAuth } = require('../middleware/auth');
+const socialService = require('../services/socialService');
 
 // 关注用户
 router.post('/:userId', auth, async (req, res) => {
   try {
     const targetId = parseInt(req.params.userId);
-    if (targetId === req.user.id) return res.json({ code: 400, message: '不能关注自己' });
-    await db.query('INSERT IGNORE INTO follows (follower_id, following_id) VALUES (?, ?)', [req.user.id, targetId]);
-    await db.query('UPDATE users SET following_count = following_count + 1 WHERE id = ?', [req.user.id]);
-    await db.query('UPDATE users SET followers_count = followers_count + 1 WHERE id = ?', [targetId]);
-    // 写入通知
-    await db.query(
-      'INSERT INTO notifications (user_id, actor_id, type) VALUES (?,?,?)',
-      [targetId, req.user.id, 'follow']
-    );
+    const data = await socialService.followUser(req.user.id, targetId);
+    if (data.invalidSelf) return res.json({ code: 400, message: '不能关注自己' });
     res.json({ code: 0, data: { success: true } });
   } catch (err) {
     res.json({ code: 500, message: '操作失败' });
@@ -25,11 +18,7 @@ router.post('/:userId', auth, async (req, res) => {
 router.delete('/:userId', auth, async (req, res) => {
   try {
     const targetId = parseInt(req.params.userId);
-    const [result] = await db.query('DELETE FROM follows WHERE follower_id = ? AND following_id = ?', [req.user.id, targetId]);
-    if (result.affectedRows > 0) {
-      await db.query('UPDATE users SET following_count = GREATEST(following_count - 1, 0) WHERE id = ?', [req.user.id]);
-      await db.query('UPDATE users SET followers_count = GREATEST(followers_count - 1, 0) WHERE id = ?', [targetId]);
-    }
+    await socialService.unfollowUser(req.user.id, targetId);
     res.json({ code: 0, data: { success: true } });
   } catch (err) {
     res.json({ code: 500, message: '操作失败' });
@@ -41,15 +30,8 @@ router.get('/following', auth, async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 20;
-    const offset = (page - 1) * limit;
-    const [list] = await db.query(
-      `SELECT u.id, u.name, u.avatar, u.bio, u.works_count, u.followers_count
-       FROM follows f JOIN users u ON f.following_id = u.id
-       WHERE f.follower_id = ? ORDER BY f.created_at DESC LIMIT ? OFFSET ?`,
-      [req.user.id, limit, offset]
-    );
-    const [[{ total }]] = await db.query('SELECT COUNT(*) as total FROM follows WHERE follower_id = ?', [req.user.id]);
-    res.json({ code: 0, data: { list, total } });
+    const data = await socialService.listFollowers(req.user.id, page, limit, 'following', true, req.user.id);
+    res.json({ code: 0, data });
   } catch (err) {
     res.json({ code: 500, message: '获取失败' });
   }
@@ -60,51 +42,32 @@ router.get('/followers', auth, async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 20;
-    const offset = (page - 1) * limit;
-    const [list] = await db.query(
-      `SELECT u.id, u.name, u.avatar, u.bio, u.works_count, u.followers_count
-       FROM follows f JOIN users u ON f.follower_id = u.id
-       WHERE f.following_id = ? ORDER BY f.created_at DESC LIMIT ? OFFSET ?`,
-      [req.user.id, limit, offset]
-    );
-    const [[{ total }]] = await db.query('SELECT COUNT(*) as total FROM follows WHERE following_id = ?', [req.user.id]);
-    res.json({ code: 0, data: { list, total } });
+    const data = await socialService.listFollowers(req.user.id, page, limit, 'followers', true, req.user.id);
+    res.json({ code: 0, data });
   } catch (err) {
     res.json({ code: 500, message: '获取失败' });
   }
 });
 
 // 他人关注列表
-router.get('/:userId/following', async (req, res) => {
+router.get('/:userId/following', optionalAuth, async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 20;
-    const offset = (page - 1) * limit;
-    const [list] = await db.query(
-      `SELECT u.id, u.name, u.avatar, u.bio FROM follows f JOIN users u ON f.following_id = u.id
-       WHERE f.follower_id = ? ORDER BY f.created_at DESC LIMIT ? OFFSET ?`,
-      [req.params.userId, limit, offset]
-    );
-    const [[{ total }]] = await db.query('SELECT COUNT(*) as total FROM follows WHERE follower_id = ?', [req.params.userId]);
-    res.json({ code: 0, data: { list, total } });
+    const data = await socialService.listFollowers(req.params.userId, page, limit, 'following', false, req.user?.id || null);
+    res.json({ code: 0, data });
   } catch (err) {
     res.json({ code: 500, message: '获取失败' });
   }
 });
 
 // 他人粉丝列表
-router.get('/:userId/followers', async (req, res) => {
+router.get('/:userId/followers', optionalAuth, async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 20;
-    const offset = (page - 1) * limit;
-    const [list] = await db.query(
-      `SELECT u.id, u.name, u.avatar, u.bio FROM follows f JOIN users u ON f.follower_id = u.id
-       WHERE f.following_id = ? ORDER BY f.created_at DESC LIMIT ? OFFSET ?`,
-      [req.params.userId, limit, offset]
-    );
-    const [[{ total }]] = await db.query('SELECT COUNT(*) as total FROM follows WHERE following_id = ?', [req.params.userId]);
-    res.json({ code: 0, data: { list, total } });
+    const data = await socialService.listFollowers(req.params.userId, page, limit, 'followers', false, req.user?.id || null);
+    res.json({ code: 0, data });
   } catch (err) {
     res.json({ code: 500, message: '获取失败' });
   }
@@ -114,20 +77,9 @@ router.get('/:userId/followers', async (req, res) => {
 router.post('/:userId/toggle', auth, async (req, res) => {
   try {
     const targetId = parseInt(req.params.userId);
-    if (targetId === req.user.id) return res.json({ code: 400, message: '不能关注自己' });
-    const [rows] = await db.query('SELECT 1 FROM follows WHERE follower_id = ? AND following_id = ?', [req.user.id, targetId]);
-    if (rows.length > 0) {
-      await db.query('DELETE FROM follows WHERE follower_id = ? AND following_id = ?', [req.user.id, targetId]);
-      await db.query('UPDATE users SET following_count = GREATEST(following_count-1,0) WHERE id = ?', [req.user.id]);
-      await db.query('UPDATE users SET followers_count = GREATEST(followers_count-1,0) WHERE id = ?', [targetId]);
-      res.json({ code: 0, data: { followed: false } });
-    } else {
-      await db.query('INSERT IGNORE INTO follows (follower_id, following_id) VALUES (?, ?)', [req.user.id, targetId]);
-      await db.query('UPDATE users SET following_count = following_count+1 WHERE id = ?', [req.user.id]);
-      await db.query('UPDATE users SET followers_count = followers_count+1 WHERE id = ?', [targetId]);
-      await db.query('INSERT INTO notifications (user_id, actor_id, type) VALUES (?,?,?)', [targetId, req.user.id, 'follow']);
-      res.json({ code: 0, data: { followed: true } });
-    }
+    const data = await socialService.toggleFollow(req.user.id, targetId);
+    if (data.invalidSelf) return res.json({ code: 400, message: '不能关注自己' });
+    res.json({ code: 0, data: { followed: data.followed } });
   } catch (err) { res.json({ code: 500, message: '操作失败' }); }
 });
 

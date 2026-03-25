@@ -16,8 +16,8 @@
             <span>{{ challenge.submissions || 0 }} 件作品</span>
             <span v-if="challenge.prize">奖励：{{ challenge.prize }}</span>
           </div>
-          <button class="btn-join" v-if="challenge.status === 'active'" :disabled="joined" @click="handleJoin">
-            {{ joined ? '已参与' : '参与挑战' }}
+          <button class="btn-join" v-if="challenge.status === 'active'" @click="handleJoin">
+            {{ joined ? '开始创作' : '参与并创作' }}
           </button>
         </div>
 
@@ -39,7 +39,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { challengeAPI } from '@/api/index.js'
 
@@ -55,19 +55,38 @@ function statusText(s) {
 
 async function handleJoin() {
   if (!localStorage.getItem('auth_token')) { router.push('/login'); return }
+  if (joined.value) {
+    router.push(`/editor?challengeId=${challenge.value.id}`)
+    return
+  }
   const res = await challengeAPI.join(challenge.value.id)
-  if (res.success) { joined.value = true; challenge.value.participants = (challenge.value.participants || 0) + 1 }
+  if (res.success) {
+    joined.value = true
+    if (res.data?.changed) {
+      challenge.value.participants = (challenge.value.participants || 0) + 1
+    }
+    router.push(`/editor?challengeId=${challenge.value.id}`)
+  }
 }
 
-onMounted(async () => {
+async function loadChallenge() {
   const id = route.params.id
+  challenge.value = {}
+  submissions.value = []
+  joined.value = false
   const [res, subRes] = await Promise.allSettled([
     challengeAPI.getDetail(id),
     challengeAPI.getSubmissions(id, { page: 1, limit: 20 })
   ])
-  if (res.value?.success) challenge.value = res.value.data?.challenge || res.value.data || {}
+  if (res.value?.success) {
+    challenge.value = res.value.data?.challenge || res.value.data || {}
+    joined.value = !!challenge.value.joined
+  }
   if (subRes.value?.success) submissions.value = subRes.value.data?.list || []
-})
+}
+
+onMounted(loadChallenge)
+watch(() => route.params.id, loadChallenge)
 </script>
 
 <style scoped>
@@ -100,4 +119,3 @@ onMounted(async () => {
 .loading { text-align: center; padding: 80px 0; color: #999; }
 @media (max-width: 768px) { .artwork-grid { grid-template-columns: repeat(2, 1fr); } }
 </style>
-

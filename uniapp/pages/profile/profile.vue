@@ -247,15 +247,21 @@ export default {
 
     // 跳转到粉丝页面
     goToFollowers() {
+      if (!(this.userStore.currentUser && this.userStore.currentUser.id)) {
+        return
+      }
       uni.navigateTo({
-        url: '/pages/followers/followers'
+        url: `/pages/user-list/user-list?type=followers&userId=${this.userStore.currentUser.id}`
       })
     },
 
     // 跳转到关注页面
     goToFollowing() {
+      if (!(this.userStore.currentUser && this.userStore.currentUser.id)) {
+        return
+      }
       uni.navigateTo({
-        url: '/pages/following/following'
+        url: `/pages/user-list/user-list?type=following&userId=${this.userStore.currentUser.id}`
       })
     },
 

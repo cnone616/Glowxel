@@ -424,6 +424,7 @@
 </template>
 
 <script>
+import { challengeAPI, templateAPI } from "../../api/index.js";
 import { useProjectStore } from "../../store/project.js";
 import { useToast } from "../../composables/useToast.js";
 import {
@@ -599,23 +600,15 @@ export default {
     }
     // 检查是否从模板创建
     else if (options && options.templateId) {
-      this.mode = "template";
+      this.mode = "blank";
       this.templateId = options.templateId;
-      // TODO: 加载模板数据
-      uni.showToast({
-        title: "正在加载模板...",
-        icon: "loading",
-      });
+      this.loadTemplateProject();
     }
     // 检查是否从挑战创建
     else if (options && options.challengeId) {
-      this.mode = "challenge";
+      this.mode = "blank";
       this.challengeId = options.challengeId;
-      // TODO: 加载挑战信息
-      uni.showToast({
-        title: "正在加载挑战...",
-        icon: "loading",
-      });
+      this.loadChallengeInfo();
     }
 
     // 注册自定义 Toast 实例
@@ -631,6 +624,137 @@ export default {
   },
 
   methods: {
+    attachChallengeToProject(projectId) {
+      if (!this.challengeId) {
+        return;
+      }
+      this.projectStore.updateProject(projectId, {
+        challengeId: this.challengeId,
+      });
+    },
+
+    getPaddedSize(value) {
+      return Math.ceil(value / 64) * 64;
+    },
+
+    parseTemplateSize(sizeText) {
+      const matched = /^(\d+)x(\d+)$/i.exec(sizeText);
+      if (!matched) {
+        throw new Error("invalid template size");
+      }
+      return {
+        width: Number(matched[1]),
+        height: Number(matched[2]),
+      };
+    },
+
+    buildPixelsMap(pixelObject) {
+      if (
+        !pixelObject ||
+        Array.isArray(pixelObject) ||
+        typeof pixelObject !== "object"
+      ) {
+        throw new Error("invalid template pixels");
+      }
+      return new Map(Object.entries(pixelObject));
+    },
+
+    buildPaletteCodes(pixels) {
+      const hexColors = [...new Set(Array.from(pixels.values()))];
+      return hexColors.map((hex) => {
+        const matchedColor = ARTKAL_COLORS_FULL.find(
+          (color) => color.hex.toUpperCase() === hex.toUpperCase(),
+        );
+        if (!matchedColor) {
+          throw new Error(`unknown artkal color: ${hex}`);
+        }
+        return matchedColor.code;
+      });
+    },
+
+    async loadTemplateProject() {
+      uni.showLoading({ title: "加载模板..." });
+
+      try {
+        const res = await templateAPI.getTemplateById(this.templateId);
+        if (!(res.success && res.data && res.data.template && res.data.pixels)) {
+          throw new Error("template load failed");
+        }
+
+        const template = res.data.template;
+        const size = this.parseTemplateSize(template.size);
+        const pixels = this.buildPixelsMap(res.data.pixels);
+        const palette = this.buildPaletteCodes(pixels);
+
+        this.name = template.name;
+        this.customWidth = size.width;
+        this.customHeight = size.height;
+        this.selectedColors = new Set(palette);
+        this.previewPixels = pixels;
+        this.previewUrl = template.image_url;
+
+        const paddedWidth = this.getPaddedSize(size.width);
+        const paddedHeight = this.getPaddedSize(size.height);
+        const projectId = this.projectStore.addProject(
+          template.name,
+          size.width,
+          size.height,
+          palette.length,
+          palette,
+          paddedWidth,
+          paddedHeight,
+          template.image_url,
+        );
+
+        if (!projectId) {
+          throw new Error("project create failed");
+        }
+
+        this.projectStore.saveProjectPixels(projectId, pixels);
+
+        try {
+          await templateAPI.useTemplate(this.templateId);
+        } catch (error) {
+          console.error("更新模板使用次数失败:", error);
+        }
+
+        uni.hideLoading();
+        this.toast.showSuccess("模板已载入");
+        uni.redirectTo({
+          url: `/pages/overview/overview?id=${projectId}`,
+        });
+      } catch (error) {
+        uni.hideLoading();
+        console.error("加载模板失败:", error);
+        this.toast.showError("模板加载失败");
+        setTimeout(() => {
+          uni.navigateBack();
+        }, 500);
+      }
+    },
+
+    async loadChallengeInfo() {
+      uni.showLoading({ title: "加载挑战..." });
+
+      try {
+        const res = await challengeAPI.getChallengeById(this.challengeId);
+        if (!(res.success && res.data && res.data.challenge)) {
+          throw new Error("challenge load failed");
+        }
+
+        this.name = res.data.challenge.title;
+        uni.hideLoading();
+        this.toast.showSuccess("已载入挑战");
+      } catch (error) {
+        uni.hideLoading();
+        console.error("加载挑战失败:", error);
+        this.toast.showError("挑战加载失败");
+        setTimeout(() => {
+          uni.navigateBack();
+        }, 500);
+      }
+    },
+
     resetForm() {
       this.name = "";
       this.customWidth = 64;
@@ -1536,12 +1660,13 @@ export default {
             const maxDimension = Math.max(this.paddedWidth, this.paddedHeight);
 
             // 根据项目大小选择倍数
+            let multiplier = 1;
             // #ifdef H5
-            const multiplier = maxDimension > 64 ? 3 : 2;
+            multiplier = maxDimension > 64 ? 3 : 2;
             // #endif
 
             // #ifdef MP-WEIXIN
-            const multiplier = maxDimension > 64 ? 1.5 : 1;
+            multiplier = maxDimension > 64 ? 1.5 : 1;
             // #endif
 
             let scale = Math.min(
@@ -1698,8 +1823,8 @@ export default {
             this.customHeight,
             palette.length,
             palette,
-            this.customWidth,
-            this.customHeight,
+            this.paddedWidth,
+            this.paddedHeight,
             thumbnailBase64,
           );
 
@@ -1714,6 +1839,7 @@ export default {
             this.projectStore.saveProjectPixels(projectId, this.previewPixels);
           }
 
+          this.attachChallengeToProject(projectId);
           this.toast.showSuccess("项目创建成功！");
           this.isProcessing = false;
 
@@ -1736,8 +1862,8 @@ export default {
             this.customHeight,
             palette.length,
             palette,
-            this.customWidth,
-            this.customHeight,
+            this.paddedWidth,
+            this.paddedHeight,
             null,
           );
 
@@ -1746,6 +1872,7 @@ export default {
             return;
           }
 
+          this.attachChallengeToProject(projectId);
           this.toast.showSuccess("项目创建成功！");
 
           // 返回 workspace 页面
