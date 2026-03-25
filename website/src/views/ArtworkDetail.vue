@@ -10,7 +10,7 @@
           <h1>{{ detail.title || '加载中...' }}</h1>
           <div class="author-row" v-if="detail.author_name">
             <span class="author-name" style="cursor:pointer" @click="$router.push(`/user/${detail.author_id}`)">{{ detail.author_name }}</span>
-            <button class="follow-btn" @click="handleFollow">{{ isFollowing ? '已关注' : '关注' }}</button>
+            <button v-if="String(detail.author_id) !== String(currentUserId)" class="follow-btn" @click="handleFollow">{{ isFollowing ? '已关注' : '关注' }}</button>
           </div>
           <p class="desc">{{ detail.description || '暂无描述' }}</p>
           <div class="actions">
@@ -31,7 +31,7 @@
             </div>
             <div class="comment-list">
               <div class="comment-item" v-for="c in comments" :key="c.id">
-                <span class="comment-author">{{ c.author }}</span>
+                <span class="comment-author">{{ c.user_name }}</span>
                 <span class="comment-text">{{ c.content }}</span>
               </div>
             </div>
@@ -43,7 +43,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { artworkAPI, likeAPI, collectAPI, commentAPI, followAPI } from '@/api/index.js'
 
@@ -54,22 +54,38 @@ const commentText = ref('')
 const isLiked = ref(false)
 const isCollected = ref(false)
 const isFollowing = ref(false)
+const currentUserId = JSON.parse(localStorage.getItem('user_info') || '{}').id
 
-onMounted(async () => {
+async function loadArtwork() {
   const id = route.params.id
+  detail.value = {}
+  comments.value = []
+  commentText.value = ''
+  isLiked.value = false
+  isCollected.value = false
+  isFollowing.value = false
   const [res, cRes, likedRes, collectedRes] = await Promise.allSettled([
     artworkAPI.getDetail(id),
     commentAPI.getList(id, { page: 1, limit: 20 }),
     likeAPI.check(id),
     collectAPI.check(id),
   ])
-  if (res.value?.success) detail.value = res.value.data?.artwork || res.value.data || {}
+  if (res.value?.success) {
+    detail.value = res.value.data?.artwork || res.value.data || {}
+    isFollowing.value = !!detail.value.isFollowing
+    isLiked.value = typeof detail.value.isLiked === 'boolean' ? detail.value.isLiked : isLiked.value
+    isCollected.value = typeof detail.value.isCollected === 'boolean' ? detail.value.isCollected : isCollected.value
+  }
   if (cRes.value?.success) comments.value = cRes.value.data?.list || []
   if (likedRes.value?.success) isLiked.value = likedRes.value.data === true
   if (collectedRes.value?.success) isCollected.value = collectedRes.value.data === true
-})
+}
+
+onMounted(loadArtwork)
+watch(() => route.params.id, loadArtwork)
 
 async function handleLike() {
+  if (!detail.value.id) return
   if (isLiked.value) {
     await likeAPI.unlike(route.params.id)
     detail.value.likes = Math.max(0, (detail.value.likes || 1) - 1)
@@ -81,6 +97,7 @@ async function handleLike() {
 }
 
 async function handleCollect() {
+  if (!detail.value.id) return
   if (isCollected.value) {
     await collectAPI.uncollect(route.params.id)
   } else {
@@ -90,15 +107,17 @@ async function handleCollect() {
 }
 
 async function handleFollow() {
+  if (!detail.value.author_id || String(detail.value.author_id) === String(currentUserId)) return
   const res = await followAPI.toggle(detail.value.author_id)
   if (res.success) isFollowing.value = res.data?.followed ?? !isFollowing.value
 }
 
 async function submitComment() {
+  if (!detail.value.id) return
   if (!commentText.value.trim()) return
   const res = await commentAPI.add(route.params.id, commentText.value.trim())
   if (res.success) {
-    comments.value.unshift({ id: Date.now(), author_name: '我', content: commentText.value })
+    comments.value.unshift(res.data?.comment || { id: Date.now(), user_name: '我', content: commentText.value.trim() })
     commentText.value = ''
   }
 }
@@ -135,4 +154,3 @@ async function submitComment() {
   .detail-layout { grid-template-columns: 1fr; }
 }
 </style>
-

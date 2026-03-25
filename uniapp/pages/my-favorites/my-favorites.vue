@@ -165,6 +165,7 @@
 </template>
 
 <script>
+import { collectionAPI } from "../../api/index.js";
 import { useToast } from "../../composables/useToast.js";
 import statusBarMixin from "../../mixins/statusBar.js";
 import Icon from "../../components/Icon.vue";
@@ -186,45 +187,8 @@ export default {
       categories: [
         { value: "all", label: "全部", icon: "grid", count: 0 },
         { value: "artwork", label: "作品", icon: "picture", count: 0 },
-        { value: "template", label: "模板", icon: "layout", count: 0 },
-        { value: "pattern", label: "图案", icon: "star", count: 0 },
       ],
-      favorites: [
-        // 模拟数据
-        {
-          id: "1",
-          type: "artwork",
-          title: "像素小猫",
-          author: "设计师A",
-          width: 32,
-          height: 32,
-          thumbnail: "",
-          favoriteTime: Date.now() - 86400000,
-          tags: ["可爱", "动物", "像素"],
-        },
-        {
-          id: "2",
-          type: "template",
-          title: "圣诞树模板",
-          author: "官方",
-          width: 64,
-          height: 64,
-          thumbnail: "",
-          favoriteTime: Date.now() - 172800000,
-          tags: ["节日", "圣诞", "模板"],
-        },
-        {
-          id: "3",
-          type: "pattern",
-          title: "几何图案",
-          author: "用户B",
-          width: 16,
-          height: 16,
-          thumbnail: "",
-          favoriteTime: Date.now() - 259200000,
-          tags: ["几何", "抽象"],
-        },
-      ],
+      favorites: [],
     };
   },
 
@@ -241,7 +205,7 @@ export default {
 
   onLoad() {
     this.toast = useToast();
-    this.updateCategoryCounts();
+    this.loadFavorites();
 
     this.$nextTick(() => {
       if (this.$refs.toastRef) {
@@ -250,7 +214,51 @@ export default {
     });
   },
 
+  onShow() {
+    this.loadFavorites();
+  },
+
   methods: {
+    async saveFavoriteImage(imageUrl, fileName) {
+      if (!imageUrl) {
+        throw new Error("image url missing");
+      }
+
+      // #ifdef H5
+      const link = document.createElement("a");
+      link.href = imageUrl;
+      link.download = `${fileName}-${Date.now()}.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      return;
+      // #endif
+
+      // #ifndef H5
+      const downloadRes = await new Promise((resolve, reject) => {
+        uni.downloadFile({
+          url: imageUrl,
+          success: (res) => {
+            if (res.statusCode === 200) {
+              resolve(res);
+              return;
+            }
+            reject(new Error("download failed"));
+          },
+          fail: reject,
+        });
+      });
+
+      await new Promise((resolve, reject) => {
+        uni.saveImageToPhotosAlbum({
+          filePath: downloadRes.tempFilePath,
+          success: resolve,
+          fail: reject,
+        });
+      });
+      // #endif
+    },
+
     handleBack() {
       uni.navigateBack();
     },
@@ -261,16 +269,35 @@ export default {
       });
     },
 
+    async loadFavorites() {
+      try {
+        const res = await collectionAPI.getMyCollections(1, 100);
+        if (res.success && res.data) {
+          this.favorites = res.data.list.map((item) => ({
+            id: item.id,
+            type: "artwork",
+            title: item.title,
+            author: item.author_name,
+            width: item.width,
+            height: item.height,
+            thumbnail: item.cover_url,
+            favoriteTime: item.created_at,
+            tags: [],
+          }));
+        } else {
+          this.favorites = [];
+        }
+        this.updateCategoryCounts();
+      } catch (error) {
+        console.error("加载收藏失败:", error);
+        this.toast.showError("加载收藏失败");
+      }
+    },
+
     updateCategoryCounts() {
       this.categories[0].count = this.favorites.length;
       this.categories[1].count = this.favorites.filter(
         (f) => f.type === "artwork",
-      ).length;
-      this.categories[2].count = this.favorites.filter(
-        (f) => f.type === "template",
-      ).length;
-      this.categories[3].count = this.favorites.filter(
-        (f) => f.type === "pattern",
       ).length;
     },
 
@@ -296,80 +323,83 @@ export default {
         return;
       }
 
-      // 根据类型跳转到不同页面
-      switch (item.type) {
-        case "artwork":
-          uni.navigateTo({
-            url: `/pages/artwork-detail/artwork-detail?id=${item.id}`,
-          });
-          break;
-        case "template":
-          // 跳转到模板详情或直接使用
-          this.useTemplate(item);
-          break;
-        case "pattern":
-          // 跳转到图案详情
-          this.toast.showInfo("图案详情功能开发中");
-          break;
-      }
-    },
-
-    useTemplate(template) {
-      uni.showModal({
-        title: "使用模板",
-        content: `确定要使用模板"${template.title}"创建新作品吗？`,
-        success: (res) => {
-          if (res.confirm) {
-            // 跳转到创建页面并传递模板信息
-            uni.navigateTo({
-              url: `/pages/create/create?template=${template.id}`,
-            });
-          }
-        },
+      uni.navigateTo({
+        url: `/pages/artwork-detail/artwork-detail?id=${item.id}`,
       });
     },
 
-    downloadFavorite(item) {
-      this.toast.showInfo("下载功能开发中");
+    async downloadFavorite(item) {
+      try {
+        await this.saveFavoriteImage(item.thumbnail, item.title);
+        this.toast.showSuccess("下载成功");
+      } catch (error) {
+        console.error("下载收藏失败:", error);
+        this.toast.showError("下载失败");
+      }
     },
 
-    removeFavorite(item) {
+    async removeFavorite(item) {
       uni.showModal({
         title: "移除收藏",
         content: `确定要移除"${item.title}"吗？`,
-        success: (res) => {
+        success: async (res) => {
           if (res.confirm) {
-            const index = this.favorites.findIndex((f) => f.id === item.id);
-            if (index > -1) {
-              this.favorites.splice(index, 1);
-              this.updateCategoryCounts();
+            try {
+              await collectionAPI.uncollectArtwork(item.id);
+              const index = this.favorites.findIndex((f) => f.id === item.id);
+              if (index > -1) {
+                this.favorites.splice(index, 1);
+                this.updateCategoryCounts();
+              }
               this.toast.showSuccess("已移除收藏");
+            } catch (error) {
+              console.error("移除收藏失败:", error);
+              this.toast.showError("移除失败");
             }
           }
         },
       });
     },
 
-    batchDownload() {
+    async batchDownload() {
       if (this.selectedItems.length === 0) return;
 
-      this.toast.showInfo(`批量下载 ${this.selectedItems.length} 项功能开发中`);
+      try {
+        const selectedFavorites = this.favorites.filter((item) =>
+          this.selectedItems.includes(item.id),
+        );
+        for (const item of selectedFavorites) {
+          await this.saveFavoriteImage(item.thumbnail, item.title);
+        }
+        this.toast.showSuccess("批量下载成功");
+      } catch (error) {
+        console.error("批量下载收藏失败:", error);
+        this.toast.showError("批量下载失败");
+      }
     },
 
-    batchRemove() {
+    async batchRemove() {
       if (this.selectedItems.length === 0) return;
 
       uni.showModal({
         title: "批量移除",
         content: `确定要移除选中的 ${this.selectedItems.length} 项收藏吗？`,
-        success: (res) => {
+        success: async (res) => {
           if (res.confirm) {
-            this.favorites = this.favorites.filter(
-              (f) => !this.selectedItems.includes(f.id),
-            );
-            this.selectedItems = [];
-            this.updateCategoryCounts();
-            this.toast.showSuccess("批量移除成功");
+            try {
+              await Promise.all(
+                this.selectedItems.map((id) => collectionAPI.uncollectArtwork(id)),
+              );
+              this.favorites = this.favorites.filter(
+                (f) => !this.selectedItems.includes(f.id),
+              );
+              this.selectedItems = [];
+              this.updateCategoryCounts();
+              this.toast.showSuccess("批量移除成功");
+            } catch (error) {
+              console.error("批量移除收藏失败:", error);
+              this.toast.showError("批量移除失败");
+            }
           }
         },
       });
@@ -378,8 +408,6 @@ export default {
     getTypeIcon(type) {
       const icons = {
         artwork: "picture",
-        template: "layout",
-        pattern: "star",
       };
       return icons[type] || "picture";
     },

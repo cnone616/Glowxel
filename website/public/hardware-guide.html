@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>RenLight 组装指南</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f6f7fb;
+        --card: #ffffff;
+        --text: #1f2937;
+        --muted: #6b7280;
+        --border: #e5e7eb;
+        --accent: #0f766e;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: "PingFang SC", "Noto Sans SC", sans-serif;
+        background: linear-gradient(180deg, #f7fafc 0%, #eef3f8 100%);
+        color: var(--text);
+      }
+
+      .wrap {
+        max-width: 880px;
+        margin: 0 auto;
+        padding: 48px 20px 72px;
+      }
+
+      .card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 20px;
+        padding: 32px;
+        box-shadow: 0 16px 50px rgba(15, 23, 42, 0.08);
+      }
+
+      h1 {
+        margin: 0 0 12px;
+        font-size: 34px;
+      }
+
+      p {
+        line-height: 1.7;
+      }
+
+      .muted {
+        color: var(--muted);
+      }
+
+      .section {
+        margin-top: 28px;
+      }
+
+      .section h2 {
+        margin: 0 0 10px;
+        font-size: 20px;
+      }
+
+      ul {
+        margin: 0;
+        padding-left: 20px;
+        color: var(--muted);
+        line-height: 1.8;
+      }
+
+      .cta {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        margin-top: 24px;
+        padding: 12px 18px;
+        border-radius: 999px;
+        background: var(--accent);
+        color: #fff;
+        text-decoration: none;
+        font-weight: 600;
+      }
+
+      .note {
+        margin-top: 14px;
+        font-size: 14px;
+        color: var(--muted);
+      }
+    </style>
+  </head>
+  <body>
+    <main class="wrap">
+      <section class="card">
+        <h1>RenLight 组装指南</h1>
+        <p class="muted">
+          RenLight 硬件套件包含 64×64 LED 矩阵、主控板、电源与外壳组件。开始装配前，请先确认配件完整，并准备好常用焊接与固定工具。
+        </p>
+
+        <div class="section">
+          <h2>装配前准备</h2>
+          <ul>
+            <li>确认 LED 面板、控制板、电源线、外壳结构件和固定件齐全。</li>
+            <li>准备十字螺丝刀、电烙铁、焊锡、绝缘胶带等基础工具。</li>
+            <li>接线前先断电，焊接后检查焊点和方向是否正确。</li>
+          </ul>
+        </div>
+
+        <div class="section">
+          <h2>推荐装配顺序</h2>
+          <ul>
+            <li>先固定主控板与 LED 面板，再完成电源与排线连接。</li>
+            <li>完成点亮测试后，再安装外壳、导光件和后盖。</li>
+            <li>首次启动后通过 RenLight 小程序完成配网和设备初始化。</li>
+          </ul>
+        </div>
+
+        <div class="section">
+          <h2>调试建议</h2>
+          <ul>
+            <li>若屏幕无显示，优先检查电源电压、排线方向与焊接完整性。</li>
+            <li>若网络异常，重新进入设备配网模式并确认当前 WiFi 为 2.4G。</li>
+            <li>同步作品前，先在平台中完成一次设备连接测试。</li>
+          </ul>
+        </div>
+
+        <a class="cta" href="/" target="_self">返回 RenLight 官网</a>
+        <div class="note">
+          如需完整硬件文件、外壳模型或 BOM，请在项目提供的硬件资料包中查看对应资源。
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

@@ -3,7 +3,7 @@
     <!-- 模板预览图 -->
     <view class="template-image-container">
       <image 
-        :src="template.image" 
+        :src="template.image_url" 
         class="template-image"
         mode="aspectFill"
         @error="handleImageError"
@@ -33,14 +33,14 @@
         
         <view class="detail-item">
           <Icon name="picture" :size="24" color="#666666" />
-          <text class="detail-text">{{ template.colorCount }}色</text>
+          <text class="detail-text">{{ template.color_count }}色</text>
         </view>
       </view>
       
       <!-- 使用统计 -->
       <view class="template-stats">
         <Icon name="user" :size="24" color="#4F7FFF" />
-        <text class="usage-count">{{ formatUsageCount(template.usageCount) }}人使用</text>
+        <text class="usage-count">{{ formatUsageCount(template.usage_count) }}人使用</text>
       </view>
     </view>
   </view>
@@ -87,7 +87,7 @@ export default {
     },
     
     formatUsageCount(count) {
-      if (count === undefined || count === null) return '0'
+      if (typeof count !== 'number') return '0'
       if (count >= 10000) {
         return (count / 10000).toFixed(1) + '万'
       } else if (count >= 1000) {

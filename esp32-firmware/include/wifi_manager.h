@@ -3,7 +3,6 @@
 
 #include <Arduino.h>
 #include <WiFi.h>
-#include <DNSServer.h>
 
 class WiFiManager {
 public:
@@ -15,11 +14,6 @@ public:
   static bool config_mode;
   static String saved_ssid;
   static String saved_password;
-  static DNSServer dnsServer;
-  
-private:
-  static const char* ap_ssid;
-  static const char* ap_password;
 };
 
 #endif

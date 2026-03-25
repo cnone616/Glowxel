@@ -7,7 +7,7 @@
           <h1>{{ user.name || '加载中...' }}</h1>
           <p class="bio">{{ user.bio || '这个人很懒，什么都没写' }}</p>
           <div class="stats">
-            <span @click="$router.push('/my/works')" style="cursor:pointer">{{ user.works_count || 0 }} 作品</span>
+            <span @click="tab = 'works'" style="cursor:pointer">{{ user.works_count || 0 }} 作品</span>
             <span @click="$router.push('/followers')" style="cursor:pointer">{{ user.followers_count || 0 }} 粉丝</span>
             <span @click="$router.push('/following')" style="cursor:pointer">{{ user.following_count || 0 }} 关注</span>
           </div>
@@ -112,4 +112,3 @@ onMounted(async () => {
 .empty { grid-column: 1/-1; text-align: center; padding: 60px 0; color: #999; font-size: 14px; }
 @media (max-width: 768px) { .artwork-grid { grid-template-columns: repeat(2, 1fr); } .profile-header { flex-direction: column; } }
 </style>
-

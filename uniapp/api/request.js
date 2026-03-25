@@ -44,10 +44,12 @@ export async function request(url, options = {}) {
       })
     })
 
-    if (res.statusCode === 200) {
+    const bizCode = typeof res.data?.code === 'number' ? res.data.code : null
+
+    if (res.statusCode === 200 && bizCode === 0) {
       return {
         success: true,
-        data: res.data.data || res.data,
+        data: res.data.data,
         message: res.data.message || 'ok'
       }
     }
@@ -59,9 +61,14 @@ export async function request(url, options = {}) {
       return { success: false, data: null, message: '登录已过期，请重新登录' }
     }
 
+    if (bizCode === 401) {
+      uni.removeStorageSync('auth_token')
+      uni.removeStorageSync('isLoggedIn')
+    }
+
     return {
       success: false,
-      data: null,
+      data: res.data?.data,
       message: res.data?.message || `请求失败 (${res.statusCode})`
     }
   } catch (error) {

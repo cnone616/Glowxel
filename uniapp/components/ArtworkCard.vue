@@ -3,7 +3,7 @@
     <!-- 作品图片 -->
     <view class="artwork-image-container">
       <image 
-        :src="artwork.image" 
+        :src="artwork.cover_url" 
         class="artwork-image"
         mode="aspectFill"
         @error="handleImageError"
@@ -22,11 +22,11 @@
       <!-- 创作者信息 -->
       <view class="author-info">
         <Avatar 
-          :src="artwork.author.avatar" 
+          :src="artwork.author_avatar" 
           size="small"
           @error="handleAvatarError"
         />
-        <text class="author-name">{{ artwork.author.name }}</text>
+        <text class="author-name">{{ artwork.author_name }}</text>
       </view>
       
       <!-- 互动数据 -->
@@ -42,7 +42,7 @@
         
         <view class="stat-item" @click.stop="handleComment">
           <Icon name="comment" :size="32" color="#666666" />
-          <text class="stat-text">{{ formatNumber(artwork.comments) }}</text>
+          <text class="stat-text">{{ formatNumber(artwork.comments_count) }}</text>
         </view>
         
         <view class="stat-item">
@@ -110,6 +110,9 @@ export default {
     },
     
     formatNumber(num) {
+      if (typeof num !== 'number') {
+        return '0'
+      }
       if (num >= 1000) {
         return (num / 1000).toFixed(1) + 'k'
       }

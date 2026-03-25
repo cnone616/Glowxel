@@ -97,7 +97,9 @@ async function loadList() {
   loading.value = true;
   try {
     const res = await http.get("/firmware/list");
-    if (res.code === 0) list.value = res.data.versions || [];
+    list.value = res.data?.versions || [];
+  } catch (e) {
+    message.error(e?.response?.data?.message || e?.message || "获取版本列表失败");
   } finally {
     loading.value = false;
   }
@@ -127,22 +129,18 @@ async function handleUpload() {
     const res = await http.post("/firmware/upload", fd, {
       headers: { "Content-Type": "multipart/form-data" },
     });
-    if (res.code === 0) {
-      message.success("上传成功");
-      showUpload.value = false;
-      form.value = {
-        version: "",
-        device_type: "renlight-64",
-        changelog: "",
-        is_force: false,
-      };
-      file.value = null;
-      loadList();
-    } else {
-      message.error(res.message || "上传失败");
-    }
+    message.success("上传成功");
+    showUpload.value = false;
+    form.value = {
+      version: "",
+      device_type: "renlight-64",
+      changelog: "",
+      is_force: false,
+    };
+    file.value = null;
+    loadList();
   } catch (e) {
-    message.error("上传失败");
+    message.error(e?.response?.data?.message || e?.message || "上传失败");
   } finally {
     uploading.value = false;
   }

@@ -1159,9 +1159,10 @@ export default {
       const canvasData = {
         projectId: this.projectId,
         boardId: this.boardId,
-        pixels: Array.from(this.displayPixels.entries()),
-        width: this.boardOffset.w,
-        height: this.boardOffset.h,
+        challengeId: this.project.challengeId,
+        pixels: Array.from(this.pixels.entries()),
+        width: this.project.width,
+        height: this.project.height,
         colors: this.paletteColors.map((c) => c.code),
         projectName: this.project?.name || "未命名画布",
       };

@@ -1,25 +1,13 @@
 const router = require('express').Router();
 const db = require('../config/db');
 const { auth, optionalAuth } = require('../middleware/auth');
+const artworkService = require('../services/artworkService');
 
 // 发布作品
 router.post('/publish', auth, async (req, res) => {
   try {
-    const { title, description, tags, pixelData, thumbnail, width, height, colorCount, boardCount, difficulty } = req.body;
-    const pixelBuffer = pixelData ? Buffer.from(JSON.stringify(pixelData)) : null;
-    const [result] = await db.query(
-      `INSERT INTO artworks (user_id, title, description, cover_url, width, height, color_count, board_count, difficulty, pixel_data)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [req.user.id, title, description, thumbnail, width, height, colorCount || 0, boardCount || 1, difficulty || '中等', pixelBuffer]
-    );
-    // 插入标签
-    if (tags && tags.length > 0) {
-      const tagValues = tags.map(t => [result.insertId, t]);
-      await db.query('INSERT INTO artwork_tags (artwork_id, tag) VALUES ?', [tagValues]);
-    }
-    // 更新用户作品数
-    await db.query('UPDATE users SET works_count = works_count + 1 WHERE id = ?', [req.user.id]);
-    res.json({ code: 0, data: { artworkId: result.insertId } });
+    const data = await artworkService.publishArtwork(req.user.id, req.body);
+    res.json({ code: 0, data });
   } catch (err) {
     console.error('发布失败:', err);
     res.json({ code: 500, message: '发布失败' });
@@ -154,8 +142,10 @@ router.get('/:id', optionalAuth, async (req, res) => {
     if (req.user) {
       const [liked] = await db.query('SELECT 1 FROM likes WHERE user_id = ? AND artwork_id = ?', [req.user.id, req.params.id]);
       const [collected] = await db.query('SELECT 1 FROM collections WHERE user_id = ? AND artwork_id = ?', [req.user.id, req.params.id]);
+      const [following] = await db.query('SELECT 1 FROM follows WHERE follower_id = ? AND following_id = ?', [req.user.id, artwork.user_id]);
       artwork.isLiked = liked.length > 0;
       artwork.isCollected = collected.length > 0;
+      artwork.isFollowing = following.length > 0;
     }
     res.json({ code: 0, data: { artwork } });
   } catch (err) { res.json({ code: 500, message: '获取失败' }); }
@@ -164,9 +154,9 @@ router.get('/:id', optionalAuth, async (req, res) => {
 // 删除作品
 router.delete('/:id', auth, async (req, res) => {
   try {
-    await db.query('UPDATE artworks SET status = "deleted" WHERE id = ? AND user_id = ?', [req.params.id, req.user.id]);
-    await db.query('UPDATE users SET works_count = GREATEST(works_count - 1, 0) WHERE id = ?', [req.user.id]);
-    res.json({ code: 0, data: { success: true } });
+    const data = await artworkService.removeArtwork(req.user.id, req.params.id);
+    if (data?.notFound) return res.json({ code: 404, message: '作品不存在' });
+    res.json({ code: 0, data });
   } catch (err) { res.json({ code: 500, message: '删除失败' }); }
 });
 

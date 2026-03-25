@@ -63,14 +63,14 @@
                 :status="user.isOnline ? 'online' : 'offline'"
               />
               <text class="user-name">{{ user.name }}</text>
-              <text class="user-works">{{ user.worksCount }} 作品</text>
+              <text class="user-works">{{ user.works_count }} 作品</text>
               <view
                 class="follow-btn"
-                :class="{ following: user.isFollowing }"
+                :class="{ following: followingUserIds.has(user.id) }"
                 @click.stop="toggleFollow(user)"
               >
                 <text class="follow-text">{{
-                  user.isFollowing ? "已关注" : "关注"
+                  followingUserIds.has(user.id) ? "已关注" : "关注"
                 }}</text>
               </view>
             </view>
@@ -135,7 +135,7 @@
 </template>
 
 <script>
-import { artworkAPI, userAPI } from "../../api/index.js";
+import { artworkAPI, followAPI, likeAPI, userAPI } from "../../api/index.js";
 import statusBarMixin from "../../mixins/statusBar.js";
 import ArtworkCard from "../../components/ArtworkCard.vue";
 import Avatar from "../../components/Avatar.vue";
@@ -157,6 +157,8 @@ export default {
       artworks: [],
       recommendedUsers: [],
       likedArtworks: new Set(),
+      followingUserIds: new Set(),
+      currentUserId: null,
       isLoading: false,
       isRefreshing: false,
       hasMore: true,
@@ -185,7 +187,7 @@ export default {
       return this.artworks.filter(
         (artwork) =>
           artwork.title.toLowerCase().includes(term) ||
-          artwork.author.name.toLowerCase().includes(term) ||
+          artwork.author_name.toLowerCase().includes(term) ||
           (artwork.tags &&
             artwork.tags.some((tag) => tag.toLowerCase().includes(term))),
       );
@@ -206,11 +208,15 @@ export default {
       this.isLoading = true;
 
       try {
+        await this.loadFollowingUserIds();
+
         // 加载推荐用户
         const recRes = await userAPI.getRecommendedUsers(8);
-        this.recommendedUsers = recRes.success
-          ? (recRes.data || []).slice(0, 8)
-          : [];
+        if (recRes.success && recRes.data && recRes.data.list) {
+          this.recommendedUsers = recRes.data.list.slice(0, 8);
+        } else {
+          this.recommendedUsers = [];
+        }
 
         // 加载作品
         await this.loadArtworks(true);
@@ -222,6 +228,32 @@ export default {
         });
       } finally {
         this.isLoading = false;
+      }
+    },
+
+    async loadFollowingUserIds() {
+      const token = uni.getStorageSync("auth_token");
+      if (!token) {
+        this.followingUserIds = new Set();
+        this.currentUserId = null;
+        return;
+      }
+
+      const profileRes = await userAPI.getProfile();
+      if (!(profileRes.success && profileRes.data && profileRes.data.user)) {
+        this.followingUserIds = new Set();
+        this.currentUserId = null;
+        return;
+      }
+
+      this.currentUserId = profileRes.data.user.id;
+      const followRes = await followAPI.getFollowing(this.currentUserId, 1, 100);
+      if (followRes.success && followRes.data && followRes.data.list) {
+        this.followingUserIds = new Set(
+          followRes.data.list.map((user) => user.id),
+        );
+      } else {
+        this.followingUserIds = new Set();
       }
     },
 
@@ -238,22 +270,24 @@ export default {
         switch (this.activeCategory) {
           case "recommended":
             const popRes = await artworkAPI.getPopularArtworks(1, 20);
-            newArtworks = popRes.success ? popRes.data?.list || [] : [];
+            newArtworks =
+              popRes.success && popRes.data ? popRes.data.list : [];
             break;
           case "latest":
             const latRes = await artworkAPI.getLatestArtworks(1, 20);
-            newArtworks = latRes.success ? latRes.data?.list || [] : [];
+            newArtworks =
+              latRes.success && latRes.data ? latRes.data.list : [];
             break;
           case "popular":
-            const folRes = await artworkAPI.getFollowingArtworks(1, 20);
-            newArtworks = folRes.success ? folRes.data?.list || [] : [];
+            const hotRes = await artworkAPI.getPopularArtworks(1, 20);
+            newArtworks =
+              hotRes.success && hotRes.data ? hotRes.data.list : [];
             break;
           default:
             // 按标签搜索
             const tagRes = await artworkAPI.searchByTag(this.activeCategory);
-            newArtworks = tagRes.success
-              ? tagRes.data?.list || tagRes.data || []
-              : [];
+            newArtworks =
+              tagRes.success && tagRes.data ? tagRes.data.list : [];
             break;
         }
 
@@ -284,10 +318,13 @@ export default {
 
         // 刷新推荐用户
         if (this.activeCategory === "recommended") {
+          await this.loadFollowingUserIds();
           const recRes2 = await userAPI.getRecommendedUsers(8);
-          this.recommendedUsers = recRes2.success
-            ? (recRes2.data || []).slice(0, 8)
-            : [];
+          if (recRes2.success && recRes2.data && recRes2.data.list) {
+            this.recommendedUsers = recRes2.data.list.slice(0, 8);
+          } else {
+            this.recommendedUsers = [];
+          }
         }
       } catch (error) {
         console.error("刷新失败:", error);
@@ -341,45 +378,60 @@ export default {
       });
     },
 
-    handleArtworkLike(data) {
+    async handleArtworkLike(data) {
       const { artwork, liked } = data;
 
-      if (liked) {
-        this.likedArtworks.add(artwork.id);
-        artwork.likes = (artwork.likes || 0) + 1;
-      } else {
-        this.likedArtworks.delete(artwork.id);
-        artwork.likes = Math.max(0, (artwork.likes || 0) - 1);
+      try {
+        if (liked) {
+          await likeAPI.likeArtwork(artwork.id);
+          this.likedArtworks.add(artwork.id);
+          artwork.likes += 1;
+        } else {
+          await likeAPI.unlikeArtwork(artwork.id);
+          this.likedArtworks.delete(artwork.id);
+          artwork.likes -= 1;
+        }
+      } catch (error) {
+        console.error("点赞作品失败:", error);
+        uni.showToast({
+          title: "操作失败",
+          icon: "none",
+        });
       }
-
-      // TODO: 发送点赞请求到服务器
-      console.log("点赞作品:", artwork.id, liked);
     },
 
     handleArtworkComment(artwork) {
-      // TODO: 跳转到评论页面
-      uni.showToast({
-        title: "评论功能开发中",
-        icon: "none",
+      uni.navigateTo({
+        url: `/pages/artwork-detail/artwork-detail?id=${artwork.id}`,
       });
     },
 
-    toggleFollow(user) {
-      user.isFollowing = !user.isFollowing;
+    async toggleFollow(user) {
+      try {
+        const res = await followAPI.toggleFollow(user.id);
+        if (!(res.success && res.data)) {
+          throw new Error("follow failed");
+        }
 
-      if (user.isFollowing) {
-        user.followersCount = (user.followersCount || 0) + 1;
-      } else {
-        user.followersCount = Math.max(0, (user.followersCount || 0) - 1);
+        if (res.data.followed) {
+          this.followingUserIds.add(user.id);
+          user.followers_count += 1;
+        } else {
+          this.followingUserIds.delete(user.id);
+          user.followers_count -= 1;
+        }
+
+        uni.showToast({
+          title: res.data.followed ? "已关注" : "已取消关注",
+          icon: "success",
+        });
+      } catch (error) {
+        console.error("关注用户失败:", error);
+        uni.showToast({
+          title: "操作失败",
+          icon: "none",
+        });
       }
-
-      // TODO: 发送关注请求到服务器
-      console.log("关注用户:", user.id, user.isFollowing);
-
-      uni.showToast({
-        title: user.isFollowing ? "已关注" : "已取消关注",
-        icon: "success",
-      });
     },
 
     goToUserProfile(user) {
@@ -390,10 +442,8 @@ export default {
     },
 
     goToUserList() {
-      // TODO: 跳转到用户列表页
-      uni.showToast({
-        title: "用户列表页开发中",
-        icon: "none",
+      uni.navigateTo({
+        url: "/pages/user-list/user-list?type=recommended",
       });
     },
   },

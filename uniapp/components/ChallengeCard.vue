@@ -3,7 +3,7 @@
     <!-- 挑战横幅图片 -->
     <view class="challenge-banner">
       <image 
-        :src="challenge.banner" 
+        :src="challenge.banner_url" 
         class="banner-image"
         mode="aspectFill"
         @error="handleImageError"
@@ -18,7 +18,7 @@
       
       <!-- 挑战图标 -->
       <view class="challenge-icon">
-        <Icon :name="challenge.icon" :size="48" color="#FFFFFF" />
+        <Icon name="work" :size="48" color="#FFFFFF" />
       </view>
       
       <!-- 状态标签 -->
@@ -49,9 +49,9 @@
       </view>
       
       <!-- 奖励信息 -->
-      <view v-if="challenge.reward" class="reward-info">
+      <view v-if="challenge.prize" class="reward-info">
         <Icon name="work" :size="24" color="#FF7A45" />
-        <text class="reward-text">奖励: {{ challenge.reward }}</text>
+        <text class="reward-text">奖励: {{ challenge.prize }}</text>
       </view>
     </view>
     
@@ -135,12 +135,12 @@ export default {
     
     timeText() {
       if (this.challenge.status === 'active') {
-        return `还剩 ${this.challenge.remainingDays} 天`
-      } else if (this.challenge.status === 'upcoming') {
-        return `${this.challenge.startDate} 开始`
-      } else {
-        return `${this.challenge.endDate} 结束`
+        return this.getRemainingText()
       }
+      if (this.challenge.status === 'upcoming') {
+        return `${this.formatDate(this.challenge.start_date)} 开始`
+      }
+      return `${this.formatDate(this.challenge.end_date)} 结束`
     }
   },
   
@@ -173,12 +173,39 @@ export default {
     },
     
     formatNumber(num) {
+      if (typeof num !== 'number') {
+        return '0'
+      }
       if (num >= 10000) {
         return (num / 10000).toFixed(1) + '万'
       } else if (num >= 1000) {
         return (num / 1000).toFixed(1) + 'k'
       }
       return num.toString()
+    },
+
+    getRemainingText() {
+      if (!this.challenge.end_date) {
+        return '进行中'
+      }
+      const endDate = new Date(this.challenge.end_date)
+      const now = new Date()
+      const day = 24 * 60 * 60 * 1000
+      const remainingDays = Math.ceil((endDate.getTime() - now.getTime()) / day)
+      if (remainingDays > 0) {
+        return `还剩 ${remainingDays} 天`
+      }
+      return '今日截止'
+    },
+
+    formatDate(dateString) {
+      if (!dateString) {
+        return ''
+      }
+      const date = new Date(dateString)
+      const month = `${date.getMonth() + 1}`.padStart(2, '0')
+      const day = `${date.getDate()}`.padStart(2, '0')
+      return `${month}-${day}`
     }
   }
 }

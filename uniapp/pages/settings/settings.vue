@@ -358,15 +358,29 @@ export default {
     },
 
     goToPrivacy() {
-      this.toast.showInfo("隐私设置功能开发中");
+      uni.showModal({
+        title: "隐私设置",
+        content:
+          "Glowxel 会在本地保存登录状态、项目草稿、应用设置和设备连接信息，用于创作、同步与设备控制。",
+        showCancel: false,
+      });
     },
 
     goToHelp() {
-      this.toast.showInfo("帮助页面功能开发中");
+      uni.showModal({
+        title: "帮助与反馈",
+        content:
+          "创作前请先创建或导入画布；设备功能需先完成蓝牙配网；如遇同步异常，可在云同步页面重新执行同步。",
+        showCancel: false,
+      });
     },
 
     goToAbout() {
-      this.toast.showInfo("关于页面功能开发中");
+      uni.showModal({
+        title: "关于 Glowxel",
+        content: `Glowxel 是面向像素创作与设备联动的创作平台。当前应用版本 v${this.appVersion}。`,
+        showCancel: false,
+      });
     },
 
     goToBleConfig() {

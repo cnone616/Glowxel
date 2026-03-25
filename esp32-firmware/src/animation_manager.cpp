@@ -6,14 +6,18 @@
 GIFAnimation* AnimationManager::currentGIF = nullptr;
 int AnimationManager::receivingFrameIndex = -1;
 
-// 上一帧像素缓冲，用于 full 帧时清除残留
-static PixelData* s_prevPixels = nullptr;
-static int s_prevPixelCount = 0;
+static bool s_loopBlendActive = false;
+static int s_loopBlendStep = 0;
+static unsigned long s_loopBlendDelay = 0;
+static const int LOOP_BLEND_STEPS = 2;
 
 void AnimationManager::init() {
   // 动画管理器初始化
   currentGIF = nullptr;
   receivingFrameIndex = -1;
+  s_loopBlendActive = false;
+  s_loopBlendStep = 0;
+  s_loopBlendDelay = 0;
 
   // 尝试从 LittleFS 加载保存的动画
   if (loadAnimation() && currentGIF != nullptr) {
@@ -31,7 +35,9 @@ void AnimationManager::init() {
 
 void AnimationManager::updateGIFAnimation() {
   if (currentGIF == nullptr || !currentGIF->isPlaying) return;
-  if (currentGIF->frameCount <= 1) return;  // 单帧无需更新
+  if (currentGIF->frameCount <= 1) {
+    return;
+  }
 
   unsigned long currentTime = millis();
   AnimationFrame& frame = currentGIF->frames[currentGIF->currentFrame];
@@ -39,13 +45,62 @@ void AnimationManager::updateGIFAnimation() {
   // 限制最低帧间隔50ms, 防止过快刷新
   unsigned long frameDelay = frame.delay < 50 ? 50 : frame.delay;
 
+  if (s_loopBlendActive) {
+    if (currentTime - currentGIF->lastFrameTime >= s_loopBlendDelay) {
+      AnimationFrame& lastFrame = currentGIF->frames[currentGIF->frameCount - 1];
+      AnimationFrame& firstFrame = currentGIF->frames[0];
+      s_loopBlendStep++;
+
+      if (s_loopBlendStep > LOOP_BLEND_STEPS) {
+        s_loopBlendActive = false;
+        s_loopBlendStep = 0;
+        currentGIF->currentFrame = 0;
+        renderGIFFrame(0);
+      } else {
+        uint8_t mix = (255 * s_loopBlendStep) / (LOOP_BLEND_STEPS + 1);
+        DisplayManager::renderAnimationTransition(
+          lastFrame.pixels, lastFrame.pixelCount,
+          firstFrame.pixels, firstFrame.pixelCount,
+          mix
+        );
+      }
+
+      currentGIF->lastFrameTime = currentTime;
+    }
+    return;
+  }
+
   // 检查是否需要切换到下一帧
   if (currentTime - currentGIF->lastFrameTime >= frameDelay) {
-    // 切换到下一帧（帧0已在首次播放时渲染，后续循环跳过帧0避免全屏重绘闪烁）
-    int nextFrame = (currentGIF->currentFrame + 1) % currentGIF->frameCount;
+    int nextFrame = currentGIF->currentFrame + 1;
+    if (nextFrame >= currentGIF->frameCount) {
+      AnimationFrame& lastFrame = currentGIF->frames[currentGIF->frameCount - 1];
+      AnimationFrame& firstFrame = currentGIF->frames[0];
+      bool canBlendLoop = (lastFrame.type == "full" && firstFrame.type == "full");
+
+      if (canBlendLoop) {
+        s_loopBlendActive = true;
+        s_loopBlendStep = 1;
+        s_loopBlendDelay = frameDelay / (LOOP_BLEND_STEPS + 1);
+        if (s_loopBlendDelay < 40) {
+          s_loopBlendDelay = 40;
+        }
+        uint8_t mix = (255 * s_loopBlendStep) / (LOOP_BLEND_STEPS + 1);
+        DisplayManager::renderAnimationTransition(
+          lastFrame.pixels, lastFrame.pixelCount,
+          firstFrame.pixels, firstFrame.pixelCount,
+          mix
+        );
+        currentGIF->lastFrameTime = currentTime;
+        return;
+      }
+
+      nextFrame = 0;
+    }
+
     currentGIF->currentFrame = nextFrame;
 
-    // 渲染当前帧（diff帧只更新变化的像素，不会闪）
+    // 动画调度只决定“哪一帧”，真正如何画由 DisplayManager 负责。
     renderGIFFrame(currentGIF->currentFrame);
     currentGIF->lastFrameTime = currentTime;
   }
@@ -55,26 +110,7 @@ void AnimationManager::renderGIFFrame(int frameIndex) {
   if (currentGIF == nullptr || frameIndex >= currentGIF->frameCount) return;
 
   AnimationFrame& frame = currentGIF->frames[frameIndex];
-
-  if (frame.type == "full") {
-    // full 帧：直接覆盖，不先擦除（避免闪烁）
-    // 更新 prevPixels 缓冲（用于跟踪上一帧覆盖的区域）
-    if (s_prevPixels != nullptr) free(s_prevPixels);
-    s_prevPixelCount = frame.pixelCount;
-    s_prevPixels = (PixelData*)malloc(sizeof(PixelData) * s_prevPixelCount);
-    if (s_prevPixels) memcpy(s_prevPixels, frame.pixels, sizeof(PixelData) * s_prevPixelCount);
-  }
-
-  // 绘制当前帧像素
-  for (int i = 0; i < frame.pixelCount; i++) {
-    PixelData& pixel = frame.pixels[i];
-    if (pixel.x < DisplayManager::PANEL_RES_X && pixel.y < DisplayManager::PANEL_RES_Y) {
-      DisplayManager::dma_display->drawPixelRGB888(pixel.x, pixel.y, pixel.r, pixel.g, pixel.b);
-    }
-  }
-
-  // 动画帧上叠加时钟显示
-  DisplayManager::drawClockOverlay();
+  DisplayManager::renderAnimationFrame(frame.pixels, frame.pixelCount, frame.type == "full");
 }
 
 void AnimationManager::freeGIFAnimation() {
@@ -88,12 +124,9 @@ void AnimationManager::freeGIFAnimation() {
     free(currentGIF);
     currentGIF = nullptr;
   }
-  // 释放上一帧缓冲
-  if (s_prevPixels != nullptr) {
-    free(s_prevPixels);
-    s_prevPixels = nullptr;
-    s_prevPixelCount = 0;
-  }
+  s_loopBlendActive = false;
+  s_loopBlendStep = 0;
+  s_loopBlendDelay = 0;
 }
 
 bool AnimationManager::loadGIFAnimation(JsonVariant animData) {
@@ -144,6 +177,7 @@ bool AnimationManager::loadGIFAnimation(JsonVariant animData) {
       frame.type = (frameArray[0].as<int>() == 1) ? "full" : "diff";
       frame.delay = frameArray[1] | 100;
       frame.pixelCount = frameArray[2] | 0;
+      frame.capacity = frame.pixelCount;
 
       // 限制每帧像素数量（全帧最多4096=64x64，差分帧最多1024）
       int maxPixels = (frame.type == "full") ? 4096 : 1024;
@@ -203,6 +237,8 @@ void AnimationManager::playAnimation() {
   if (currentGIF != nullptr) {
     currentGIF->isPlaying = true;
     currentGIF->lastFrameTime = millis();
+    s_loopBlendActive = false;
+    s_loopBlendStep = 0;
   }
 }
 
@@ -216,6 +252,8 @@ void AnimationManager::stopAnimation() {
   if (currentGIF != nullptr) {
     currentGIF->isPlaying = false;
     currentGIF->currentFrame = 0;
+    s_loopBlendActive = false;
+    s_loopBlendStep = 0;
     DisplayManager::dma_display->clearScreen();
   }
 }
@@ -242,6 +280,8 @@ bool AnimationManager::beginAnimation(int frameCount) {
   currentGIF->currentFrame = 0;
   currentGIF->lastFrameTime = millis();
   currentGIF->isPlaying = false;
+  s_loopBlendActive = false;
+  s_loopBlendStep = 0;
 
   // 分配帧数组
   currentGIF->frames = (AnimationFrame*)calloc(frameCount, sizeof(AnimationFrame));
@@ -256,6 +296,7 @@ bool AnimationManager::beginAnimation(int frameCount) {
   for (int i = 0; i < frameCount; i++) {
     currentGIF->frames[i].pixels = nullptr;
     currentGIF->frames[i].pixelCount = 0;
+    currentGIF->frames[i].capacity = 0;
     currentGIF->frames[i].delay = 100;
     currentGIF->frames[i].type = "full";
   }
@@ -288,6 +329,7 @@ bool AnimationManager::addFrame(int index, JsonVariant frameData) {
   frame.type = (frameArray[0].as<int>() == 1) ? "full" : "diff";
   frame.delay = frameArray[1] | 100;
   frame.pixelCount = frameArray[2] | 0;
+  frame.capacity = frame.pixelCount;
 
   // 全帧最多4096=64x64，差分帧最多1024
   int maxPixels = (frame.type == "full") ? 4096 : 1024;
@@ -375,6 +417,7 @@ bool AnimationManager::beginFrame(int index, int type, int delay, int totalPixel
   // 预分配总像素空间（直接用前端传的实际像素数）
   if (totalPixels <= 0) totalPixels = 1;
   if (totalPixels > 4096) totalPixels = 4096;  // 安全上限
+  frame.capacity = totalPixels;
 
   frame.pixels = (PixelData*)malloc(sizeof(PixelData) * totalPixels);
   if (frame.pixels == nullptr) {
@@ -403,7 +446,7 @@ bool AnimationManager::addFrameChunk(int index, JsonArray pixels) {
   int maxPixels = (frame.type == "full") ? 4096 : 1024;
   int added = 0;
 
-  for (size_t j = 0; j < pixels.size() && frame.pixelCount < maxPixels; j++) {
+  for (size_t j = 0; j < pixels.size() && frame.pixelCount < maxPixels && frame.pixelCount < frame.capacity; j++) {
     JsonArray pixel = pixels[j];
     if (pixel.size() >= 5) {
       frame.pixels[frame.pixelCount].x = pixel[0];
@@ -435,7 +478,7 @@ bool AnimationManager::addFrameChunkBinary(int index, uint8_t *data, int pixelCo
   int maxPixels = (frame.type == "full") ? 4096 : 1024;
   int added = 0;
 
-  for (int j = 0; j < pixelCount && frame.pixelCount < maxPixels; j++) {
+  for (int j = 0; j < pixelCount && frame.pixelCount < maxPixels && frame.pixelCount < frame.capacity; j++) {
     int offset = j * 5;
     uint8_t x = data[offset];
     uint8_t y = data[offset + 1];
@@ -555,6 +598,8 @@ bool AnimationManager::loadAnimation() {
   currentGIF->currentFrame = 0;
   currentGIF->lastFrameTime = 0;
   currentGIF->isPlaying = false;
+  s_loopBlendActive = false;
+  s_loopBlendStep = 0;
 
   for (int i = 0; i < frameCount; i++) {
     uint8_t type = 0;
@@ -568,6 +613,7 @@ bool AnimationManager::loadAnimation() {
     currentGIF->frames[i].type = (type == 1) ? "full" : "diff";
     currentGIF->frames[i].delay = delay;
     currentGIF->frames[i].pixelCount = pixelCount;
+    currentGIF->frames[i].capacity = pixelCount;
     currentGIF->frames[i].pixels = nullptr;
 
     if (pixelCount > 0 && pixelCount <= 4096) {

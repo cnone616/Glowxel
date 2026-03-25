@@ -18,7 +18,6 @@ public:
   
 private:
   static void setupRoutes();
-  static void setupConfigRoutes();
   static void setupAPIRoutes();
 };
 

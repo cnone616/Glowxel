@@ -27,8 +27,10 @@ const router = useRouter()
 const list = ref([])
 
 async function handleUse(item) {
-  await templateAPI.use(item.id)
-  router.push(`/editor?templateId=${item.id}`)
+  const res = await templateAPI.use(item.id)
+  if (res.success) {
+    router.push(`/editor?templateId=${item.id}`)
+  }
 }
 
 onMounted(async () => {
@@ -74,4 +76,3 @@ onMounted(async () => {
   .page-title { font-size: 22px; }
 }
 </style>
-

@@ -44,9 +44,14 @@ const hasMore = ref(true)
 async function fetchList(reset = false) {
   if (reset) { page.value = 1; list.value = [] }
   try {
-    const res = await artworkAPI.getList({ page: page.value, limit: 12, sort: tab.value })
+    const res = tab.value === 'hot'
+      ? await artworkAPI.getPopular(12 * page.value)
+      : await artworkAPI.getLatest(12 * page.value)
     if (res.success) {
-      const items = res.data?.list || []
+      const allItems = res.data?.list || []
+      const items = tab.value === 'hot' || tab.value === 'latest'
+        ? allItems.slice((page.value - 1) * 12, page.value * 12)
+        : allItems
       list.value = reset ? items : [...list.value, ...items]
       hasMore.value = items.length >= 12
     }
@@ -104,4 +109,3 @@ onMounted(() => fetchList())
   .page-title { font-size: 22px; }
 }
 </style>
-

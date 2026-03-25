@@ -33,7 +33,13 @@
           </svg>
           新建
         </router-link>
-        <router-link to="/login" class="btn-login" @click="closeMobileMenu"
+        <template v-if="isLoggedIn">
+          <router-link to="/profile" class="btn-login" @click="closeMobileMenu"
+            >我的</router-link
+          >
+          <button class="btn-login btn-logout" @click="handleLogout">退出</button>
+        </template>
+        <router-link v-else to="/login" class="btn-login" @click="closeMobileMenu"
           >登录</router-link
         >
       </div>
@@ -75,16 +81,25 @@
 </template>
 
 <script setup>
-import { ref } from "vue";
+import { computed, ref } from "vue";
+import { useRouter } from "vue-router";
 import iconUrl from "@/assets/images/RenLight-logo.png";
 import logoUrl from "@/assets/images/RenLight-logo.png";
 
+const router = useRouter();
 const mobileMenuOpen = ref(false);
+const isLoggedIn = computed(() => !!localStorage.getItem("auth_token"));
 const toggleMobileMenu = () => {
   mobileMenuOpen.value = !mobileMenuOpen.value;
 };
 const closeMobileMenu = () => {
   mobileMenuOpen.value = false;
+};
+const handleLogout = () => {
+  localStorage.removeItem("auth_token");
+  localStorage.removeItem("user_info");
+  closeMobileMenu();
+  router.push("/login");
 };
 </script>
 
@@ -183,6 +198,10 @@ const closeMobileMenu = () => {
 .btn-login:hover {
   color: var(--color-text-primary);
   border-color: var(--color-border-hover);
+}
+.btn-logout {
+  background: #fff;
+  cursor: pointer;
 }
 
 .mobile-menu-btn {

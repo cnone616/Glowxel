@@ -19,14 +19,24 @@ export const useUserStore = defineStore('user', {
     
     // 获取用户昵称
     nickname: (state) => {
-      if (state.currentUser) return state.currentUser.name
-      return state.userInfo?.nickName || '微信用户'
+      if (state.currentUser) {
+        return state.currentUser.name
+      }
+      if (state.userInfo && state.userInfo.nickName) {
+        return state.userInfo.nickName
+      }
+      return '微信用户'
     },
     
     // 获取用户头像
     avatar: (state) => {
-      if (state.currentUser) return state.currentUser.avatar
-      return state.userInfo?.avatarUrl || ''
+      if (state.currentUser) {
+        return state.currentUser.avatar
+      }
+      if (state.userInfo && state.userInfo.avatarUrl) {
+        return state.userInfo.avatarUrl
+      }
+      return ''
     },
     
     // 是否开启云同步
@@ -36,12 +46,10 @@ export const useUserStore = defineStore('user', {
     userStats: (state) => {
       if (state.currentUser) {
         return {
-          level: state.currentUser.level,
-          followersCount: state.currentUser.followersCount || state.currentUser.followers || 0,
-          followingCount: state.currentUser.followingCount || state.currentUser.following || 0,
-          worksCount: state.currentUser.worksCount || state.currentUser.artworks || 0,
-          totalLikes: state.currentUser.totalLikes || state.currentUser.likes || 0,
-          badges: state.currentUser.badges || []
+          followers_count: state.currentUser.followers_count,
+          following_count: state.currentUser.following_count,
+          works_count: state.currentUser.works_count,
+          total_likes: state.currentUser.total_likes
         }
       }
       return null
@@ -63,6 +71,7 @@ export const useUserStore = defineStore('user', {
       const userInfo = uni.getStorageSync('userInfo')
       const syncEnabled = uni.getStorageSync('syncEnabled')
       const loginTime = uni.getStorageSync('loginTime')
+      const currentUser = uni.getStorageSync('currentUser')
       
       if (isLoggedIn) {
         // 检查登录是否过期（30天）
@@ -72,9 +81,10 @@ export const useUserStore = defineStore('user', {
         if (loginTime && (now - loginTime) < thirtyDays) {
           // 未过期，恢复登录状态
           this.isLoggedIn = true
-          this.userInfo = userInfo || { nickName: '微信用户', avatarUrl: '' }
-          this.syncEnabled = syncEnabled || false
-          this.openid = uni.getStorageSync('openid') || ''
+          this.userInfo = userInfo
+          this.currentUser = currentUser
+          this.syncEnabled = !!syncEnabled
+          this.openid = uni.getStorageSync('openid')
         } else {
           // 已过期，清除登录状态
           this.logout()
@@ -91,11 +101,10 @@ export const useUserStore = defineStore('user', {
 
       try {
         const res = await userAPI.getProfile()
-        if (res.success) {
-          // 后端返回 { code: 0, data: { user: {...} } }，request.js 转换后 res.data = { user: {...} }
-          this.currentUser = res.data.user || res.data
+        if (res.success && res.data && res.data.user) {
+          this.currentUser = res.data.user
           this.userInfo = {
-            nickName: this.currentUser.name || this.currentUser.nickname,
+            nickName: this.currentUser.name,
             avatarUrl: this.currentUser.avatar
           }
           uni.setStorageSync('userInfo', this.userInfo)
@@ -122,9 +131,9 @@ export const useUserStore = defineStore('user', {
         })
 
         const res = await userAPI.login(loginRes.code)
-        if (res.success) {
+        if (res.success && res.data && res.data.user) {
           this.isLoggedIn = true
-          this.openid = res.data.openid || ''
+          this.openid = res.data.user.openid
           uni.setStorageSync('auth_token', res.data.token)
           await this.loadCurrentUser()
 
@@ -139,21 +148,7 @@ export const useUserStore = defineStore('user', {
         // #endif
 
         // #ifndef MP-WEIXIN
-        const res2 = await userAPI.login('h5_dev')
-        if (res2.success) {
-          this.isLoggedIn = true
-          this.openid = res2.data.openid || ''
-          uni.setStorageSync('auth_token', res2.data.token)
-          await this.loadCurrentUser()
-
-          const loginTime = Date.now()
-          uni.setStorageSync('isLoggedIn', true)
-          uni.setStorageSync('openid', this.openid)
-          uni.setStorageSync('loginTime', loginTime)
-
-          return { success: true, message: '登录成功' }
-        }
-        return { success: false, error: res2.message || '登录失败' }
+        return { success: false, error: 'H5 暂不支持直接登录，请在微信小程序中登录' }
         // #endif
       } catch (error) {
         return {
@@ -214,19 +209,22 @@ export const useUserStore = defineStore('user', {
       
       try {
         const res = await followAPI.toggleFollow(userId)
-        const result = res.success ? res.data : { success: false }
+        const result = res.success ? res.data : null
         
         // 更新当前用户的关注数
-        if (result.success && this.currentUser) {
-          if (result.isFollowing) {
-            this.currentUser.following += 1
+        if (result && this.currentUser) {
+          if (result.followed) {
+            this.currentUser.following_count += 1
           } else {
-            this.currentUser.following -= 1
+            this.currentUser.following_count -= 1
           }
           uni.setStorageSync('currentUser', this.currentUser)
         }
         
-        return result
+        return {
+          success: !!result,
+          followed: result ? result.followed : false
+        }
       } catch (error) {
         return { success: false, error: '操作失败' }
       }

@@ -15,7 +15,11 @@ router.get('/list', async (req, res) => {
     sql += ' ORDER BY usage_count DESC LIMIT ? OFFSET ?';
     params.push(limit, offset);
     const [list] = await db.query(sql, params);
-    const [[{ total }]] = await db.query('SELECT COUNT(*) as total FROM templates');
+    let countSql = 'SELECT COUNT(*) as total FROM templates WHERE 1=1';
+    const countParams = [];
+    if (category) { countSql += ' AND category = ?'; countParams.push(category); }
+    if (difficulty) { countSql += ' AND difficulty = ?'; countParams.push(difficulty); }
+    const [[{ total }]] = await db.query(countSql, countParams);
     res.json({ code: 0, data: { list, total } });
   } catch (err) { res.json({ code: 500, message: '获取失败' }); }
 });

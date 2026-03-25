@@ -5,7 +5,7 @@
       <p class="page-desc">参与主题挑战，展示你的创意</p>
 
       <div class="challenge-list">
-        <div class="challenge-card" v-for="item in list" :key="item.id">
+        <div class="challenge-card" v-for="item in list" :key="item.id" @click="router.push(`/challenge/${item.id}`)">
           <div class="challenge-header">
             <span class="challenge-tag" :class="item.status">{{ statusText(item.status) }}</span>
             <span class="challenge-date">{{ item.end_date ? item.end_date.slice(0,10) : '' }}</span>
@@ -14,7 +14,7 @@
           <p>{{ item.description || '暂无描述' }}</p>
           <div class="challenge-footer">
             <span class="participants">{{ item.participants || 0 }} 人参与</span>
-            <button class="join-btn" v-if="item.status === 'active'" @click="handleJoin(item)">参与挑战</button>
+            <button class="join-btn" v-if="item.status === 'active'" @click.stop="handleJoin(item)">参与挑战</button>
           </div>
         </div>
       </div>
@@ -39,7 +39,10 @@ async function handleJoin(item) {
   if (!token) { router.push('/login'); return }
   const res = await challengeAPI.join(item.id)
   if (res.success) {
-    item.participants = (item.participants || 0) + 1
+    if (res.data?.changed) {
+      item.participants = (item.participants || 0) + 1
+    }
+    router.push(`/editor?challengeId=${item.id}`)
   }
 }
 
@@ -60,7 +63,7 @@ onMounted(async () => {
 
 .challenge-card {
   background: #fafafa; border: 1px solid #f0f0f0; border-radius: 12px;
-  padding: 24px; transition: border-color 0.2s;
+  padding: 24px; transition: border-color 0.2s; cursor: pointer;
 }
 .challenge-card:hover { border-color: #ddd; }
 
@@ -89,4 +92,3 @@ onMounted(async () => {
   .challenge-card { padding: 16px; }
 }
 </style>
-

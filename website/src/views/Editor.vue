@@ -82,28 +82,6 @@
     </div>
   </div>
 
-  <!-- 图片导入对话框 -->
-  <div class="modal-overlay" v-if="showImportModal" @click.self="showImportModal = false">
-    <div class="modal">
-      <h3>图片像素化设置</h3>
-      <div class="preview-row">
-        <img :src="importPreviewUrl" class="import-preview" />
-        <canvas ref="importCanvasRef" class="import-result"></canvas>
-      </div>
-      <div class="modal-form">
-        <label>目标宽度（格）
-          <input type="number" v-model.number="importWidth" min="8" max="64" @input="previewImport" />
-        </label>
-        <label>目标高度（格）
-          <input type="number" v-model.number="importHeight" min="8" max="64" @input="previewImport" />
-        </label>
-      </div>
-      <div class="modal-actions">
-        <button class="btn-cancel" @click="showImportModal = false">取消</button>
-        <button class="btn-confirm" @click="confirmImport">应用</button>
-      </div>
-    </div>
-  </div>
 </template>
 
 
@@ -113,7 +91,7 @@ import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ARTKAL_COLORS_FULL as ARTKAL_COLORS, findClosestColor } from '@/data/artkal-colors.js'
 import { imageToPixels } from '@/utils/imageProcessor.js'
-import { artworkAPI } from '@/api/index.js'
+import { artworkAPI, challengeAPI, projectAPI, templateAPI } from '@/api/index.js'
 
 const route = useRoute()
 const router = useRouter()
@@ -144,6 +122,8 @@ const importPreviewUrl = ref('')
 const importWidth = ref(32)
 const importHeight = ref(32)
 let importImage = null
+const projectId = ref(route.params.id || '')
+const challengeId = ref(route.query.challengeId || '')
 
 const tools = [
   { id: 'pen', label: '画笔', icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19l7-7-3-3-7 7v3h3z"/><path d="M18 13l1.5-1.5a2.121 2.121 0 0 0-3-3L15 10"/></svg>' },
@@ -307,21 +287,52 @@ async function handleSave() {
   const canvas = canvasRef.value
   const thumbnail = canvas.toDataURL('image/png')
   const pixelData = Object.fromEntries(pixels.value)
-  const data = { title: projectName.value, width: width.value, height: height.value, pixelData, thumbnail }
-  localStorage.setItem('editor_draft', JSON.stringify(data))
-  alert('已保存到本地草稿')
+  if (!projectId.value) {
+    projectId.value = globalThis.crypto?.randomUUID?.() || `web-${Date.now()}`
+  }
+  const project = {
+    id: projectId.value,
+    name: projectName.value,
+    width: width.value,
+    height: height.value,
+    thumbnail,
+    progress: 0,
+    status: 'draft',
+    palette: Array.from(new Set(pixels.value.values()))
+  }
+  const res = await projectAPI.sync(project, pixelData)
+  if (res.success) {
+    localStorage.setItem('editor_draft', JSON.stringify({ ...project, pixelData, challengeId: challengeId.value }))
+    alert('已保存到云端草稿')
+  } else {
+    alert(res.message || '保存失败')
+  }
 }
 
 async function handlePublish() {
   if (!localStorage.getItem('auth_token')) { router.push('/login'); return }
+  if (!projectId.value) {
+    await handleSave()
+  }
   const canvas = canvasRef.value
   const thumbnail = canvas.toDataURL('image/png')
   const pixelData = Object.fromEntries(pixels.value)
   const res = await artworkAPI.publish({
+    projectId: projectId.value || null,
     title: projectName.value, width: width.value, height: height.value,
     pixelData, thumbnail, colorCount: new Set(pixels.value.values()).size
   })
-  if (res.success) { alert('发布成功！'); router.push('/community') }
+  if (res.success) {
+    if (challengeId.value && res.data?.artworkId) {
+      const submitRes = await challengeAPI.submit(challengeId.value, res.data.artworkId)
+      if (!submitRes.success) {
+        alert(submitRes.message || '作品已发布，但挑战投稿失败')
+      }
+    }
+    localStorage.removeItem('editor_draft')
+    alert('发布成功！')
+    router.push('/community')
+  }
   else alert(res.message || '发布失败')
 }
 
@@ -333,18 +344,65 @@ function onKeyDown(e) {
 }
 
 onMounted(() => {
-  // load draft or route params
-  const draft = localStorage.getItem('editor_draft')
-  if (draft) {
-    try {
-      const d = JSON.parse(draft)
-      projectName.value = d.title || '未命名项目'
-      width.value = d.width || 32; height.value = d.height || 32
-      if (d.pixelData) pixels.value = new Map(Object.entries(d.pixelData))
-    } catch {}
+  // load draft or project detail
+  const loadEditorState = async () => {
+    challengeId.value = route.query.challengeId || ''
+    let loaded = false
+
+    if (route.params.id) {
+      const res = await projectAPI.getDetail(route.params.id)
+      if (res.success) {
+        const project = res.data?.project || {}
+        projectId.value = project.id || route.params.id
+        projectName.value = project.name || '未命名项目'
+        width.value = project.width || 32
+        height.value = project.height || 32
+        if (res.data?.pixels) pixels.value = new Map(Object.entries(res.data.pixels))
+        loaded = true
+      } else {
+        return
+      }
+    }
+
+    if (!loaded && route.query.templateId) {
+      const res = await templateAPI.getDetail(route.query.templateId)
+      if (res.success) {
+        const template = res.data?.template || {}
+        const size = `${template.size || ''}`.match(/^(\d+)x(\d+)$/i)
+        projectName.value = template.name || '未命名模板'
+        if (size) {
+          width.value = parseInt(size[1], 10) || width.value
+          height.value = parseInt(size[2], 10) || height.value
+        }
+        if (res.data?.pixels) {
+          pixels.value = new Map(Object.entries(res.data.pixels))
+        }
+        loaded = true
+      }
+    }
+
+    if (!loaded) {
+      const draft = localStorage.getItem('editor_draft')
+      if (draft) {
+        try {
+          const d = JSON.parse(draft)
+          projectId.value = d.id || ''
+          projectName.value = d.title || d.name || '未命名项目'
+          width.value = d.width || 32
+          height.value = d.height || 32
+          if (d.pixelData) pixels.value = new Map(Object.entries(d.pixelData))
+          if (d.challengeId) challengeId.value = d.challengeId
+        } catch {}
+      }
+    }
+    nextTick(render)
+    if (route.query.mode === 'image') {
+      showImportModal.value = true
+    }
   }
+
   window.addEventListener('keydown', onKeyDown)
-  nextTick(render)
+  loadEditorState()
 })
 onUnmounted(() => window.removeEventListener('keydown', onKeyDown))
 </script>

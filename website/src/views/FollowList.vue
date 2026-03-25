@@ -13,8 +13,8 @@
             <span class="name">{{ u.name }}</span>
             <span class="bio">{{ u.bio || '暂无简介' }}</span>
           </div>
-          <button class="btn-follow" @click.stop="handleToggle(u)">
-            {{ u._following ? '已关注' : '关注' }}
+          <button v-if="String(u.id) !== String(currentUserId)" class="btn-follow" @click.stop="handleToggle(u)">
+            {{ u.is_following ? '已关注' : '关注' }}
           </button>
         </div>
         <div class="empty" v-if="list.length === 0 && !loading">暂无数据</div>
@@ -24,18 +24,27 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { ref, onMounted, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { followAPI } from '@/api/index.js'
 
 const route = useRoute()
-const tab = ref(route.query.tab || 'followers')
+const router = useRouter()
+const getTabFromRoute = () => {
+  if (route.query.tab === 'followers' || route.query.tab === 'following') {
+    return route.query.tab
+  }
+  return route.path.includes('/following') ? 'following' : 'followers'
+}
+
+const tab = ref(getTabFromRoute())
 const list = ref([])
 const loading = ref(false)
 const followerTotal = ref(0)
 const followingTotal = ref(0)
 
-const userId = route.params.id || JSON.parse(localStorage.getItem('user_info') || '{}').id
+const currentUserId = JSON.parse(localStorage.getItem('user_info') || '{}').id
+const userId = route.params.id || currentUserId
 
 async function load(t) {
   loading.value = true
@@ -53,11 +62,21 @@ async function load(t) {
 async function switchTab(t) { tab.value = t; await load(t) }
 
 async function handleToggle(u) {
+  if (!currentUserId) {
+    router.push('/login')
+    return
+  }
+  if (String(u.id) === String(currentUserId)) return
   const res = await followAPI.toggle(u.id)
-  if (res.success) u._following = res.data?.followed
+  if (res.success) u.is_following = res.data?.followed
 }
 
 onMounted(() => load(tab.value))
+
+watch(() => route.fullPath, async () => {
+  tab.value = getTabFromRoute()
+  await load(tab.value)
+})
 </script>
 
 <style scoped>
@@ -77,4 +96,3 @@ onMounted(() => load(tab.value))
 .btn-follow:hover { border-color: #1a1a1a; }
 .empty { text-align: center; padding: 60px 0; color: #999; font-size: 14px; }
 </style>
-

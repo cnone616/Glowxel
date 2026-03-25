@@ -1,5 +1,7 @@
 # 项目部署文档
 
+> 本文档已按 2026-03 当前仓库状态收口，重点保留线上部署和本地编译所需信息。
+
 ## 服务器信息
 
 | 项目      | 值                           |
@@ -91,7 +93,7 @@ sudo nginx -t && sudo nginx -s reload
 cd esp32-firmware && pio run
 
 # ESP32 烧录
-pio run --target upload
+cd esp32-firmware && pio run --target upload
 ```
 
 ## 服务器目录结构
@@ -121,7 +123,7 @@ pio run --target upload
 | -------- | --------------- |
 | AppID    | 待配置          |
 | 开发工具 | 微信开发者工具  |
-| 框架     | uni-app + Vue 2 |
+| 框架     | uni-app         |
 
 ## ESP32 设备
 
@@ -131,5 +133,5 @@ pio run --target upload
 | 屏幕         | 64x64 HUB75 LED 矩阵 |
 | 固件版本     | 1.0.0                |
 | BLE 配网名称 | RenLight-Setup       |
-| BLE 配网密码 | 12345678             |
+| 配网方式     | BLE 写入 WiFi 凭据   |
 | WebSocket    | ws://设备IP/ws       |

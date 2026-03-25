@@ -173,6 +173,10 @@ function handleTableChange(pag) { pagination.value.current = pag.current; fetchL
 function openCreate() { editId.value = null; form.value = defaultForm(); showModal.value = true }
 
 function editItem(record) {
+  let rules = record.rules
+  if (typeof rules === 'string') {
+    try { rules = JSON.parse(rules) } catch { rules = [] }
+  }
   editId.value = record.id
   form.value = {
     title: record.title || '', description: record.description || '',
@@ -181,7 +185,7 @@ function editItem(record) {
     end_date: record.end_date || '', difficulty: record.difficulty || '简单',
     reward_type: record.reward_type || '荣誉', max_participants: record.max_participants || 0,
     prize: record.prize || '', sort_order: record.sort_order || 0,
-    rulesText: Array.isArray(record.rules) ? record.rules.join('\n') : ''
+    rulesText: Array.isArray(rules) ? rules.join('\n') : ''
   }
   showModal.value = true
 }
@@ -211,5 +215,4 @@ async function remove(id) {
 
 onMounted(fetchList)
 </script>
-
 

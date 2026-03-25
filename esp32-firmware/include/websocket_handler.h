@@ -31,6 +31,7 @@ public:
   static unsigned long lastMessageTime;
   
 private:
+  static const char* getCurrentModeString();
   static void handleJsonCommand(AsyncWebSocketClient *client, JsonDocument& doc);
   static void handleJsonCommand(AsyncWebSocketClient *client, uint8_t *data, size_t len, AwsFrameInfo *info);
   static void handleBinaryData(AsyncWebSocketClient *client, uint8_t *data, size_t len);

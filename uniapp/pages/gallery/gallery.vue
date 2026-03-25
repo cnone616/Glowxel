@@ -125,7 +125,7 @@
 </template>
 
 <script>
-import { artworkAPI, templateAPI, challengeAPI } from '../../api/index.js'
+import { artworkAPI, challengeAPI, likeAPI, templateAPI } from '../../api/index.js'
 import statusBarMixin from '../../mixins/statusBar.js'
 import ArtworkCard from '../../components/ArtworkCard.vue'
 import TemplateCard from '../../components/TemplateCard.vue'
@@ -196,7 +196,7 @@ export default {
         // artworks
         return this.artworks.filter(artwork => 
           artwork.title.toLowerCase().includes(term) ||
-          artwork.author.name.toLowerCase().includes(term) ||
+          artwork.author_name.toLowerCase().includes(term) ||
           (artwork.tags && artwork.tags.some(tag => tag.toLowerCase().includes(term)))
         )
       }
@@ -289,13 +289,13 @@ export default {
         // 根据页面类型和分类获取数据
         switch (this.pageType) {
           case 'templates':
-            newArtworks = this.getTemplateData()
+            newArtworks = await this.getTemplateData()
             break
           case 'challenges':
-            newArtworks = this.getChallengeData()
+            newArtworks = await this.getChallengeData()
             break
           default:
-            newArtworks = this.getArtworkData()
+            newArtworks = await this.getArtworkData()
             break
         }
         
@@ -319,11 +319,20 @@ export default {
     },
     
     async getArtworkData() {
-      const sort = this.activeCategory === 'popular' ? 'popular' : this.activeCategory === 'latest' ? 'latest' : 'latest'
-      const res = this.activeCategory === 'following'
-        ? await artworkAPI.getFollowingArtworks(1, 20)
-        : await artworkAPI.getArtworks({ page: 1, limit: 20, sort })
-      return res.success ? (res.data?.list || []) : []
+      if (this.activeCategory === 'following') {
+        const res = await artworkAPI.getFollowingArtworks(1, 20)
+        return res.success && res.data ? res.data.list : []
+      }
+      if (this.activeCategory === 'popular') {
+        const res = await artworkAPI.getPopularArtworks(1, 20)
+        return res.success && res.data ? res.data.list : []
+      }
+      if (this.activeCategory === 'latest') {
+        const res = await artworkAPI.getLatestArtworks(1, 20)
+        return res.success && res.data ? res.data.list : []
+      }
+      const res = await artworkAPI.getArtworks({ page: 1, limit: 20 })
+      return res.success && res.data ? res.data.list : []
     },
 
     async getTemplateData() {
@@ -339,13 +348,13 @@ export default {
       }
       const category = this.activeCategory === 'all' ? undefined : categoryNameMap[this.activeCategory]
       const res = await templateAPI.getTemplates({ category, page: 1, limit: 20 })
-      return res.success ? (res.data?.list || []) : []
+      return res.success && res.data ? res.data.list : []
     },
 
     async getChallengeData() {
       const status = this.activeCategory === 'all' ? undefined : this.activeCategory
       const res = await challengeAPI.getChallenges({ status, page: 1, limit: 20 })
-      return res.success ? (res.data?.list || []) : []
+      return res.success && res.data ? res.data.list : []
     },
     
     async handleRefresh() {
@@ -409,25 +418,30 @@ export default {
       })
     },
     
-    handleArtworkLike(data) {
+    async handleArtworkLike(data) {
       const { artwork, liked } = data
       
-      if (liked) {
-        this.likedArtworks.add(artwork.id)
-        artwork.likes = (artwork.likes || 0) + 1
-      } else {
-        this.likedArtworks.delete(artwork.id)
-        artwork.likes = Math.max(0, (artwork.likes || 0) - 1)
+      try {
+        if (liked) {
+          await likeAPI.likeArtwork(artwork.id)
+          this.likedArtworks.add(artwork.id)
+          artwork.likes += 1
+        } else {
+          await likeAPI.unlikeArtwork(artwork.id)
+          this.likedArtworks.delete(artwork.id)
+          artwork.likes -= 1
+        }
+      } catch (error) {
+        uni.showToast({
+          title: '操作失败',
+          icon: 'none'
+        })
       }
-      
-      console.log('点赞作品:', artwork.id, liked)
     },
     
     handleArtworkComment(artwork) {
-      // TODO: 跳转到评论页面
-      uni.showToast({
-        title: '评论功能开发中',
-        icon: 'none'
+      uni.navigateTo({
+        url: `/pages/artwork-detail/artwork-detail?id=${artwork.id}`
       })
     },
     
@@ -471,11 +485,26 @@ export default {
       })
     },
     
-    handleChallengeJoin(challenge) {
-      uni.showToast({
-        title: '已参与挑战',
-        icon: 'success'
-      })
+    async handleChallengeJoin(challenge) {
+      try {
+        const res = await challengeAPI.joinChallenge(challenge.id)
+        if (!(res.success && res.data)) {
+          throw new Error('join failed')
+        }
+        challenge.joined = res.data.joined
+        if (res.data.changed) {
+          challenge.participants += 1
+        }
+        uni.showToast({
+          title: '已参与挑战',
+          icon: 'success'
+        })
+      } catch (error) {
+        uni.showToast({
+          title: '参与失败',
+          icon: 'none'
+        })
+      }
     }
   }
 }

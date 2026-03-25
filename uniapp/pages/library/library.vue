@@ -103,7 +103,7 @@
 </template>
 
 <script>
-import { artworkAPI, templateAPI, challengeAPI } from '../../api/index.js'
+import { artworkAPI, challengeAPI, likeAPI, templateAPI } from '../../api/index.js'
 import statusBarMixin from '../../mixins/statusBar.js'
 import Logo from '../../components/Logo.vue'
 import ArtworkCard from '../../components/ArtworkCard.vue'
@@ -173,19 +173,20 @@ export default {
     async loadRecommendedContent() {
       try {
         const artRes = await artworkAPI.getPopularArtworks(1, 6)
-        if (artRes.success) this.recommendedArtworks = artRes.data?.list || []
+        if (artRes.success && artRes.data) {
+          this.recommendedArtworks = artRes.data.list
+        }
 
         const tplRes = await templateAPI.getPopularTemplates(4)
-        if (tplRes.success) {
-          const list = tplRes.data?.list || tplRes.data || []
-          this.officialTemplates = Array.isArray(list) ? list : []
+        if (tplRes.success && tplRes.data) {
+          this.officialTemplates = tplRes.data.list
         }
 
         const chRes = await challengeAPI.getActiveChallenges()
-        if (chRes.success) {
-          const challenges = chRes.data?.list || chRes.data || []
+        if (chRes.success && chRes.data) {
+          const challenges = chRes.data.list
           if (Array.isArray(challenges) && challenges.length > 0) {
-            this.weeklyChallenge = challenges.find(c => c.type === 'weekly') || challenges[0]
+            this.weeklyChallenge = challenges[0]
           }
         }
       } catch (error) {
@@ -286,8 +287,21 @@ export default {
       })
     },
     
-    handleArtworkLike(data) {
-      console.log('点赞作品:', data)
+    async handleArtworkLike(data) {
+      try {
+        if (data.liked) {
+          await likeAPI.likeArtwork(data.artwork.id)
+          data.artwork.likes += 1
+        } else {
+          await likeAPI.unlikeArtwork(data.artwork.id)
+          data.artwork.likes -= 1
+        }
+      } catch (error) {
+        uni.showToast({
+          title: '操作失败',
+          icon: 'none'
+        })
+      }
     },
     
     handleTemplateClick(template) {
@@ -304,11 +318,26 @@ export default {
       })
     },
     
-    handleChallengeJoin(challenge) {
-      uni.showToast({
-        title: '已参与挑战',
-        icon: 'success'
-      })
+    async handleChallengeJoin(challenge) {
+      try {
+        const res = await challengeAPI.joinChallenge(challenge.id)
+        if (!(res.success && res.data)) {
+          throw new Error('join failed')
+        }
+        challenge.joined = res.data.joined
+        if (res.data.changed) {
+          challenge.participants += 1
+        }
+        uni.showToast({
+          title: '已参与挑战',
+          icon: 'success'
+        })
+      } catch (error) {
+        uni.showToast({
+          title: '参与失败',
+          icon: 'none'
+        })
+      }
     }
   }
 }
@@ -637,4 +666,3 @@ export default {
   margin: 0 32rpx 48rpx;
 }
 </style>
-

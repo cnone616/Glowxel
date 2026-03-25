@@ -31,7 +31,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { userAPI, artworkAPI } from '@/api/index.js'
 
@@ -39,15 +39,20 @@ const route = useRoute()
 const user = ref({})
 const artworks = ref([])
 
-onMounted(async () => {
+async function loadProfile() {
   const id = route.params.id
+  user.value = {}
+  artworks.value = []
   try {
     const uRes = await userAPI.getUserDetail(id)
-    if (uRes.success) user.value = uRes.data || {}
+    if (uRes.success) user.value = uRes.data?.user || {}
     const aRes = await artworkAPI.getUserArtworks(id, { page: 1, limit: 20 })
     if (aRes.success) artworks.value = aRes.data?.list || []
   } catch (e) { /* ignore */ }
-})
+}
+
+onMounted(loadProfile)
+watch(() => route.params.id, loadProfile)
 </script>
 
 <style scoped>
@@ -75,4 +80,3 @@ onMounted(async () => {
   .stats { justify-content: center; }
 }
 </style>
-
