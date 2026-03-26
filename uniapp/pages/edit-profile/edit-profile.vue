@@ -141,6 +141,7 @@
 <script>
 import { useUserStore } from "../../store/user.js";
 import { useToast } from "../../composables/useToast.js";
+import { getUploadUrl } from "../../config/api.js";
 import statusBarMixin from "../../mixins/statusBar.js";
 import Icon from "../../components/Icon.vue";
 import Toast from "../../components/Toast.vue";
@@ -228,7 +229,7 @@ export default {
           const tempPath = res.tempFilePaths[0];
           uni.showLoading({ title: "上传中..." });
           uni.uploadFile({
-            url: "https://glowxel.com/api/upload?type=avatar",
+            url: getUploadUrl("avatar"),
             filePath: tempPath,
             name: "file",
             header: {

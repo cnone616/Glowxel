@@ -55,8 +55,10 @@ public:
   // 画板模式相关
   static uint8_t canvasBuffer[64][64][3]; // [y][x][rgb]
   static uint16_t backgroundBuffer[64][64]; // 静态背景缓存，用于时钟脏区恢复
+  static uint16_t animationBuffer[64][64];  // 动画帧缓存，避免清屏闪烁
   static bool canvasInitialized;
   static bool backgroundValid;
+  static bool animationBufferValid;
   static bool receivingPixels;  // 正在接收背景像素，暂不刷新时钟
   
   // 黑色像素坐标存储

@@ -7,68 +7,27 @@ require("dotenv").config({
   path: require("path").join(__dirname, "../../.env"),
 });
 const db = require("./db");
-const fs = require("fs");
-const path = require("path");
-const crypto = require("crypto");
-
-const hashPassword = (pwd) =>
-  crypto
-    .createHash("sha256")
-    .update(pwd + (process.env.PWD_SALT || "glowxel"))
-    .digest("hex");
+const { hashAdminPassword } = require("../services/adminPasswordService");
+const { runMigrations } = require("./migrationService");
 
 async function seed() {
   console.log("=== RenLight 数据库初始化 ===\n");
 
-  // 1. 执行 init.sql 建表
-  console.log("[1/6] 执行建表脚本...");
-  const initSql = fs.readFileSync(path.join(__dirname, "init.sql"), "utf8");
-  const statements = initSql
-    .split(";")
-    .map((s) => s.trim())
-    .filter((s) => s.length > 0 && !s.startsWith("--"));
-  for (const stmt of statements) {
-    try {
-      await db.query(stmt);
-    } catch (e) {
-      if (
-        !e.message.includes("already exists") &&
-        !e.message.includes("Duplicate")
-      ) {
-        console.log("  ! SQL错误:", e.message.substring(0, 80));
-      }
-    }
-  }
-  console.log("  ✓ 表结构就绪");
-
-  // 2. 补充字段
-  console.log("[2/6] 检查字段更新...");
-  const alterColumns = [
-    [
-      "ALTER TABLE users ADD COLUMN role ENUM('user','admin') DEFAULT 'user' AFTER status",
-      "role",
-    ],
-    [
-      "ALTER TABLE users ADD COLUMN admin_username VARCHAR(50) NULL AFTER role",
-      "admin_username",
-    ],
-    [
-      "ALTER TABLE users ADD COLUMN admin_password VARCHAR(64) NULL AFTER admin_username",
-      "admin_password",
-    ],
-  ];
-  for (const [sql, col] of alterColumns) {
-    try {
-      await db.query(sql);
-      console.log(`  ✓ users 表添加 ${col} 字段`);
-    } catch (e) {
-      if (e.code === "ER_DUP_FIELDNAME") console.log(`  - ${col} 字段已存在`);
-      else console.log("  !", e.message);
-    }
+  // 1. 执行迁移
+  console.log("[1/5] 执行迁移脚本...");
+  const { executedVersions } = await runMigrations({
+    logger: (message) => {
+      console.log(`  - ${message}`);
+    },
+  });
+  if (executedVersions.length) {
+    console.log(`  ✓ 已执行 ${executedVersions.length} 条迁移`);
+  } else {
+    console.log("  ✓ 无待执行迁移");
   }
 
-  // 3. 插入用户
-  console.log("[3/6] 插入用户数据...");
+  // 2. 插入用户
+  console.log("[2/5] 插入用户数据...");
   const users = [
     [
       1,
@@ -126,12 +85,12 @@ async function seed() {
   await db.query("UPDATE users SET role='admin' WHERE id=1");
   await db.query(
     "UPDATE users SET admin_username=?, admin_password=? WHERE id=1",
-    ["along", hashPassword("along.0408")],
+    ["along", await hashAdminPassword("along.0408")],
   );
-  console.log("  ✓ " + users.length + " 个用户（#1 为管理员，账号: along）");
+  console.log("  ✓ " + users.length + " 个用户（#1 为管理员，账号: along，密码哈希已切换为 bcrypt）");
 
-  // 4. 插入作品
-  console.log("[4/6] 插入作品数据...");
+  // 3. 插入作品
+  console.log("[3/5] 插入作品数据...");
   const artworks = [
     [
       1,
@@ -271,8 +230,8 @@ async function seed() {
   }
   console.log("  ✓ " + artworks.length + " 个作品");
 
-  // 5. 插入模板
-  console.log("[5/6] 插入模板数据...");
+  // 4. 插入模板
+  console.log("[4/5] 插入模板数据...");
   const templates = [
     [
       1,
@@ -372,8 +331,8 @@ async function seed() {
   }
   console.log("  ✓ " + templates.length + " 个模板");
 
-  // 6. 插入挑战 + 固件版本
-  console.log("[6/6] 插入挑战和固件数据...");
+  // 5. 插入挑战 + 固件版本
+  console.log("[5/5] 插入挑战和固件数据...");
   const challenges = [
     [
       1,

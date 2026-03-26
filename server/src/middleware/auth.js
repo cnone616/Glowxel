@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const db = require('../config/db');
+const serverLogger = require('../services/serverLogger');
 
 // JWT 鉴权中间件
 const auth = (req, res, next) => {
@@ -31,6 +32,11 @@ const optionalAuth = (req, res, next) => {
 const adminAuth = async (req, res, next) => {
   const token = req.headers.authorization?.replace('Bearer ', '');
   if (!token) {
+    serverLogger.warn('admin_auth_missing_token', {
+      path: req.originalUrl,
+      method: req.method,
+      ip: serverLogger.getClientIp(req)
+    });
     return res.status(401).json({ code: 401, message: '未登录' });
   }
   try {
@@ -39,10 +45,22 @@ const adminAuth = async (req, res, next) => {
     // 检查是否是管理员
     const [rows] = await db.query('SELECT role FROM users WHERE id = ?', [decoded.id]);
     if (!rows.length || rows[0].role !== 'admin') {
+      serverLogger.warn('admin_auth_forbidden', {
+        path: req.originalUrl,
+        method: req.method,
+        ip: serverLogger.getClientIp(req),
+        userId: decoded.id || null
+      });
       return res.status(403).json({ code: 403, message: '无管理员权限' });
     }
     next();
   } catch (err) {
+    serverLogger.warn('admin_auth_invalid_token', {
+      path: req.originalUrl,
+      method: req.method,
+      ip: serverLogger.getClientIp(req),
+      message: err.message
+    });
     return res.status(401).json({ code: 401, message: 'token 无效或已过期' });
   }
 };
@@ -82,7 +100,7 @@ const rateLimit = (maxRequests = 60, windowMs = 60000) => {
 };
 
 // 定期清理过期的限流记录
-setInterval(() => {
+const rateLimitCleanupTimer = setInterval(() => {
   const now = Date.now();
   for (const ip in rateLimitStore) {
     if (now > rateLimitStore[ip].resetTime) {
@@ -91,5 +109,6 @@ setInterval(() => {
   }
 }, 300000); // 5分钟清理一次
 
-module.exports = { auth, optionalAuth, adminAuth, deviceAuth, rateLimit };
+rateLimitCleanupTimer.unref();
 
+module.exports = { auth, optionalAuth, adminAuth, deviceAuth, rateLimit };

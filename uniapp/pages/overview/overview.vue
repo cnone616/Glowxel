@@ -347,20 +347,15 @@
 
 <script>
 import { useProjectStore } from "../../store/project.js";
-import { useUserStore } from "../../store/user.js";
 import { useToast } from "../../composables/useToast.js";
 import statusBarMixin from "../../mixins/statusBar.js";
 import Icon from "../../components/Icon.vue";
 import Toast from "../../components/Toast.vue";
 import ConfirmModal from "../../components/ConfirmModal.vue";
-import {
-  exportCanvasAsImage,
-  saveImageToAlbum,
-} from "../../utils/exportCanvas.js";
-import { getCloudProjects, deleteCloudProject } from "../../api/project.js";
+import overviewActionMixin from "./mixins/overviewActionMixin.js";
 
 export default {
-  mixins: [statusBarMixin],
+  mixins: [statusBarMixin, overviewActionMixin],
   name: "OverviewPage",
   components: {
     Icon,
@@ -632,18 +627,8 @@ export default {
       });
     },
 
-    scrollToCol(col) {
-      // 列跳转暂时不需要，已删除横向索引
-    },
-
     handleBack() {
       uni.navigateBack();
-    },
-
-    goToFullEditor() {
-      uni.navigateTo({
-        url: `/pages/editor/editor?id=${this.projectId}`,
-      });
     },
 
     goToEditor() {
@@ -672,103 +657,6 @@ export default {
       this.showExportConfirm = true;
     },
 
-    async handleExportBoard(board) {
-      try {
-        this.toast.showInfo("正在生成图纸...");
-
-        // 实时计算像素数据
-        const boardPixels = this.getBoardPixels(board.x, board.y);
-
-        const tempFilePath = await exportCanvasAsImage({
-          pixels: boardPixels,
-          width: 64,
-          height: 64,
-          projectName: `${this.project?.name || "未命名"} - ${board.id}`,
-          palette: this.project?.palette,
-          cellSize: 30,
-          showGrid: true,
-          showCoordinates: true,
-          showColorCodes: true,
-          showStatistics: true,
-          showLogo: true,
-          canvasId: "exportCanvas",
-        });
-
-        await saveImageToAlbum(tempFilePath);
-        this.toast.showSuccess(`画布 ${board.id} 已保存到相册`);
-      } catch (error) {
-        console.error("导出失败:", error);
-        this.toast.showError(error.message || "导出失败，请重试");
-      }
-    },
-
-    async handleBatchExport() {
-      if (this.isExporting || !this.project) return;
-
-      // 显示确认弹窗
-      this.exportType = "batch";
-      this.showExportConfirm = true;
-    },
-
-    async performBatchExport() {
-      if (this.isExporting || !this.project) return;
-
-      this.isExporting = true;
-      this.toast.showInfo("正在生成完整图纸...");
-
-      try {
-        // 根据画布大小动态调整 cellSize
-        const width = this.project.paddedWidth || this.project.width;
-        const height = this.project.paddedHeight || this.project.height;
-        const maxDimension = Math.max(width, height);
-        let cellSize = 30;
-
-        // 根据最大边长调整 cellSize
-        if (maxDimension >= 520) {
-          cellSize = 7;
-        } else if (maxDimension >= 400) {
-          cellSize = 9;
-        } else if (maxDimension >= 300) {
-          cellSize = 12;
-        } else if (maxDimension >= 200) {
-          cellSize = 18;
-        } else if (maxDimension >= 100) {
-          cellSize = 25;
-        }
-
-        console.log(`画布尺寸: ${width}x${height}, 使用 cellSize: ${cellSize}`);
-
-        // 直接使用全局像素数据，不需要遍历boards
-        const tempFilePath = await exportCanvasAsImage({
-          pixels: this.pixels,
-          width: width,
-          height: height,
-          projectName: this.project.name,
-          palette: this.project.palette,
-          cellSize: cellSize,
-          showGrid: true,
-          showCoordinates: true,
-          showColorCodes: true,
-          showStatistics: true,
-          showLogo: true,
-          canvasId: "exportCanvas",
-        });
-
-        await saveImageToAlbum(tempFilePath);
-        this.toast.showSuccess("完整图纸已保存到相册");
-      } catch (error) {
-        console.error("导出失败:", error);
-        // 如果是因为尺寸过大导致的错误，给出更友好的提示
-        if (error.message && error.message.includes("分块导出")) {
-          this.toast.showError("图纸过大，建议在下方选择单个看板导出");
-        } else {
-          this.toast.showError(error.message || "导出失败，请重试");
-        }
-      } finally {
-        this.isExporting = false;
-      }
-    },
-
     handleEdit() {
       this.newProjectName = this.project?.name || "";
       this.showRenameModal = true;
@@ -791,86 +679,6 @@ export default {
 
     handleDeleteClick() {
       this.showDeleteConfirm = true;
-    },
-
-    confirmExport() {
-      this.showExportConfirm = false;
-
-      if (this.exportType === "batch") {
-        // 批量导出
-        this.performBatchExport();
-      } else if (this.exportType === "single") {
-        // 单个看板导出
-        const board = this.boards.find((b) => b.id === this.exportBoardData);
-        if (board) {
-          this.selectedBoard = null;
-          this.handleExportBoard(board);
-        }
-      }
-    },
-
-    async confirmDelete() {
-      if (!this.project) return;
-
-      // 检查是否已登录且开启云同步
-      const userStore = useUserStore();
-
-      if (userStore.hasLogin && userStore.syncEnabled) {
-        // 显示删除云端备份确认弹窗
-        this.showDeleteCloudModal = true;
-      } else {
-        // 未登录或未开启云同步，直接删除本地
-        this.deleteProjectLocal();
-      }
-    },
-
-    // 删除本地项目
-    deleteProjectLocal() {
-      this.projectStore.deleteProject(this.project.id);
-      this.toast.showSuccess("本地画布已删除");
-      uni.switchTab({
-        url: "/pages/workspace/workspace",
-      });
-    },
-
-    // 删除本地和云端项目
-    async deleteProjectWithCloud() {
-      uni.showLoading({ title: "删除中..." });
-
-      try {
-        // 先获取云端项目
-        const cloudRes = await getCloudProjects();
-        if (cloudRes.success && cloudRes.data) {
-          const cloudProject = cloudRes.data.list.find(
-            (p) => p.id === this.project.id,
-          );
-          if (cloudProject) {
-            // 删除云端项目
-            await deleteCloudProject(cloudProject.id);
-          }
-        }
-
-        // 删除本地项目
-        this.projectStore.deleteProject(this.project.id);
-
-        uni.hideLoading();
-        this.toast.showSuccess("本地和云端画布已删除");
-        uni.switchTab({
-          url: "/pages/workspace/workspace",
-        });
-      } catch (error) {
-        uni.hideLoading();
-        console.error("删除云端项目失败:", error);
-        this.toast.showError("云端删除失败，仅删除了本地");
-
-        // 即使云端删除失败，也删除本地
-        this.projectStore.deleteProject(this.project.id);
-        setTimeout(() => {
-          uni.switchTab({
-            url: "/pages/workspace/workspace",
-          });
-        }, 1500);
-      }
     },
   },
 };

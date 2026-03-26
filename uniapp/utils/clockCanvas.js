@@ -1,243 +1,587 @@
 // 闹钟 Canvas 绘制工具
-// 5x7 点阵字体数据
+
+// 5x7 点阵字体数据（列位图）
 export const font5x7 = {
-  '0': [0x3E, 0x51, 0x49, 0x45, 0x3E],
-  '1': [0x00, 0x42, 0x7F, 0x40, 0x00],
-  '2': [0x42, 0x61, 0x51, 0x49, 0x46],
-  '3': [0x21, 0x41, 0x45, 0x4B, 0x31],
-  '4': [0x18, 0x14, 0x12, 0x7F, 0x10],
-  '5': [0x27, 0x45, 0x45, 0x45, 0x39],
-  '6': [0x3C, 0x4A, 0x49, 0x49, 0x30],
-  '7': [0x01, 0x71, 0x09, 0x05, 0x03],
-  '8': [0x36, 0x49, 0x49, 0x49, 0x36],
-  '9': [0x06, 0x49, 0x49, 0x29, 0x1E],
-  ':': [0x00, 0x36, 0x36, 0x00, 0x00],
-  '-': [0x08, 0x08, 0x08, 0x08, 0x08],
-  '/': [0x20, 0x10, 0x08, 0x04, 0x02],
-  ' ': [0x00, 0x00, 0x00, 0x00, 0x00],
-  
-  // 英文字母（大写）
-  'A': [0x7E, 0x09, 0x09, 0x09, 0x7E],
-  'B': [0x7F, 0x49, 0x49, 0x49, 0x36],
-  'C': [0x3E, 0x41, 0x41, 0x41, 0x22],
-  'D': [0x7F, 0x41, 0x41, 0x22, 0x1C],
-  'E': [0x7F, 0x49, 0x49, 0x49, 0x41],
-  'F': [0x7F, 0x09, 0x09, 0x09, 0x01],
-  'G': [0x3E, 0x41, 0x49, 0x49, 0x7A],
-  'H': [0x7F, 0x08, 0x08, 0x08, 0x7F],
-  'I': [0x00, 0x41, 0x7F, 0x41, 0x00],
-  'J': [0x20, 0x40, 0x41, 0x3F, 0x01],
-  'K': [0x7F, 0x08, 0x14, 0x22, 0x41],
-  'L': [0x7F, 0x40, 0x40, 0x40, 0x40],
-  'M': [0x7F, 0x02, 0x0C, 0x02, 0x7F],
-  'N': [0x7F, 0x04, 0x08, 0x10, 0x7F],
-  'O': [0x3E, 0x41, 0x41, 0x41, 0x3E],
-  'P': [0x7F, 0x09, 0x09, 0x09, 0x06],
-  'Q': [0x3E, 0x41, 0x51, 0x21, 0x5E],
-  'R': [0x7F, 0x09, 0x19, 0x29, 0x46],
-  'S': [0x46, 0x49, 0x49, 0x49, 0x31],
-  'T': [0x01, 0x01, 0x7F, 0x01, 0x01],
-  'U': [0x3F, 0x40, 0x40, 0x40, 0x3F],
-  'V': [0x1F, 0x20, 0x40, 0x20, 0x1F],
-  'W': [0x3F, 0x40, 0x38, 0x40, 0x3F],
-  'X': [0x63, 0x14, 0x08, 0x14, 0x63],
-  'Y': [0x07, 0x08, 0x70, 0x08, 0x07],
-  'Z': [0x61, 0x51, 0x49, 0x45, 0x43],
-  
-  // 英文字母（小写）
-  'a': [0x20, 0x54, 0x54, 0x54, 0x78],
-  'b': [0x7F, 0x48, 0x44, 0x44, 0x38],
-  'c': [0x38, 0x44, 0x44, 0x44, 0x20],
-  'd': [0x38, 0x44, 0x44, 0x48, 0x7F],
-  'e': [0x38, 0x54, 0x54, 0x54, 0x18],
-  'f': [0x08, 0x7E, 0x09, 0x01, 0x02],
-  'g': [0x0C, 0x52, 0x52, 0x52, 0x3E],
-  'h': [0x7F, 0x08, 0x04, 0x04, 0x78],
-  'i': [0x00, 0x44, 0x7D, 0x40, 0x00],
-  'j': [0x20, 0x40, 0x44, 0x3D, 0x00],
-  'k': [0x7F, 0x10, 0x28, 0x44, 0x00],
-  'l': [0x00, 0x41, 0x7F, 0x40, 0x00],
-  'm': [0x7C, 0x04, 0x18, 0x04, 0x78],
-  'n': [0x7C, 0x08, 0x04, 0x04, 0x78],
-  'o': [0x38, 0x44, 0x44, 0x44, 0x38],
-  'p': [0x7C, 0x14, 0x14, 0x14, 0x08],
-  'q': [0x08, 0x14, 0x14, 0x18, 0x7C],
-  'r': [0x7C, 0x08, 0x04, 0x04, 0x08],
-  's': [0x48, 0x54, 0x54, 0x54, 0x20],
-  't': [0x04, 0x3F, 0x44, 0x40, 0x20],
-  'u': [0x3C, 0x40, 0x40, 0x20, 0x7C],
-  'v': [0x1C, 0x20, 0x40, 0x20, 0x1C],
-  'w': [0x3C, 0x40, 0x30, 0x40, 0x3C],
-  'x': [0x44, 0x28, 0x10, 0x28, 0x44],
-  'y': [0x0C, 0x50, 0x50, 0x50, 0x3C],
-  'z': [0x44, 0x64, 0x54, 0x4C, 0x44],
-  
-  // 中文字符（简化版）
-  '月': [0x7F, 0x49, 0x49, 0x49, 0x7F],
-  '日': [0x7F, 0x41, 0x41, 0x41, 0x7F],
-  '一': [0x00, 0x00, 0x7F, 0x00, 0x00],
-  '二': [0x00, 0x7F, 0x00, 0x7F, 0x00],
-  '三': [0x7F, 0x00, 0x7F, 0x00, 0x7F],
-  '四': [0x7F, 0x49, 0x49, 0x49, 0x7F],
-  '五': [0x7F, 0x09, 0x09, 0x09, 0x7F],
-  '六': [0x7F, 0x09, 0x7F, 0x49, 0x7F],
-  '周': [0x7F, 0x49, 0x49, 0x49, 0x7F]
-}
+  "0": [0x3e, 0x51, 0x49, 0x45, 0x3e],
+  "1": [0x00, 0x42, 0x7f, 0x40, 0x00],
+  "2": [0x42, 0x61, 0x51, 0x49, 0x46],
+  "3": [0x21, 0x41, 0x45, 0x4b, 0x31],
+  "4": [0x18, 0x14, 0x12, 0x7f, 0x10],
+  "5": [0x27, 0x45, 0x45, 0x45, 0x39],
+  "6": [0x3c, 0x4a, 0x49, 0x49, 0x30],
+  "7": [0x01, 0x71, 0x09, 0x05, 0x03],
+  "8": [0x36, 0x49, 0x49, 0x49, 0x36],
+  "9": [0x06, 0x49, 0x49, 0x29, 0x1e],
+  ":": [0x00, 0x36, 0x36, 0x00, 0x00],
+  "-": [0x08, 0x08, 0x08, 0x08, 0x08],
+  "/": [0x20, 0x10, 0x08, 0x04, 0x02],
+  " ": [0x00, 0x00, 0x00, 0x00, 0x00],
 
-// 3x5 点阵字体（与 ESP32 FONT3X5 完全一致）
-// 每字符5行，每行3bit: bit2=左列, bit1=中列, bit0=右列
+  A: [0x7e, 0x09, 0x09, 0x09, 0x7e],
+  B: [0x7f, 0x49, 0x49, 0x49, 0x36],
+  C: [0x3e, 0x41, 0x41, 0x41, 0x22],
+  D: [0x7f, 0x41, 0x41, 0x22, 0x1c],
+  E: [0x7f, 0x49, 0x49, 0x49, 0x41],
+  F: [0x7f, 0x09, 0x09, 0x09, 0x01],
+  G: [0x3e, 0x41, 0x49, 0x49, 0x7a],
+  H: [0x7f, 0x08, 0x08, 0x08, 0x7f],
+  I: [0x00, 0x41, 0x7f, 0x41, 0x00],
+  J: [0x20, 0x40, 0x41, 0x3f, 0x01],
+  K: [0x7f, 0x08, 0x14, 0x22, 0x41],
+  L: [0x7f, 0x40, 0x40, 0x40, 0x40],
+  M: [0x7f, 0x02, 0x0c, 0x02, 0x7f],
+  N: [0x7f, 0x04, 0x08, 0x10, 0x7f],
+  O: [0x3e, 0x41, 0x41, 0x41, 0x3e],
+  P: [0x7f, 0x09, 0x09, 0x09, 0x06],
+  Q: [0x3e, 0x41, 0x51, 0x21, 0x5e],
+  R: [0x7f, 0x09, 0x19, 0x29, 0x46],
+  S: [0x46, 0x49, 0x49, 0x49, 0x31],
+  T: [0x01, 0x01, 0x7f, 0x01, 0x01],
+  U: [0x3f, 0x40, 0x40, 0x40, 0x3f],
+  V: [0x1f, 0x20, 0x40, 0x20, 0x1f],
+  W: [0x3f, 0x40, 0x38, 0x40, 0x3f],
+  X: [0x63, 0x14, 0x08, 0x14, 0x63],
+  Y: [0x07, 0x08, 0x70, 0x08, 0x07],
+  Z: [0x61, 0x51, 0x49, 0x45, 0x43],
+};
+
+// 3x5 点阵字体（与 ESP32 侧基础字模一致）
 export const font3x5 = {
-  '0':[7,5,5,5,7],'1':[2,6,2,2,7],'2':[7,1,7,4,7],'3':[7,1,7,1,7],
-  '4':[5,5,7,1,1],'5':[7,4,7,1,7],'6':[7,4,7,5,7],'7':[7,1,1,1,1],
-  '8':[7,5,7,5,7],'9':[7,5,7,1,7],
-  '.':[0,0,0,0,2],':':[0,2,0,2,0],'-':[0,0,7,0,0],' ':[0,0,0,0,0],
-  'A':[2,5,7,5,5],'B':[6,5,6,5,6],'C':[7,4,4,4,7],'D':[6,5,5,5,6],
-  'E':[7,4,7,4,7],'F':[7,4,7,4,4],'G':[7,4,5,5,7],'H':[5,5,7,5,5],
-  'I':[7,2,2,2,7],'J':[3,1,1,5,7],'K':[5,6,4,6,5],'L':[4,4,4,4,7],
-  'M':[5,7,5,5,5],'N':[5,7,7,5,5],'O':[7,5,5,5,7],'P':[7,5,7,4,4],
-  'Q':[7,5,5,7,1],'R':[7,5,7,6,5],'S':[7,4,7,1,7],'T':[7,2,2,2,2],
-  'U':[5,5,5,5,7],'V':[5,5,5,2,2],'W':[5,5,5,7,5],'X':[5,5,2,5,5],
-  'Y':[5,5,2,2,2],'Z':[7,1,2,4,7],
-  'a':[0,7,5,5,7],'b':[4,6,5,5,6],'c':[0,7,4,4,7],'d':[1,3,5,5,3],
-  'e':[0,7,5,7,4],'f':[3,4,7,4,4],'g':[7,5,7,1,7],'h':[4,4,6,5,5],
-  'i':[2,0,2,2,2],'k':[4,5,6,5,5],'l':[6,2,2,2,7],'m':[0,5,7,5,5],
-  'n':[0,6,5,5,5],'o':[0,7,5,5,7],'p':[7,5,7,4,4],'r':[0,7,4,4,4],
-  's':[7,4,7,1,7],'t':[4,7,4,4,3],'u':[0,5,5,5,7],'w':[0,5,5,7,5],
-  'x':[0,5,2,2,5],'y':[5,5,7,1,7]
-}
+  "0": [7, 5, 5, 5, 7],
+  "1": [2, 6, 2, 2, 7],
+  "2": [7, 1, 7, 4, 7],
+  "3": [7, 1, 7, 1, 7],
+  "4": [5, 5, 7, 1, 1],
+  "5": [7, 4, 7, 1, 7],
+  "6": [7, 4, 7, 5, 7],
+  "7": [7, 1, 1, 1, 1],
+  "8": [7, 5, 7, 5, 7],
+  "9": [7, 5, 7, 1, 7],
+  ".": [0, 0, 0, 0, 2],
+  ":": [0, 2, 0, 2, 0],
+  "-": [0, 0, 7, 0, 0],
+  " ": [0, 0, 0, 0, 0],
+  A: [2, 5, 7, 5, 5],
+  B: [6, 5, 6, 5, 6],
+  C: [7, 4, 4, 4, 7],
+  D: [6, 5, 5, 5, 6],
+  E: [7, 4, 7, 4, 7],
+  F: [7, 4, 7, 4, 4],
+  G: [7, 4, 5, 5, 7],
+  H: [5, 5, 7, 5, 5],
+  I: [7, 2, 2, 2, 7],
+  J: [3, 1, 1, 5, 7],
+  K: [5, 6, 4, 6, 5],
+  L: [4, 4, 4, 4, 7],
+  M: [5, 7, 5, 5, 5],
+  N: [5, 7, 7, 5, 5],
+  O: [7, 5, 5, 5, 7],
+  P: [7, 5, 7, 4, 4],
+  Q: [7, 5, 5, 7, 1],
+  R: [7, 5, 7, 6, 5],
+  S: [7, 4, 7, 1, 7],
+  T: [7, 2, 2, 2, 2],
+  U: [5, 5, 5, 5, 7],
+  V: [5, 5, 5, 2, 2],
+  W: [5, 5, 5, 7, 5],
+  X: [5, 5, 2, 5, 5],
+  Y: [5, 5, 2, 2, 2],
+  Z: [7, 1, 2, 4, 7],
+};
 
-// 绘制单个字符到像素 Map（3x5 字体，与 ESP32 drawTinyText 一致）
-export function drawTinyCharToPixels(char, x, y, color, pixelMap, size = 1) {
-  const glyph = font3x5[char]
-  if (!glyph) return 4 * size
-  for (let row = 0; row < 5; row++) {
-    const bits = glyph[row]
-    for (let sy = 0; sy < size; sy++) {
-      for (let sx = 0; sx < size; sx++) {
-        if (bits & 4) { const px = x + sx,       py = y + row * size + sy; if (px >= 0 && px < 64 && py >= 0 && py < 64) pixelMap.set(`${px},${py}`, color) }
-        if (bits & 2) { const px = x + size + sx, py = y + row * size + sy; if (px >= 0 && px < 64 && py >= 0 && py < 64) pixelMap.set(`${px},${py}`, color) }
-        if (bits & 1) { const px = x + size*2 + sx, py = y + row * size + sy; if (px >= 0 && px < 64 && py >= 0 && py < 64) pixelMap.set(`${px},${py}`, color) }
+const CLOCK_FONT_OPTIONS = [
+  {
+    id: "classic_5x7",
+    name: "5x7 经典",
+    width: 5,
+    height: 7,
+    spacing: 1,
+    previewColor: "#00ff9d",
+    previewBg: "#0f221b",
+    glyphs: {
+      "0": [14, 17, 19, 21, 25, 17, 14],
+      "1": [4, 12, 4, 4, 4, 4, 14],
+      "2": [14, 17, 1, 2, 4, 8, 31],
+      "3": [30, 1, 1, 14, 1, 1, 30],
+      "4": [2, 6, 10, 18, 31, 2, 2],
+      "5": [31, 16, 30, 1, 1, 17, 14],
+      "6": [6, 8, 16, 30, 17, 17, 14],
+      "7": [31, 1, 2, 4, 8, 8, 8],
+      "8": [14, 17, 17, 14, 17, 17, 14],
+      "9": [14, 17, 17, 15, 1, 2, 12],
+      ":": [0, 12, 12, 0, 12, 12, 0],
+    },
+  },
+  {
+    id: "minimal_3x5",
+    name: "3x5 极简",
+    width: 3,
+    height: 5,
+    spacing: 1,
+    previewColor: "#ff6464",
+    previewBg: "#2a1212",
+    glyphs: {
+      "0": [7, 5, 5, 5, 7],
+      "1": [2, 6, 2, 2, 7],
+      "2": [7, 1, 7, 4, 7],
+      "3": [7, 1, 7, 1, 7],
+      "4": [5, 5, 7, 1, 1],
+      "5": [7, 4, 7, 1, 7],
+      "6": [7, 4, 7, 5, 7],
+      "7": [7, 1, 2, 2, 2],
+      "8": [7, 5, 7, 5, 7],
+      "9": [7, 5, 7, 1, 7],
+      ":": [0, 2, 0, 2, 0],
+    },
+  },
+  {
+    id: "rounded_4x6",
+    name: "4x6 圆润",
+    width: 4,
+    height: 6,
+    spacing: 1,
+    previewColor: "#64c8ff",
+    previewBg: "#10202a",
+    glyphs: {
+      "0": [6, 9, 9, 9, 9, 6],
+      "1": [4, 12, 4, 4, 4, 14],
+      "2": [6, 9, 1, 2, 4, 15],
+      "3": [14, 1, 6, 1, 1, 14],
+      "4": [2, 6, 10, 15, 2, 2],
+      "5": [15, 8, 14, 1, 9, 6],
+      "6": [6, 8, 14, 9, 9, 6],
+      "7": [15, 1, 2, 4, 4, 4],
+      "8": [6, 9, 6, 9, 9, 6],
+      "9": [6, 9, 9, 7, 1, 6],
+      ":": [0, 4, 0, 0, 4, 0],
+    },
+  },
+  {
+    id: "lcd_6x8",
+    name: "6x8 LCD",
+    width: 6,
+    height: 8,
+    spacing: 1,
+    previewColor: "#ffb020",
+    previewBg: "#261b08",
+    glyphs: {
+      "0": [30, 51, 33, 33, 33, 33, 51, 30],
+      "1": [12, 28, 12, 12, 12, 12, 12, 63],
+      "2": [30, 51, 3, 6, 12, 24, 48, 63],
+      "3": [62, 3, 3, 14, 3, 3, 3, 62],
+      "4": [6, 14, 22, 38, 63, 6, 6, 6],
+      "5": [63, 48, 48, 62, 3, 3, 51, 30],
+      "6": [14, 24, 48, 62, 51, 51, 51, 30],
+      "7": [63, 3, 6, 12, 24, 24, 24, 24],
+      "8": [30, 51, 51, 30, 51, 51, 51, 30],
+      "9": [30, 51, 51, 31, 3, 6, 12, 56],
+      ":": [0, 12, 12, 0, 0, 12, 12, 0],
+    },
+  },
+  {
+    id: "hollow_5x7",
+    name: "5x7 空心",
+    width: 5,
+    height: 7,
+    spacing: 1,
+    previewColor: "#5ba8ff",
+    previewBg: "#101a2b",
+    glyphs: {
+      "0": [14, 17, 17, 17, 17, 17, 14],
+      "1": [4, 12, 4, 4, 4, 4, 4],
+      "2": [14, 17, 1, 2, 4, 8, 31],
+      "3": [30, 1, 1, 14, 1, 1, 30],
+      "4": [2, 6, 10, 18, 31, 2, 2],
+      "5": [31, 16, 30, 1, 1, 17, 14],
+      "6": [6, 8, 16, 30, 17, 17, 14],
+      "7": [31, 1, 2, 4, 8, 8, 8],
+      "8": [14, 17, 17, 14, 17, 17, 14],
+      "9": [14, 17, 17, 15, 1, 2, 12],
+      ":": [0, 8, 0, 0, 0, 8, 0],
+    },
+  },
+  {
+    id: "seven_seg_5x7",
+    name: "5x7 七段",
+    width: 5,
+    height: 7,
+    spacing: 1,
+    previewColor: "#ff4f88",
+    previewBg: "#2b101b",
+    glyphs: {
+      "0": [31, 17, 17, 17, 17, 17, 31],
+      "1": [1, 1, 1, 1, 1, 1, 1],
+      "2": [31, 1, 1, 31, 16, 16, 31],
+      "3": [31, 1, 1, 31, 1, 1, 31],
+      "4": [17, 17, 17, 31, 1, 1, 1],
+      "5": [31, 16, 16, 31, 1, 1, 31],
+      "6": [31, 16, 16, 31, 17, 17, 31],
+      "7": [31, 1, 1, 1, 1, 1, 1],
+      "8": [31, 17, 17, 31, 17, 17, 31],
+      "9": [31, 17, 17, 31, 1, 1, 31],
+      ":": [0, 4, 0, 0, 0, 4, 0],
+    },
+  },
+  {
+    id: "italic_6x7",
+    name: "6x7 斜体",
+    width: 6,
+    height: 7,
+    spacing: 1,
+    previewColor: "#7cff7c",
+    previewBg: "#102612",
+    glyphs: {
+      "0": [14, 17, 18, 20, 24, 32, 60],
+      "1": [4, 12, 4, 4, 8, 8, 28],
+      "2": [14, 17, 2, 4, 8, 16, 62],
+      "3": [30, 1, 2, 12, 2, 1, 30],
+      "4": [2, 6, 10, 18, 31, 4, 4],
+      "5": [31, 16, 30, 1, 1, 18, 12],
+      "6": [6, 8, 16, 30, 17, 18, 12],
+      "7": [31, 1, 2, 4, 8, 8, 16],
+      "8": [14, 17, 18, 12, 18, 33, 30],
+      "9": [14, 17, 18, 15, 2, 4, 24],
+      ":": [0, 8, 0, 0, 16, 0, 0],
+    },
+  },
+  {
+    id: "retro_5x7",
+    name: "5x7 终端",
+    width: 5,
+    height: 7,
+    spacing: 1,
+    previewColor: "#8ef2ff",
+    previewBg: "#102728",
+    glyphs: {
+      "0": [31, 17, 19, 21, 25, 17, 31],
+      "1": [6, 14, 6, 6, 6, 6, 31],
+      "2": [31, 1, 1, 31, 16, 16, 31],
+      "3": [31, 1, 1, 31, 1, 1, 31],
+      "4": [17, 17, 17, 31, 1, 1, 1],
+      "5": [31, 16, 16, 31, 1, 1, 31],
+      "6": [31, 16, 16, 31, 17, 17, 31],
+      "7": [31, 1, 1, 1, 1, 1, 1],
+      "8": [31, 17, 17, 31, 17, 17, 31],
+      "9": [31, 17, 17, 31, 1, 1, 31],
+      ":": [0, 12, 0, 0, 0, 12, 0],
+    },
+  },
+];
+
+const CLOCK_FONT_MAP = CLOCK_FONT_OPTIONS.reduce((result, option) => {
+  result[option.id] = option;
+  return result;
+}, {});
+
+function getBase5x7Rows(char) {
+  const columns = font5x7[char];
+  if (!columns) {
+    return null;
+  }
+  const rows = [];
+  for (let row = 0; row < 7; row++) {
+    let bits = 0;
+    for (let col = 0; col < columns.length; col++) {
+      bits <<= 1;
+      if (columns[col] & (1 << row)) {
+        bits |= 1;
       }
     }
+    rows.push(bits);
   }
-  return (3 * size) + size  // 3列×size + 1px间距×size
+  return rows;
 }
 
-// 绘制文本到像素 Map（3x5 字体，支持 size 缩放和对齐）
-export function drawTinyTextToPixels(text, x, y, color, pixelMap, size = 1, align = 'left') {
-  const totalWidth = getTinyTextWidth(text, size)
-  let startX = x
-  if (align === 'center') startX = x - Math.floor(totalWidth / 2)
-  else if (align === 'right') startX = x - totalWidth
-  let cx = startX
-  for (let i = 0; i < text.length; i++) {
-    cx += drawTinyCharToPixels(text[i], cx, y, color, pixelMap, size)
+function rowsToMatrix(rows, width) {
+  return rows.map((rowBits) => {
+    const row = [];
+    for (let col = 0; col < width; col++) {
+      const mask = 1 << (width - col - 1);
+      row.push(rowBits & mask ? 1 : 0);
+    }
+    return row;
+  });
+}
+
+function scaleMatrix(matrix, width, height) {
+  const sourceHeight = matrix.length;
+  const sourceWidth = matrix[0].length;
+  const scaled = [];
+
+  for (let y = 0; y < height; y++) {
+    const sourceY = Math.floor((y * sourceHeight) / height);
+    const row = [];
+    for (let x = 0; x < width; x++) {
+      const sourceX = Math.floor((x * sourceWidth) / width);
+      row.push(matrix[sourceY][sourceX] ? 1 : 0);
+    }
+    scaled.push(row);
   }
+
+  return scaled;
 }
 
-// 计算 3x5 文本宽度（支持 size 缩放）
-export function getTinyTextWidth(text, size = 1) {
-  if (!text || text.length === 0) return 0
-  return text.length * 4 * size - size  // 每字符(3+1)×size，最后一个字符不加间距
-}
-export function hexToRgb(hex) {
-  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex)
-  return result ? {
-    r: parseInt(result[1], 16),
-    g: parseInt(result[2], 16),
-    b: parseInt(result[3], 16)
-  } : { r: 255, g: 255, b: 255 }
+function matrixToRows(matrix) {
+  return matrix.map((row) =>
+    row.reduce((bits, pixel) => (bits << 1) | (pixel ? 1 : 0), 0),
+  );
 }
 
-// 绘制单个字符到像素 Map
-export function drawCharToPixels(char, x, y, color, size, pixelMap) {
-  const fontData = font5x7[char]
-  if (!fontData) return 5 * size
-  
-  for (let col = 0; col < 5; col++) {
-    for (let row = 0; row < 8; row++) {
-      if (fontData[col] & (1 << row)) {
-        for (let sy = 0; sy < size; sy++) {
-          for (let sx = 0; sx < size; sx++) {
-            const px = x + col * size + sx
-            const py = y + row * size + sy
-            if (px >= 0 && px < 64 && py >= 0 && py < 64) {
-              pixelMap.set(`${px},${py}`, color)
-            }
+function createDashRows(width, height) {
+  const rows = new Array(height).fill(0);
+  rows[Math.floor(height / 2)] = (1 << width) - 1;
+  return rows;
+}
+
+function createEmptyRows(height) {
+  return new Array(height).fill(0);
+}
+
+function getGeneratedRows(font, char) {
+  if (char === " ") {
+    return createEmptyRows(font.height);
+  }
+  if (char === "-") {
+    return createDashRows(font.width, font.height);
+  }
+
+  const normalizedChar = /^[a-z]$/.test(char) ? char.toUpperCase() : char;
+  let baseRows = null;
+  let baseWidth = 5;
+
+  if (font.width === 3 && font.height === 5 && font3x5[normalizedChar]) {
+    baseRows = font3x5[normalizedChar];
+    baseWidth = 3;
+  } else {
+    baseRows = getBase5x7Rows(normalizedChar);
+    baseWidth = 5;
+  }
+
+  if (!baseRows) {
+    return createEmptyRows(font.height);
+  }
+
+  const matrix = rowsToMatrix(baseRows, baseWidth);
+  const scaledMatrix = scaleMatrix(matrix, font.width, font.height);
+  return matrixToRows(scaledMatrix);
+}
+
+export function getClockFontOptions() {
+  return CLOCK_FONT_OPTIONS;
+}
+
+export function getClockFont(fontId) {
+  return CLOCK_FONT_MAP[fontId];
+}
+
+export function getClockGlyphRows(fontId, char) {
+  const font = getClockFont(fontId);
+  const directGlyph = font.glyphs[char];
+  if (directGlyph) {
+    return directGlyph;
+  }
+  return getGeneratedRows(font, char);
+}
+
+export function drawClockCharToPixels(
+  char,
+  x,
+  y,
+  color,
+  pixelMap,
+  fontId,
+  size = 1,
+) {
+  const font = getClockFont(fontId);
+  const rows = getClockGlyphRows(fontId, char);
+
+  for (let row = 0; row < font.height; row++) {
+    const bits = rows[row];
+    for (let col = 0; col < font.width; col++) {
+      const mask = 1 << (font.width - col - 1);
+      if (!(bits & mask)) {
+        continue;
+      }
+      for (let sy = 0; sy < size; sy++) {
+        for (let sx = 0; sx < size; sx++) {
+          const px = x + col * size + sx;
+          const py = y + row * size + sy;
+          if (px >= 0 && px < 64 && py >= 0 && py < 64) {
+            pixelMap.set(`${px},${py}`, color);
           }
         }
       }
     }
   }
-  
-  return (5 + 1) * size
+
+  return (font.width + font.spacing) * size;
 }
 
-// 计算文本宽度（像素数）
-export function getTextWidth(text, size) {
-  let width = 0
+export function getClockTextWidth(text, fontId, size = 1) {
+  const font = getClockFont(fontId);
+  if (!text || text.length === 0) {
+    return 0;
+  }
+  return text.length * (font.width + font.spacing) * size - font.spacing * size;
+}
+
+export function getClockTextHeight(fontId, size = 1) {
+  const font = getClockFont(fontId);
+  return font.height * size;
+}
+
+export function drawClockTextToPixels(
+  text,
+  x,
+  y,
+  color,
+  pixelMap,
+  fontId,
+  size = 1,
+  align = "left",
+) {
+  const totalWidth = getClockTextWidth(text, fontId, size);
+  let startX = x;
+  if (align === "center") {
+    startX = x - Math.floor(totalWidth / 2);
+  } else if (align === "right") {
+    startX = x - totalWidth;
+  }
+
+  let currentX = startX;
   for (let i = 0; i < text.length; i++) {
-    const fontData = font5x7[text[i]]
-    if (fontData) {
-      width += (5 + 1) * size // 每个字符宽度 5 + 间距 1
+    currentX += drawClockCharToPixels(
+      text[i],
+      currentX,
+      y,
+      color,
+      pixelMap,
+      fontId,
+      size,
+    );
+  }
+}
+
+export function drawTinyCharToPixels(char, x, y, color, pixelMap, size = 1) {
+  return drawClockCharToPixels(
+    char,
+    x,
+    y,
+    color,
+    pixelMap,
+    "minimal_3x5",
+    size,
+  );
+}
+
+export function drawTinyTextToPixels(
+  text,
+  x,
+  y,
+  color,
+  pixelMap,
+  size = 1,
+  align = "left",
+) {
+  drawClockTextToPixels(
+    text,
+    x,
+    y,
+    color,
+    pixelMap,
+    "minimal_3x5",
+    size,
+    align,
+  );
+}
+
+export function getTinyTextWidth(text, size = 1) {
+  return getClockTextWidth(text, "minimal_3x5", size);
+}
+
+export function hexToRgb(hex) {
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  return result
+    ? {
+        r: parseInt(result[1], 16),
+        g: parseInt(result[2], 16),
+        b: parseInt(result[3], 16),
+      }
+    : { r: 255, g: 255, b: 255 };
+}
+
+export function drawCharToPixels(char, x, y, color, size, pixelMap) {
+  return drawClockCharToPixels(
+    char,
+    x,
+    y,
+    color,
+    pixelMap,
+    "classic_5x7",
+    size,
+  );
+}
+
+export function getTextWidth(text, size) {
+  return getClockTextWidth(text, "classic_5x7", size);
+}
+
+export function drawTextToPixels(
+  text,
+  x,
+  y,
+  color,
+  size,
+  pixelMap,
+  align = "left",
+) {
+  drawClockTextToPixels(
+    text,
+    x,
+    y,
+    color,
+    pixelMap,
+    "classic_5x7",
+    size,
+    align,
+  );
+}
+
+export function getCurrentTimeText(showSeconds, hourFormat) {
+  const now = new Date();
+  let hours = now.getHours();
+
+  if (hourFormat === 12) {
+    hours = hours % 12;
+    if (hours === 0) {
+      hours = 12;
     }
   }
-  return width
-}
 
-// 绘制文本到像素 Map（支持对齐）
-export function drawTextToPixels(text, x, y, color, size, pixelMap, align = 'left') {
-  // 计算文本总宽度
-  const totalWidth = getTextWidth(text, size)
-  
-  // 根据对齐方式调整起始 x 坐标
-  let startX = x
-  if (align === 'center') {
-    // 居中：x 是中心点，向左偏移一半宽度
-    startX = x - Math.floor(totalWidth / 2)
-  } else if (align === 'right') {
-    // 右对齐：x 是右边界，向左偏移整个宽度
-    startX = x - totalWidth
+  const hourText = String(hours).padStart(2, "0");
+  const minuteText = String(now.getMinutes()).padStart(2, "0");
+
+  if (showSeconds) {
+    const secondText = String(now.getSeconds()).padStart(2, "0");
+    return `${hourText}:${minuteText}:${secondText}`;
   }
-  // 左对齐：x 就是起始点，不需要调整
-  
-  // 绘制文本
-  let offsetX = 0
-  for (let i = 0; i < text.length; i++) {
-    offsetX += drawCharToPixels(text[i], startX + offsetX, y, color, size, pixelMap)
-  }
-  return offsetX
+
+  return `${hourText}:${minuteText}`;
 }
 
-// 获取当前时间文本
-export function getCurrentTimeText() {
-  const now = new Date()
-  const hours = String(now.getHours()).padStart(2, '0')
-  const minutes = String(now.getMinutes()).padStart(2, '0')
-  return `${hours}:${minutes}`
-}
-
-// 获取当前日期文本
 export function getCurrentDateText() {
-  const now = new Date()
-  const month = String(now.getMonth() + 1).padStart(2, '0')
-  const date = String(now.getDate()).padStart(2, '0')
-  return `${month}/${date}`
+  const now = new Date();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const date = String(now.getDate()).padStart(2, "0");
+  return `${month}-${date}`;
 }
 
-// 获取当前星期文本（英文缩写）
 export function getCurrentWeekText() {
-  const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-  const now = new Date()
-  return weekDays[now.getDay()]
+  const weekDays = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
+  const now = new Date();
+  return weekDays[now.getDay()];
 }
 
-// 将图片绘制到像素 Map
 export function drawImageToPixels(imageData, x, y, width, height, pixelMap) {
-  // imageData 是 base64 格式的图片
-  // 这里需要在 canvas 中处理，返回 Promise
-  return new Promise((resolve, reject) => {
-    // 这个函数需要在页面中调用，因为需要访问 canvas context
-    resolve()
-  })
+  return Promise.resolve();
 }

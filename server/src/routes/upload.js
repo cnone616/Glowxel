@@ -4,6 +4,17 @@ const path = require('path');
 const fs = require('fs');
 const { auth } = require('../middleware/auth');
 
+const getRequestBaseUrl = (req) => {
+  const forwardedProto = req.get('x-forwarded-proto');
+  const host = req.get('host');
+
+  if (forwardedProto) {
+    return `${forwardedProto}://${host}`;
+  }
+
+  return `${req.protocol}://${host}`;
+};
+
 // 存储配置
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -32,7 +43,7 @@ const upload = multer({
 router.post('/', auth, upload.single('file'), (req, res) => {
   if (!req.file) return res.json({ code: 400, message: '未收到文件' });
   const type = req.query.type || 'misc';
-  const url = `https://glowxel.com/uploads/${type}/${req.file.filename}`;
+  const url = `${getRequestBaseUrl(req)}/uploads/${type}/${req.file.filename}`;
   res.json({ code: 0, data: { url } });
 });
 
@@ -42,4 +53,3 @@ router.use((err, req, res, next) => {
 });
 
 module.exports = router;
-
