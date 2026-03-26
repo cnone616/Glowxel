@@ -259,21 +259,16 @@ import ColorPalette from "../../components/ColorPalette.vue";
 import HelpModal from "../../components/HelpModal.vue";
 import Toast from "../../components/Toast.vue";
 import Icon from "../../components/Icon.vue";
-import PublishButton from "../../components/PublishButton.vue";
-import {
-  exportCanvasAsImage,
-  saveImageToAlbum,
-} from "../../utils/exportCanvas.js";
+import editorPersistenceMixin from "./mixins/editorPersistenceMixin.js";
 
 export default {
-  mixins: [statusBarMixin],
+  mixins: [statusBarMixin, editorPersistenceMixin],
   components: {
     PixelCanvas,
     ColorPalette,
     HelpModal,
     Toast,
     Icon,
-    PublishButton,
   },
 
   data() {
@@ -281,8 +276,6 @@ export default {
       projectStore: null,
       toast: null,
 
-      showRenameModal: false,
-      newProjectName: "",
       projectId: "",
       boardId: "",
       project: null,
@@ -311,10 +304,6 @@ export default {
       // 状态
       showSaveConfirm: false,
       showLeaveConfirm: false,
-      showExportConfirm: false,
-      showSaveToAlbumConfirm: false,
-      showConnectModal: false,
-      exportedImagePath: "",
       hasUnsavedChanges: false,
       savedPixelsSnapshot: "",
       isHelpOpen: false,
@@ -360,32 +349,9 @@ export default {
       return status === "draft" || status === "rejected";
     },
 
-    // 是否可导出
-    isExportable() {
-      if (!this.project) return false;
-      if (this.project.source === "collected") return false;
-      if (this.project.permissions && !this.project.permissions.canExport)
-        return false;
-      return true;
-    },
-
-    // 是否可发布
-    isPublishable() {
-      if (!this.project) return false;
-      if (this.project.source === "collected") return false;
-      if (this.project.permissions && !this.project.permissions.canPublish)
-        return false;
-      const status = this.project.status || "draft";
-      return status === "draft" || status === "rejected";
-    },
-
     // 是否为收藏项目
     isCollectedProject() {
       return this.project && this.project.source === "collected";
-    },
-
-    deviceConnected() {
-      return this.deviceStore?.connected || false;
     },
 
     boardOffset() {
@@ -441,9 +407,6 @@ export default {
       return (
         this.showSaveConfirm ||
         this.showLeaveConfirm ||
-        this.showExportConfirm ||
-        this.showSaveToAlbumConfirm ||
-        this.showRenameModal ||
         this.isHelpOpen ||
         this.toastVisible
       );
@@ -529,13 +492,6 @@ export default {
     }
   },
 
-  onShow() {
-    // 隐藏 tabBar
-    uni.hideTabBar({
-      animation: false,
-    });
-  },
-
   onReady() {
     // 注册自定义 Toast 实例
     if (this.$refs.toastRef) {
@@ -591,77 +547,6 @@ export default {
   },
 
   methods: {
-    // ========== 设备同步方法 ==========
-    toggleDeviceSync() {
-      if (this.deviceConnected) {
-        // 断开连接
-        this.deviceStore.disconnect();
-        this.toast.showInfo("设备已断开");
-      } else {
-        // 显示连接弹窗
-        this.showConnectModal = true;
-      }
-    },
-
-    async handleConnectConfirm(ip) {
-      try {
-        const result = await this.deviceStore.connect(ip);
-        if (result.success) {
-          // 连接成功后立即同步当前画布
-          setTimeout(() => {
-            this.syncToDevice();
-          }, 500);
-
-          this.$refs.connectModal.onSuccess();
-          this.toast.showSuccess("设备已连接");
-        } else {
-          this.$refs.connectModal.onError("连接失败，请检查 IP 地址");
-        }
-      } catch (err) {
-        console.error("连接失败:", err);
-        this.$refs.connectModal.onError("连接失败，请检查 IP 地址");
-      }
-    },
-
-    handleConnectCancel() {
-      // 取消连接
-    },
-
-    // 同步整个画布到设备
-    async syncToDevice() {
-      if (!this.deviceConnected) return;
-
-      try {
-        const width = this.boardOffset.w;
-        const height = this.boardOffset.h;
-        const pixels = [];
-
-        // 转换画布数据为 RGB 数组
-        for (let y = 0; y < height; y++) {
-          for (let x = 0; x < width; x++) {
-            const key = `${x},${y}`;
-            const colorCode = this.pixels.get(key);
-
-            if (colorCode) {
-              const color = getColorByCode(colorCode);
-              if (color) {
-                pixels.push(color.r, color.g, color.b);
-              } else {
-                pixels.push(0, 0, 0);
-              }
-            } else {
-              pixels.push(0, 0, 0);
-            }
-          }
-        }
-
-        await this.deviceStore.sendImage(pixels, width, height);
-      } catch (err) {
-        console.error("同步到设备失败:", err);
-      }
-    },
-
-    // ========== 原有方法 ==========
     setTool(newTool) {
       if (this.tool !== newTool) {
         this.tool = newTool;
@@ -717,11 +602,6 @@ export default {
 
       this.history = newHistory;
       this.historyIndex = newHistory.length - 1;
-
-      // 同步到设备
-      if (this.deviceConnected) {
-        this.syncToDevice();
-      }
     },
 
     handleUndo() {
@@ -729,11 +609,6 @@ export default {
       if (this.historyIndex > 0) {
         this.historyIndex--;
         this.pixels = new Map(this.history[this.historyIndex]);
-
-        // 同步到设备
-        if (this.deviceConnected) {
-          this.syncToDevice();
-        }
       }
     },
 
@@ -742,11 +617,6 @@ export default {
       if (this.historyIndex < this.history.length - 1) {
         this.historyIndex++;
         this.pixels = new Map(this.history[this.historyIndex]);
-
-        // 同步到设备
-        if (this.deviceConnected) {
-          this.syncToDevice();
-        }
       }
     },
 
@@ -813,370 +683,6 @@ export default {
       }
     },
 
-    handleSave() {
-      if (!this.isEditable) {
-        uni.showToast({ title: "已发布作品不可编辑", icon: "none" });
-        return;
-      }
-      this.showSaveConfirm = true;
-    },
-
-    handleRename() {
-      if (!this.isEditable) {
-        uni.showToast({ title: "已发布作品不可重命名", icon: "none" });
-        return;
-      }
-      if (!this.newProjectName.trim()) {
-        this.toast.showError("名称不能为空");
-        return;
-      }
-
-      this.projectStore.updateProjectName(
-        this.projectId,
-        this.newProjectName.trim(),
-      );
-
-      // 重新获取项目数据
-      const updatedProject = this.projectStore.getProject(this.projectId);
-      if (updatedProject) {
-        this.project = { ...updatedProject };
-      }
-
-      this.showRenameModal = false;
-      this.newProjectName = "";
-      this.toast.showSuccess("重命名成功");
-    },
-
-    async confirmSave() {
-      if (!this.isEditable) {
-        uni.showToast({ title: "已发布作品不可编辑", icon: "none" });
-        return;
-      }
-      // 保存像素数据
-      this.projectStore.saveProjectPixels(this.projectId, this.pixels);
-      this.savedPixelsSnapshot = JSON.stringify(
-        Array.from(this.pixels.entries()),
-      );
-      this.hasUnsavedChanges = false;
-
-      // 生成并保存缩略图
-      await this.generateAndSaveThumbnail();
-
-      this.toast.showSuccess("已保存");
-      this.showSaveConfirm = false;
-    },
-
-    handleBack() {
-      if (this.hasUnsavedChanges) {
-        this.showLeaveConfirm = true;
-      } else {
-        uni.navigateBack();
-      }
-    },
-
-    confirmLeave() {
-      this.showLeaveConfirm = false;
-      uni.navigateBack();
-    },
-
-    async saveAndLeave() {
-      if (!this.isEditable) {
-        uni.navigateBack();
-        return;
-      }
-      // 保存像素数据
-      this.projectStore.saveProjectPixels(this.projectId, this.pixels);
-
-      // 生成并保存缩略图
-      await this.generateAndSaveThumbnail();
-
-      this.toast.showSuccess("已保存");
-      this.showLeaveConfirm = false;
-      setTimeout(() => {
-        uni.navigateBack();
-      }, 500);
-    },
-
-    // 生成并保存缩略图
-    async generateAndSaveThumbnail() {
-      try {
-        // 使用隐藏的 canvas 生成缩略图
-        const query = uni.createSelectorQuery().in(this);
-        query
-          .select("#thumbnailCanvas")
-          .fields({ node: true, size: true })
-          .exec((res) => {
-            if (!res || !res[0]) {
-              console.error("无法获取缩略图canvas");
-              return;
-            }
-
-            const canvas = res[0].node;
-            const ctx = canvas.getContext("2d");
-
-            // 缩小到 100x100 节省存储空间
-            const thumbnailSize = 100;
-            canvas.width = thumbnailSize;
-            canvas.height = thumbnailSize;
-
-            // 清空背景为透明
-            ctx.clearRect(0, 0, thumbnailSize, thumbnailSize);
-
-            // 计算缩放比例（保持宽高比，居中显示）
-            const scale = Math.min(
-              thumbnailSize / this.project.width,
-              thumbnailSize / this.project.height,
-            );
-            const scaledWidth = this.project.width * scale;
-            const scaledHeight = this.project.height * scale;
-            const offsetX = (thumbnailSize - scaledWidth) / 2;
-            const offsetY = (thumbnailSize - scaledHeight) / 2;
-
-            // 绘制像素
-            this.pixels.forEach((color, key) => {
-              const [x, y] = key.split(",").map(Number);
-              ctx.fillStyle = color;
-              ctx.fillRect(
-                offsetX + x * scale,
-                offsetY + y * scale,
-                Math.ceil(scale) + 1,
-                Math.ceil(scale) + 1,
-              );
-            });
-
-            // 延迟一下确保绘制完成
-            setTimeout(() => {
-              // 转换为 Base64（永久保存）
-              uni.canvasToTempFilePath(
-                {
-                  canvas: canvas,
-                  canvasId: "thumbnailCanvas",
-                  fileType: "png",
-                  quality: 0.8, // 压缩质量
-                  success: (res) => {
-                    // 将临时文件转为 Base64
-                    // #ifdef MP-WEIXIN
-                    const fs = uni.getFileSystemManager();
-                    fs.readFile({
-                      filePath: res.tempFilePath,
-                      encoding: "base64",
-                      success: (fileRes) => {
-                        const base64 = "data:image/png;base64," + fileRes.data;
-                        console.log(
-                          "缩略图生成成功 (Base64):",
-                          Math.round(base64.length / 1024),
-                          "KB",
-                        );
-                        this.projectStore.updateProjectThumbnail(
-                          this.projectId,
-                          base64,
-                        );
-                      },
-                      fail: (err) => {
-                        console.error("读取缩略图文件失败:", err);
-                        // 降级：保存临时文件路径
-                        this.projectStore.updateProjectThumbnail(
-                          this.projectId,
-                          res.tempFilePath,
-                        );
-                      },
-                    });
-                    // #endif
-
-                    // #ifdef H5
-                    // H5 直接使用 canvas.toDataURL
-                    try {
-                      const base64 = canvas.toDataURL("image/png", 0.8);
-                      console.log(
-                        "缩略图生成成功 (Base64):",
-                        Math.round(base64.length / 1024),
-                        "KB",
-                      );
-                      this.projectStore.updateProjectThumbnail(
-                        this.projectId,
-                        base64,
-                      );
-                    } catch (err) {
-                      console.error("生成 Base64 失败:", err);
-                      // 降级：保存临时文件路径
-                      this.projectStore.updateProjectThumbnail(
-                        this.projectId,
-                        res.tempFilePath,
-                      );
-                    }
-                    // #endif
-                  },
-                  fail: (err) => {
-                    console.error("生成缩略图失败:", err);
-                  },
-                },
-                this,
-              );
-            }, 100);
-          });
-
-        // 如果是看板模式，生成看板缩略图（继续用临时文件）
-        if (this.boardId) {
-          await this.generateBoardThumbnail();
-        }
-      } catch (error) {
-        console.error("生成缩略图失败:", error);
-      }
-    },
-
-    // 生成看板缩略图
-    async generateBoardThumbnail() {
-      try {
-        const query = uni.createSelectorQuery().in(this);
-        query
-          .select("#boardThumbnailCanvas")
-          .fields({ node: true, size: true })
-          .exec((res) => {
-            if (!res || !res[0]) {
-              return;
-            }
-
-            const canvas = res[0].node;
-            const ctx = canvas.getContext("2d");
-
-            const thumbnailSize = 200;
-            canvas.width = thumbnailSize;
-            canvas.height = thumbnailSize;
-
-            // 清空背景
-            ctx.clearRect(0, 0, thumbnailSize, thumbnailSize);
-
-            // 看板固定 64x64，计算缩放
-            const scale = thumbnailSize / 64;
-
-            // 绘制当前看板的像素
-            this.displayPixels.forEach((color, key) => {
-              const [x, y] = key.split(",").map(Number);
-              ctx.fillStyle = color;
-              ctx.fillRect(
-                x * scale,
-                y * scale,
-                Math.ceil(scale),
-                Math.ceil(scale),
-              );
-            });
-
-            // 转换为 base64
-            uni.canvasToTempFilePath(
-              {
-                canvas: canvas,
-                success: (res) => {
-                  // 保存看板缩略图
-                  this.projectStore.saveBoardThumbnail(
-                    this.projectId,
-                    this.boardId,
-                    res.tempFilePath,
-                  );
-                },
-                fail: (err) => {
-                  console.error("生成看板缩略图失败:", err);
-                },
-              },
-              this,
-            );
-          });
-      } catch (error) {
-        console.error("生成看板缩略图失败:", error);
-      }
-    },
-
-    handleToastShow() {
-      this.toastVisible = true;
-    },
-
-    handleToastHide() {
-      this.toastVisible = false;
-    },
-
-    // 处理发布按钮点击
-    handlePublish() {
-      // 检查画布是否为空
-      if (this.pixels.size === 0) {
-        this.toast.showError("画布为空，无法发布");
-        return;
-      }
-
-      // 检查是否有未保存的修改
-      if (this.hasUnsavedChanges) {
-        uni.showModal({
-          title: "有未保存的修改",
-          content: "检测到您有未保存的修改，是否先保存再发布？",
-          confirmText: "保存并发布",
-          cancelText: "直接发布",
-          success: (res) => {
-            if (res.confirm) {
-              // 保存并发布
-              this.saveAndPublish();
-            } else if (res.cancel) {
-              // 直接发布
-              this.navigateToPublish();
-            }
-          },
-        });
-      } else {
-        // 直接发布
-        this.navigateToPublish();
-      }
-    },
-
-    // 保存并发布
-    async saveAndPublish() {
-      if (!this.isEditable) {
-        uni.showToast({ title: "已发布作品不可重复发布", icon: "none" });
-        return;
-      }
-      try {
-        // 保存像素数据
-        this.projectStore.saveProjectPixels(this.projectId, this.pixels);
-        this.savedPixelsSnapshot = JSON.stringify(
-          Array.from(this.pixels.entries()),
-        );
-        this.hasUnsavedChanges = false;
-
-        // 生成并保存缩略图
-        await this.generateAndSaveThumbnail();
-
-        this.toast.showSuccess("已保存");
-
-        // 跳转到发布页面
-        setTimeout(() => {
-          this.navigateToPublish();
-        }, 500);
-      } catch (error) {
-        console.error("保存失败:", error);
-        this.toast.showError("保存失败，请重试");
-      }
-    },
-
-    // 跳转到发布页面
-    navigateToPublish() {
-      // 传递当前画布数据到发布页面
-      const canvasData = {
-        projectId: this.projectId,
-        boardId: this.boardId,
-        challengeId: this.project.challengeId,
-        pixels: Array.from(this.pixels.entries()),
-        width: this.project.width,
-        height: this.project.height,
-        colors: this.paletteColors.map((c) => c.code),
-        projectName: this.project?.name || "未命名画布",
-      };
-
-      // 将数据存储到临时存储中
-      uni.setStorageSync("temp_publish_data", canvasData);
-
-      // 添加页面切换动画
-      uni.navigateTo({
-        url: "/pages/publish-project/publish-project",
-        animationType: "slide-in-right",
-        animationDuration: 300,
-      });
-    },
   },
 };
 </script>

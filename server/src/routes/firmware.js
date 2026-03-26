@@ -6,6 +6,7 @@ const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
 const crypto = require("crypto");
+const serverLogger = require("../services/serverLogger");
 
 // 固件文件存储
 const storage = multer.diskStorage({
@@ -54,7 +55,11 @@ router.get("/check", rateLimit(30, 60000), async (req, res) => {
       },
     });
   } catch (err) {
-    console.error("检查更新失败:", err);
+    serverLogger.error("firmware_check_error", {
+      path: req.originalUrl,
+      message: err.message,
+      stack: err.stack,
+    });
     res.json({ code: 500, message: "检查更新失败" });
   }
 });
@@ -107,11 +112,16 @@ router.post(
           changelog || "",
           is_force ? 1 : 0,
         ],
-      );
+    );
 
       res.json({ code: 0, data: { version, file_size: req.file.size, md5 } });
     } catch (err) {
-      console.error("上传固件失败:", err);
+      serverLogger.error("firmware_upload_error", {
+        userId: req.user?.id || null,
+        path: req.originalUrl,
+        message: err.message,
+        stack: err.stack,
+      });
       res.json({ code: 500, message: "上传失败" });
     }
   },

@@ -1,8 +1,7 @@
 /**
  * 统一 HTTP 请求基础层
  */
-
-const BASE_URL = 'https://glowxel.com'
+import { API_BASE_URL } from '../config/api'
 
 // 获取本地存储的 token
 function getToken() {
@@ -35,7 +34,7 @@ export async function request(url, options = {}) {
   try {
     const res = await new Promise((resolve, reject) => {
       uni.request({
-        url: `${BASE_URL}${url}`,
+        url: `${API_BASE_URL}${url}`,
         method,
         data,
         header,

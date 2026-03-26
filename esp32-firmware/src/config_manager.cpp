@@ -4,13 +4,19 @@
 // 静态成员初始化
 Preferences ConfigManager::preferences;
 ClockConfig ConfigManager::clockConfig = {
-  .time = {2, 22, 4, 255, 255, 255},
+  .font = CLOCK_FONT_CLASSIC_5X7,
+  .showSeconds = false,
+  .hourFormat = 24,
+  .time = {true, 2, 22, 4, 255, 255, 255},
   .date = {false, 1, 22, 10, 120, 120, 120},
   .week = {false, 26, 47, 100, 100, 100},
   .image = {false, 0, 0, 64, 64}
 };
 ClockConfig ConfigManager::animClockConfig = {
-  .time = {2, 22, 4, 255, 255, 255},
+  .font = CLOCK_FONT_CLASSIC_5X7,
+  .showSeconds = false,
+  .hourFormat = 24,
+  .time = {true, 2, 22, 4, 255, 255, 255},
   .date = {false, 1, 22, 10, 120, 120, 120},
   .week = {false, 26, 47, 100, 100, 100},
   .image = {false, 0, 0, 64, 64}
@@ -226,14 +232,20 @@ void ConfigManager::resetToDefault() {
   animImagePixelCount = 0;
 
   clockConfig = {
-    .time = {2, 22, 4, 255, 255, 255},
+    .font = CLOCK_FONT_CLASSIC_5X7,
+    .showSeconds = false,
+    .hourFormat = 24,
+    .time = {true, 2, 22, 4, 255, 255, 255},
     .date = {false, 1, 22, 10, 120, 120, 120},
     .week = {false, 26, 47, 100, 100, 100},
     .image = {false, 0, 0, 64, 64}
   };
 
   animClockConfig = {
-    .time = {2, 22, 4, 255, 255, 255},
+    .font = CLOCK_FONT_CLASSIC_5X7,
+    .showSeconds = false,
+    .hourFormat = 24,
+    .time = {true, 2, 22, 4, 255, 255, 255},
     .date = {false, 1, 22, 10, 120, 120, 120},
     .week = {false, 26, 47, 100, 100, 100},
     .image = {false, 0, 0, 64, 64}

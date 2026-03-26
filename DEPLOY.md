@@ -2,16 +2,32 @@
 
 > 本文档已按 2026-03 当前仓库状态收口，重点保留线上部署和本地编译所需信息。
 
+## 部署前准备
+
+部署脚本不再保存任何生产环境真实地址或密码，执行前请先在本地 shell 中显式设置以下变量：
+
+```bash
+export DEPLOY_SERVER="ubuntu@your-server"
+export DEPLOY_DB_NAME="your_db_name"
+export DEPLOY_DB_USER="your_db_user"
+export DEPLOY_DB_PASSWORD="your_db_password"
+export SERVER_IP="your.server.ip"
+export SERVER_USER="ubuntu"
+export DOMAIN="your-domain.com"
+```
+
+> 如果变量缺失，部署脚本和 HTTPS 脚本会直接报错退出，不再使用仓库内默认值。
+
 ## 服务器信息
 
-| 项目      | 值                           |
-| --------- | ---------------------------- |
-| 服务器 IP | 175.178.153.146              |
-| SSH 用户  | ubuntu                       |
-| SSH 连接  | `ssh ubuntu@175.178.153.146` |
-| 操作系统  | Ubuntu 22.04.5 LTS           |
-| 内网 IP   | 10.1.0.5                     |
-| 磁盘      | 58.94GB（已用 12%）          |
+| 项目      | 值                         |
+| --------- | -------------------------- |
+| 服务器 IP | 通过 `SERVER_IP` 提供      |
+| SSH 用户  | 通过 `SERVER_USER` 提供    |
+| SSH 连接  | `ssh ${SERVER_USER}@${SERVER_IP}` |
+| 操作系统  | Ubuntu 22.04 LTS           |
+| 内网 IP   | 按实际服务器环境填写       |
+| 磁盘      | 按实际服务器环境填写       |
 
 ## 项目路径
 
@@ -26,21 +42,21 @@
 
 ## 数据库
 
-| 项目     | 值        |
-| -------- | --------- |
-| 类型     | MySQL     |
-| 端口     | 3306      |
-| 用户     | root      |
-| 密码     | matrix123 |
-| 数据库名 | matrix    |
+| 项目     | 值                      |
+| -------- | ----------------------- |
+| 类型     | MySQL                   |
+| 端口     | 3306                    |
+| 用户     | 通过 `DEPLOY_DB_USER` 提供 |
+| 密码     | 通过 `DEPLOY_DB_PASSWORD` 提供 |
+| 数据库名 | 通过 `DEPLOY_DB_NAME` 提供 |
 
 ## 后端服务
 
-| 项目     | 值                      |
-| -------- | ----------------------- |
-| 端口     | 3000                    |
-| JWT 密钥 | glowxel_jwt_secret_2024 |
-| 框架     | Express.js              |
+| 项目     | 值                    |
+| -------- | --------------------- |
+| 端口     | 3000                  |
+| JWT 密钥 | 仅保存在服务端环境变量 |
+| 框架     | Express.js            |
 
 ## 一键部署（推荐）
 
@@ -63,10 +79,10 @@ bash deploy.sh --skip-admin
 bash deploy.sh --skip-website
 ```
 
-网站地址：https://glowxel.com
-后台管理：https://admin.glowxel.com
+网站地址：按实际域名配置
+后台管理：按实际域名配置
 
-> 首次部署后台需在服务器执行：`sudo certbot --nginx -d admin.glowxel.com`
+> 首次部署后台时，请把命令中的域名替换为你的后台域名，例如：`sudo certbot --nginx -d admin.your-domain.com`
 
 ---
 
@@ -74,7 +90,7 @@ bash deploy.sh --skip-website
 
 ```bash
 # SSH 连接服务器
-ssh ubuntu@175.178.153.146
+ssh ${SERVER_USER}@${SERVER_IP}
 
 # 查看服务状态
 pm2 status
@@ -84,7 +100,7 @@ pm2 logs glowxel-server
 pm2 restart glowxel-server
 
 # 手动更新数据库结构
-cd ~/glowxel-server && mysql -u root -pmatrix123 matrix < src/config/init.sql
+cd ~/glowxel-server && mysql -u "${DEPLOY_DB_USER}" -p"${DEPLOY_DB_PASSWORD}" "${DEPLOY_DB_NAME}" < src/config/init.sql
 
 # nginx 重载
 sudo nginx -t && sudo nginx -s reload
@@ -110,12 +126,12 @@ cd esp32-firmware && pio run --target upload
 
 ## API 地址
 
-| 环境     | 地址                        |
-| -------- | --------------------------- |
-| 服务器   | http://175.178.153.146:3000 |
-| 本地开发 | http://localhost:3000       |
-| 健康检查 | GET /api/health             |
-| 固件检查 | GET /api/firmware/check     |
+| 环境     | 地址                                  |
+| -------- | ------------------------------------- |
+| 服务器   | `http://${SERVER_IP}:3000`            |
+| 本地开发 | `http://localhost:3000`               |
+| 健康检查 | `GET /api/health`                     |
+| 固件检查 | `GET /api/firmware/check`             |
 
 ## 微信小程序
 

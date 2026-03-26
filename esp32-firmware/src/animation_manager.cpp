@@ -9,7 +9,7 @@ int AnimationManager::receivingFrameIndex = -1;
 static bool s_loopBlendActive = false;
 static int s_loopBlendStep = 0;
 static unsigned long s_loopBlendDelay = 0;
-static const int LOOP_BLEND_STEPS = 2;
+static const int LOOP_BLEND_STEPS = 4;
 
 void AnimationManager::init() {
   // 动画管理器初始化
@@ -110,7 +110,8 @@ void AnimationManager::renderGIFFrame(int frameIndex) {
   if (currentGIF == nullptr || frameIndex >= currentGIF->frameCount) return;
 
   AnimationFrame& frame = currentGIF->frames[frameIndex];
-  DisplayManager::renderAnimationFrame(frame.pixels, frame.pixelCount, frame.type == "full");
+  bool clearFirst = (frameIndex == 0) || (frame.type == "full");
+  DisplayManager::renderAnimationFrame(frame.pixels, frame.pixelCount, clearFirst);
 }
 
 void AnimationManager::freeGIFAnimation() {

@@ -1,12 +1,15 @@
 const router = require('express').Router();
 const db = require('../config/db');
 const { adminAuth } = require('../middleware/auth');
+const { adminAudit } = require('../middleware/adminAudit');
 const artworkService = require('../services/artworkService');
 const commentService = require('../services/commentService');
 const userService = require('../services/userService');
+const serverLogger = require('../services/serverLogger');
 
 // 所有 admin 路由都需要管理员权限
 router.use(adminAuth);
+router.use(adminAudit);
 
 // ─── 仪表盘统计 ───────────────────────────────────────────────
 router.get('/stats', async (req, res) => {
@@ -20,7 +23,12 @@ router.get('/stats', async (req, res) => {
     const [[{ todayActive }]] = await db.query('SELECT COUNT(*) as todayActive FROM users WHERE DATE(created_at) = ?', [today]);
     res.json({ code: 0, data: { userCount, artworkCount, templateCount, commentCount, challengeCount, todayActive } });
   } catch (err) {
-    console.error(err);
+    serverLogger.error('admin_stats_error', {
+      userId: req.user?.id || null,
+      path: req.originalUrl,
+      message: err.message,
+      stack: err.stack
+    });
     res.json({ code: 500, message: '获取统计失败' });
   }
 });
@@ -434,7 +442,15 @@ router.get('/activities', async (req, res) => {
       `SELECT COUNT(*) as total FROM activities WHERE title LIKE ? ${typeCond} ${statusCond}`, countParams
     );
     res.json({ code: 0, data: { list, total } });
-  } catch (err) { console.error(err); res.json({ code: 500, message: '获取失败' }); }
+  } catch (err) {
+    serverLogger.error('admin_activities_list_error', {
+      userId: req.user?.id || null,
+      path: req.originalUrl,
+      message: err.message,
+      stack: err.stack
+    });
+    res.json({ code: 500, message: '获取失败' });
+  }
 });
 
 router.post('/activities', async (req, res) => {
@@ -453,7 +469,15 @@ router.post('/activities', async (req, res) => {
        status === 'published' ? (published_at || new Date()) : null]
     );
     res.json({ code: 0, data: { id: result.insertId } });
-  } catch (err) { console.error(err); res.json({ code: 500, message: '创建失败' }); }
+  } catch (err) {
+    serverLogger.error('admin_activities_create_error', {
+      userId: req.user?.id || null,
+      path: req.originalUrl,
+      message: err.message,
+      stack: err.stack
+    });
+    res.json({ code: 500, message: '创建失败' });
+  }
 });
 
 router.put('/activities/:id', async (req, res) => {
@@ -474,7 +498,15 @@ router.put('/activities/:id', async (req, res) => {
        sort_order, start_time, end_time, link_url, published_at, req.params.id]
     );
     res.json({ code: 0, message: '更新成功' });
-  } catch (err) { console.error(err); res.json({ code: 500, message: '更新失败' }); }
+  } catch (err) {
+    serverLogger.error('admin_activities_update_error', {
+      userId: req.user?.id || null,
+      path: req.originalUrl,
+      message: err.message,
+      stack: err.stack
+    });
+    res.json({ code: 500, message: '更新失败' });
+  }
 });
 
 router.delete('/activities/:id', async (req, res) => {

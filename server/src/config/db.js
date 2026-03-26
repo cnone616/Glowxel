@@ -13,15 +13,16 @@ const pool = mysql.createPool({
   charset: 'utf8mb4'
 });
 
-// 测试连接
-pool.getConnection()
-  .then(conn => {
-    console.log('MySQL 连接成功');
-    conn.release();
-  })
-  .catch(err => {
-    console.error('MySQL 连接失败:', err.message);
-  });
+if (process.env.NODE_ENV !== 'test') {
+  // 测试连接
+  pool.getConnection()
+    .then(conn => {
+      console.log('MySQL 连接成功');
+      conn.release();
+    })
+    .catch(err => {
+      console.error('MySQL 连接失败:', err.message);
+    });
+}
 
 module.exports = pool;
-

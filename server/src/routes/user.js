@@ -1,13 +1,11 @@
 const router = require('express').Router();
 const jwt = require('jsonwebtoken');
 const axios = require('axios');
-const crypto = require('crypto');
 const db = require('../config/db');
 const { auth } = require('../middleware/auth');
 const { contentFilter } = require('../middleware/contentFilter');
-
-// 工具：sha256 哈希密码
-const hashPassword = (pwd) => crypto.createHash('sha256').update(pwd + (process.env.PWD_SALT || 'glowxel')).digest('hex');
+const { hashAdminPassword, verifyAdminPassword } = require('../services/adminPasswordService');
+const serverLogger = require('../services/serverLogger');
 
 // 管理员账号密码登录
 router.post('/admin-login', async (req, res) => {
@@ -19,17 +17,46 @@ router.post('/admin-login', async (req, res) => {
       "SELECT id, name, avatar, role, admin_username, admin_password FROM users WHERE admin_username = ? AND role = 'admin'",
       [username]
     );
-    if (!rows.length) return res.json({ code: 401, message: '用户名或密码错误' });
-
-    const user = rows[0];
-    if (user.admin_password !== hashPassword(password)) {
+    if (!rows.length) {
+      serverLogger.warn('admin_login_failed', {
+        username,
+        reason: 'user_not_found',
+        ip: serverLogger.getClientIp(req)
+      });
       return res.json({ code: 401, message: '用户名或密码错误' });
     }
 
+    const user = rows[0];
+    const passwordResult = await verifyAdminPassword(password, user.admin_password);
+    if (!passwordResult.matched) {
+      serverLogger.warn('admin_login_failed', {
+        username,
+        userId: user.id,
+        reason: 'password_mismatch',
+        ip: serverLogger.getClientIp(req)
+      });
+      return res.json({ code: 401, message: '用户名或密码错误' });
+    }
+
+    if (passwordResult.needsUpgrade) {
+      const nextPasswordHash = await hashAdminPassword(password);
+      await db.query('UPDATE users SET admin_password = ? WHERE id = ?', [nextPasswordHash, user.id]);
+    }
+
     const token = jwt.sign({ id: user.id, role: 'admin' }, process.env.JWT_SECRET, { expiresIn: '7d' });
+    serverLogger.info('admin_login_success', {
+      username,
+      userId: user.id,
+      ip: serverLogger.getClientIp(req)
+    });
     res.json({ code: 0, data: { token, user: { id: user.id, name: user.name, avatar: user.avatar, role: user.role } } });
   } catch (err) {
-    console.error('管理员登录失败:', err);
+    serverLogger.error('admin_login_error', {
+      username: req.body?.username || '',
+      ip: serverLogger.getClientIp(req),
+      message: err.message,
+      stack: err.stack
+    });
     res.json({ code: 500, message: '登录失败' });
   }
 });
@@ -69,7 +96,11 @@ router.post('/login', async (req, res) => {
     const token = jwt.sign({ id: user.id, openid }, process.env.JWT_SECRET, { expiresIn: '30d' });
     res.json({ code: 0, data: { token, user } });
   } catch (err) {
-    console.error('登录失败:', err);
+    serverLogger.error('wx_login_error', {
+      ip: serverLogger.getClientIp(req),
+      message: err.message,
+      stack: err.stack
+    });
     res.json({ code: 500, message: '登录失败' });
   }
 });

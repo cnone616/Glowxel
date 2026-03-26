@@ -4,12 +4,18 @@
 #include <Arduino.h>
 #include <Preferences.h>
 #include <ArduinoJson.h>
+#include "clock_font_renderer.h"
 
-#define CONFIG_VERSION 8  // 改默认配置时递增此版本号
+#define CONFIG_VERSION 9  // 改默认配置时递增此版本号
 
 // 闹钟配置结构
 struct ClockConfig {
+  uint8_t font;
+  bool showSeconds;
+  uint8_t hourFormat;
+
   struct {
+    bool show;
     int fontSize;
     int x;
     int y;

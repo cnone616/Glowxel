@@ -1,4 +1,5 @@
 #include "display_manager.h"
+#include "clock_font_renderer.h"
 #include <time.h>
 
 // 静态成员初始化
@@ -8,8 +9,10 @@ int DisplayManager::currentBrightness = 50;
 bool DisplayManager::clientConnected = false;
 uint8_t DisplayManager::canvasBuffer[64][64][3];
 uint16_t DisplayManager::backgroundBuffer[64][64];
+uint16_t DisplayManager::animationBuffer[64][64];
 bool DisplayManager::canvasInitialized = false;
 bool DisplayManager::backgroundValid = false;
+bool DisplayManager::animationBufferValid = false;
 bool DisplayManager::receivingPixels = false;
 DisplayManager::BlackPixel* DisplayManager::blackPixels = nullptr;
 int DisplayManager::blackPixelCount = 0;
@@ -141,10 +144,12 @@ void DisplayManager::updateLoadingAnimation() {
 static int clockConfig_timeY();
 static void writeBackgroundPixel(int x, int y, uint8_t r, uint8_t g, uint8_t b);
 static void restoreBackgroundRect(int x, int y, int w, int h);
-static int centeredTextWidth(const char* text, int size);
-static void centeredTextBounds(const char* text, int y, int size, int& x, int& w, int& h);
+static void clockTextBounds(const char* text, int x, int y, uint8_t fontId, int size, int& outX, int& outW, int& outH);
 static void drawStaticClockOverlayDirty(const ClockConfig& c, const struct tm& timeinfo);
 static void cacheLogoBackground(int x, int y);
+static void formatTimeText(const ClockConfig& c, const struct tm& timeinfo, char* buffer, size_t bufferSize);
+static void formatDateText(const struct tm& timeinfo, char* buffer, size_t bufferSize);
+static void formatWeekText(const struct tm& timeinfo, char* buffer, size_t bufferSize);
 
 static void writeBackgroundPixel(int x, int y, uint8_t r, uint8_t g, uint8_t b) {
   if (x < 0 || x >= DisplayManager::PANEL_RES_X || y < 0 || y >= DisplayManager::PANEL_RES_Y) {
@@ -200,16 +205,37 @@ static void cacheLogoBackground(int x, int y) {
   }
 }
 
-static int centeredTextWidth(const char* text, int size) {
-  int len = strlen(text);
-  return len > 0 ? (len * 4 * size - size) : 0;
+static void clockTextBounds(const char* text, int x, int y, uint8_t fontId, int size, int& outX, int& outW, int& outH) {
+  outX = x;
+  outW = getClockTextWidth(text, fontId, size);
+  outH = getClockTextHeight(fontId, size);
+  (void)y;
 }
 
-static void centeredTextBounds(const char* text, int y, int size, int& x, int& w, int& h) {
-  w = centeredTextWidth(text, size);
-  h = 5 * size;
-  x = (DisplayManager::PANEL_RES_X - w) / 2;
-  if (x < 0) x = 0;
+static void formatTimeText(const ClockConfig& c, const struct tm& timeinfo, char* buffer, size_t bufferSize) {
+  int hours = timeinfo.tm_hour;
+  if (c.hourFormat == 12) {
+    hours = hours % 12;
+    if (hours == 0) {
+      hours = 12;
+    }
+  }
+
+  if (c.showSeconds) {
+    snprintf(buffer, bufferSize, "%02d:%02d:%02d", hours, timeinfo.tm_min, timeinfo.tm_sec);
+    return;
+  }
+
+  snprintf(buffer, bufferSize, "%02d:%02d", hours, timeinfo.tm_min);
+}
+
+static void formatDateText(const struct tm& timeinfo, char* buffer, size_t bufferSize) {
+  snprintf(buffer, bufferSize, "%02d-%02d", timeinfo.tm_mon + 1, timeinfo.tm_mday);
+}
+
+static void formatWeekText(const struct tm& timeinfo, char* buffer, size_t bufferSize) {
+  const char* weekDays[] = {"SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"};
+  snprintf(buffer, bufferSize, "%s", weekDays[timeinfo.tm_wday]);
 }
 
 void DisplayManager::drawPixels(const PixelData* pixels, int pixelCount, bool clearFirst) {
@@ -234,7 +260,34 @@ void DisplayManager::drawPixels(const PixelData* pixels, int pixelCount, bool cl
 }
 
 void DisplayManager::renderAnimationFrame(const PixelData* pixels, int pixelCount, bool clearFirst) {
-  drawPixels(pixels, pixelCount, clearFirst);
+  if (clearFirst || !animationBufferValid) {
+    memset(animationBuffer, 0, sizeof(animationBuffer));
+    animationBufferValid = true;
+  }
+
+  if (pixels != nullptr && pixelCount > 0) {
+    for (int i = 0; i < pixelCount; i++) {
+      const PixelData& p = pixels[i];
+      if (p.x < PANEL_RES_X && p.y < PANEL_RES_Y) {
+        animationBuffer[p.y][p.x] = dma_display->color565(p.r, p.g, p.b);
+      }
+      if (i % 100 == 0) {
+        yield();
+      }
+    }
+  }
+
+  for (int y = 0; y < PANEL_RES_Y; y++) {
+    for (int x = 0; x < PANEL_RES_X; x++) {
+      uint16_t color = animationBuffer[y][x];
+      dma_display->drawPixel(x, y, color);
+      backgroundBuffer[y][x] = color;
+    }
+    if (y % 8 == 0) {
+      yield();
+    }
+  }
+
   drawClockOverlay();
 }
 
@@ -369,20 +422,22 @@ void DisplayManager::renderAnimationTransition(
     }
   }
 
-  dma_display->clearScreen();
   for (int y = 0; y < PANEL_RES_Y; y++) {
     for (int x = 0; x < PANEL_RES_X; x++) {
-      dma_display->drawPixelRGB888(
-        x, y,
+      uint16_t color = dma_display->color565(
         blended[y][x][0],
         blended[y][x][1],
         blended[y][x][2]
       );
+      dma_display->drawPixel(x, y, color);
+      animationBuffer[y][x] = color;
+      backgroundBuffer[y][x] = color;
     }
     if (y % 8 == 0) {
       yield();
     }
   }
+  animationBufferValid = true;
 
   drawClockOverlay();
 }
@@ -428,17 +483,34 @@ void DisplayManager::displayClock(bool force) {
 
   struct tm timeinfo;
   if (!getLocalTime(&timeinfo)) {
+    char placeholder[9];
+    if (cfg.showSeconds) {
+      snprintf(placeholder, sizeof(placeholder), "--:--:--");
+    } else {
+      snprintf(placeholder, sizeof(placeholder), "--:--");
+    }
     dma_display->clearScreen();
     if (currentMode == MODE_CLOCK && !hasCustomImage) {
       drawLogo(12, 18);
     }
-    drawTinyTextCentered("--:--", clockConfig_timeY(), dma_display->color565(255, 255, 255));
+    if (cfg.time.show) {
+      drawClockText(
+        dma_display,
+        placeholder,
+        cfg.time.x,
+        cfg.time.y,
+        dma_display->color565(cfg.time.r, cfg.time.g, cfg.time.b),
+        cfg.font,
+        cfg.time.fontSize
+      );
+    }
     return;
   }
 
-  static int s_lastMin = -1;
-  if (!force && timeinfo.tm_min == s_lastMin) return;
-  s_lastMin = timeinfo.tm_min;
+  static int s_lastMinuteOrSecond = -1;
+  int tickValue = cfg.showSeconds ? timeinfo.tm_sec : timeinfo.tm_min;
+  if (!force && tickValue == s_lastMinuteOrSecond) return;
+  s_lastMinuteOrSecond = tickValue;
 
   bool rebuildBackground = force;
   if (currentMode == MODE_CLOCK && !backgroundValid) {
@@ -472,117 +544,187 @@ static int clockConfig_timeY() {
 }
 
 static void drawClockOverlayAnimationMode(const ClockConfig& c, const struct tm& timeinfo) {
-  char timeStr[6];
-  sprintf(timeStr, "%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min);
-  DisplayManager::drawTinyTextCentered(
-    timeStr,
-    c.time.y,
-    DisplayManager::dma_display->color565(c.time.r, c.time.g, c.time.b),
-    c.time.fontSize
-  );
+  if (c.time.show) {
+    char timeStr[9];
+    formatTimeText(c, timeinfo, timeStr, sizeof(timeStr));
+    drawClockText(
+      DisplayManager::dma_display,
+      timeStr,
+      c.time.x,
+      c.time.y,
+      DisplayManager::dma_display->color565(c.time.r, c.time.g, c.time.b),
+      c.font,
+      c.time.fontSize
+    );
+  }
 
   if (c.date.show) {
     char dateStr[6];
-    sprintf(dateStr, "%02d-%02d", timeinfo.tm_mon + 1, timeinfo.tm_mday);
-    DisplayManager::drawTinyTextCentered(
+    formatDateText(timeinfo, dateStr, sizeof(dateStr));
+    drawClockText(
+      DisplayManager::dma_display,
       dateStr,
+      c.date.x,
       c.date.y,
       DisplayManager::dma_display->color565(c.date.r, c.date.g, c.date.b),
+      c.font,
       c.date.fontSize
     );
   }
 
   if (c.week.show) {
-    const char* weekDays[] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
-    const char* weekStr = weekDays[timeinfo.tm_wday];
-    DisplayManager::drawTinyTextCentered(
+    char weekStr[4];
+    formatWeekText(timeinfo, weekStr, sizeof(weekStr));
+    drawClockText(
+      DisplayManager::dma_display,
       weekStr,
+      c.week.x,
       c.week.y,
       DisplayManager::dma_display->color565(c.week.r, c.week.g, c.week.b),
+      c.font,
       1
     );
   }
 }
 
 static void drawStaticClockOverlayDirty(const ClockConfig& c, const struct tm& timeinfo) {
-  static char s_prevTime[6] = "";
-  static int s_prevTimeY = -1, s_prevTimeSize = 0;
+  static char s_prevTime[9] = "";
+  static int s_prevTimeX = -1, s_prevTimeY = -1, s_prevTimeSize = 0, s_prevTimeFont = -1;
   static char s_prevDate[6] = "";
-  static int s_prevDateY = -1, s_prevDateSize = 0;
+  static int s_prevDateX = -1, s_prevDateY = -1, s_prevDateSize = 0, s_prevDateFont = -1;
   static char s_prevWeek[4] = "";
-  static int s_prevWeekY = -1;
+  static int s_prevWeekX = -1, s_prevWeekY = -1, s_prevWeekFont = -1;
   static DeviceMode s_prevMode = MODE_CANVAS;
 
   if (DisplayManager::currentMode != s_prevMode) {
     s_prevTime[0] = '\0';
     s_prevDate[0] = '\0';
     s_prevWeek[0] = '\0';
+    s_prevTimeX = -1;
     s_prevTimeY = -1;
+    s_prevDateX = -1;
     s_prevDateY = -1;
+    s_prevWeekX = -1;
     s_prevWeekY = -1;
     s_prevMode = DisplayManager::currentMode;
   }
 
-  char timeStr[6];
-  sprintf(timeStr, "%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min);
-  if (strcmp(s_prevTime, timeStr) != 0 || s_prevTimeY != c.time.y || s_prevTimeSize != c.time.fontSize) {
+  if (c.time.show) {
+    char timeStr[9];
+    formatTimeText(c, timeinfo, timeStr, sizeof(timeStr));
+    if (strcmp(s_prevTime, timeStr) != 0 ||
+        s_prevTimeX != c.time.x ||
+        s_prevTimeY != c.time.y ||
+        s_prevTimeSize != c.time.fontSize ||
+        s_prevTimeFont != c.font) {
+      int oldX = 0, oldW = 0, oldH = 0;
+      int newX = 0, newW = 0, newH = 0;
+      clockTextBounds(s_prevTime, s_prevTimeX, s_prevTimeY, s_prevTimeFont < 0 ? c.font : s_prevTimeFont, s_prevTimeSize, oldX, oldW, oldH);
+      clockTextBounds(timeStr, c.time.x, c.time.y, c.font, c.time.fontSize, newX, newW, newH);
+      restoreBackgroundRect(oldX, s_prevTimeY, oldW, oldH);
+      restoreBackgroundRect(newX, c.time.y, newW, newH);
+      drawClockText(
+        DisplayManager::dma_display,
+        timeStr,
+        c.time.x,
+        c.time.y,
+        DisplayManager::dma_display->color565(c.time.r, c.time.g, c.time.b),
+        c.font,
+        c.time.fontSize
+      );
+      strcpy(s_prevTime, timeStr);
+      s_prevTimeX = c.time.x;
+      s_prevTimeY = c.time.y;
+      s_prevTimeSize = c.time.fontSize;
+      s_prevTimeFont = c.font;
+    }
+  } else if (s_prevTime[0]) {
     int oldX = 0, oldW = 0, oldH = 0;
-    int newX = 0, newW = 0, newH = 0;
-    centeredTextBounds(s_prevTime, s_prevTimeY, s_prevTimeSize, oldX, oldW, oldH);
-    centeredTextBounds(timeStr, c.time.y, c.time.fontSize, newX, newW, newH);
+    clockTextBounds(s_prevTime, s_prevTimeX, s_prevTimeY, s_prevTimeFont < 0 ? c.font : s_prevTimeFont, s_prevTimeSize, oldX, oldW, oldH);
     restoreBackgroundRect(oldX, s_prevTimeY, oldW, oldH);
-    restoreBackgroundRect(newX, c.time.y, newW, newH);
-    DisplayManager::drawTinyTextCentered(timeStr, c.time.y,
-      DisplayManager::dma_display->color565(c.time.r, c.time.g, c.time.b), c.time.fontSize);
-    strcpy(s_prevTime, timeStr);
-    s_prevTimeY = c.time.y;
-    s_prevTimeSize = c.time.fontSize;
+    s_prevTime[0] = '\0';
+    s_prevTimeX = -1;
+    s_prevTimeY = -1;
+    s_prevTimeSize = 0;
+    s_prevTimeFont = -1;
   }
 
   if (c.date.show) {
     char dateStr[6];
-    sprintf(dateStr, "%02d-%02d", timeinfo.tm_mon + 1, timeinfo.tm_mday);
-    if (strcmp(s_prevDate, dateStr) != 0 || s_prevDateY != c.date.y || s_prevDateSize != c.date.fontSize) {
+    formatDateText(timeinfo, dateStr, sizeof(dateStr));
+    if (strcmp(s_prevDate, dateStr) != 0 ||
+        s_prevDateX != c.date.x ||
+        s_prevDateY != c.date.y ||
+        s_prevDateSize != c.date.fontSize ||
+        s_prevDateFont != c.font) {
       int oldX = 0, oldW = 0, oldH = 0;
       int newX = 0, newW = 0, newH = 0;
-      centeredTextBounds(s_prevDate, s_prevDateY, s_prevDateSize, oldX, oldW, oldH);
-      centeredTextBounds(dateStr, c.date.y, c.date.fontSize, newX, newW, newH);
+      clockTextBounds(s_prevDate, s_prevDateX, s_prevDateY, s_prevDateFont < 0 ? c.font : s_prevDateFont, s_prevDateSize, oldX, oldW, oldH);
+      clockTextBounds(dateStr, c.date.x, c.date.y, c.font, c.date.fontSize, newX, newW, newH);
       restoreBackgroundRect(oldX, s_prevDateY, oldW, oldH);
       restoreBackgroundRect(newX, c.date.y, newW, newH);
-      DisplayManager::drawTinyTextCentered(dateStr, c.date.y,
-        DisplayManager::dma_display->color565(c.date.r, c.date.g, c.date.b), c.date.fontSize);
+      drawClockText(
+        DisplayManager::dma_display,
+        dateStr,
+        c.date.x,
+        c.date.y,
+        DisplayManager::dma_display->color565(c.date.r, c.date.g, c.date.b),
+        c.font,
+        c.date.fontSize
+      );
       strcpy(s_prevDate, dateStr);
+      s_prevDateX = c.date.x;
       s_prevDateY = c.date.y;
       s_prevDateSize = c.date.fontSize;
+      s_prevDateFont = c.font;
     }
   } else if (s_prevDate[0]) {
     int oldX = 0, oldW = 0, oldH = 0;
-    centeredTextBounds(s_prevDate, s_prevDateY, s_prevDateSize, oldX, oldW, oldH);
+    clockTextBounds(s_prevDate, s_prevDateX, s_prevDateY, s_prevDateFont < 0 ? c.font : s_prevDateFont, s_prevDateSize, oldX, oldW, oldH);
     restoreBackgroundRect(oldX, s_prevDateY, oldW, oldH);
     s_prevDate[0] = '\0';
+    s_prevDateX = -1;
+    s_prevDateY = -1;
+    s_prevDateSize = 0;
+    s_prevDateFont = -1;
   }
 
   if (c.week.show) {
-    const char* weekDays[] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
-    const char* weekStr = weekDays[timeinfo.tm_wday];
-    if (strcmp(s_prevWeek, weekStr) != 0 || s_prevWeekY != c.week.y) {
+    char weekStr[4];
+    formatWeekText(timeinfo, weekStr, sizeof(weekStr));
+    if (strcmp(s_prevWeek, weekStr) != 0 ||
+        s_prevWeekX != c.week.x ||
+        s_prevWeekY != c.week.y ||
+        s_prevWeekFont != c.font) {
       int oldX = 0, oldW = 0, oldH = 0;
       int newX = 0, newW = 0, newH = 0;
-      centeredTextBounds(s_prevWeek, s_prevWeekY, 1, oldX, oldW, oldH);
-      centeredTextBounds(weekStr, c.week.y, 1, newX, newW, newH);
+      clockTextBounds(s_prevWeek, s_prevWeekX, s_prevWeekY, s_prevWeekFont < 0 ? c.font : s_prevWeekFont, 1, oldX, oldW, oldH);
+      clockTextBounds(weekStr, c.week.x, c.week.y, c.font, 1, newX, newW, newH);
       restoreBackgroundRect(oldX, s_prevWeekY, oldW, oldH);
       restoreBackgroundRect(newX, c.week.y, newW, newH);
-      DisplayManager::drawTinyTextCentered(weekStr, c.week.y,
-        DisplayManager::dma_display->color565(c.week.r, c.week.g, c.week.b), 1);
+      drawClockText(
+        DisplayManager::dma_display,
+        weekStr,
+        c.week.x,
+        c.week.y,
+        DisplayManager::dma_display->color565(c.week.r, c.week.g, c.week.b),
+        c.font,
+        1
+      );
       strncpy(s_prevWeek, weekStr, 3);
       s_prevWeek[3] = '\0';
+      s_prevWeekX = c.week.x;
       s_prevWeekY = c.week.y;
+      s_prevWeekFont = c.font;
     }
   } else if (s_prevWeek[0]) {
     int oldX = 0, oldW = 0, oldH = 0;
-    centeredTextBounds(s_prevWeek, s_prevWeekY, 1, oldX, oldW, oldH);
+    clockTextBounds(s_prevWeek, s_prevWeekX, s_prevWeekY, s_prevWeekFont < 0 ? c.font : s_prevWeekFont, 1, oldX, oldW, oldH);
     restoreBackgroundRect(oldX, s_prevWeekY, oldW, oldH);
     s_prevWeek[0] = '\0';
+    s_prevWeekX = -1;
+    s_prevWeekY = -1;
+    s_prevWeekFont = -1;
   }
 }
 

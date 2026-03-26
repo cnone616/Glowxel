@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS users (
   status        ENUM('active','banned') DEFAULT 'active',
   role          ENUM('user','admin') DEFAULT 'user',
   admin_username VARCHAR(50) NULL,         -- 管理员登录用户名
-  admin_password VARCHAR(128) NULL,        -- 管理员登录密码(sha256)
+  admin_password VARCHAR(128) NULL,        -- 管理员登录密码(bcrypt)
   settings      JSON,
   created_at    DATETIME DEFAULT NOW(),
   updated_at    DATETIME DEFAULT NOW() ON UPDATE NOW()

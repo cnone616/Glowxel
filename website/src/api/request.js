@@ -1,4 +1,4 @@
-const BASE_URL = import.meta.env.VITE_API_BASE_URL || ''
+import { API_BASE_URL } from '../config/api'
 
 function getToken() {
   return localStorage.getItem('auth_token') || ''
@@ -23,7 +23,7 @@ export async function request(url, options = {}) {
     : ''
 
   try {
-    const res = await fetch(`${BASE_URL}${url}${queryStr}`, config)
+    const res = await fetch(`${API_BASE_URL}${url}${queryStr}`, config)
     const json = await res.json()
     const bizCode = typeof json?.code === 'number' ? json.code : 0
 

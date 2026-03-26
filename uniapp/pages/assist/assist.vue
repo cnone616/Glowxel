@@ -408,6 +408,7 @@ import HelpModal from "../../components/HelpModal.vue";
 import ConnectModal from "../../components/ConnectModal.vue";
 import Toast from "../../components/Toast.vue";
 import Icon from "../../components/Icon.vue";
+import assistDeviceSyncMixin from "./mixins/assistDeviceSyncMixin.js";
 
 // 创建颜色查找映射
 const colorCodeMap = new Map();
@@ -416,7 +417,7 @@ ARTKAL_COLORS_FULL.forEach((color) => {
 });
 
 export default {
-  mixins: [statusBarMixin],
+  mixins: [statusBarMixin, assistDeviceSyncMixin],
   components: {
     PixelCanvas,
     HelpModal,
@@ -675,16 +676,7 @@ export default {
     if (this.deviceConnected && this.localPixels.size > 0) {
       console.log("页面显示，确保画板模式并同步画布");
       setTimeout(async () => {
-        try {
-          const ws = this.deviceStore.getWebSocket();
-          if (ws) {
-            await ws.send({ cmd: "set_mode", mode: "canvas" });
-            await new Promise((resolve) => setTimeout(resolve, 200));
-            await this.syncToDevice();
-          }
-        } catch (err) {
-          console.error("切换模式或同步失败:", err);
-        }
+        this.ensureCanvasModeAndSync();
       }, 300);
     }
   },
@@ -728,234 +720,6 @@ export default {
           })
           .exec();
       }, 150);
-    },
-
-    // ========== 设备同步方法 ==========
-    toggleDeviceSync() {
-      if (this.deviceConnected) {
-        // 断开连接
-        this.deviceStore.disconnect();
-        this.toast.showInfo("设备已断开");
-      } else {
-        // 显示连接弹窗
-        this.showConnectModal = true;
-      }
-    },
-
-    async handleConnectConfirm(ip) {
-      try {
-        const result = await this.deviceStore.connect(ip);
-        if (result.success) {
-          // 连接成功后，ESP32 肯定是闹钟模式（断开连接后会回到闹钟模式）
-          // 需要先切换到画板模式，再同步画布
-          setTimeout(async () => {
-            try {
-              const ws = this.deviceStore.getWebSocket();
-              if (ws) {
-                console.log("切换到画板模式");
-                await ws.send({ cmd: "set_mode", mode: "canvas" });
-                // 等待模式切换完成
-                await new Promise((resolve) => setTimeout(resolve, 200));
-                // 同步画布
-                await this.syncToDevice();
-              }
-            } catch (err) {
-              console.error("切换模式或同步失败:", err);
-              this.toast.showError("同步失败");
-            }
-          }, 500);
-
-          this.$refs.connectModal.onSuccess();
-          this.toast.showSuccess("设备已连接");
-        } else {
-          this.$refs.connectModal.onError("连接失败，请检查 IP 地址");
-        }
-      } catch (err) {
-        console.error("连接失败:", err);
-        this.$refs.connectModal.onError("连接失败，请检查 IP 地址");
-      }
-    },
-
-    handleConnectCancel() {
-      // 取消连接
-    },
-
-    // 同步画布到设备（根据当前模式）
-    async syncToDevice() {
-      if (!this.deviceConnected) {
-        console.log("设备未连接，跳过同步");
-        return;
-      }
-
-      // 检查是否有像素数据
-      if (this.localPixels.size === 0) {
-        console.log("没有像素数据，跳过同步");
-        return;
-      }
-
-      try {
-        console.log("开始同步画布到设备，模式:", this.assistMode);
-
-        // hex 转 RGB 的辅助函数
-        const hexToRgb = (hex) => {
-          const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-          return result
-            ? {
-                r: parseInt(result[1], 16),
-                g: parseInt(result[2], 16),
-                b: parseInt(result[3], 16),
-              }
-            : { r: 0, g: 0, b: 0 };
-        };
-
-        // 只发送 localPixels 中有的像素（稀疏格式）
-        const sparsePixels = [];
-
-        this.localPixels.forEach((hexColor, key) => {
-          const [x, y] = key.split(",").map(Number);
-
-          // 用 hex 查找颜色对象
-          const colorObj = ARTKAL_COLORS_FULL.find(
-            (c) => c.hex.toLowerCase() === hexColor.toLowerCase(),
-          );
-
-          if (colorObj) {
-            // 将 hex 转换为 RGB
-            const rgb = hexToRgb(colorObj.hex);
-            let r = rgb.r;
-            let g = rgb.g;
-            let b = rgb.b;
-
-            // 逐行模式：当前行高亮，其他行降低亮度
-            if (this.assistMode === "row" && y !== this.currentRow) {
-              r = Math.floor(r * 0.2);
-              g = Math.floor(g * 0.2);
-              b = Math.floor(b * 0.2);
-            }
-            // 颜色模式：如果有高亮颜色，非高亮颜色降低亮度
-            else if (
-              this.assistMode === "color" &&
-              this.highlightColor &&
-              hexColor.toLowerCase() !== this.highlightColor.toLowerCase()
-            ) {
-              r = Math.floor(r * 0.2);
-              g = Math.floor(g * 0.2);
-              b = Math.floor(b * 0.2);
-            }
-
-            sparsePixels.push(x, y, r, g, b);
-          }
-        });
-
-        console.log(
-          `准备发送 ${sparsePixels.length / 5} 个有效像素（稀疏格式）`,
-        );
-
-        await this.deviceStore.sendSparseImage(sparsePixels);
-        console.log("画布同步成功");
-      } catch (err) {
-        console.error("同步到设备失败:", err);
-        this.toast.showError("同步失败");
-      }
-    },
-
-    // 快速更新行亮度（仅逐行模式）
-    async updateRowBrightness() {
-      if (!this.deviceConnected) {
-        console.log("设备未连接，跳过行亮度更新");
-        return;
-      }
-
-      if (this.assistMode !== "row") {
-        console.log("不在逐行模式，跳过行亮度更新");
-        return;
-      }
-
-      try {
-        const ws = this.deviceStore.getWebSocket();
-        if (!ws) {
-          console.error("WebSocket 未初始化");
-          return;
-        }
-
-        console.log("发送高亮行命令:", this.currentRow);
-
-        // 使用 highlight_row 命令
-        await ws.send({
-          cmd: "highlight_row",
-          row: this.currentRow,
-        });
-
-        // 记录当前同步的行
-        this.lastSyncedRow = this.currentRow;
-      } catch (err) {
-        console.error("更新行亮度失败:", err);
-        // 任何错误都尝试完整同步（可能是画布未初始化）
-        console.log("回退到完整同步");
-        await this.syncToDevice();
-      }
-    },
-
-    // 快速更新高亮颜色亮度（仅颜色模式）
-    async updateHighlightBrightness(previousColor, newColor) {
-      if (!this.deviceConnected) {
-        console.log("设备未连接，跳过高亮更新");
-        return;
-      }
-
-      if (this.assistMode !== "color") {
-        console.log("不在颜色模式，跳过高亮更新");
-        return;
-      }
-
-      try {
-        const ws = this.deviceStore.getWebSocket();
-        if (!ws) {
-          console.error("WebSocket 未初始化");
-          return;
-        }
-
-        // hex 转 RGB 的辅助函数
-        const hexToRgb = (hex) => {
-          const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-          return result
-            ? {
-                r: parseInt(result[1], 16),
-                g: parseInt(result[2], 16),
-                b: parseInt(result[3], 16),
-              }
-            : null;
-        };
-
-        // 如果有新颜色，发送高亮命令
-        if (newColor) {
-          const colorObj = ARTKAL_COLORS_FULL.find(
-            (c) => c.hex.toLowerCase() === newColor.toLowerCase(),
-          );
-          if (colorObj) {
-            const rgb = hexToRgb(colorObj.hex);
-            if (rgb) {
-              console.log("发送高亮颜色命令:", colorObj.code, rgb);
-              await ws.send({
-                cmd: "highlight_color",
-                color: rgb,
-              });
-            }
-          }
-        } else {
-          // 取消高亮
-          console.log("发送取消高亮命令");
-          await ws.send({
-            cmd: "highlight_color",
-            color: null,
-          });
-        }
-      } catch (err) {
-        console.error("更新高亮亮度失败:", err);
-        // 任何错误都尝试完整同步（可能是画布未初始化）
-        console.log("回退到完整同步");
-        await this.syncToDevice();
-      }
     },
 
     // ========== 原有方法 ==========
@@ -1083,7 +847,6 @@ export default {
 
     setAssistMode(mode) {
       if (this.assistMode !== mode) {
-        const oldMode = this.assistMode;
         this.assistMode = mode;
         this.highlightColor = null;
 

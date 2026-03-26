@@ -8,10 +8,18 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-SERVER="ubuntu@175.178.153.146"
 SKIP_WEBSITE=false
 SKIP_ADMIN=false
 DB_ONLY=false
+
+: "${DEPLOY_SERVER:?请先设置 DEPLOY_SERVER，例如 ubuntu@your-server}"
+: "${DEPLOY_DB_NAME:?请先设置 DEPLOY_DB_NAME}"
+: "${DEPLOY_DB_USER:?请先设置 DEPLOY_DB_USER}"
+: "${DEPLOY_DB_PASSWORD:?请先设置 DEPLOY_DB_PASSWORD}"
+
+DB_NAME_ESCAPED=$(printf '%q' "$DEPLOY_DB_NAME")
+DB_USER_ESCAPED=$(printf '%q' "$DEPLOY_DB_USER")
+DB_PASSWORD_ESCAPED=$(printf '%q' "$DEPLOY_DB_PASSWORD")
 
 for arg in "$@"; do
   case $arg in
@@ -33,12 +41,12 @@ echo "  ✓ 代码已推送"
 
 # ── 2. 服务器拉取代码 + 更新数据库 + 重启后端 ────────────────
 echo "[2/5] 更新服务器代码 + 数据库 + 重启后端..."
-ssh $SERVER << 'REMOTE'
+ssh "$DEPLOY_SERVER" <<REMOTE
 set -e
 cd ~/glowxel-repo && git pull
 cd ~/glowxel-server
 # 数据库结构更新（IF NOT EXISTS 安全执行，不影响已有数据）
-mysql -u root -pmatrix123 matrix < src/config/init.sql 2>/dev/null
+mysql -u $DB_USER_ESCAPED -p$DB_PASSWORD_ESCAPED $DB_NAME_ESCAPED < src/config/init.sql 2>/dev/null
 npm install --production --silent
 pm2 restart glowxel-server 2>/dev/null || pm2 start src/app.js --name glowxel-server
 pm2 save --silent
@@ -52,8 +60,8 @@ if [ "$SKIP_WEBSITE" = false ]; then
   npm install --silent
   npm run build
   tar -czf /tmp/website-dist.tar.gz -C dist .
-  scp /tmp/website-dist.tar.gz $SERVER:/tmp/
-  ssh $SERVER << 'REMOTE'
+  scp /tmp/website-dist.tar.gz "$DEPLOY_SERVER":/tmp/
+  ssh "$DEPLOY_SERVER" << 'REMOTE'
 sudo mkdir -p /var/www/glowxel
 sudo tar -xzf /tmp/website-dist.tar.gz -C /var/www/glowxel
 sudo chown -R www-data:www-data /var/www/glowxel
@@ -73,8 +81,8 @@ if [ "$SKIP_ADMIN" = false ]; then
   npm install --silent
   npm run build
   tar -czf /tmp/admin-dist.tar.gz -C dist .
-  scp /tmp/admin-dist.tar.gz $SERVER:/tmp/
-  ssh $SERVER << 'REMOTE'
+  scp /tmp/admin-dist.tar.gz "$DEPLOY_SERVER":/tmp/
+  ssh "$DEPLOY_SERVER" << 'REMOTE'
 sudo mkdir -p /var/www/glowxel-admin
 sudo tar -xzf /tmp/admin-dist.tar.gz -C /var/www/glowxel-admin
 sudo chown -R www-data:www-data /var/www/glowxel-admin
@@ -89,7 +97,7 @@ fi
 
 # ── 5. 检查 nginx admin 配置 + reload ────────────────────────
 echo "[5/5] 检查 nginx 配置..."
-ssh $SERVER << 'REMOTE'
+ssh "$DEPLOY_SERVER" << 'REMOTE'
 if [ ! -f /etc/nginx/sites-available/glowxel-admin ]; then
   echo "  创建 admin.glowxel.com nginx 配置..."
   sudo tee /etc/nginx/sites-available/glowxel-admin > /dev/null << 'NGINX'
@@ -119,7 +127,6 @@ REMOTE
 echo ""
 echo "================================"
 echo "✅ 部署完成！"
-echo "   官网:   https://glowxel.com"
-echo "   后台:   http://admin.glowxel.com"
-echo "   API:    https://glowxel.com/api/health"
-
+echo "   官网:   请按实际域名访问"
+echo "   后台:   请按实际域名访问"
+echo "   API:    请按实际域名检查 /api/health"
