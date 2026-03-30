@@ -4,11 +4,21 @@ export default {
   methods: {
     startLoading() {
       this.stopLoading();
+      this.loadingActive = true;
       const ws = this.deviceStore.getWebSocket();
       ws.send({ cmd: "start_loading" }).catch(() => {});
     },
 
     stopLoading() {
+      if (!this.loadingActive) {
+        if (this.loadingTimer) {
+          clearInterval(this.loadingTimer);
+          this.loadingTimer = null;
+        }
+        return;
+      }
+
+      this.loadingActive = false;
       const ws = this.deviceStore.getWebSocket();
       ws.send({ cmd: "stop_loading" }).catch(() => {});
       if (this.loadingTimer) {
@@ -59,7 +69,6 @@ export default {
         config: configToSave,
         clockMode: this.clockMode,
         hasGif: !!(this.gifAnimationData && this._gifParser),
-        pixels: Array.from(this.canvasPixels.entries()),
         imagePixels: this.imagePixels
           ? Array.from(this.imagePixels.entries())
           : null,
@@ -67,7 +76,6 @@ export default {
 
       console.log("保存配置:", {
         模式: this.clockMode,
-        手绘像素数量: this.canvasPixels.size,
         图片像素数量: this.imagePixels ? this.imagePixels.size : 0,
         hasGif: saveData.hasGif,
       });
@@ -123,11 +131,6 @@ export default {
             };
           }
 
-          this.canvasPixels =
-            savedData.pixels && Array.isArray(savedData.pixels)
-              ? new Map(savedData.pixels)
-              : new Map();
-
           this.imagePixels =
             savedData.imagePixels && Array.isArray(savedData.imagePixels)
               ? new Map(savedData.imagePixels)
@@ -151,9 +154,7 @@ export default {
           }
 
           console.log(
-            "配置加载成功，手绘像素数量:",
-            this.canvasPixels.size,
-            "图片像素数量:",
+            "配置加载成功，图片像素数量:",
             this.imagePixels ? this.imagePixels.size : 0,
             "模式:",
             this.clockMode,
@@ -169,7 +170,6 @@ export default {
         }
       } else {
         console.log(`${storageKey} 无保存数据，使用默认配置`);
-        this.canvasPixels = new Map();
         this.imagePixels = null;
         this.gifAnimationData = null;
         this.gifRenderedFrameMaps = null;
@@ -507,12 +507,6 @@ export default {
         } else {
           const allPixels = new Map();
 
-          if (this.canvasPixels) {
-            this.canvasPixels.forEach((color, key) => {
-              allPixels.set(key, color);
-            });
-          }
-
           if (this.imagePixels) {
             const offsetX = this.config.image.x || 0;
             const offsetY = this.config.image.y || 0;
@@ -545,6 +539,7 @@ export default {
           }
         }
 
+        this.deviceStore.setDeviceMode(this.clockMode, { businessMode: true });
         this.saveConfig();
       } catch (err) {
         console.error("发送失败:", err);

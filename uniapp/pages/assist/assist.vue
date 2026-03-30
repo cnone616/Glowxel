@@ -471,6 +471,7 @@ export default {
       currentTouchLetter: "",
       bubblePosition: { x: 0, y: 0 },
       isIndexTouching: false,
+      _modeRestoredOnExit: false,
 
       helpItems: [
         {
@@ -660,6 +661,7 @@ export default {
 
     this.loadPixels();
     this.loadProgress();
+    this._modeRestoredOnExit = false;
   },
 
   onReady() {
@@ -673,7 +675,7 @@ export default {
     if (!this.canvasReady) {
       this.initCanvas();
     }
-    if (this.deviceConnected && this.localPixels.size > 0) {
+    if (this.deviceConnected) {
       console.log("页面显示，确保画板模式并同步画布");
       setTimeout(async () => {
         this.ensureCanvasModeAndSync();
@@ -683,6 +685,7 @@ export default {
 
   onUnload() {
     this.saveProgress();
+    this.restoreModeAfterCanvas();
   },
 
   methods: {
@@ -1050,8 +1053,9 @@ export default {
         .exec();
     },
 
-    goToOverview() {
+    async goToOverview() {
       this.saveProgress();
+      await this.restoreModeAfterCanvas();
       uni.navigateBack();
     },
   },

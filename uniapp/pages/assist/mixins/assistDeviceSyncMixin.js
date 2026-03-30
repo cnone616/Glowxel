@@ -1,5 +1,9 @@
 import { ARTKAL_COLORS_FULL } from "../../../data/artkal-colors-full.js";
 
+const DEVICE_MODE_KEY = "device_mode";
+const DEVICE_LAST_BUSINESS_MODE_KEY = "device_last_business_mode";
+const PREVIOUS_MODE_BEFORE_CANVAS_KEY = "previous_mode_before_canvas";
+
 function hexToRgb(hex) {
   const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
   return result
@@ -13,6 +17,20 @@ function hexToRgb(hex) {
 
 export default {
   methods: {
+    getBusinessModeForCanvasRestore() {
+      const previousBusinessMode = uni.getStorageSync(DEVICE_LAST_BUSINESS_MODE_KEY);
+      if (previousBusinessMode) {
+        return previousBusinessMode;
+      }
+
+      const currentMode = uni.getStorageSync(DEVICE_MODE_KEY);
+      if (currentMode && currentMode !== "canvas") {
+        return currentMode;
+      }
+
+      return "clock";
+    },
+
     toggleDeviceSync() {
       if (this.deviceConnected) {
         this.deviceStore.disconnect();
@@ -29,7 +47,16 @@ export default {
           return;
         }
 
+        const storedRestoreMode = uni.getStorageSync(
+          PREVIOUS_MODE_BEFORE_CANVAS_KEY,
+        );
+        if (!storedRestoreMode) {
+          const restoreMode = this.getBusinessModeForCanvasRestore();
+          uni.setStorageSync(PREVIOUS_MODE_BEFORE_CANVAS_KEY, restoreMode);
+        }
+
         await ws.send({ cmd: "set_mode", mode: "canvas" });
+        this.deviceStore.setDeviceMode("canvas", { businessMode: false });
         await new Promise((resolve) => setTimeout(resolve, 200));
         await this.syncToDevice();
       } catch (err) {
@@ -59,6 +86,70 @@ export default {
 
     handleConnectCancel() {
       // 取消连接
+    },
+
+    async restoreModeAfterCanvas() {
+      if (this._modeRestoredOnExit) {
+        return;
+      }
+      this._modeRestoredOnExit = true;
+
+      let restoreMode = uni.getStorageSync(PREVIOUS_MODE_BEFORE_CANVAS_KEY);
+      if (!restoreMode) {
+        restoreMode = this.getBusinessModeForCanvasRestore();
+      }
+
+      uni.removeStorageSync(PREVIOUS_MODE_BEFORE_CANVAS_KEY);
+      this.deviceStore.setDeviceMode(restoreMode, {
+        businessMode: restoreMode !== "canvas",
+      });
+
+      if (!this.deviceConnected) {
+        return;
+      }
+
+      try {
+        const ws = this.deviceStore.getWebSocket();
+        if (!ws) {
+          return;
+        }
+
+        if (restoreMode === "tetris") {
+          const savedConfig = uni.getStorageSync("tetris_config");
+          const speedMap = { slow: 300, normal: 150, fast: 80 };
+
+          if (
+            savedConfig &&
+            savedConfig.clearMode !== undefined &&
+            savedConfig.cellSize !== undefined &&
+            savedConfig.speed !== undefined &&
+            savedConfig.showClock !== undefined &&
+            savedConfig.pieces !== undefined &&
+            speedMap[savedConfig.speed] !== undefined
+          ) {
+            await ws.send({
+              cmd: "set_mode",
+              mode: "tetris",
+              clearMode: savedConfig.clearMode,
+              cellSize: savedConfig.cellSize,
+              speed: speedMap[savedConfig.speed],
+              showClock: savedConfig.showClock,
+              pieces: savedConfig.pieces,
+            });
+          } else {
+            await ws.send({
+              cmd: "set_mode",
+              mode: "tetris",
+            });
+          }
+          return;
+        }
+
+        await ws.send({ cmd: "set_mode", mode: restoreMode });
+      } catch (err) {
+        console.error("退出拼豆恢复模式失败:", err);
+        this.toast.showError("恢复上次模式失败");
+      }
     },
 
     async syncToDevice() {

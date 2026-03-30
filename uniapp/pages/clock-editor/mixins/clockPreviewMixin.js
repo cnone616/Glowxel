@@ -210,12 +210,6 @@ export default {
       }
       this._lastImagePixels = this.imagePixels;
 
-      this.canvasPixels.forEach((color, key) => {
-        const [x, y] = key.split(",").map(Number);
-        ctx.fillStyle = color;
-        ctx.fillRect(x * pixelSize, y * pixelSize, pixelSize, pixelSize);
-      });
-
       if (this.showPreview) {
         this._redrawClockOnly(ctx, pixelSize);
       }
@@ -240,11 +234,7 @@ export default {
       const offsetY = this.config.image.y || 0;
       const rx = x - offsetX;
       const ry = y - offsetY;
-      return (
-        this.imagePixels.get(`${rx},${ry}`) ||
-        this.canvasPixels.get(`${x},${y}`) ||
-        null
-      );
+      return this.imagePixels.get(`${rx},${ry}`) || null;
     },
 
     _drawPixelLayer(ctx, pixelSize, includeClockText) {
@@ -264,7 +254,6 @@ export default {
                 }
               });
             }
-            this.canvasPixels.forEach((color, key) => pixels.set(key, color));
             return pixels;
           })();
 
@@ -403,10 +392,6 @@ export default {
           }
         });
       }
-
-      this.canvasPixels.forEach((color, key) => {
-        allPixels.set(key, color);
-      });
 
       if (this.showPreview) {
         const previewPixels = this.getPreviewPixels();

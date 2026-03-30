@@ -33,8 +33,8 @@
           <div class="card-icon">
             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
           </div>
-          <h3>时钟配置说明</h3>
-          <p>查看 Web 与小程序的能力边界，时钟编辑和设备同步请在小程序完成</p>
+          <h3>时钟编辑器</h3>
+          <p>连接 RenLight 设备，配置字体、时间样式并一键下发</p>
           <span class="card-arrow">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
           </span>

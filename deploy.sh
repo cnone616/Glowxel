@@ -8,6 +8,7 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+SERVER="ubuntu@175.178.153.146"
 SKIP_WEBSITE=false
 SKIP_ADMIN=false
 DB_ONLY=false

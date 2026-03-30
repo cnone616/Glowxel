@@ -50,55 +50,15 @@
           :canvas-width="containerSize.width"
           :canvas-height="containerSize.height"
           :grid-visible="gridVisible"
-          :allow-single-touch-pan="currentTool === 'move'"
-          :is-dark-mode="false"
+          :allow-single-touch-pan="true"
+          :is-dark-mode="true"
           canvas-id="clockCanvas"
-          @pixel-click="handlePixelClick"
           @pan="handlePan"
           @zoom="handlePinchZoom"
         />
       </view>
       <!-- 紧凑工具栏 -->
       <view class="canvas-toolbar">
-        <view class="toolbar-group">
-          <view
-            class="tb-btn"
-            :class="{ disabled: historyIndex <= 0 }"
-            @click="handleUndo"
-          >
-            <Icon name="back" :size="32" />
-          </view>
-          <view
-            class="tb-btn"
-            :class="{ disabled: historyIndex >= history.length - 1 }"
-            @click="handleRedo"
-          >
-            <Icon name="forward" :size="32" />
-          </view>
-        </view>
-        <view class="toolbar-group">
-          <view
-            class="tb-btn"
-            :class="{ active: currentTool === 'pencil' }"
-            @click="currentTool = 'pencil'"
-          >
-            <Icon name="edit" :size="32" />
-          </view>
-          <view
-            class="tb-btn"
-            :class="{ active: currentTool === 'eraser' }"
-            @click="currentTool = 'eraser'"
-          >
-            <Icon name="ashbin" :size="32" />
-          </view>
-          <view
-            class="tb-btn"
-            :class="{ active: currentTool === 'move' }"
-            @click="currentTool = 'move'"
-          >
-            <Icon name="move" :size="32" />
-          </view>
-        </view>
         <view class="toolbar-group">
           <view class="tb-btn" @click="handleZoom(-1)"
             ><Icon name="zoom-out" :size="32"
@@ -153,7 +113,7 @@
 
         <!-- 日期设置 -->
         <ClockTextSettingsCard
-          v-show="currentTab === 4"
+          v-show="currentTab === 3"
           icon-name="calendar"
           title="日期显示"
           :section="config.date"
@@ -169,7 +129,7 @@
 
         <!-- 星期设置 -->
         <ClockTextSettingsCard
-          v-show="currentTab === 5"
+          v-show="currentTab === 4"
           icon-name="rili5"
           title="星期显示"
           :section="config.week"
@@ -182,7 +142,7 @@
         />
 
         <!-- 背景图片 -->
-        <view v-show="currentTab === 3" class="settings-card">
+        <view v-show="currentTab === 2" class="settings-card">
           <view class="card-title-section">
             <Icon name="picture" :size="32" />
             <text class="card-title">背景图片</text>
@@ -365,14 +325,6 @@
           </view>
         </view>
 
-        <!-- 绘制工具 -->
-        <view v-show="currentTab === 2" class="settings-card draw-card">
-          <ColorPalette
-            :colors="paletteColors"
-            :selected-color="selectedColor"
-            @select-color="selectedColor = $event"
-          />
-        </view>
       </view>
     </scroll-view>
 
@@ -424,33 +376,22 @@
 import { useDeviceStore } from "../../store/device.js";
 import { useToast } from "../../composables/useToast.js";
 import statusBarMixin from "../../mixins/statusBar.js";
-import canvasInteractionMixin from "./mixins/canvasInteractionMixin.js";
 import clockPreviewMixin from "./mixins/clockPreviewMixin.js";
 import imageGifMixin from "./mixins/imageGifMixin.js";
 import deviceSyncMixin from "./mixins/deviceSyncMixin.js";
 import Icon from "../../components/Icon.vue";
 import Toast from "../../components/Toast.vue";
 import PixelCanvas from "../../components/PixelCanvas.vue";
-import ColorPalette from "../../components/ColorPalette.vue";
 import ClockFontPanel from "../../components/clock-editor/ClockFontPanel.vue";
 import ClockTextSettingsCard from "../../components/clock-editor/ClockTextSettingsCard.vue";
-import { ARTKAL_COLORS_FULL } from "../../data/artkal-colors-full.js";
 import { getClockFontOptions } from "../../utils/clockCanvas.js";
-import { COLOR_PALETTE_221, COMMON_COLORS } from "../../utils/colorPalette.js";
 
 export default {
-  mixins: [
-    statusBarMixin,
-    canvasInteractionMixin,
-    clockPreviewMixin,
-    imageGifMixin,
-    deviceSyncMixin,
-  ],
+  mixins: [statusBarMixin, clockPreviewMixin, imageGifMixin, deviceSyncMixin],
   components: {
     Icon,
     Toast,
     PixelCanvas,
-    ColorPalette,
     ClockFontPanel,
     ClockTextSettingsCard,
   },
@@ -475,12 +416,8 @@ export default {
       canvasHidden: false,
       canvasNode: null,
       canvasCtx: null,
-      canvasPixels: new Map(),
       imagePixels: null,
-      currentTool: "pencil", // pencil, eraser, move
-      selectedColor: "#64c8ff",
       showPreview: true,
-      showColorPicker: false,
 
       // PixelCanvas 视图控制
       zoom: 4,
@@ -489,21 +426,15 @@ export default {
       containerSize: { width: 320, height: 320 },
       canvasReady: false,
 
-      // 历史记录（撤回/重做）
-      history: [],
-      historyIndex: -1,
-
       // loading 动画定时器（实例变量，方便清理）
       loadingTimer: null,
+      loadingActive: false,
 
-      // 调色板
-      allColors: COLOR_PALETTE_221,
-      commonColors: COMMON_COLORS,
       fontOptions: getClockFontOptions(),
 
       currentTab: 0,
-      tabs: ["时间", "字体", "绘制", "图片", "日期", "星期"],
-      tabIconNames: ["time", "text", "edit", "picture", "calendar", "rili5"],
+      tabs: ["时间", "字体", "图片", "日期", "星期"],
+      tabIconNames: ["time", "text", "picture", "calendar", "rili5"],
 
       config: {
         font: "classic_5x7",
@@ -542,17 +473,6 @@ export default {
         },
       },
 
-      drawColors: [
-        { name: "青色", hex: "#64c8ff" },
-        { name: "绿色", hex: "#00ff9d" },
-        { name: "黄色", hex: "#ffdc00" },
-        { name: "橙色", hex: "#ffa500" },
-        { name: "红色", hex: "#ff6464" },
-        { name: "紫色", hex: "#c864ff" },
-        { name: "白色", hex: "#ffffff" },
-        { name: "灰色", hex: "#787878" },
-      ],
-      paletteColors: ARTKAL_COLORS_FULL,
       presetColors: [
         { name: "青色", hex: "#64c8ff" },
         { name: "绿色", hex: "#00ff9d" },
@@ -605,8 +525,6 @@ export default {
         });
       }
 
-      this.canvasPixels.forEach((color, key) => pixels.set(key, color));
-
       if (this.showPreview) {
         this.getPreviewPixels().forEach((color, key) => pixels.set(key, color));
       }
@@ -621,22 +539,16 @@ export default {
   },
 
   onLoad(options) {
-    this.clockMode = options.mode || "clock";
+    const savedMode = uni.getStorageSync("device_mode");
+    const defaultMode = savedMode === "animation" ? "animation" : "clock";
+    this.clockMode = options.mode || defaultMode;
     this._clockModeFromOptions = !!options.mode;
 
     this.loadConfig();
 
     this.deviceStore = useDeviceStore();
+    this.deviceStore.init();
     this.toast = useToast();
-
-    if (
-      !options.mode &&
-      this.deviceStore.connected &&
-      this.deviceStore.deviceMode
-    ) {
-      this.clockMode = this.deviceStore.deviceMode;
-      console.log("从板子同步模式:", this.clockMode);
-    }
 
     const systemInfo = uni.getSystemInfoSync();
     const statusBarHeight = systemInfo.statusBarHeight || 0;
@@ -662,8 +574,6 @@ export default {
               this.pan = { x: 16, y: 16 };
             }
             this.canvasReady = true;
-            this.history = [new Map(this.canvasPixels)];
-            this.historyIndex = 0;
             if (this.$refs.toastRef) {
               this.toast.setToastInstance(this.$refs.toastRef);
             }

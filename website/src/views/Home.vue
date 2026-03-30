@@ -5,7 +5,7 @@
         <h1 class="hero-title">RenLight</h1>
         <p class="hero-subtitle">像素创作平台 · 让创意点亮每一格</p>
         <p class="hero-desc">
-          在线设计像素图案、导入图片处理、浏览社区作品；设备时钟配置请在配套小程序完成
+          在线设计像素图案、导入图片处理、浏览社区作品，并支持网页连接设备进行时钟配置与控制
         </p>
         <div class="hero-actions">
           <router-link to="/create" class="btn btn-primary"
@@ -107,7 +107,7 @@
         <p class="about-text">
           RenLight（仁光数字科技）是一个面向像素艺术爱好者的创作平台。
           我们提供在线像素编辑器、图片转像素工具、社区分享等功能，
-          支持将作品同步到 RenLight 像素显示设备；设备时钟配置当前由小程序端承担。
+          支持将作品同步到 RenLight 像素显示设备，并可在网页端直接连接设备进行基础控制与时钟配置。
           无论你是像素艺术新手还是资深创作者，都能在这里找到灵感、分享作品、参与社区挑战。
         </p>
       </div>
@@ -128,7 +128,7 @@ const features = [
   {
     icon: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`,
     title: "时钟配置",
-    desc: "官网提供能力说明，完整时钟编辑与设备同步在小程序完成",
+    desc: "网页与小程序都可进行时钟参数编辑并同步设备",
   },
   {
     icon: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>`,

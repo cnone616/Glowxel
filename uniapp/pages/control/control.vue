@@ -48,11 +48,11 @@
             <Icon name="direction-right" :size="28" color="#C0C0C0" />
           </view>
         </view>
-        <view class="action-row" @click="editClock">
+        <view class="action-row" @click="openPrimaryEditor">
           <Icon name="edit" :size="36" color="#4F7FFF" />
           <view class="action-info">
-            <text class="action-label">自定义时钟样式</text>
-            <text class="action-desc">编辑时钟字体、颜色和背景</text>
+            <text class="action-label">{{ primaryActionLabel }}</text>
+            <text class="action-desc">{{ primaryActionDesc }}</text>
           </view>
           <Icon name="direction-right" :size="28" color="#C0C0C0" />
         </view>
@@ -65,71 +65,70 @@
           <view class="mode-grid">
             <view
               class="mode-item"
-              :class="{ active: deviceMode === 'clock' }"
               @click="switchMode('clock')"
             >
-              <view
-                class="mode-icon-wrap"
-                :class="{ active: deviceMode === 'clock' }"
-              >
-                <Icon
-                  name="time"
-                  :size="40"
-                  :color="deviceMode === 'clock' ? '#4F7FFF' : '#999'"
-                />
+              <view class="mode-icon-wrap">
+                <Icon name="time" :size="40" color="#4F7FFF" />
               </view>
               <text class="mode-name">静态时钟</text>
             </view>
             <view
               class="mode-item"
-              :class="{ active: deviceMode === 'animation' }"
               @click="switchMode('animation')"
             >
-              <view
-                class="mode-icon-wrap"
-                :class="{ active: deviceMode === 'animation' }"
-              >
-                <Icon
-                  name="play"
-                  :size="40"
-                  :color="deviceMode === 'animation' ? '#4F7FFF' : '#999'"
-                />
+              <view class="mode-icon-wrap">
+                <Icon name="play" :size="40" color="#4F7FFF" />
               </view>
               <text class="mode-name">动态时钟</text>
             </view>
             <view
               class="mode-item"
-              :class="{ active: deviceMode === 'canvas' }"
               @click="switchMode('canvas')"
             >
-              <view
-                class="mode-icon-wrap"
-                :class="{ active: deviceMode === 'canvas' }"
-              >
-                <Icon
-                  name="picture"
-                  :size="40"
-                  :color="deviceMode === 'canvas' ? '#4F7FFF' : '#999'"
-                />
+              <view class="mode-icon-wrap">
+                <Icon name="picture" :size="40" color="#4F7FFF" />
               </view>
               <text class="mode-name">画板模式</text>
             </view>
             <view
               class="mode-item"
-              :class="{ active: deviceMode === 'tetris' }"
-              @click="openTetrisSettings"
+              @click="switchMode('tetris')"
             >
-              <view
-                class="mode-icon-wrap"
-                :class="{ active: deviceMode === 'tetris' }"
-              >
+              <view class="mode-icon-wrap">
                 <Icon
                   name="a-Grid-ninejiugongge"
                   :size="40"
-                  :color="deviceMode === 'tetris' ? '#4F7FFF' : '#999'"
+                  color="#4F7FFF"
                 />
               </view>
               <text class="mode-name">方块屏保</text>
+            </view>
+            <view
+              class="mode-item"
+              @click="switchMode('text_display')"
+            >
+              <view class="mode-icon-wrap">
+                <Icon name="text" :size="40" color="#4F7FFF" />
+              </view>
+              <text class="mode-name">文本展示</text>
+            </view>
+            <view
+              class="mode-item"
+              @click="switchMode('breath_effect')"
+            >
+              <view class="mode-icon-wrap">
+                <Icon name="prompt" :size="40" color="#4F7FFF" />
+              </view>
+              <text class="mode-name">呼吸灯</text>
+            </view>
+            <view
+              class="mode-item"
+              @click="switchMode('rhythm_effect')"
+            >
+              <view class="mode-icon-wrap">
+                <Icon name="task" :size="40" color="#4F7FFF" />
+              </view>
+              <text class="mode-name">律动</text>
             </view>
           </view>
         </view>
@@ -272,6 +271,7 @@ export default {
   onLoad(options) {
     this.deviceStore = useDeviceStore();
     this.toast = useToast();
+    this.deviceStore.init();
 
     // 从缓存读取设备 IP
     const savedIp = uni.getStorageSync("device_ip");
@@ -283,12 +283,17 @@ export default {
     const savedMode = uni.getStorageSync("device_mode");
     if (savedMode) {
       this.deviceMode = savedMode;
+      this.deviceStore.setDeviceMode(savedMode, {
+        businessMode: false,
+      });
     }
 
     // 从 URL 参数读取模式（优先级更高）
     if (options && options.mode) {
       this.deviceMode = options.mode;
-      uni.setStorageSync("device_mode", options.mode);
+      this.deviceStore.setDeviceMode(options.mode, {
+        businessMode: false,
+      });
     }
 
     // 从缓存读取亮度
@@ -308,6 +313,42 @@ export default {
   computed: {
     isDeviceConnected() {
       return this.deviceStore?.connected || false;
+    },
+    primaryActionLabel() {
+      if (this.deviceMode === "text_display") {
+        return "编辑文本展示";
+      }
+      if (this.deviceMode === "breath_effect") {
+        return "编辑呼吸灯";
+      }
+      if (this.deviceMode === "rhythm_effect") {
+        return "编辑律动";
+      }
+      if (this.deviceMode === "tetris") {
+        return "编辑方块屏保";
+      }
+      if (this.deviceMode === "canvas") {
+        return "编辑画板内容";
+      }
+      return "自定义时钟样式";
+    },
+    primaryActionDesc() {
+      if (this.deviceMode === "text_display") {
+        return "编辑文本、方向、速度和颜色";
+      }
+      if (this.deviceMode === "breath_effect") {
+        return "编辑亮度区间、周期、波形和颜色";
+      }
+      if (this.deviceMode === "rhythm_effect") {
+        return "编辑 BPM、强度、方向和色彩";
+      }
+      if (this.deviceMode === "tetris") {
+        return "编辑速度、方块类型和时钟叠加";
+      }
+      if (this.deviceMode === "canvas") {
+        return "绘制像素内容并保存到设备";
+      }
+      return "编辑时钟字体、颜色和背景";
     },
   },
 
@@ -329,7 +370,7 @@ export default {
     async handleConnect() {
       if (this.connectionStatus === "connected") {
         // 已连接，断开
-        this.deviceStore.disconnect();
+        await this.deviceStore.disconnect();
         this.connectionStatus = "disconnected";
         this.toast.showInfo("设备已断开");
         return;
@@ -351,45 +392,26 @@ export default {
         if (result.success) {
           this.connectionStatus = "connected";
 
-          // 获取设备实际状态（模式、亮度等）
-          try {
-            const ws = this.deviceStore.getWebSocket();
-            const status = await ws.getStatus();
-
-            if (status) {
-              // 同步设备模式
-              const mode = status.mode || "canvas";
-              this.deviceMode = mode;
-              uni.setStorageSync("device_mode", mode);
-              console.log("同步设备模式:", mode);
-
-              if (status.brightness !== undefined) {
-                // 将板子的亮度值（0-178）映射回前端显示（0-100）
-                const maxBrightness = 178; // 255 * 0.7
-                this.brightness = Math.round(
-                  (status.brightness * 100) / maxBrightness,
-                );
-                uni.setStorageSync("device_brightness", this.brightness);
-                console.log(
-                  "同步板子亮度:",
-                  status.brightness,
-                  "→",
-                  this.brightness + "%",
-                );
-              }
-            }
-          } catch (err) {
-            console.error("获取设备状态失败:", err);
-          }
-
           this.$refs.connectModal.onSuccess();
           this.toast.showSuccess("已连接到 RenLight 设备");
         } else {
-          this.$refs.connectModal.onError("连接失败，请检查 IP 地址");
+          let errorMessage = "连接失败，请检查 IP 地址";
+          if (result.error && result.error.errMsg) {
+            errorMessage = result.error.errMsg;
+          } else if (result.error && result.error.message) {
+            errorMessage = result.error.message;
+          }
+          this.$refs.connectModal.onError(errorMessage);
         }
       } catch (err) {
         console.error("连接失败:", err);
-        this.$refs.connectModal.onError("连接失败，请检查 IP 地址");
+        let errorMessage = "连接失败，请检查 IP 地址";
+        if (err && err.errMsg) {
+          errorMessage = err.errMsg;
+        } else if (err && err.message) {
+          errorMessage = err.message;
+        }
+        this.$refs.connectModal.onError(errorMessage);
       }
     },
 
@@ -421,43 +443,83 @@ export default {
     },
 
     async switchMode(mode) {
-      if (this.deviceMode === mode) return;
+      this.deviceMode = mode;
+      this.deviceStore.setDeviceMode(mode, {
+        businessMode: false,
+      });
 
-      try {
-        const ws = this.deviceStore.getWebSocket();
-        // clock 在 ESP32 端对应 canvas 模式（黑底+时钟）
-        const espMode = mode === "clock" ? "clock" : mode;
-        await ws.setMode(espMode);
-        this.deviceMode = mode;
-
-        // 保存到缓存
-        uni.setStorageSync("device_mode", mode);
-
-        if (mode === "clock") {
-          this.toast.showSuccess("已切换到静态时钟");
-        } else if (mode === "animation") {
-          this.toast.showSuccess("已切换到动态时钟");
-        } else if (mode === "canvas") {
-          this.toast.showSuccess("已切换到画板模式");
-        } else if (mode === "tetris") {
-          this.toast.showSuccess("已切换到方块屏保");
-        }
-      } catch (err) {
-        console.error("切换模式失败:", err);
-        this.toast.showError("切换模式失败");
+      if (mode === "clock" || mode === "animation") {
+        this.editClockWithMode(mode);
+      } else if (mode === "text_display") {
+        this.editEffectWithMode("text_display");
+      } else if (mode === "breath_effect") {
+        this.editEffectWithMode("breath_effect");
+      } else if (mode === "rhythm_effect") {
+        this.editEffectWithMode("rhythm_effect");
+      } else if (mode === "tetris") {
+        this.openTetrisSettings();
+      } else if (mode === "canvas") {
+        this.openCanvasEditor();
       }
     },
 
-    editClock() {
+    editClockWithMode(mode) {
+      const targetMode = mode === "animation" ? "animation" : "clock";
       uni.navigateTo({
-        url: `/pages/clock-editor/clock-editor?mode=${this.deviceMode}`,
+        url: `/pages/clock-editor/clock-editor?mode=${targetMode}`,
       });
+    },
+
+    editClock() {
+      this.editClockWithMode(this.deviceMode);
+    },
+
+    openPrimaryEditor() {
+      if (
+        this.deviceMode === "text_display" ||
+        this.deviceMode === "breath_effect" ||
+        this.deviceMode === "rhythm_effect"
+      ) {
+        this.editEffect();
+        return;
+      }
+      if (this.deviceMode === "tetris") {
+        this.openTetrisSettings();
+        return;
+      }
+      if (this.deviceMode === "canvas") {
+        this.openCanvasEditor();
+        return;
+      }
+      this.editClock();
     },
 
     openTetrisSettings() {
       uni.navigateTo({
         url: "/pages/tetris-settings/tetris-settings",
       });
+    },
+
+    openCanvasEditor() {
+      uni.navigateTo({
+        url: "/pages/canvas-editor/canvas-editor",
+      });
+    },
+
+    editEffectWithMode(mode) {
+      uni.navigateTo({
+        url: `/pages/effect-editor/effect-editor?mode=${mode}`,
+      });
+    },
+
+    editEffect() {
+      if (
+        this.deviceMode === "text_display" ||
+        this.deviceMode === "breath_effect" ||
+        this.deviceMode === "rhythm_effect"
+      ) {
+        this.editEffectWithMode(this.deviceMode);
+      }
     },
 
     importJSON() {
@@ -954,12 +1016,13 @@ export default {
 /* 模式切换 */
 .mode-grid {
   display: flex;
+  flex-wrap: wrap;
   padding: 24rpx 20rpx;
   gap: 16rpx;
 }
 
 .mode-item {
-  flex: 1;
+  width: calc((100% - 32rpx) / 3);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -977,25 +1040,16 @@ export default {
   width: 88rpx;
   height: 88rpx;
   border-radius: 22rpx;
-  background-color: #f5f5f7;
+  background-color: #eef2ff;
+  box-shadow: 0 4rpx 16rpx rgba(79, 127, 255, 0.15);
   display: flex;
   align-items: center;
   justify-content: center;
   transition: all 0.2s;
 }
 
-.mode-icon-wrap.active {
-  background-color: #eef2ff;
-  box-shadow: 0 4rpx 16rpx rgba(79, 127, 255, 0.15);
-}
-
 .mode-name {
   font-size: 24rpx;
-  color: #666;
-  font-weight: 500;
-}
-
-.mode-item.active .mode-name {
   color: #4f7fff;
   font-weight: 600;
 }

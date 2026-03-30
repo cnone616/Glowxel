@@ -11,6 +11,9 @@
         <router-link to="/workspace" @click="closeMobileMenu"
           >工作台</router-link
         >
+        <router-link to="/device-control" @click="closeMobileMenu"
+          >设备</router-link
+        >
         <router-link to="/community" @click="closeMobileMenu">社区</router-link>
         <router-link to="/templates" @click="closeMobileMenu">模板</router-link>
         <router-link to="/challenges" @click="closeMobileMenu"
