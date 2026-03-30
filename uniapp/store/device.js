@@ -2,13 +2,17 @@
 import { defineStore } from 'pinia'
 import DeviceWebSocket from '../utils/webSocket.js'
 
+const DEVICE_MODE_KEY = 'device_mode'
+const DEVICE_LAST_BUSINESS_MODE_KEY = 'device_last_business_mode'
+
 export const useDeviceStore = defineStore('device', {
   state: () => ({
     webSocket: null,
     connected: false,
     deviceIp: '',
     deviceInfo: null,
-    deviceMode: 'clock', // 板子当前模式: clock / animation
+    deviceMode: 'clock', // 前端当前工作模式
+    lastBusinessMode: 'clock',
     isLoading: false,
     error: null
   }),
@@ -32,6 +36,18 @@ export const useDeviceStore = defineStore('device', {
       if (savedIp) {
         this.deviceIp = savedIp
       }
+
+      const savedMode = uni.getStorageSync(DEVICE_MODE_KEY)
+      if (savedMode) {
+        this.deviceMode = savedMode
+      }
+
+      const savedBusinessMode = uni.getStorageSync(DEVICE_LAST_BUSINESS_MODE_KEY)
+      if (savedBusinessMode) {
+        this.lastBusinessMode = savedBusinessMode
+      } else if (savedMode && savedMode !== 'canvas') {
+        this.lastBusinessMode = savedMode
+      }
     },
 
     // 设置 WebSocket 回调
@@ -54,14 +70,24 @@ export const useDeviceStore = defineStore('device', {
         if (data.status === 'ok') {
           this.deviceInfo = data
         }
-        // ESP32 连接时返回当前模式
         if (data.status === 'connected') {
           this.deviceInfo = data
-          // canvas 映射为 clock（前端叫法）
-          const mode = data.mode === 'animation' ? 'animation' : 'clock'
-          this.deviceMode = mode
         }
       })
+    },
+
+    setDeviceMode(mode, options = {}) {
+      const persist = options.persist !== false
+      const businessMode = options.businessMode !== false
+
+      this.deviceMode = mode
+      if (persist) {
+        uni.setStorageSync(DEVICE_MODE_KEY, mode)
+      }
+      if (businessMode && mode !== 'canvas') {
+        this.lastBusinessMode = mode
+        uni.setStorageSync(DEVICE_LAST_BUSINESS_MODE_KEY, mode)
+      }
     },
 
     // 连接设备（只支持 IP 直连）
@@ -86,7 +112,11 @@ export const useDeviceStore = defineStore('device', {
 
       try {
         await this.webSocket.connect(ip)
-        await this.webSocket.getStatus()
+        try {
+          await this.webSocket.getStatus()
+        } catch (statusErr) {
+          console.warn('连接成功，但获取设备状态失败:', statusErr)
+        }
         return { success: true }
       } catch (err) {
         console.error('连接失败:', err)

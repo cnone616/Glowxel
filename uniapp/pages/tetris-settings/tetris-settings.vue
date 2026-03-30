@@ -182,6 +182,7 @@ export default {
   },
   onLoad() {
     this.deviceStore = useDeviceStore();
+    this.deviceStore.init();
     this.toast = useToast();
     const saved = uni.getStorageSync("tetris_config");
     if (saved) {
@@ -210,12 +211,17 @@ export default {
       try {
         const ws = this.deviceStore.getWebSocket();
         const speedMap = { slow: 300, normal: 150, fast: 80 };
+        const speed = speedMap[this.config.speed];
+        if (speed === undefined) {
+          this.toast.showError("速度参数无效");
+          return;
+        }
         await ws.send({
           cmd: "set_mode",
           mode: "tetris",
           clearMode: this.config.clearMode,
           cellSize: this.config.cellSize,
-          speed: speedMap[this.config.speed] || 150,
+          speed,
           showClock: this.config.showClock,
           pieces: this.config.pieces,
         });
@@ -225,9 +231,9 @@ export default {
           const prev = pages[pages.length - 2];
           if (prev && prev.deviceMode !== undefined) {
             prev.deviceMode = "tetris";
-            uni.setStorageSync("device_mode", "tetris");
           }
         }
+        this.deviceStore.setDeviceMode("tetris", { businessMode: true });
       } catch (err) {
         console.error("发送失败:", err);
         this.toast.showError("发送失败");

@@ -46,6 +46,7 @@ void ConfigManager::init() {
     loadAnimClockConfig();
     loadStaticImagePixels();
     loadAnimImagePixels();
+    loadCanvasPixels();
   }
 }
 
@@ -208,6 +209,45 @@ void ConfigManager::saveAnimImagePixels() {
   preferences.end();
 }
 
+void ConfigManager::loadCanvasPixels() {
+  DisplayManager::clearCanvas();
+  preferences.begin("canvas", true);
+
+  bool initialized = preferences.getBool("initialized", false);
+  size_t dataSize = preferences.getBytesLength("buffer");
+
+  if (initialized && dataSize == sizeof(DisplayManager::canvasBuffer)) {
+    preferences.getBytes("buffer", DisplayManager::canvasBuffer, sizeof(DisplayManager::canvasBuffer));
+    DisplayManager::canvasInitialized = true;
+    Serial.println("画板像素数据已加载");
+  } else {
+    Serial.println("无可用画板像素数据，使用空画板");
+  }
+
+  preferences.end();
+}
+
+void ConfigManager::saveCanvasPixels() {
+  preferences.begin("canvas", false);
+
+  preferences.putBool("initialized", DisplayManager::canvasInitialized);
+  if (DisplayManager::canvasInitialized) {
+    preferences.putBytes("buffer", DisplayManager::canvasBuffer, sizeof(DisplayManager::canvasBuffer));
+  } else {
+    preferences.remove("buffer");
+  }
+
+  preferences.end();
+  Serial.println("画板像素数据已保存");
+}
+
+void ConfigManager::clearCanvasPixels() {
+  preferences.begin("canvas", false);
+  preferences.clear();
+  preferences.end();
+  Serial.println("画板像素持久化已清空");
+}
+
 void ConfigManager::resetToDefault() {
   Serial.println("清除所有配置，恢复默认...");
 
@@ -216,6 +256,10 @@ void ConfigManager::resetToDefault() {
   preferences.end();
 
   preferences.begin("anim", false);
+  preferences.clear();
+  preferences.end();
+
+  preferences.begin("canvas", false);
   preferences.clear();
   preferences.end();
 

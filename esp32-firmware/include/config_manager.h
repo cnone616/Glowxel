@@ -72,6 +72,9 @@ public:
   static void saveStaticImagePixels();
   static void loadAnimImagePixels();
   static void saveAnimImagePixels();
+  static void loadCanvasPixels();
+  static void saveCanvasPixels();
+  static void clearCanvasPixels();
   static void resetToDefault();
 
   static ClockConfig clockConfig;

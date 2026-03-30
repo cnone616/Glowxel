@@ -13,6 +13,58 @@ enum DeviceMode {
   MODE_TRANSFERRING  // 3: 传输模式（临时状态，不保存到 NVS）
 };
 
+enum NativeEffectType : uint8_t {
+  NATIVE_EFFECT_NONE = 0,
+  NATIVE_EFFECT_BREATH = 1,
+  NATIVE_EFFECT_RHYTHM = 2
+};
+
+enum BreathWaveform : uint8_t {
+  BREATH_WAVE_SINE = 0,
+  BREATH_WAVE_TRIANGLE = 1,
+  BREATH_WAVE_SQUARE = 2
+};
+
+enum RhythmDirection : uint8_t {
+  RHYTHM_DIR_LEFT = 0,
+  RHYTHM_DIR_RIGHT = 1,
+  RHYTHM_DIR_UP = 2,
+  RHYTHM_DIR_DOWN = 3
+};
+
+enum RhythmMode : uint8_t {
+  RHYTHM_MODE_PULSE = 0,
+  RHYTHM_MODE_GRADIENT = 1,
+  RHYTHM_MODE_JUMP = 2
+};
+
+struct BreathEffectConfig {
+  uint8_t speed;
+  bool loop;
+  uint8_t minBrightness;
+  uint8_t maxBrightness;
+  uint16_t periodMs;
+  uint8_t waveform;
+  uint8_t colorR;
+  uint8_t colorG;
+  uint8_t colorB;
+};
+
+struct RhythmEffectConfig {
+  uint16_t bpm;
+  uint8_t speed;
+  bool loop;
+  uint8_t direction;
+  uint8_t strength;
+  uint8_t mode;
+  uint8_t colorAR;
+  uint8_t colorAG;
+  uint8_t colorAB;
+  uint8_t colorBR;
+  uint8_t colorBG;
+  uint8_t colorBB;
+};
+
 class DisplayManager {
 public:
   static void init();
@@ -33,6 +85,11 @@ public:
     int toPixelCount,
     uint8_t mix
   );
+  static void renderAnimationTransitionBuffers(
+    const uint16_t* fromBuffer,
+    const uint16_t* toBuffer,
+    uint8_t mix
+  );
   static void drawLogo(int x, int y);  // 画九宫格 logo 到指定坐标
   static void displayImage(uint8_t* data, size_t len, int width, int height);
   static void clearScreen();
@@ -41,6 +98,10 @@ public:
   // 3x5 微型字体渲染
   static void drawTinyText(const char* text, int x, int y, uint16_t color, int size = 1);
   static void drawTinyTextCentered(const char* text, int y, uint16_t color, int size = 1);
+  static void setNativeEffectNone();
+  static void activateBreathEffect(const BreathEffectConfig& config);
+  static void activateRhythmEffect(const RhythmEffectConfig& config);
+  static void renderNativeEffect();
 
   // Loading 动画控制
   static void startLoadingAnimation();
@@ -49,6 +110,11 @@ public:
 
   static MatrixPanel_I2S_DMA* dma_display;
   static DeviceMode currentMode;
+  static DeviceMode lastBusinessMode;
+  static NativeEffectType nativeEffectType;
+  static BreathEffectConfig breathEffectConfig;
+  static RhythmEffectConfig rhythmEffectConfig;
+  static unsigned long nativeEffectStartTime;
   static int currentBrightness;
   static bool clientConnected;
   

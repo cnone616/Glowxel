@@ -33,6 +33,8 @@ npm run dev:mp-weixin
 - `pages/assist/assist.vue`：辅助拼豆
 - `pages/control/control.vue`：设备控制
 - `pages/clock-editor/clock-editor.vue`：时钟编辑器
+- `pages/effect-editor/effect-editor.vue`：文本展示 / 呼吸灯 / 律动编辑
+- `pages/canvas-editor/canvas-editor.vue`：设备画板模式编辑
 - `pages/ble-config/ble-config.vue`：BLE 配网
 - `pages/publish-project/publish-project.vue`：发布作品
 
@@ -48,5 +50,8 @@ npm run dev:mp-weixin
 ## 备注
 
 - 当前仓库保留 `utils/cloud.js`，但主链以当前 API/本地数据流为主
-- 设备控制链路与固件当前契约已对齐 `clock / animation / canvas / transferring`
+- 设备控制链路与固件当前契约已对齐：
+  - 模式：`clock / animation / canvas / transferring / text_display / breath_effect / rhythm_effect`
+  - 效果命令：`set_breath_effect / set_rhythm_effect`
+  - 画板命令：`save_canvas / load_canvas / clear_canvas`
 - 旧的重复页面副本已清理，当前仅保留一个 `clock-editor.vue`

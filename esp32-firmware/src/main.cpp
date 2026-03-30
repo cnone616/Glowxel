@@ -44,9 +44,11 @@ void setup() {
     // 清除WiFi状态画面，进入正常显示
     DisplayManager::clearScreen();
 
-    // 立即渲染首帧：画布模式画时钟，动画模式由 AnimationManager::init() 已处理
+    // 立即渲染首帧：动画模式由 AnimationManager::init() 已处理
     if (DisplayManager::currentMode == MODE_CLOCK) {
       DisplayManager::displayClock();
+    } else if (DisplayManager::currentMode == MODE_CANVAS) {
+      DisplayManager::renderCanvas();
     }
   }
   
@@ -162,6 +164,8 @@ void loop() {
       // 俄罗斯方块屏保
       TetrisEffect::update();
       TetrisEffect::render(DisplayManager::dma_display);
+    } else if (DisplayManager::nativeEffectType != NATIVE_EFFECT_NONE) {
+      DisplayManager::renderNativeEffect();
     } else {
       // GIF 动画
       AnimationManager::updateGIFAnimation();

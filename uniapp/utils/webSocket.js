@@ -13,10 +13,10 @@ class WebSocket {
     this.onConnectCallback = null;
     this.onDisconnectCallback = null;
     this.onErrorCallback = null;
-    // 指数退避重连
     this._reconnectAttempts = 0;
     this._reconnectTimer = null;
     this._manualDisconnect = false;
+    this._suppressReconnectOnClose = false;
     this._maxReconnectAttempts = 10;
     this._heartbeatTimer = null;
   }
@@ -28,8 +28,16 @@ class WebSocket {
    */
   connect(host, port = 80) {
     return new Promise((resolve, reject) => {
+      // 主动发起新连接时，清理残留重连定时器
+      if (this._reconnectTimer) {
+        clearTimeout(this._reconnectTimer);
+        this._reconnectTimer = null;
+      }
+
       // 如果已经有连接，先关闭
       if (this.socket) {
+        this._suppressReconnectOnClose = true;
+        this._stopHeartbeat();
         console.log("关闭旧连接");
         this.socket.close({
           success: () => {
@@ -100,6 +108,10 @@ class WebSocket {
         if (this.onDisconnectCallback) {
           this.onDisconnectCallback();
         }
+        if (this._suppressReconnectOnClose) {
+          this._suppressReconnectOnClose = false;
+          return;
+        }
         // 意外断线时自动重连（指数退避）
         if (!this._manualDisconnect && this.host) {
           this._scheduleReconnect();
@@ -149,6 +161,7 @@ class WebSocket {
    */
   disconnect() {
     this._manualDisconnect = true;
+    this._suppressReconnectOnClose = false;
     this._stopHeartbeat();
     if (this._reconnectTimer) {
       clearTimeout(this._reconnectTimer);
@@ -186,6 +199,9 @@ class WebSocket {
    * 指数退避重连（意外断线时自动调用）
    */
   _scheduleReconnect() {
+    if (this._reconnectTimer) {
+      return;
+    }
     if (this._reconnectAttempts >= this._maxReconnectAttempts) {
       console.log(`已达最大重连次数 ${this._maxReconnectAttempts}，停止重连`);
       return;

@@ -10,6 +10,35 @@ static bool s_loopBlendActive = false;
 static int s_loopBlendStep = 0;
 static unsigned long s_loopBlendDelay = 0;
 static const int LOOP_BLEND_STEPS = 4;
+static const int LOOP_BRIDGE_PIXELS = 64 * 64;
+static uint16_t s_loopBridgeFromBuffer[LOOP_BRIDGE_PIXELS];
+static uint16_t s_loopBridgeToBuffer[LOOP_BRIDGE_PIXELS];
+
+static bool prepareLoopBridgeFrames() {
+  if (AnimationManager::currentGIF == nullptr || AnimationManager::currentGIF->frameCount <= 0) {
+    return false;
+  }
+
+  for (int y = 0; y < 64; y++) {
+    for (int x = 0; x < 64; x++) {
+      int pos = y * 64 + x;
+      s_loopBridgeFromBuffer[pos] = DisplayManager::animationBuffer[y][x];
+      s_loopBridgeToBuffer[pos] = 0;
+    }
+  }
+
+  AnimationFrame& firstFrame = AnimationManager::currentGIF->frames[0];
+  if (firstFrame.pixels != nullptr && firstFrame.pixelCount > 0) {
+    for (int i = 0; i < firstFrame.pixelCount; i++) {
+      const PixelData& p = firstFrame.pixels[i];
+      if (p.x < 64 && p.y < 64) {
+        int pos = p.y * 64 + p.x;
+        s_loopBridgeToBuffer[pos] = DisplayManager::dma_display->color565(p.r, p.g, p.b);
+      }
+    }
+  }
+  return true;
+}
 
 void AnimationManager::init() {
   // 动画管理器初始化
@@ -47,20 +76,17 @@ void AnimationManager::updateGIFAnimation() {
 
   if (s_loopBlendActive) {
     if (currentTime - currentGIF->lastFrameTime >= s_loopBlendDelay) {
-      AnimationFrame& lastFrame = currentGIF->frames[currentGIF->frameCount - 1];
-      AnimationFrame& firstFrame = currentGIF->frames[0];
       s_loopBlendStep++;
 
       if (s_loopBlendStep > LOOP_BLEND_STEPS) {
         s_loopBlendActive = false;
         s_loopBlendStep = 0;
         currentGIF->currentFrame = 0;
-        renderGIFFrame(0);
       } else {
-        uint8_t mix = (255 * s_loopBlendStep) / (LOOP_BLEND_STEPS + 1);
-        DisplayManager::renderAnimationTransition(
-          lastFrame.pixels, lastFrame.pixelCount,
-          firstFrame.pixels, firstFrame.pixelCount,
+        uint8_t mix = (255 * s_loopBlendStep) / LOOP_BLEND_STEPS;
+        DisplayManager::renderAnimationTransitionBuffers(
+          s_loopBridgeFromBuffer,
+          s_loopBridgeToBuffer,
           mix
         );
       }
@@ -74,21 +100,17 @@ void AnimationManager::updateGIFAnimation() {
   if (currentTime - currentGIF->lastFrameTime >= frameDelay) {
     int nextFrame = currentGIF->currentFrame + 1;
     if (nextFrame >= currentGIF->frameCount) {
-      AnimationFrame& lastFrame = currentGIF->frames[currentGIF->frameCount - 1];
-      AnimationFrame& firstFrame = currentGIF->frames[0];
-      bool canBlendLoop = (lastFrame.type == "full" && firstFrame.type == "full");
-
-      if (canBlendLoop) {
+      if (prepareLoopBridgeFrames()) {
         s_loopBlendActive = true;
         s_loopBlendStep = 1;
         s_loopBlendDelay = frameDelay / (LOOP_BLEND_STEPS + 1);
         if (s_loopBlendDelay < 40) {
           s_loopBlendDelay = 40;
         }
-        uint8_t mix = (255 * s_loopBlendStep) / (LOOP_BLEND_STEPS + 1);
-        DisplayManager::renderAnimationTransition(
-          lastFrame.pixels, lastFrame.pixelCount,
-          firstFrame.pixels, firstFrame.pixelCount,
+        uint8_t mix = (255 * s_loopBlendStep) / LOOP_BLEND_STEPS;
+        DisplayManager::renderAnimationTransitionBuffers(
+          s_loopBridgeFromBuffer,
+          s_loopBridgeToBuffer,
           mix
         );
         currentGIF->lastFrameTime = currentTime;

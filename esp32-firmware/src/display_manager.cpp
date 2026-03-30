@@ -1,10 +1,16 @@
 #include "display_manager.h"
 #include "clock_font_renderer.h"
 #include <time.h>
+#include <math.h>
 
 // 静态成员初始化
 MatrixPanel_I2S_DMA* DisplayManager::dma_display = nullptr;
 DeviceMode DisplayManager::currentMode = MODE_CANVAS;
+DeviceMode DisplayManager::lastBusinessMode = MODE_CLOCK;
+NativeEffectType DisplayManager::nativeEffectType = NATIVE_EFFECT_NONE;
+BreathEffectConfig DisplayManager::breathEffectConfig = {5, true, 10, 100, 1800, BREATH_WAVE_SINE, 100, 200, 255};
+RhythmEffectConfig DisplayManager::rhythmEffectConfig = {120, 5, true, RHYTHM_DIR_LEFT, 70, RHYTHM_MODE_PULSE, 100, 200, 255, 255, 100, 100};
+unsigned long DisplayManager::nativeEffectStartTime = 0;
 int DisplayManager::currentBrightness = 50;
 bool DisplayManager::clientConnected = false;
 uint8_t DisplayManager::canvasBuffer[64][64][3];
@@ -442,6 +448,45 @@ void DisplayManager::renderAnimationTransition(
   drawClockOverlay();
 }
 
+void DisplayManager::renderAnimationTransitionBuffers(
+    const uint16_t* fromBuffer,
+    const uint16_t* toBuffer,
+    uint8_t mix) {
+  if (fromBuffer == nullptr || toBuffer == nullptr) {
+    return;
+  }
+
+  int fromWeight = 255 - mix;
+  for (int y = 0; y < PANEL_RES_Y; y++) {
+    for (int x = 0; x < PANEL_RES_X; x++) {
+      int pos = y * PANEL_RES_X + x;
+      uint16_t fromColor = fromBuffer[pos];
+      uint16_t toColor = toBuffer[pos];
+
+      uint8_t fromR = (fromColor >> 11) & 0x1F;
+      uint8_t fromG = (fromColor >> 5) & 0x3F;
+      uint8_t fromB = fromColor & 0x1F;
+      uint8_t toR = (toColor >> 11) & 0x1F;
+      uint8_t toG = (toColor >> 5) & 0x3F;
+      uint8_t toB = toColor & 0x1F;
+
+      uint8_t blendR = ((uint16_t)fromR * fromWeight + (uint16_t)toR * mix) / 255;
+      uint8_t blendG = ((uint16_t)fromG * fromWeight + (uint16_t)toG * mix) / 255;
+      uint8_t blendB = ((uint16_t)fromB * fromWeight + (uint16_t)toB * mix) / 255;
+
+      uint16_t color = (blendR << 11) | (blendG << 5) | blendB;
+      dma_display->drawPixel(x, y, color);
+      animationBuffer[y][x] = color;
+      backgroundBuffer[y][x] = color;
+    }
+    if (y % 8 == 0) {
+      yield();
+    }
+  }
+  animationBufferValid = true;
+  drawClockOverlay();
+}
+
 // 独立背景绘制：清屏 + 画像素背景或 Logo，不涉及时钟文字
 void DisplayManager::drawBackground() {
   PixelData* imagePixels = (currentMode == MODE_ANIMATION)
@@ -824,4 +869,142 @@ void DisplayManager::drawTinyTextCentered(const char* text, int y, uint16_t colo
   int x = (64 - width) / 2;
   if (x < 0) x = 0;
   drawTinyText(text, x, y, color, size);
+}
+
+void DisplayManager::setNativeEffectNone() {
+  nativeEffectType = NATIVE_EFFECT_NONE;
+}
+
+void DisplayManager::activateBreathEffect(const BreathEffectConfig& config) {
+  breathEffectConfig = config;
+  nativeEffectType = NATIVE_EFFECT_BREATH;
+  nativeEffectStartTime = millis();
+}
+
+void DisplayManager::activateRhythmEffect(const RhythmEffectConfig& config) {
+  rhythmEffectConfig = config;
+  nativeEffectType = NATIVE_EFFECT_RHYTHM;
+  nativeEffectStartTime = millis();
+}
+
+static uint8_t clampByte(int value) {
+  if (value < 0) return 0;
+  if (value > 255) return 255;
+  return (uint8_t)value;
+}
+
+void DisplayManager::renderNativeEffect() {
+  if (nativeEffectType == NATIVE_EFFECT_NONE) {
+    return;
+  }
+
+  unsigned long now = millis();
+  unsigned long elapsed = now - nativeEffectStartTime;
+
+  if (nativeEffectType == NATIVE_EFFECT_BREATH) {
+    if (!breathEffectConfig.loop && elapsed >= breathEffectConfig.periodMs) {
+      setNativeEffectNone();
+      return;
+    }
+
+    float phase = 0.0f;
+    if (breathEffectConfig.periodMs > 0) {
+      phase = (float)(elapsed % breathEffectConfig.periodMs) / (float)breathEffectConfig.periodMs;
+    }
+
+    float level = 0.0f;
+    if (breathEffectConfig.waveform == BREATH_WAVE_SINE) {
+      level = (sinf(phase * 2.0f * 3.1415926f - 3.1415926f / 2.0f) + 1.0f) * 0.5f;
+    } else if (breathEffectConfig.waveform == BREATH_WAVE_TRIANGLE) {
+      level = phase < 0.5f ? (phase * 2.0f) : (2.0f - phase * 2.0f);
+    } else {
+      level = phase < 0.5f ? 1.0f : 0.0f;
+    }
+
+    int minB = breathEffectConfig.minBrightness;
+    int maxB = breathEffectConfig.maxBrightness;
+    int brightness = minB + (int)((maxB - minB) * level);
+
+    uint8_t r = clampByte((breathEffectConfig.colorR * brightness) / 100);
+    uint8_t g = clampByte((breathEffectConfig.colorG * brightness) / 100);
+    uint8_t b = clampByte((breathEffectConfig.colorB * brightness) / 100);
+
+    dma_display->fillRect(0, 0, PANEL_RES_X, PANEL_RES_Y, dma_display->color565(r, g, b));
+    return;
+  }
+
+  if (nativeEffectType == NATIVE_EFFECT_RHYTHM) {
+    if (!rhythmEffectConfig.loop && elapsed >= 60000UL) {
+      setNativeEffectNone();
+      return;
+    }
+
+    int bpm = rhythmEffectConfig.bpm <= 0 ? 120 : rhythmEffectConfig.bpm;
+    unsigned long beatInterval = 60000UL / (unsigned long)bpm;
+    if (beatInterval == 0) {
+      beatInterval = 1;
+    }
+
+    float beatPhase = (float)(elapsed % beatInterval) / (float)beatInterval;
+    float pulse = 1.0f - beatPhase;
+    if (pulse < 0.0f) pulse = 0.0f;
+
+    int strength = rhythmEffectConfig.strength;
+    if (strength < 0) strength = 0;
+    if (strength > 100) strength = 100;
+
+    if (rhythmEffectConfig.mode == RHYTHM_MODE_JUMP) {
+      bool useA = ((elapsed / beatInterval) % 2) == 0;
+      uint8_t r = useA ? rhythmEffectConfig.colorAR : rhythmEffectConfig.colorBR;
+      uint8_t g = useA ? rhythmEffectConfig.colorAG : rhythmEffectConfig.colorBG;
+      uint8_t b = useA ? rhythmEffectConfig.colorAB : rhythmEffectConfig.colorBB;
+      int scaled = (strength * 255) / 100;
+      dma_display->fillRect(
+        0,
+        0,
+        PANEL_RES_X,
+        PANEL_RES_Y,
+        dma_display->color565((r * scaled) / 255, (g * scaled) / 255, (b * scaled) / 255)
+      );
+      return;
+    }
+
+    int speed = rhythmEffectConfig.speed;
+    if (speed < 1) speed = 1;
+    if (speed > 10) speed = 10;
+
+    for (int y = 0; y < PANEL_RES_Y; y++) {
+      for (int x = 0; x < PANEL_RES_X; x++) {
+        float position = 0.0f;
+        if (rhythmEffectConfig.direction == RHYTHM_DIR_LEFT) {
+          position = (float)(x + (elapsed / (12UL - speed))) / (float)PANEL_RES_X;
+        } else if (rhythmEffectConfig.direction == RHYTHM_DIR_RIGHT) {
+          position = (float)((PANEL_RES_X - 1 - x) + (elapsed / (12UL - speed))) / (float)PANEL_RES_X;
+        } else if (rhythmEffectConfig.direction == RHYTHM_DIR_UP) {
+          position = (float)(y + (elapsed / (12UL - speed))) / (float)PANEL_RES_Y;
+        } else {
+          position = (float)((PANEL_RES_Y - 1 - y) + (elapsed / (12UL - speed))) / (float)PANEL_RES_Y;
+        }
+
+        float frac = position - floorf(position);
+        float pulseWeight = rhythmEffectConfig.mode == RHYTHM_MODE_PULSE ? pulse : 1.0f;
+        float mix = frac;
+
+        int r = (int)(rhythmEffectConfig.colorAR * (1.0f - mix) + rhythmEffectConfig.colorBR * mix);
+        int g = (int)(rhythmEffectConfig.colorAG * (1.0f - mix) + rhythmEffectConfig.colorBG * mix);
+        int b = (int)(rhythmEffectConfig.colorAB * (1.0f - mix) + rhythmEffectConfig.colorBB * mix);
+
+        int scaled = (int)(strength * pulseWeight * 2.55f);
+        if (scaled > 255) scaled = 255;
+
+        dma_display->drawPixelRGB888(
+          x,
+          y,
+          clampByte((r * scaled) / 255),
+          clampByte((g * scaled) / 255),
+          clampByte((b * scaled) / 255)
+        );
+      }
+    }
+  }
 }

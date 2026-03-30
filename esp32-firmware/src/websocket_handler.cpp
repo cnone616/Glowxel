@@ -55,12 +55,29 @@ void WebSocketHandler::onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *c
     Serial.printf("WebSocket 客户端已断开: %u\n", client->id());
     DisplayManager::clientConnected = false;
 
-    // 断开连接后，如果有动画在播放则保持动画模式
-    if (AnimationManager::currentGIF != nullptr && AnimationManager::currentGIF->isPlaying) {
+    if (DisplayManager::currentMode == MODE_CANVAS) {
+      DisplayManager::currentMode = DisplayManager::lastBusinessMode;
+      Serial.printf(
+        "客户端断开时自动恢复模式: canvas -> %s\n",
+        getCurrentModeString()
+      );
+
+      if (DisplayManager::currentMode == MODE_CLOCK) {
+        DisplayManager::displayClock(true);
+      } else if (DisplayManager::currentMode == MODE_ANIMATION) {
+        if (AnimationManager::currentGIF != nullptr) {
+          AnimationManager::currentGIF->isPlaying = true;
+          AnimationManager::currentGIF->currentFrame = 0;
+          AnimationManager::currentGIF->lastFrameTime = millis();
+          AnimationManager::renderGIFFrame(0);
+        } else {
+          DisplayManager::displayClock(true);
+        }
+      }
+    } else if (AnimationManager::currentGIF != nullptr && AnimationManager::currentGIF->isPlaying) {
+      // 断开连接后，如果有动画在播放则保持动画模式
       DisplayManager::currentMode = MODE_ANIMATION;
     }
-    // 否则保持当前模式和画布数据不变，用户重连后可继续编辑
-    // 不清空 canvasBuffer / canvasInitialized / blackPixels
   }
   else if (type == WS_EVT_DATA) {
     lastMessageTime = millis();
@@ -356,6 +373,7 @@ void WebSocketHandler::handleJsonCommand(AsyncWebSocketClient *client, JsonDocum
     WebSocketCommandHandlers::handleBasicCommand(client, doc, response, getCurrentModeString()) ||
     WebSocketCommandHandlers::handleModeCommand(client, doc, response) ||
     WebSocketCommandHandlers::handleClockCommand(client, doc, response) ||
+    WebSocketCommandHandlers::handleEffectCommand(client, doc, response) ||
     WebSocketCommandHandlers::handleAnimationCommand(client, doc, response, responseSent) ||
     WebSocketCommandHandlers::handleCanvasCommand(client, doc, response) ||
     WebSocketCommandHandlers::handleOtaCommand(client, doc, response, responseSent);
