@@ -10,10 +10,6 @@
 }
 
 .card {
-  background-color: var(--color-card-background);
-  border: 2rpx solid var(--border-primary);
-  border-radius: var(--radius-medium);
-  box-shadow: var(--shadow-card);
   transition: all 0.2s ease;
 }
 

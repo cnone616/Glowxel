@@ -44,6 +44,12 @@ namespace WebSocketCommandHandlers {
     StaticJsonDocument<512>& response
   );
 
+  bool handleEyesCommand(
+    AsyncWebSocketClient* client,
+    JsonDocument& doc,
+    StaticJsonDocument<512>& response
+  );
+
   bool handleOtaCommand(
     AsyncWebSocketClient* client,
     JsonDocument& doc,

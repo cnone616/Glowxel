@@ -21,6 +21,13 @@ ClockConfig ConfigManager::animClockConfig = {
   .week = {false, 26, 47, 100, 100, 100},
   .image = {false, 0, 0, 64, 64}
 };
+EyesConfig ConfigManager::eyesConfig = {
+  .layout = {24, 14, 16, 10, 4},
+  .behavior = {true, 3200, 4200, 2, 45000},
+  .interaction = {1200, 1800},
+  .time = {true, false},
+  .style = {"#9bdcff", "#1b6dff", "#d8f3ff"}
+};
 PixelData* ConfigManager::staticImagePixels = nullptr;
 int ConfigManager::staticImagePixelCount = 0;
 PixelData* ConfigManager::animImagePixels = nullptr;
@@ -46,6 +53,7 @@ void ConfigManager::init() {
     loadAnimClockConfig();
     loadStaticImagePixels();
     loadAnimImagePixels();
+    loadEyesConfig();
     loadCanvasPixels();
   }
 }
@@ -68,8 +76,38 @@ void ConfigManager::loadClockConfig() {
   // 恢复上次的显示模式
   int savedMode = preferences.getInt("dispMode", (int)MODE_CLOCK);
   DisplayManager::currentMode = (DeviceMode)savedMode;
+  String savedBusinessMode = preferences.getString("bizMode", "");
+  if (savedBusinessMode.length() == 0) {
+    if (savedMode == MODE_CLOCK) {
+      savedBusinessMode = "clock";
+    } else if (savedMode == MODE_CANVAS) {
+      savedBusinessMode = "canvas";
+    } else if (savedMode == MODE_ANIMATION) {
+      savedBusinessMode = "animation";
+    } else {
+      savedBusinessMode = "clock";
+    }
+  }
+  String savedLastBusinessMode = preferences.getString("lastBizMode", "");
+  if (savedLastBusinessMode.length() == 0) {
+    if (savedBusinessMode == "clock") {
+      savedLastBusinessMode = "clock";
+    } else if (savedBusinessMode == "canvas") {
+      savedLastBusinessMode = "clock";
+    } else {
+      savedLastBusinessMode = savedBusinessMode;
+    }
+  }
+  DisplayManager::currentBusinessModeTag = savedBusinessMode;
+  DisplayManager::lastBusinessModeTag = savedLastBusinessMode;
+  if (savedLastBusinessMode == "clock") {
+    DisplayManager::lastBusinessMode = MODE_CLOCK;
+  } else {
+    DisplayManager::lastBusinessMode = MODE_ANIMATION;
+  }
   const char* modeStr = savedMode == MODE_ANIMATION ? "ANIMATION" : (savedMode == MODE_CLOCK ? "CLOCK" : "CANVAS");
   Serial.printf("恢复显示模式: %s\n", modeStr);
+  Serial.printf("恢复业务模式: %s\n", DisplayManager::currentBusinessModeTag.c_str());
 
   preferences.end();
 }
@@ -78,6 +116,8 @@ void ConfigManager::saveClockConfig() {
   preferences.begin("clock", false);
   preferences.putBytes("config", &clockConfig, sizeof(ClockConfig));
   preferences.putInt("dispMode", (int)DisplayManager::currentMode);
+  preferences.putString("bizMode", DisplayManager::currentBusinessModeTag);
+  preferences.putString("lastBizMode", DisplayManager::lastBusinessModeTag);
   preferences.end();
   Serial.println("static clock config saved");
 }
@@ -209,6 +249,27 @@ void ConfigManager::saveAnimImagePixels() {
   preferences.end();
 }
 
+void ConfigManager::loadEyesConfig() {
+  preferences.begin("eyes", true);
+
+  size_t configSize = preferences.getBytesLength("config");
+  if (configSize == sizeof(EyesConfig)) {
+    preferences.getBytes("config", &eyesConfig, sizeof(EyesConfig));
+    Serial.println("eyes config loaded");
+  } else {
+    Serial.println("eyes config: using default");
+  }
+
+  preferences.end();
+}
+
+void ConfigManager::saveEyesConfig() {
+  preferences.begin("eyes", false);
+  preferences.putBytes("config", &eyesConfig, sizeof(EyesConfig));
+  preferences.end();
+  Serial.println("eyes config saved");
+}
+
 void ConfigManager::loadCanvasPixels() {
   DisplayManager::clearCanvas();
   preferences.begin("canvas", true);
@@ -263,6 +324,10 @@ void ConfigManager::resetToDefault() {
   preferences.clear();
   preferences.end();
 
+  preferences.begin("eyes", false);
+  preferences.clear();
+  preferences.end();
+
   if (staticImagePixels != nullptr) {
     free(staticImagePixels);
     staticImagePixels = nullptr;
@@ -294,6 +359,26 @@ void ConfigManager::resetToDefault() {
     .week = {false, 26, 47, 100, 100, 100},
     .image = {false, 0, 0, 64, 64}
   };
+
+  EyesConfig defaultEyesConfig = {};
+  defaultEyesConfig.layout.eyeY = 24;
+  defaultEyesConfig.layout.eyeSpacing = 14;
+  defaultEyesConfig.layout.eyeWidth = 16;
+  defaultEyesConfig.layout.eyeHeight = 10;
+  defaultEyesConfig.layout.timeY = 4;
+  defaultEyesConfig.behavior.autoSwitch = true;
+  defaultEyesConfig.behavior.blinkIntervalMs = 3200;
+  defaultEyesConfig.behavior.lookIntervalMs = 4200;
+  defaultEyesConfig.behavior.idleMove = 2;
+  defaultEyesConfig.behavior.sleepyAfterMs = 45000;
+  defaultEyesConfig.interaction.lookHoldMs = 1200;
+  defaultEyesConfig.interaction.moodHoldMs = 1800;
+  defaultEyesConfig.time.show = true;
+  defaultEyesConfig.time.showSeconds = false;
+  memcpy(defaultEyesConfig.style.eyeColor, "#9bdcff", sizeof(defaultEyesConfig.style.eyeColor));
+  memcpy(defaultEyesConfig.style.pupilColor, "#1b6dff", sizeof(defaultEyesConfig.style.pupilColor));
+  memcpy(defaultEyesConfig.style.timeColor, "#d8f3ff", sizeof(defaultEyesConfig.style.timeColor));
+  eyesConfig = defaultEyesConfig;
 
   Serial.println("配置已恢复默认");
 }

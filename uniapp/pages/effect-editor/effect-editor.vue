@@ -4,7 +4,7 @@
     <view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
     <!-- #endif -->
 
-    <view class="navbar">
+    <view class="header">
       <view class="nav-left" @click="handleBack">
         <Icon
           name="direction-left"
@@ -12,26 +12,61 @@
           color="var(--color-text-primary)"
         />
       </view>
-      <text class="nav-title">{{ pageTitle }}</text>
+      <view class="nav-title">
+        <text class="project-name">{{ pageTitle }}</text>
+      </view>
     </view>
 
-    <scroll-view scroll-y class="content">
-      <view class="card">
-        <view class="card-title-section">
-          <text class="card-title">连接状态</text>
-          <text class="card-subtitle">{{
-            deviceConnected ? "已连接" : "未连接"
-          }}</text>
-        </view>
-        <text class="desc-text">{{
-          deviceConnected ? "可直接保存并应用到设备" : "请先回设备页连接后再发送"
-        }}</text>
+    <view class="canvas-section">
+      <view v-if="!previewHidden" class="preview-canvas-container">
+        <PixelCanvas
+          v-if="previewCanvasReady"
+          :width="64"
+          :height="64"
+          :pixels="currentPreviewPixels"
+          :zoom="previewZoom"
+          :offset-x="previewOffset.x"
+          :offset-y="previewOffset.y"
+          :canvas-width="previewContainerSize.width"
+          :canvas-height="previewContainerSize.height"
+          :grid-visible="true"
+          :is-dark-mode="true"
+          :touch-enabled="false"
+          canvas-id="effectPreviewCanvas"
+        />
       </view>
+      <view
+        v-else
+        class="preview-canvas-container preview-canvas-placeholder"
+      ></view>
+      <view class="preview-caption">
+        <view class="preview-caption-info">
+          <text class="preview-title">64 x 64 模拟预览</text>
+          <text class="preview-subtitle">{{ previewSubtitle }}</text>
+        </view>
+        <view class="preview-actions">
+          <view class="action-btn-sm" @click="saveDraft">
+            <Icon name="save" :size="36" color="var(--color-text-primary)" />
+            <text>保存</text>
+          </view>
+          <view
+            class="action-btn-sm primary"
+            :class="{ disabled: isSending }"
+            @click="saveAndApply"
+          >
+            <Icon name="link" :size="36" color="#fff" />
+            <text>{{ isSending ? "发送中" : "发送" }}</text>
+          </view>
+        </view>
+      </view>
+    </view>
 
+    <scroll-view scroll-y class="content" :style="{ height: contentHeight }">
+      <view class="content-wrapper">
       <view v-if="effectType === 'text_display'" class="card">
         <view class="card-title-section">
           <text class="card-title">文本展示参数</text>
-          <text class="card-subtitle">支持中文</text>
+          <text class="card-subtitle">支持中文与背景色</text>
         </view>
 
         <view class="form-row">
@@ -118,47 +153,29 @@
 
         <view class="form-row">
           <text class="form-label">文字颜色</text>
-          <view class="color-grid">
-            <view
-              v-for="item in colorOptions"
-              :key="`text-${item.hex}`"
-              class="color-item"
-              :class="{ active: textConfig.color === item.hex }"
-              @click="handleTextColorSelect(item.hex)"
-            >
-              <view
-                class="color-dot"
-                :style="{ backgroundColor: item.hex }"
-              ></view>
-              <text class="color-name">{{ item.name }}</text>
-            </view>
-          </view>
+          <ColorPanelPicker
+            :value="textConfig.color"
+            label="文字颜色"
+            :preset-colors="colorOptions"
+            @input="handleTextColorSelect"
+          />
         </view>
 
         <view class="form-row">
           <text class="form-label">背景颜色</text>
-          <view class="color-grid">
-            <view
-              v-for="item in bgColorOptions"
-              :key="`bg-${item.hex}`"
-              class="color-item"
-              :class="{ active: textConfig.bgColor === item.hex }"
-              @click="handleTextBgColorSelect(item.hex)"
-            >
-              <view
-                class="color-dot"
-                :style="{ backgroundColor: item.hex }"
-              ></view>
-              <text class="color-name">{{ item.name }}</text>
-            </view>
-          </view>
+          <ColorPanelPicker
+            :value="textConfig.bgColor"
+            label="背景颜色"
+            :preset-colors="bgColorOptions"
+            @input="handleTextBgColorSelect"
+          />
         </view>
       </view>
 
       <view v-if="effectType === 'breath_effect'" class="card">
         <view class="card-title-section">
-          <text class="card-title">呼吸灯参数</text>
-          <text class="card-subtitle">快速方式</text>
+          <text class="card-title">环绕灯参数</text>
+          <text class="card-subtitle">转圈、层扫与配色</text>
         </view>
 
         <view class="piece-grid">
@@ -174,14 +191,14 @@
         </view>
 
         <view class="form-row">
-          <text class="form-label">波形</text>
-          <view class="option-row">
+          <text class="form-label">运行方式</text>
+          <view class="option-row option-row-wrap">
             <view
-              v-for="item in waveformOptions"
+              v-for="item in ringMotionOptions"
               :key="item.value"
-              class="option-btn"
-              :class="{ active: breathConfig.waveform === item.value }"
-              @click="handleWaveformSelect(item.value)"
+              class="option-btn option-btn-small"
+              :class="{ active: breathConfig.motion === item.value }"
+              @click="handleBreathMotionSelect(item.value)"
             >
               <text>{{ item.label }}</text>
             </view>
@@ -198,6 +215,36 @@
         </view>
 
         <view class="form-row">
+          <text class="form-label">显示范围</text>
+          <view class="option-row">
+            <view
+              v-for="item in ringScopeOptions"
+              :key="item.value"
+              class="option-btn"
+              :class="{ active: breathConfig.scope === item.value }"
+              @click="handleBreathScopeSelect(item.value)"
+            >
+              <text>{{ item.label }}</text>
+            </view>
+          </view>
+        </view>
+
+        <view class="form-row">
+          <text class="form-label">颜色模式</text>
+          <view class="option-row">
+            <view
+              v-for="item in ringColorModeOptions"
+              :key="item.value"
+              class="option-btn"
+              :class="{ active: breathConfig.colorMode === item.value }"
+              @click="handleBreathColorModeSelect(item.value)"
+            >
+              <text>{{ item.label }}</text>
+            </view>
+          </view>
+        </view>
+
+        <view class="form-row">
           <text class="form-label">速度 {{ breathConfig.speed }}</text>
           <slider
             :value="breathConfig.speed"
@@ -209,60 +256,26 @@
         </view>
 
         <view class="form-row">
-          <text class="form-label"
-            >最小亮度 {{ breathConfig.minBrightness }}%</text
-          >
-          <slider
-            :value="breathConfig.minBrightness"
-            min="0"
-            max="100"
-            activeColor="#4F7FFF"
-            @change="handleBreathMinBrightnessChange"
+          <text class="form-label">主色</text>
+          <ColorPanelPicker
+            :value="breathConfig.colorA"
+            label="环绕灯主色"
+            :preset-colors="colorOptions"
+            @input="handleBreathColorSelect"
           />
         </view>
 
-        <view class="form-row">
-          <text class="form-label"
-            >最大亮度 {{ breathConfig.maxBrightness }}%</text
-          >
-          <slider
-            :value="breathConfig.maxBrightness"
-            min="0"
-            max="100"
-            activeColor="#4F7FFF"
-            @change="handleBreathMaxBrightnessChange"
+        <view
+          v-if="breathConfig.colorMode === 'gradient'"
+          class="form-row"
+        >
+          <text class="form-label">渐变次色</text>
+          <ColorPanelPicker
+            :value="breathConfig.colorB"
+            label="环绕灯次色"
+            :preset-colors="colorOptions"
+            @input="handleBreathColorBSelect"
           />
-        </view>
-
-        <view class="form-row">
-          <text class="form-label">周期 {{ breathConfig.periodMs }}ms</text>
-          <slider
-            :value="breathConfig.periodMs"
-            min="200"
-            max="10000"
-            step="100"
-            activeColor="#4F7FFF"
-            @change="handleBreathPeriodChange"
-          />
-        </view>
-
-        <view class="form-row">
-          <text class="form-label">颜色</text>
-          <view class="color-grid">
-            <view
-              v-for="item in colorOptions"
-              :key="`breath-${item.hex}`"
-              class="color-item"
-              :class="{ active: breathConfig.color === item.hex }"
-              @click="handleBreathColorSelect(item.hex)"
-            >
-              <view
-                class="color-dot"
-                :style="{ backgroundColor: item.hex }"
-              ></view>
-              <text class="color-name">{{ item.name }}</text>
-            </view>
-          </view>
         </view>
       </view>
 
@@ -358,49 +371,24 @@
 
         <view class="form-row">
           <text class="form-label">主色</text>
-          <view class="color-grid">
-            <view
-              v-for="item in colorOptions"
-              :key="`rhythm-a-${item.hex}`"
-              class="color-item"
-              :class="{ active: rhythmConfig.colorA === item.hex }"
-              @click="handleRhythmColorASelect(item.hex)"
-            >
-              <view
-                class="color-dot"
-                :style="{ backgroundColor: item.hex }"
-              ></view>
-              <text class="color-name">{{ item.name }}</text>
-            </view>
-          </view>
+          <ColorPanelPicker
+            :value="rhythmConfig.colorA"
+            label="律动主色"
+            :preset-colors="colorOptions"
+            @input="handleRhythmColorASelect"
+          />
         </view>
 
         <view class="form-row">
           <text class="form-label">次色</text>
-          <view class="color-grid">
-            <view
-              v-for="item in colorOptions"
-              :key="`rhythm-b-${item.hex}`"
-              class="color-item"
-              :class="{ active: rhythmConfig.colorB === item.hex }"
-              @click="handleRhythmColorBSelect(item.hex)"
-            >
-              <view
-                class="color-dot"
-                :style="{ backgroundColor: item.hex }"
-              ></view>
-              <text class="color-name">{{ item.name }}</text>
-            </view>
-          </view>
+          <ColorPanelPicker
+            :value="rhythmConfig.colorB"
+            label="律动次色"
+            :preset-colors="colorOptions"
+            @input="handleRhythmColorBSelect"
+          />
         </view>
       </view>
-
-      <view class="save-section">
-        <view class="save-btn" :class="{ disabled: isSending }" @click="saveAndApply">
-          <text class="save-btn-text">{{
-            isSending ? "发送中..." : "保存并应用"
-          }}</text>
-        </view>
       </view>
     </scroll-view>
 
@@ -411,7 +399,7 @@
       style="position: fixed; left: -9999px; top: -9999px; width: 64px; height: 64px; opacity: 0"
     />
 
-    <Toast ref="toastRef" />
+    <Toast ref="toastRef" @show="previewHidden = true" @hide="onToastHide" />
   </view>
 </template>
 
@@ -419,6 +407,8 @@
 import statusBarMixin from "../../mixins/statusBar.js";
 import Icon from "../../components/Icon.vue";
 import Toast from "../../components/Toast.vue";
+import PixelCanvas from "../../components/PixelCanvas.vue";
+import ColorPanelPicker from "../../components/ColorPanelPicker.vue";
 import { useDeviceStore } from "../../store/device.js";
 import { useToast } from "../../composables/useToast.js";
 import { uploadAnimationFrames } from "../../utils/animationUploader.js";
@@ -427,22 +417,70 @@ import {
   buildRhythmFrames,
   hexToRgb,
 } from "../../utils/effectFrameBuilders.js";
+import {
+  drawClockCharToPixels,
+  getClockFont,
+} from "../../utils/clockCanvas.js";
 
 const TEXT_CONFIG_KEY = "text_display_config";
 const BREATH_CONFIG_KEY = "breath_effect_config";
 const RHYTHM_CONFIG_KEY = "rhythm_effect_config";
 
+function fillPreviewRect(pixelMap, x, y, width, height, color) {
+  for (let row = 0; row < height; row++) {
+    for (let col = 0; col < width; col++) {
+      const px = x + col;
+      const py = y + row;
+      if (px < 0 || px >= 64 || py < 0 || py >= 64) {
+        continue;
+      }
+      pixelMap.set(`${px},${py}`, color);
+    }
+  }
+}
+
+function isPreviewAsciiChar(char) {
+  return typeof char === "string" && /^[\x20-\x7E]$/.test(char);
+}
+
+function getPreviewTextFontId(font) {
+  if (font === "mono") {
+    return "retro_5x7";
+  }
+  if (font === "serif") {
+    return "rounded_4x6";
+  }
+  return "classic_5x7";
+}
+
 export default {
   mixins: [statusBarMixin],
-  components: { Icon, Toast },
+  components: {
+    Icon,
+    Toast,
+    PixelCanvas,
+    ColorPanelPicker,
+  },
   data() {
     return {
       deviceStore: null,
       toast: null,
       isSending: false,
+      contentHeight: "calc(100vh - 88rpx - 520rpx)",
       effectType: "text_display",
       selectedBreathPresetKey: "",
       selectedRhythmPresetKey: "",
+      previewFrameMaps: [],
+      previewFrameDelays: [],
+      previewFrameIndex: 0,
+      previewTimer: null,
+      previewRefreshTimer: null,
+      previewRefreshToken: 0,
+      previewCanvasReady: false,
+      previewHidden: false,
+      previewZoom: 4,
+      previewOffset: { x: 16, y: 16 },
+      previewContainerSize: { width: 320, height: 320 },
       textFontOptions: [
         { label: "无衬线", value: "sans" },
         { label: "等宽", value: "mono" },
@@ -454,10 +492,19 @@ export default {
         { label: "向上", value: "up" },
         { label: "向下", value: "down" },
       ],
-      waveformOptions: [
-        { label: "正弦", value: "sine" },
-        { label: "三角", value: "triangle" },
-        { label: "方波", value: "square" },
+      ringMotionOptions: [
+        { label: "顺时针", value: "clockwise" },
+        { label: "逆时针", value: "counterclockwise" },
+        { label: "外向内", value: "inward" },
+        { label: "内向外", value: "outward" },
+      ],
+      ringScopeOptions: [
+        { label: "一圈", value: "single_ring" },
+        { label: "全屏", value: "full_screen" },
+      ],
+      ringColorModeOptions: [
+        { label: "纯色", value: "solid" },
+        { label: "渐变", value: "gradient" },
       ],
       rhythmModeOptions: [
         { label: "脉冲", value: "pulse" },
@@ -482,81 +529,81 @@ export default {
       ],
       breathPresets: [
         {
-          key: "soft_wave",
-          label: "柔和呼吸",
+          key: "clockwise_single",
+          label: "顺时针单圈",
           config: {
-            speed: 3,
+            speed: 5,
             loop: true,
-            minBrightness: 8,
-            maxBrightness: 65,
-            periodMs: 2600,
-            waveform: "sine",
-            color: "#64c8ff",
+            motion: "clockwise",
+            scope: "single_ring",
+            colorMode: "solid",
+            colorA: "#64c8ff",
+            colorB: "#64c8ff",
           },
         },
         {
-          key: "energy_blink",
-          label: "能量脉冲",
+          key: "counter_gradient",
+          label: "逆时针渐变",
           config: {
-            speed: 8,
+            speed: 6,
             loop: true,
-            minBrightness: 25,
-            maxBrightness: 100,
-            periodMs: 900,
-            waveform: "square",
-            color: "#00ff9d",
+            motion: "counterclockwise",
+            scope: "single_ring",
+            colorMode: "gradient",
+            colorA: "#00ff9d",
+            colorB: "#64c8ff",
           },
         },
         {
-          key: "warm_ambient",
-          label: "暖光氛围",
+          key: "inward_single",
+          label: "外向内层扫",
           config: {
             speed: 4,
             loop: true,
-            minBrightness: 6,
-            maxBrightness: 55,
-            periodMs: 3200,
-            waveform: "triangle",
-            color: "#ffa500",
+            motion: "inward",
+            scope: "single_ring",
+            colorMode: "solid",
+            colorA: "#ffa500",
+            colorB: "#ffa500",
           },
         },
         {
-          key: "night_guard",
-          label: "夜间守护",
+          key: "outward_single",
+          label: "内向外层扫",
           config: {
-            speed: 2,
+            speed: 4,
             loop: true,
-            minBrightness: 3,
-            maxBrightness: 30,
-            periodMs: 4200,
-            waveform: "sine",
-            color: "#6464ff",
+            motion: "outward",
+            scope: "single_ring",
+            colorMode: "solid",
+            colorA: "#6464ff",
+            colorB: "#6464ff",
           },
         },
         {
-          key: "warning_pulse",
-          label: "警示呼吸",
+          key: "clockwise_full",
+          label: "顺时针全屏",
           config: {
             speed: 7,
             loop: true,
-            minBrightness: 15,
-            maxBrightness: 95,
-            periodMs: 1200,
-            waveform: "triangle",
-            color: "#ff6464",
+            motion: "clockwise",
+            scope: "full_screen",
+            colorMode: "gradient",
+            colorA: "#ff6464",
+            colorB: "#ffdc00",
           },
         },
         {
-          key: "single_breath",
-          label: "单次呼吸",
+          key: "outward_full",
+          label: "内向外全屏",
           config: {
             speed: 5,
             loop: false,
-            minBrightness: 10,
-            maxBrightness: 90,
-            periodMs: 1500,
-            waveform: "sine",
-            color: "#ffffff",
+            motion: "outward",
+            scope: "full_screen",
+            colorMode: "gradient",
+            colorA: "#ffffff",
+            colorB: "#64c8ff",
           },
         },
       ],
@@ -660,11 +707,11 @@ export default {
       breathConfig: {
         speed: 5,
         loop: true,
-        minBrightness: 10,
-        maxBrightness: 100,
-        periodMs: 1800,
-        waveform: "sine",
-        color: "#64c8ff",
+        motion: "clockwise",
+        scope: "single_ring",
+        colorMode: "solid",
+        colorA: "#64c8ff",
+        colorB: "#64c8ff",
       },
       rhythmConfig: {
         bpm: 120,
@@ -687,9 +734,53 @@ export default {
         return "文本展示";
       }
       if (this.effectType === "breath_effect") {
-        return "呼吸灯";
+        return "环绕灯";
       }
       return "律动";
+    },
+    currentPreviewPixels() {
+      if (this.previewFrameMaps.length === 0) {
+        return new Map();
+      }
+      if (this.previewFrameIndex >= this.previewFrameMaps.length) {
+        return this.previewFrameMaps[0];
+      }
+      return this.previewFrameMaps[this.previewFrameIndex];
+    },
+    previewSubtitle() {
+      if (this.previewFrameMaps.length > 1) {
+        return "自动播放当前参数生成的效果";
+      }
+      return "显示当前参数对应的静态结果";
+    },
+  },
+  watch: {
+    textConfig: {
+      handler() {
+        if (this.effectType === "text_display") {
+          this.schedulePreviewRefresh();
+        }
+      },
+      deep: true,
+    },
+    breathConfig: {
+      handler() {
+        if (this.effectType === "breath_effect") {
+          this.schedulePreviewRefresh();
+        }
+      },
+      deep: true,
+    },
+    rhythmConfig: {
+      handler() {
+        if (this.effectType === "rhythm_effect") {
+          this.schedulePreviewRefresh();
+        }
+      },
+      deep: true,
+    },
+    effectType() {
+      this.schedulePreviewRefresh();
     },
   },
   onLoad(options) {
@@ -712,10 +803,141 @@ export default {
     if (this.$refs.toastRef) {
       this.toast.setToastInstance(this.$refs.toastRef);
     }
+    this.initPreviewCanvas();
+    this.schedulePreviewRefresh();
+  },
+  onUnload() {
+    this.stopPreviewPlayback();
+    if (this.previewRefreshTimer) {
+      clearTimeout(this.previewRefreshTimer);
+      this.previewRefreshTimer = null;
+    }
   },
   methods: {
     handleBack() {
       uni.navigateBack();
+    },
+    onToastHide() {
+      this.previewHidden = false;
+    },
+    initPreviewCanvas() {
+      const systemInfo = uni.getSystemInfoSync();
+      const statusBarHeight = systemInfo.statusBarHeight || 0;
+
+      this.$nextTick(() => {
+        setTimeout(() => {
+          const query = uni.createSelectorQuery().in(this);
+          query.select(".canvas-section").boundingClientRect((sectionRect) => {
+            if (!sectionRect || !sectionRect.height) {
+              return;
+            }
+
+            const nextHeight =
+              systemInfo.windowHeight - statusBarHeight - 88 - sectionRect.height;
+            this.contentHeight = `${Math.max(120, nextHeight)}px`;
+          });
+          query
+            .select(".preview-canvas-container")
+            .boundingClientRect((data) => {
+              if (!data || !data.width) {
+                this.previewCanvasReady = true;
+                return;
+              }
+              const fitZoom = Math.max(2, Math.floor((data.width * 0.92) / 64));
+              this.previewContainerSize = {
+                width: data.width,
+                height: data.width,
+              };
+              this.previewZoom = fitZoom;
+              this.previewOffset = {
+                x: (data.width - 64 * fitZoom) / 2,
+                y: (data.width - 64 * fitZoom) / 2,
+              };
+              this.previewCanvasReady = true;
+            })
+            .exec();
+        }, 80);
+      });
+    },
+    frameToPixelMap(frame) {
+      const pixels = new Map();
+      if (!frame || !frame.pixels || typeof frame.pixels.length !== "number") {
+        return pixels;
+      }
+      for (let i = 0; i < frame.pixels.length; i += 5) {
+        const x = frame.pixels[i];
+        const y = frame.pixels[i + 1];
+        const r = frame.pixels[i + 2];
+        const g = frame.pixels[i + 3];
+        const b = frame.pixels[i + 4];
+        pixels.set(`${x},${y}`, `rgb(${r}, ${g}, ${b})`);
+      }
+      return pixels;
+    },
+    schedulePreviewRefresh() {
+      if (this.previewRefreshTimer) {
+        clearTimeout(this.previewRefreshTimer);
+        this.previewRefreshTimer = null;
+      }
+      this.previewRefreshTimer = setTimeout(() => {
+        this.refreshPreviewFrames();
+      }, 120);
+    },
+    async refreshPreviewFrames() {
+      const token = this.previewRefreshToken + 1;
+      this.previewRefreshToken = token;
+      try {
+        let frames;
+        if (this.effectType === "text_display") {
+          frames = this.buildTextPreviewFrames();
+        } else {
+          frames = await this.buildFrames();
+        }
+        if (token !== this.previewRefreshToken) {
+          return;
+        }
+        this.previewFrameMaps = frames.map((frame) => this.frameToPixelMap(frame));
+        this.previewFrameDelays = frames.map((frame) => {
+          if (!frame || !frame.delay) {
+            return 120;
+          }
+          return frame.delay;
+        });
+        this.previewFrameIndex = 0;
+        this.startPreviewPlayback();
+      } catch (err) {
+        console.error("预览生成失败:", err);
+        this.previewFrameMaps = [];
+        this.previewFrameDelays = [];
+        this.previewFrameIndex = 0;
+        this.stopPreviewPlayback();
+      }
+    },
+    startPreviewPlayback() {
+      this.stopPreviewPlayback();
+      if (this.previewFrameMaps.length <= 1) {
+        return;
+      }
+      const playNext = () => {
+        const delay = this.previewFrameDelays[this.previewFrameIndex];
+        const safeDelay = typeof delay === "number" ? delay : 120;
+        this.previewTimer = setTimeout(() => {
+          if (this.previewFrameMaps.length === 0) {
+            return;
+          }
+          const nextIndex = this.previewFrameIndex + 1;
+          this.previewFrameIndex =
+            nextIndex >= this.previewFrameMaps.length ? 0 : nextIndex;
+          playNext();
+        }, safeDelay);
+      };
+      playNext();
+    },
+    stopPreviewPlayback() {
+      if (this.previewTimer) {
+        clearTimeout(this.previewTimer);
+        this.previewTimer = null;
+      }
     },
 
     handleTextFontSelect(value) {
@@ -743,8 +965,8 @@ export default {
       this.textConfig.bgColor = hex;
     },
 
-    handleWaveformSelect(value) {
-      this.breathConfig.waveform = value;
+    handleBreathMotionSelect(value) {
+      this.breathConfig.motion = value;
       this.selectedBreathPresetKey = "";
     },
     handleBreathLoopToggle() {
@@ -755,20 +977,20 @@ export default {
       this.breathConfig.speed = Number(e.detail.value);
       this.selectedBreathPresetKey = "";
     },
-    handleBreathMinBrightnessChange(e) {
-      this.breathConfig.minBrightness = Number(e.detail.value);
+    handleBreathScopeSelect(value) {
+      this.breathConfig.scope = value;
       this.selectedBreathPresetKey = "";
     },
-    handleBreathMaxBrightnessChange(e) {
-      this.breathConfig.maxBrightness = Number(e.detail.value);
-      this.selectedBreathPresetKey = "";
-    },
-    handleBreathPeriodChange(e) {
-      this.breathConfig.periodMs = Number(e.detail.value);
+    handleBreathColorModeSelect(value) {
+      this.breathConfig.colorMode = value;
       this.selectedBreathPresetKey = "";
     },
     handleBreathColorSelect(hex) {
-      this.breathConfig.color = hex;
+      this.breathConfig.colorA = hex;
+      this.selectedBreathPresetKey = "";
+    },
+    handleBreathColorBSelect(hex) {
+      this.breathConfig.colorB = hex;
       this.selectedBreathPresetKey = "";
     },
 
@@ -855,13 +1077,14 @@ export default {
       return (
         Number.isFinite(Number(cfg.speed)) &&
         typeof cfg.loop === "boolean" &&
-        Number.isFinite(Number(cfg.minBrightness)) &&
-        Number.isFinite(Number(cfg.maxBrightness)) &&
-        Number.isFinite(Number(cfg.periodMs)) &&
-        (cfg.waveform === "sine" ||
-          cfg.waveform === "triangle" ||
-          cfg.waveform === "square") &&
-        typeof cfg.color === "string"
+        (cfg.motion === "clockwise" ||
+          cfg.motion === "counterclockwise" ||
+          cfg.motion === "inward" ||
+          cfg.motion === "outward") &&
+        (cfg.scope === "single_ring" || cfg.scope === "full_screen") &&
+        (cfg.colorMode === "solid" || cfg.colorMode === "gradient") &&
+        typeof cfg.colorA === "string" &&
+        typeof cfg.colorB === "string"
       );
     },
     isValidRhythmConfig(cfg) {
@@ -888,6 +1111,11 @@ export default {
       uni.setStorageSync(RHYTHM_CONFIG_KEY, this.rhythmConfig);
     },
 
+    saveDraft() {
+      this.saveConfig();
+      this.toast.showSuccess("草稿已保存");
+    },
+
     applyBreathPreset(preset) {
       if (!preset || !preset.config) {
         return;
@@ -908,6 +1136,98 @@ export default {
       return `#${color.r.toString(16).padStart(2, "0")}${color.g
         .toString(16)
         .padStart(2, "0")}${color.b.toString(16).padStart(2, "0")}`;
+    },
+    drawPreviewUnsupportedChar(char, x, y, color, pixelMap) {
+      if (char === " ") {
+        return 6;
+      }
+      fillPreviewRect(pixelMap, x, y, 6, 1, color);
+      fillPreviewRect(pixelMap, x, y + 1, 1, 6, color);
+      fillPreviewRect(pixelMap, x + 5, y + 1, 1, 6, color);
+      fillPreviewRect(pixelMap, x + 1, y + 6, 4, 1, color);
+      fillPreviewRect(pixelMap, x + 2, y + 2, 2, 2, color);
+      return 7;
+    },
+    drawPreviewTextToMap(cfg, drawX, drawY) {
+      const pixelMap = new Map();
+      const bg = this.ensureColorHex(cfg.bgColor);
+      const fg = this.ensureColorHex(cfg.color);
+      const fontId = getPreviewTextFontId(cfg.font);
+      const font = getClockFont(fontId);
+
+      if (bg !== "#000000") {
+        fillPreviewRect(pixelMap, 0, 0, 64, 64, bg);
+      }
+
+      let cursorX = drawX;
+      const baseY = drawY - Math.floor(font.height / 2);
+
+      for (let i = 0; i < cfg.text.length; i++) {
+        const char = cfg.text[i];
+        if (isPreviewAsciiChar(char)) {
+          cursorX += drawClockCharToPixels(
+            char,
+            cursorX,
+            baseY,
+            fg,
+            pixelMap,
+            fontId,
+            1,
+          );
+          continue;
+        }
+        cursorX += this.drawPreviewUnsupportedChar(char, cursorX, baseY, fg, pixelMap);
+      }
+
+      return pixelMap;
+    },
+    buildTextPreviewFrames() {
+      const cfg = { ...this.textConfig };
+      cfg.color = this.ensureColorHex(cfg.color);
+      cfg.bgColor = this.ensureColorHex(cfg.bgColor);
+
+      const frameCount = cfg.loop ? 20 : 1;
+      const step = Number(cfg.speed) * 2;
+      const frames = [];
+
+      for (let i = 0; i < frameCount; i++) {
+        const offset = i * step;
+        let drawX = Number(cfg.x);
+        let drawY = Number(cfg.y);
+
+        if (cfg.direction === "left") {
+          drawX = Number(cfg.x) - offset;
+        } else if (cfg.direction === "right") {
+          drawX = Number(cfg.x) + offset;
+        } else if (cfg.direction === "up") {
+          drawY = Number(cfg.y) - offset;
+        } else if (cfg.direction === "down") {
+          drawY = Number(cfg.y) + offset;
+        }
+
+        const map = this.drawPreviewTextToMap(cfg, drawX, drawY);
+        const pixels = [];
+        map.forEach((color, key) => {
+          const coord = key.split(",");
+          const rgb = hexToRgb(color);
+          pixels.push(
+            Number(coord[0]),
+            Number(coord[1]),
+            rgb.r,
+            rgb.g,
+            rgb.b,
+          );
+        });
+
+        frames.push({
+          type: 1,
+          delay: Math.max(40, 220 - Number(cfg.speed) * 15),
+          totalPixels: pixels.length / 5,
+          pixels: new Uint8Array(pixels),
+        });
+      }
+
+      return frames;
     },
 
     async renderTextFrameToPixels(cfg, drawX, drawY) {
@@ -1026,7 +1346,8 @@ export default {
         return this.buildTextFrames();
       }
       if (this.effectType === "breath_effect") {
-        this.breathConfig.color = this.ensureColorHex(this.breathConfig.color);
+        this.breathConfig.colorA = this.ensureColorHex(this.breathConfig.colorA);
+        this.breathConfig.colorB = this.ensureColorHex(this.breathConfig.colorB);
         return buildBreathFrames(this.breathConfig);
       }
       if (this.effectType === "rhythm_effect") {
@@ -1050,28 +1371,8 @@ export default {
       try {
         const ws = this.deviceStore.getWebSocket();
         if (this.effectType === "breath_effect") {
-          const breathColor = hexToRgb(
-            this.ensureColorHex(this.breathConfig.color),
-          );
-          try {
-            await ws.send({
-              cmd: "set_breath_effect",
-              speed: Number(this.breathConfig.speed),
-              loop: this.breathConfig.loop,
-              minBrightness: Number(this.breathConfig.minBrightness),
-              maxBrightness: Number(this.breathConfig.maxBrightness),
-              periodMs: Number(this.breathConfig.periodMs),
-              waveform: this.breathConfig.waveform,
-              color: {
-                r: breathColor.r,
-                g: breathColor.g,
-                b: breathColor.b,
-              },
-            });
-          } catch (nativeErr) {
-            const frames = await this.buildFrames();
-            await uploadAnimationFrames(ws, frames, this.effectType);
-          }
+          const frames = await this.buildFrames();
+          await uploadAnimationFrames(ws, frames, this.effectType);
         } else if (this.effectType === "rhythm_effect") {
           const colorA = hexToRgb(this.ensureColorHex(this.rhythmConfig.colorA));
           const colorB = hexToRgb(this.ensureColorHex(this.rhythmConfig.colorB));
@@ -1120,29 +1421,34 @@ export default {
 
 <style scoped>
 .effect-page {
-  min-height: 100vh;
-  background-color: #f5f5f7;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--bg-secondary);
+  overflow: hidden;
 }
 
 .status-bar {
   background-color: #1a1a1a;
 }
 
-.navbar {
+.header {
   height: 88rpx;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 0 32rpx;
-  background-color: var(--color-card-background);
+  background-color: var(--bg-elevated);
   border-bottom: 2rpx solid var(--border-primary);
   position: relative;
+  flex-shrink: 0;
 }
 
 .nav-left {
   position: absolute;
   left: 32rpx;
   width: 80rpx;
+  height: 80rpx;
   display: flex;
   align-items: center;
   justify-content: flex-start;
@@ -1154,38 +1460,155 @@ export default {
   color: var(--color-text-primary);
 }
 
+.project-name {
+  font-size: 33rpx;
+  font-weight: 700;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.action-btn-sm {
+  width: auto;
+  min-width: 88rpx;
+  height: 72rpx;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8rpx;
+  padding: 0 16rpx;
+  border-radius: 14rpx;
+  border: 2rpx solid var(--border-primary);
+  background-color: var(--bg-tertiary);
+}
+
+.action-btn-sm.primary {
+  border-color: var(--accent-primary);
+  background: var(--accent-primary);
+}
+
+.action-btn-sm.disabled {
+  opacity: 0.4;
+}
+
+.action-btn-sm text {
+  font-size: 22rpx;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.canvas-section {
+  display: flex;
+  flex-direction: column;
+  background: #000000;
+  border-bottom: 2rpx solid var(--border-primary);
+  flex-shrink: 0;
+}
+
+.preview-canvas-container {
+  width: 100%;
+  aspect-ratio: 1;
+  position: relative;
+  overflow: hidden;
+  background-color: #000000;
+}
+
+.preview-canvas-placeholder {
+  background-color: #000000;
+}
+
+.preview-caption {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16rpx;
+  padding: 14rpx 20rpx 18rpx;
+  background: var(--bg-tertiary);
+  border-bottom: 1rpx solid var(--border-color);
+}
+
+.preview-caption-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4rpx;
+}
+
+.preview-title {
+  font-size: 24rpx;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.preview-subtitle {
+  font-size: 22rpx;
+  color: var(--text-secondary);
+}
+
+.preview-actions {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  flex-shrink: 0;
+}
+
+.preview-actions .action-btn-sm {
+  width: auto;
+  min-width: 118rpx;
+  height: 64rpx;
+  padding: 0 18rpx;
+  gap: 10rpx;
+  border-radius: 18rpx;
+}
+
+.preview-actions .action-btn-sm text {
+  font-size: 24rpx;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1;
+}
+
+.preview-actions .action-btn-sm.primary text {
+  color: #ffffff;
+}
+
 .content {
-  padding: 24rpx;
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+  box-sizing: border-box;
+  background: var(--bg-tertiary);
+  padding: 20rpx;
+}
+
+.content-wrapper {
+  padding-bottom: 48rpx;
 }
 
 .card {
-  background: #fff;
-  border-radius: 24rpx;
-  padding: 28rpx;
-  margin-bottom: 24rpx;
+  padding-top: 20rpx;
 }
 
 .card-title-section {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 20rpx;
+  gap: 8rpx;
+  margin-bottom: 16rpx;
 }
 
 .card-title {
-  font-size: 30rpx;
-  font-weight: 600;
-  color: #1a1a1a;
+  font-size: 22rpx;
+  font-weight: 500;
+  color: var(--text-primary);
 }
 
 .card-subtitle {
-  font-size: 24rpx;
-  color: #999;
-}
-
-.desc-text {
-  font-size: 24rpx;
-  color: #666;
+  font-size: 20rpx;
+  color: var(--text-secondary);
 }
 
 .form-row {
@@ -1201,7 +1624,7 @@ export default {
 .form-label {
   display: block;
   font-size: 26rpx;
-  color: #1a1a1a;
+  color: var(--text-primary);
   font-weight: 500;
 }
 
@@ -1209,17 +1632,22 @@ export default {
   margin-top: 10rpx;
   height: 72rpx;
   border-radius: 16rpx;
-  background: #f5f5f7;
+  background: var(--bg-tertiary);
+  border: 2rpx solid var(--border-primary);
   padding: 0 20rpx;
   box-sizing: border-box;
   font-size: 26rpx;
-  color: #1a1a1a;
+  color: var(--text-primary);
 }
 
 .option-row {
   margin-top: 10rpx;
   display: flex;
   gap: 16rpx;
+}
+
+.option-row-wrap {
+  flex-wrap: wrap;
 }
 
 .option-btn {
@@ -1229,27 +1657,32 @@ export default {
   align-items: center;
   justify-content: center;
   border-radius: 16rpx;
-  background: #f5f5f7;
+  background: var(--bg-tertiary);
+  border: 2rpx solid var(--border-primary);
   transition: all 0.2s;
+}
+
+.option-btn-small {
+  flex: none;
+  min-width: calc(25% - 12rpx);
+  padding: 0 12rpx;
+  box-sizing: border-box;
 }
 
 .option-btn text {
   font-size: 25rpx;
-  color: #666;
+  color: var(--text-secondary);
 }
 
 .option-btn.active {
-  background: #eef2ff;
-  border: 2rpx solid #4f7fff;
+  background: rgba(79, 127, 255, 0.14);
+  border-color: var(--accent-primary);
+  box-shadow: 0 8rpx 18rpx rgba(79, 127, 255, 0.12);
 }
 
 .option-btn.active text {
-  color: #4f7fff;
+  color: var(--accent-primary);
   font-weight: 600;
-}
-
-.option-btn:active {
-  transform: scale(0.96);
 }
 
 .toggle-switch {
@@ -1260,7 +1693,7 @@ export default {
   width: 88rpx;
   height: 48rpx;
   border-radius: 24rpx;
-  background: #ddd;
+  background: var(--border-primary);
   display: flex;
   align-items: center;
   padding: 4rpx;
@@ -1268,7 +1701,7 @@ export default {
 }
 
 .switch-track.active {
-  background: #4f7fff;
+  background: var(--accent-primary);
 }
 
 .switch-thumb {
@@ -1285,107 +1718,40 @@ export default {
 }
 
 .piece-grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 16rpx;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14rpx;
 }
 
 .piece-item {
-  width: calc(33.33% - 11rpx);
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 18rpx 0;
+  min-height: 76rpx;
+  padding: 18rpx 10rpx;
   border-radius: 16rpx;
-  background: #f5f5f7;
+  background: var(--bg-tertiary);
+  border: 2rpx solid var(--border-primary);
+  box-sizing: border-box;
   transition: all 0.2s;
 }
 
 .piece-item.active {
-  background: #eef2ff;
-  border: 2rpx solid #4f7fff;
-}
-
-.piece-item:active {
-  transform: scale(0.96);
+  background: rgba(79, 127, 255, 0.14);
+  border-color: var(--accent-primary);
+  box-shadow: 0 8rpx 18rpx rgba(79, 127, 255, 0.12);
 }
 
 .piece-name {
   font-size: 24rpx;
-  color: #666;
+  color: var(--text-secondary);
   font-weight: 600;
   text-align: center;
+  line-height: 1.35;
 }
 
 .piece-item.active .piece-name {
-  color: #4f7fff;
+  color: var(--accent-primary);
 }
 
-.color-grid {
-  margin-top: 10rpx;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12rpx;
-}
-
-.color-item {
-  width: calc(25% - 9rpx);
-  background: #f5f5f7;
-  border-radius: 14rpx;
-  padding: 14rpx 8rpx 12rpx;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8rpx;
-  border: 2rpx solid transparent;
-}
-
-.color-item.active {
-  border-color: #4f7fff;
-  background: #eef2ff;
-}
-
-.color-dot {
-  width: 42rpx;
-  height: 42rpx;
-  border-radius: 10rpx;
-  border: 2rpx solid rgba(0, 0, 0, 0.08);
-}
-
-.color-name {
-  font-size: 22rpx;
-  color: #666;
-}
-
-.color-item.active .color-name {
-  color: #4f7fff;
-  font-weight: 600;
-}
-
-.save-section {
-  padding: 20rpx 0 60rpx;
-}
-
-.save-btn {
-  height: 88rpx;
-  background: #4f7fff;
-  border-radius: 20rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.save-btn.disabled {
-  opacity: 0.6;
-}
-
-.save-btn:active {
-  opacity: 0.85;
-}
-
-.save-btn-text {
-  font-size: 32rpx;
-  font-weight: 600;
-  color: #fff;
-}
 </style>

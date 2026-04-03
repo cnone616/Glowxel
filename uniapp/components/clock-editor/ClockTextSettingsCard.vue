@@ -58,16 +58,12 @@
 
       <view class="setting-item">
         <text class="setting-label">颜色</text>
-        <view class="color-picker">
-          <view
-            v-for="color in presetColors"
-            :key="color.name"
-            class="color-item"
-            :class="{ active: section.color === color.hex }"
-            :style="{ backgroundColor: color.hex }"
-            @click="$emit('update-color', color.hex)"
-          ></view>
-        </view>
+        <ColorPanelPicker
+          :value="section.color"
+          :label="`${title}颜色`"
+          :preset-colors="presetColors"
+          @input="$emit('update-color', $event)"
+        />
       </view>
 
       <view class="setting-item">
@@ -102,10 +98,12 @@
 
 <script>
 import Icon from "../Icon.vue";
+import ColorPanelPicker from "../ColorPanelPicker.vue";
 
 export default {
   components: {
     Icon,
+    ColorPanelPicker,
   },
   props: {
     iconName: {
@@ -224,31 +222,6 @@ export default {
   color: var(--accent-primary);
   min-width: 64rpx;
   text-align: center;
-}
-
-.color-picker {
-  display: flex;
-  gap: 8rpx;
-  flex-wrap: wrap;
-}
-
-.color-item {
-  width: 52rpx;
-  height: 52rpx;
-  border-radius: 12rpx;
-  border: 3rpx solid transparent;
-  transition: var(--transition-base);
-  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.2);
-}
-
-.color-item:active {
-  transform: scale(0.95);
-}
-
-.color-item.active {
-  border-color: var(--accent-primary);
-  box-shadow: 0 0 16rpx var(--accent-primary);
-  transform: scale(1.05);
 }
 
 .align-buttons {

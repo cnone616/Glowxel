@@ -3,9 +3,11 @@
 #include "clock_font_renderer.h"
 #include "config_manager.h"
 #include "display_manager.h"
+#include "eyes_effect.h"
 #include "ota_manager.h"
 #include "tetris_effect.h"
 #include "wifi_manager.h"
+#include <string.h>
 
 namespace {
   void setErrorResponse(StaticJsonDocument<512>& response, const char* message) {
@@ -17,6 +19,27 @@ namespace {
     String responseStr;
     serializeJson(response, responseStr);
     client->text(responseStr);
+  }
+
+  bool isHexColorText(const char* value) {
+    if (value == nullptr) {
+      return false;
+    }
+    if (strlen(value) != 7 || value[0] != '#') {
+      return false;
+    }
+
+    for (int i = 1; i < 7; i++) {
+      char ch = value[i];
+      bool isDigit = ch >= '0' && ch <= '9';
+      bool isLowerHex = ch >= 'a' && ch <= 'f';
+      bool isUpperHex = ch >= 'A' && ch <= 'F';
+      if (!isDigit && !isLowerHex && !isUpperHex) {
+        return false;
+      }
+    }
+
+    return true;
   }
 }
 
@@ -43,6 +66,8 @@ bool WebSocketCommandHandlers::handleBasicCommand(
       response["effectMode"] = "breath_effect";
     } else if (DisplayManager::nativeEffectType == NATIVE_EFFECT_RHYTHM) {
       response["effectMode"] = "rhythm_effect";
+    } else if (DisplayManager::nativeEffectType == NATIVE_EFFECT_EYES) {
+      response["effectMode"] = "eyes";
     } else {
       response["effectMode"] = "none";
     }
@@ -93,6 +118,35 @@ bool WebSocketCommandHandlers::handleModeCommand(
   if (cmd == "set_mode") {
     String mode = doc["mode"].as<String>();
     DeviceMode fromMode = DisplayManager::currentMode;
+    auto playLoadedAnimation = []() {
+      if (AnimationManager::currentGIF != nullptr) {
+        AnimationManager::currentGIF->isPlaying = true;
+        AnimationManager::currentGIF->currentFrame = 0;
+        AnimationManager::currentGIF->lastFrameTime = millis();
+        AnimationManager::renderGIFFrame(0);
+        return true;
+      }
+      return false;
+    };
+    auto setAnimationBusinessMode = [&](const String& modeTag, const char* message, bool fallbackToClock) {
+      DisplayManager::currentMode = MODE_ANIMATION;
+      DisplayManager::lastBusinessMode = MODE_ANIMATION;
+      DisplayManager::currentBusinessModeTag = modeTag;
+      DisplayManager::lastBusinessModeTag = modeTag;
+      ConfigManager::saveClockConfig();
+
+      if (!playLoadedAnimation()) {
+        if (fallbackToClock) {
+          DisplayManager::displayClock(true);
+        } else {
+          DisplayManager::dma_display->clearScreen();
+        }
+      }
+
+      Serial.printf("模式切换: %s -> %s\n", modeToString(fromMode), modeTag.c_str());
+      response["message"] = message;
+      return true;
+    };
 
     TetrisEffect::isActive = false;
     DisplayManager::setNativeEffectNone();
@@ -105,6 +159,8 @@ bool WebSocketCommandHandlers::handleModeCommand(
     if (mode == "clock") {
       DisplayManager::currentMode = MODE_CLOCK;
       DisplayManager::lastBusinessMode = MODE_CLOCK;
+      DisplayManager::currentBusinessModeTag = "clock";
+      DisplayManager::lastBusinessModeTag = "clock";
       ConfigManager::saveClockConfig();
       DisplayManager::displayClock(true);
       Serial.printf("模式切换: %s -> clock\n", modeToString(fromMode));
@@ -114,6 +170,7 @@ bool WebSocketCommandHandlers::handleModeCommand(
 
     if (mode == "canvas") {
       DisplayManager::currentMode = MODE_CANVAS;
+      DisplayManager::currentBusinessModeTag = "canvas";
       ConfigManager::saveClockConfig();
       DisplayManager::renderCanvas();
       Serial.printf("模式切换: %s -> canvas\n", modeToString(fromMode));
@@ -122,47 +179,18 @@ bool WebSocketCommandHandlers::handleModeCommand(
     }
 
     if (mode == "animation") {
-      DisplayManager::currentMode = MODE_ANIMATION;
-      DisplayManager::lastBusinessMode = MODE_ANIMATION;
-      ConfigManager::saveClockConfig();
-
-      if (AnimationManager::currentGIF != nullptr) {
-        AnimationManager::currentGIF->isPlaying = true;
-        AnimationManager::currentGIF->currentFrame = 0;
-        AnimationManager::currentGIF->lastFrameTime = millis();
-        AnimationManager::renderGIFFrame(0);
-        Serial.printf("模式切换: %s -> animation\n", modeToString(fromMode));
-        response["message"] = "switched to animation mode";
-      } else {
-        DisplayManager::displayClock(true);
-        Serial.printf("模式切换: %s -> animation (no GIF)\n", modeToString(fromMode));
-        response["message"] = "switched to animation mode (no GIF)";
-      }
-      return true;
+      return setAnimationBusinessMode("animation", "switched to animation mode", true);
     }
 
     if (mode == "text_display") {
-      DisplayManager::currentMode = MODE_ANIMATION;
-      DisplayManager::lastBusinessMode = MODE_ANIMATION;
-      ConfigManager::saveClockConfig();
-
-      if (AnimationManager::currentGIF != nullptr) {
-        AnimationManager::currentGIF->isPlaying = true;
-        AnimationManager::currentGIF->currentFrame = 0;
-        AnimationManager::currentGIF->lastFrameTime = millis();
-        AnimationManager::renderGIFFrame(0);
-      } else {
-        DisplayManager::displayClock(true);
-      }
-
-      Serial.printf("模式切换: %s -> text_display\n", modeToString(fromMode));
-      response["message"] = "switched to text display mode";
-      return true;
+      return setAnimationBusinessMode("text_display", "switched to text display mode", true);
     }
 
     if (mode == "breath_effect") {
       DisplayManager::currentMode = MODE_ANIMATION;
       DisplayManager::lastBusinessMode = MODE_ANIMATION;
+      DisplayManager::currentBusinessModeTag = "breath_effect";
+      DisplayManager::lastBusinessModeTag = "breath_effect";
       ConfigManager::saveClockConfig();
       DisplayManager::activateBreathEffect(DisplayManager::breathEffectConfig);
 
@@ -174,6 +202,8 @@ bool WebSocketCommandHandlers::handleModeCommand(
     if (mode == "rhythm_effect") {
       DisplayManager::currentMode = MODE_ANIMATION;
       DisplayManager::lastBusinessMode = MODE_ANIMATION;
+      DisplayManager::currentBusinessModeTag = "rhythm_effect";
+      DisplayManager::lastBusinessModeTag = "rhythm_effect";
       ConfigManager::saveClockConfig();
       DisplayManager::activateRhythmEffect(DisplayManager::rhythmEffectConfig);
 
@@ -184,6 +214,7 @@ bool WebSocketCommandHandlers::handleModeCommand(
 
     if (mode == "transferring") {
       DisplayManager::currentMode = MODE_TRANSFERRING;
+      DisplayManager::currentBusinessModeTag = "transferring";
       DisplayManager::dma_display->clearScreen();
       Serial.printf("模式切换: %s -> transferring\n", modeToString(fromMode));
       Serial.println("进入传输模式，准备接收动画数据");
@@ -194,6 +225,8 @@ bool WebSocketCommandHandlers::handleModeCommand(
     if (mode == "tetris") {
       DisplayManager::currentMode = MODE_ANIMATION;
       DisplayManager::lastBusinessMode = MODE_ANIMATION;
+      DisplayManager::currentBusinessModeTag = "tetris";
+      DisplayManager::lastBusinessModeTag = "tetris";
       bool clearMode = doc["clearMode"] | true;
       int cellSz = doc["cellSize"] | 2;
       int speed = doc["speed"] | 150;
@@ -217,6 +250,35 @@ bool WebSocketCommandHandlers::handleModeCommand(
       TetrisEffect::init(clearMode, cellSz, speed, clock, mask);
       Serial.printf("模式切换: %s -> tetris\n", modeToString(fromMode));
       response["message"] = "tetris started";
+      return true;
+    }
+
+    if (mode == "weather") {
+      return setAnimationBusinessMode("weather", "switched to weather mode", false);
+    }
+
+    if (mode == "countdown") {
+      return setAnimationBusinessMode("countdown", "switched to countdown mode", false);
+    }
+
+    if (mode == "stopwatch") {
+      return setAnimationBusinessMode("stopwatch", "switched to stopwatch mode", false);
+    }
+
+    if (mode == "notification") {
+      return setAnimationBusinessMode("notification", "switched to notification mode", false);
+    }
+
+    if (mode == "eyes") {
+      DisplayManager::currentMode = MODE_ANIMATION;
+      DisplayManager::lastBusinessMode = MODE_ANIMATION;
+      DisplayManager::currentBusinessModeTag = "eyes";
+      DisplayManager::lastBusinessModeTag = "eyes";
+      ConfigManager::saveClockConfig();
+      DisplayManager::activateEyesEffect(ConfigManager::eyesConfig);
+
+      Serial.printf("模式切换: %s -> eyes\n", modeToString(fromMode));
+      response["message"] = "switched to eyes mode";
       return true;
     }
 
@@ -314,6 +376,38 @@ namespace {
   bool ensureColorObject(JsonObject color) {
     return color.containsKey("r") && color.containsKey("g") && color.containsKey("b");
   }
+
+  bool ensureEyesLayoutObject(JsonObject layout) {
+    return layout.containsKey("eyeY") &&
+           layout.containsKey("eyeSpacing") &&
+           layout.containsKey("eyeWidth") &&
+           layout.containsKey("eyeHeight") &&
+           layout.containsKey("timeY");
+  }
+
+  bool ensureEyesBehaviorObject(JsonObject behavior) {
+    return behavior.containsKey("autoSwitch") &&
+           behavior.containsKey("blinkIntervalMs") &&
+           behavior.containsKey("lookIntervalMs") &&
+           behavior.containsKey("idleMove") &&
+           behavior.containsKey("sleepyAfterMs");
+  }
+
+  bool ensureEyesInteractionObject(JsonObject interaction) {
+    return interaction.containsKey("lookHoldMs") &&
+           interaction.containsKey("moodHoldMs");
+  }
+
+  bool ensureEyesTimeObject(JsonObject time) {
+    return time.containsKey("show") &&
+           time.containsKey("showSeconds");
+  }
+
+  bool ensureEyesStyleObject(JsonObject style) {
+    return style.containsKey("eyeColor") &&
+           style.containsKey("pupilColor") &&
+           style.containsKey("timeColor");
+  }
 }
 
 bool WebSocketCommandHandlers::handleEffectCommand(
@@ -364,6 +458,8 @@ bool WebSocketCommandHandlers::handleEffectCommand(
 
     DisplayManager::currentMode = MODE_ANIMATION;
     DisplayManager::lastBusinessMode = MODE_ANIMATION;
+    DisplayManager::currentBusinessModeTag = "breath_effect";
+    DisplayManager::lastBusinessModeTag = "breath_effect";
     TetrisEffect::isActive = false;
     if (AnimationManager::currentGIF != nullptr) {
       AnimationManager::currentGIF->isPlaying = false;
@@ -435,6 +531,8 @@ bool WebSocketCommandHandlers::handleEffectCommand(
 
     DisplayManager::currentMode = MODE_ANIMATION;
     DisplayManager::lastBusinessMode = MODE_ANIMATION;
+    DisplayManager::currentBusinessModeTag = "rhythm_effect";
+    DisplayManager::lastBusinessModeTag = "rhythm_effect";
     TetrisEffect::isActive = false;
     if (AnimationManager::currentGIF != nullptr) {
       AnimationManager::currentGIF->isPlaying = false;
@@ -442,6 +540,113 @@ bool WebSocketCommandHandlers::handleEffectCommand(
     DisplayManager::activateRhythmEffect(config);
 
     response["message"] = "rhythm effect applied";
+    return true;
+  }
+
+  (void)client;
+  return false;
+}
+
+bool WebSocketCommandHandlers::handleEyesCommand(
+  AsyncWebSocketClient* client,
+  JsonDocument& doc,
+  StaticJsonDocument<512>& response
+) {
+  String cmd = doc["cmd"].as<String>();
+
+  if (cmd == "set_eyes_config") {
+    if (!doc.containsKey("config")) {
+      setErrorResponse(response, "missing config");
+      return true;
+    }
+
+    JsonObject config = doc["config"].as<JsonObject>();
+    if (!config.containsKey("layout") ||
+        !config.containsKey("behavior") ||
+        !config.containsKey("interaction") ||
+        !config.containsKey("time") ||
+        !config.containsKey("style")) {
+      setErrorResponse(response, "missing eyes config sections");
+      return true;
+    }
+
+    JsonObject layout = config["layout"].as<JsonObject>();
+    JsonObject behavior = config["behavior"].as<JsonObject>();
+    JsonObject interaction = config["interaction"].as<JsonObject>();
+    JsonObject time = config["time"].as<JsonObject>();
+    JsonObject style = config["style"].as<JsonObject>();
+
+    if (!ensureEyesLayoutObject(layout) ||
+        !ensureEyesBehaviorObject(behavior) ||
+        !ensureEyesInteractionObject(interaction) ||
+        !ensureEyesTimeObject(time) ||
+        !ensureEyesStyleObject(style)) {
+      setErrorResponse(response, "missing eyes config fields");
+      return true;
+    }
+
+    const char* eyeColor = style["eyeColor"];
+    const char* pupilColor = style["pupilColor"];
+    const char* timeColor = style["timeColor"];
+    if (!isHexColorText(eyeColor) ||
+        !isHexColorText(pupilColor) ||
+        !isHexColorText(timeColor)) {
+      setErrorResponse(response, "invalid eyes color");
+      return true;
+    }
+
+    EyesConfig nextConfig;
+    nextConfig.layout.eyeY = layout["eyeY"].as<int>();
+    nextConfig.layout.eyeSpacing = layout["eyeSpacing"].as<int>();
+    nextConfig.layout.eyeWidth = layout["eyeWidth"].as<int>();
+    nextConfig.layout.eyeHeight = layout["eyeHeight"].as<int>();
+    nextConfig.layout.timeY = layout["timeY"].as<int>();
+
+    nextConfig.behavior.autoSwitch = behavior["autoSwitch"].as<bool>();
+    nextConfig.behavior.blinkIntervalMs = behavior["blinkIntervalMs"].as<uint16_t>();
+    nextConfig.behavior.lookIntervalMs = behavior["lookIntervalMs"].as<uint16_t>();
+    nextConfig.behavior.idleMove = behavior["idleMove"].as<uint8_t>();
+    nextConfig.behavior.sleepyAfterMs = behavior["sleepyAfterMs"].as<uint32_t>();
+
+    nextConfig.interaction.lookHoldMs = interaction["lookHoldMs"].as<uint16_t>();
+    nextConfig.interaction.moodHoldMs = interaction["moodHoldMs"].as<uint16_t>();
+
+    nextConfig.time.show = time["show"].as<bool>();
+    nextConfig.time.showSeconds = time["showSeconds"].as<bool>();
+
+    memcpy(nextConfig.style.eyeColor, eyeColor, sizeof(nextConfig.style.eyeColor));
+    memcpy(nextConfig.style.pupilColor, pupilColor, sizeof(nextConfig.style.pupilColor));
+    memcpy(nextConfig.style.timeColor, timeColor, sizeof(nextConfig.style.timeColor));
+
+    ConfigManager::eyesConfig = nextConfig;
+    ConfigManager::saveEyesConfig();
+
+    if (DisplayManager::currentBusinessModeTag == "eyes") {
+      DisplayManager::activateEyesEffect(ConfigManager::eyesConfig);
+    }
+
+    response["message"] = "eyes config updated";
+    return true;
+  }
+
+  if (cmd == "eyes_interact") {
+    if (!doc.containsKey("action")) {
+      setErrorResponse(response, "missing action");
+      return true;
+    }
+
+    if (DisplayManager::currentBusinessModeTag != "eyes") {
+      setErrorResponse(response, "eyes mode required");
+      return true;
+    }
+
+    const char* action = doc["action"];
+    if (!EyesEffect::triggerAction(action)) {
+      setErrorResponse(response, "invalid eyes action");
+      return true;
+    }
+
+    response["message"] = "eyes action applied";
     return true;
   }
 

@@ -1,5 +1,6 @@
 #include "display_manager.h"
 #include "clock_font_renderer.h"
+#include "eyes_effect.h"
 #include <time.h>
 #include <math.h>
 
@@ -7,6 +8,8 @@
 MatrixPanel_I2S_DMA* DisplayManager::dma_display = nullptr;
 DeviceMode DisplayManager::currentMode = MODE_CANVAS;
 DeviceMode DisplayManager::lastBusinessMode = MODE_CLOCK;
+String DisplayManager::currentBusinessModeTag = "clock";
+String DisplayManager::lastBusinessModeTag = "clock";
 NativeEffectType DisplayManager::nativeEffectType = NATIVE_EFFECT_NONE;
 BreathEffectConfig DisplayManager::breathEffectConfig = {5, true, 10, 100, 1800, BREATH_WAVE_SINE, 100, 200, 255};
 RhythmEffectConfig DisplayManager::rhythmEffectConfig = {120, 5, true, RHYTHM_DIR_LEFT, 70, RHYTHM_MODE_PULSE, 100, 200, 255, 255, 100, 100};
@@ -887,6 +890,12 @@ void DisplayManager::activateRhythmEffect(const RhythmEffectConfig& config) {
   nativeEffectStartTime = millis();
 }
 
+void DisplayManager::activateEyesEffect(const EyesConfig& config) {
+  EyesEffect::applyConfig(config);
+  nativeEffectType = NATIVE_EFFECT_EYES;
+  nativeEffectStartTime = millis();
+}
+
 static uint8_t clampByte(int value) {
   if (value < 0) return 0;
   if (value > 255) return 255;
@@ -1006,5 +1015,10 @@ void DisplayManager::renderNativeEffect() {
         );
       }
     }
+    return;
+  }
+
+  if (nativeEffectType == NATIVE_EFFECT_EYES) {
+    EyesEffect::render();
   }
 }

@@ -58,25 +58,6 @@ function makeUniformFrame(delay, color) {
   };
 }
 
-function waveformValue(waveform, t) {
-  if (waveform === "sine") {
-    return (Math.sin(t * Math.PI * 2) + 1) / 2;
-  }
-  if (waveform === "triangle") {
-    if (t < 0.5) {
-      return t * 2;
-    }
-    return (1 - t) * 2;
-  }
-  if (waveform === "square") {
-    if (t < 0.5) {
-      return 1;
-    }
-    return 0;
-  }
-  throw new Error("波形参数错误");
-}
-
 function blendColor(colorA, colorB, alpha) {
   const a = Math.min(Math.max(alpha, 0), 1);
   return {
@@ -102,36 +83,208 @@ function getDirectionPos(direction, x, y) {
   throw new Error("方向参数错误");
 }
 
+function buildRingPath(layer) {
+  const left = layer;
+  const top = layer;
+  const right = PANEL_SIZE - 1 - layer;
+  const bottom = PANEL_SIZE - 1 - layer;
+
+  if (left > right || top > bottom) {
+    return [];
+  }
+
+  if (left === right && top === bottom) {
+    return [[left, top]];
+  }
+
+  const path = [];
+
+  for (let x = left; x <= right; x++) {
+    path.push([x, top]);
+  }
+  for (let y = top + 1; y <= bottom; y++) {
+    path.push([right, y]);
+  }
+  if (bottom > top) {
+    for (let x = right - 1; x >= left; x--) {
+      path.push([x, bottom]);
+    }
+  }
+  if (right > left) {
+    for (let y = bottom - 1; y > top; y--) {
+      path.push([left, y]);
+    }
+  }
+
+  return path;
+}
+
+function buildAllRingPaths() {
+  const result = [];
+  for (let layer = 0; layer < Math.ceil(PANEL_SIZE / 2); layer++) {
+    const path = buildRingPath(layer);
+    if (path.length === 0) {
+      continue;
+    }
+    result.push(path);
+  }
+  return result;
+}
+
+function setFramePixel(frameMap, x, y, color) {
+  frameMap.set(`${x},${y}`, color);
+}
+
+function appendPathTrail(frameMap, path, headIndex, trailLength, colorA, colorB, colorMode) {
+  const pathLength = path.length;
+  if (pathLength === 0) {
+    return;
+  }
+
+  for (let step = 0; step < trailLength; step++) {
+    let index = headIndex - step;
+    while (index < 0) {
+      index += pathLength;
+    }
+    index = index % pathLength;
+    const point = path[index];
+    if (!point) {
+      continue;
+    }
+
+    let color = colorA;
+    if (colorMode === "gradient") {
+      const ratio = trailLength <= 1 ? 1 : step / (trailLength - 1);
+      color = blendColor(colorA, colorB, ratio);
+    }
+
+    setFramePixel(frameMap, point[0], point[1], color);
+  }
+}
+
+function fillWholePath(frameMap, path, color) {
+  for (let i = 0; i < path.length; i++) {
+    const point = path[i];
+    setFramePixel(frameMap, point[0], point[1], color);
+  }
+}
+
+function frameMapToFrame(frameMap, delay) {
+  const bytes = [];
+  frameMap.forEach((color, key) => {
+    const [x, y] = key.split(",").map(Number);
+    bytes.push(x, y, color.r, color.g, color.b);
+  });
+
+  return {
+    type: 1,
+    delay,
+    totalPixels: bytes.length / 5,
+    pixels: new Uint8Array(bytes),
+  };
+}
+
 export function buildBreathFrames(config) {
   if (!config) {
-    throw new Error("呼吸灯配置缺失");
+    throw new Error("环绕灯配置缺失");
   }
-  if (config.speed === undefined || config.loop === undefined || config.minBrightness === undefined || config.maxBrightness === undefined || config.periodMs === undefined || config.waveform === undefined || config.color === undefined) {
-    throw new Error("呼吸灯配置字段不完整");
+  if (
+    config.speed === undefined ||
+    config.loop === undefined ||
+    config.motion === undefined ||
+    config.scope === undefined ||
+    config.colorMode === undefined ||
+    config.colorA === undefined ||
+    config.colorB === undefined
+  ) {
+    throw new Error("环绕灯配置字段不完整");
   }
 
   const speed = clampInt(config.speed, 1, 10);
   const loop = config.loop === true;
-  const minBrightness = clampInt(config.minBrightness, 0, 100);
-  const maxBrightness = clampInt(config.maxBrightness, 0, 100);
-  const periodMs = clampInt(config.periodMs, 200, 10000);
-  const baseColor = hexToRgb(config.color);
-
-  const frameCount = loop ? 20 : 1;
-  const delay = Math.max(40, Math.round(periodMs / frameCount / speed));
+  const colorA = hexToRgb(config.colorA);
+  const colorB = hexToRgb(config.colorB);
+  const ringPaths = buildAllRingPaths();
+  let frameCount = loop ? 24 : 12;
+  const delay = Math.max(35, 190 - speed * 12);
   const frames = [];
 
+  if (
+    config.motion !== "clockwise" &&
+    config.motion !== "counterclockwise" &&
+    config.motion !== "inward" &&
+    config.motion !== "outward"
+  ) {
+    throw new Error("环绕灯运行方式错误");
+  }
+  if (config.scope !== "single_ring" && config.scope !== "full_screen") {
+    throw new Error("环绕灯范围参数错误");
+  }
+  if (config.colorMode !== "solid" && config.colorMode !== "gradient") {
+    throw new Error("环绕灯颜色模式错误");
+  }
+  if (config.motion === "inward" || config.motion === "outward") {
+    frameCount = ringPaths.length;
+  }
+
   for (let i = 0; i < frameCount; i++) {
-    const t = frameCount === 1 ? 1 : i / (frameCount - 1);
-    const wave = waveformValue(config.waveform, t);
-    const brightPct = minBrightness + (maxBrightness - minBrightness) * wave;
-    const bright = brightPct / 100;
-    const color = {
-      r: Math.round(baseColor.r * bright),
-      g: Math.round(baseColor.g * bright),
-      b: Math.round(baseColor.b * bright),
-    };
-    frames.push(makeUniformFrame(delay, color));
+    const frameMap = new Map();
+
+    if (config.motion === "clockwise" || config.motion === "counterclockwise") {
+      const direction = config.motion === "clockwise" ? 1 : -1;
+      const trailLength = config.scope === "full_screen" ? 18 : 28;
+
+      for (let layer = 0; layer < ringPaths.length; layer++) {
+        if (config.scope === "single_ring" && layer > 0) {
+          break;
+        }
+        const path = ringPaths[layer];
+        const pathLength = path.length;
+        if (pathLength === 0) {
+          continue;
+        }
+        const headIndex = ((i * speed * direction) + layer * 6) % pathLength;
+        const normalizedHead = headIndex < 0 ? headIndex + pathLength : headIndex;
+        appendPathTrail(
+          frameMap,
+          path,
+          normalizedHead,
+          trailLength,
+          colorA,
+          colorB,
+          config.colorMode,
+        );
+      }
+    } else {
+      const maxLayerIndex = ringPaths.length - 1;
+      const travelIndex = i % ringPaths.length;
+      const activeLayer =
+        config.motion === "inward" ? travelIndex : maxLayerIndex - travelIndex;
+
+      if (config.scope === "single_ring") {
+        const path = ringPaths[activeLayer];
+        const ringColor =
+          config.colorMode === "gradient"
+            ? blendColor(colorA, colorB, activeLayer / Math.max(maxLayerIndex, 1))
+            : colorA;
+        fillWholePath(frameMap, path, ringColor);
+      } else {
+        for (let layer = 0; layer < ringPaths.length; layer++) {
+          const shouldDraw =
+            config.motion === "inward" ? layer <= activeLayer : layer >= activeLayer;
+          if (!shouldDraw) {
+            continue;
+          }
+          const ringColor =
+            config.colorMode === "gradient"
+              ? blendColor(colorA, colorB, layer / Math.max(maxLayerIndex, 1))
+              : colorA;
+          fillWholePath(frameMap, ringPaths[layer], ringColor);
+        }
+      }
+    }
+
+    frames.push(frameMapToFrame(frameMap, delay));
   }
 
   return frames;

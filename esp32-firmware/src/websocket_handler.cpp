@@ -17,6 +17,9 @@ bool WebSocketHandler::isReceivingFragments = false;
 unsigned long WebSocketHandler::lastMessageTime = 0;
 
 const char* WebSocketHandler::getCurrentModeString() {
+  if (DisplayManager::currentBusinessModeTag.length() > 0) {
+    return DisplayManager::currentBusinessModeTag.c_str();
+  }
   if (DisplayManager::currentMode == MODE_CLOCK) {
     return "clock";
   }
@@ -57,6 +60,8 @@ void WebSocketHandler::onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *c
 
     if (DisplayManager::currentMode == MODE_CANVAS) {
       DisplayManager::currentMode = DisplayManager::lastBusinessMode;
+      DisplayManager::currentBusinessModeTag = DisplayManager::lastBusinessModeTag;
+      ConfigManager::saveClockConfig();
       Serial.printf(
         "客户端断开时自动恢复模式: canvas -> %s\n",
         getCurrentModeString()
@@ -64,8 +69,10 @@ void WebSocketHandler::onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *c
 
       if (DisplayManager::currentMode == MODE_CLOCK) {
         DisplayManager::displayClock(true);
-      } else if (DisplayManager::currentMode == MODE_ANIMATION) {
-        if (AnimationManager::currentGIF != nullptr) {
+    } else if (DisplayManager::currentMode == MODE_ANIMATION) {
+        if (DisplayManager::currentBusinessModeTag == "eyes") {
+          DisplayManager::activateEyesEffect(ConfigManager::eyesConfig);
+        } else if (AnimationManager::currentGIF != nullptr) {
           AnimationManager::currentGIF->isPlaying = true;
           AnimationManager::currentGIF->currentFrame = 0;
           AnimationManager::currentGIF->lastFrameTime = millis();
@@ -374,6 +381,7 @@ void WebSocketHandler::handleJsonCommand(AsyncWebSocketClient *client, JsonDocum
     WebSocketCommandHandlers::handleModeCommand(client, doc, response) ||
     WebSocketCommandHandlers::handleClockCommand(client, doc, response) ||
     WebSocketCommandHandlers::handleEffectCommand(client, doc, response) ||
+    WebSocketCommandHandlers::handleEyesCommand(client, doc, response) ||
     WebSocketCommandHandlers::handleAnimationCommand(client, doc, response, responseSent) ||
     WebSocketCommandHandlers::handleCanvasCommand(client, doc, response) ||
     WebSocketCommandHandlers::handleOtaCommand(client, doc, response, responseSent);
