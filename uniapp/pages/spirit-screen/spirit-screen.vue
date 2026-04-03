@@ -734,30 +734,6 @@ export default {
       }
     },
 
-    async sendExpressionNow() {
-      if (!this.deviceStore.connected) {
-        this.toast.showError("设备未连接");
-        return;
-      }
-
-      try {
-        const ws = this.deviceStore.getWebSocket();
-        await ws.setMode("eyes");
-        await ws.setEyesConfig(cloneEyesConfig(this.eyesConfig));
-        if (
-          !this.eyesConfig.behavior.autoSwitch &&
-          this.selectedEyesExpression !== "Normal"
-        ) {
-          await ws.eyesInteract(`set_expression:${this.selectedEyesExpression}`);
-        }
-        this.deviceStore.setDeviceMode("eyes", { businessMode: true });
-        this.toast.showSuccess("当前表情已应用到设备");
-      } catch (error) {
-        console.error("应用当前眼神失败:", error);
-        this.toast.showError("应用失败：" + error.message);
-      }
-    },
-
     handleExpressionSelect(value) {
       this.selectedEyesExpression = value;
       this.saveSelectedExpression();
@@ -1620,10 +1596,6 @@ export default {
   padding-top: 20rpx;
 }
 
-.info-card {
-  padding-bottom: 8rpx;
-}
-
 .card-title-section {
   display: flex;
   align-items: center;
@@ -1640,12 +1612,6 @@ export default {
 
 .card-subtitle {
   font-size: 20rpx;
-  color: var(--text-secondary);
-}
-
-.info-text {
-  font-size: 24rpx;
-  line-height: 1.7;
   color: var(--text-secondary);
 }
 
@@ -1738,17 +1704,6 @@ export default {
 }
 
 .option-btn.active text {
-  color: var(--accent-primary);
-  font-weight: 600;
-}
-
-.primary-option {
-  min-width: 100%;
-  background: rgba(79, 127, 255, 0.14);
-  border-color: var(--accent-primary);
-}
-
-.primary-option text {
   color: var(--accent-primary);
   font-weight: 600;
 }
