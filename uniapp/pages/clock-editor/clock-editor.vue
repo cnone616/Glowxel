@@ -5,30 +5,15 @@
 
     <!-- 头部 -->
     <view class="header">
-      <view class="header-left">
-        <view class="back-btn" @click="handleBack">
-          <Icon
-            name="direction-left"
-            :size="40"
-            color="var(--color-text-primary)"
-          />
-        </view>
-        <view class="header-info">
-          <text class="header-title">时钟编辑器</text>
-          <text class="header-subtitle">自定义时钟样式</text>
-        </view>
-        <view class="header-actions-inline">
-          <view class="action-btn-sm" @click="saveConfig">
-            <Icon name="save" :size="36" color="var(--color-text-primary)" />
-          </view>
-          <view
-            class="action-btn-sm primary"
-            :class="{ disabled: isSending }"
-            @click="sendToDevice"
-          >
-            <Icon name="link" :size="36" color="#fff" />
-          </view>
-        </view>
+      <view class="nav-left" @click="handleBack">
+        <Icon
+          name="direction-left"
+          :size="32"
+          color="var(--color-text-primary)"
+        />
+      </view>
+      <view class="nav-title">
+        <text class="project-name">{{ pageHeaderTitle }}</text>
       </view>
     </view>
 
@@ -49,32 +34,30 @@
           :offset-y="pan.y"
           :canvas-width="containerSize.width"
           :canvas-height="containerSize.height"
-          :grid-visible="gridVisible"
-          :allow-single-touch-pan="true"
+          :grid-visible="true"
           :is-dark-mode="true"
+          :touch-enabled="false"
           canvas-id="clockCanvas"
-          @pan="handlePan"
-          @zoom="handlePinchZoom"
         />
       </view>
-      <!-- 紧凑工具栏 -->
-      <view class="canvas-toolbar">
-        <view class="toolbar-group">
-          <view class="tb-btn" @click="handleZoom(-1)"
-            ><Icon name="zoom-out" :size="32"
-          /></view>
-          <view class="tb-btn" @click="handleZoom(1)"
-            ><Icon name="zoom-in" :size="32"
-          /></view>
-          <view class="tb-btn" @click="handleFit"
-            ><Icon name="fullscreen-expand" :size="32"
-          /></view>
+      <view v-if="canvasHidden" class="canvas-placeholder"></view>
+      <view class="preview-caption">
+        <view class="preview-caption-info">
+          <text class="preview-caption-title">64 x 64 模拟预览</text>
+          <text class="preview-caption-text">直接查看当前时钟与背景效果</text>
+        </view>
+        <view class="preview-actions">
+          <view class="action-btn-sm" @click="saveConfig">
+            <Icon name="save" :size="36" color="var(--color-text-primary)" />
+            <text>保存</text>
+          </view>
           <view
-            class="tb-btn"
-            :class="{ active: gridVisible }"
-            @click="gridVisible = !gridVisible"
+            class="action-btn-sm primary"
+            :class="{ disabled: isSending }"
+            @click="sendToDevice"
           >
-            <Icon name="a-Grid-ninejiugongge" :size="32" />
+            <Icon name="link" :size="36" color="#fff" />
+            <text>发送</text>
           </view>
         </view>
       </view>
@@ -324,7 +307,6 @@
             </view>
           </view>
         </view>
-
       </view>
     </scroll-view>
 
@@ -422,7 +404,6 @@ export default {
       // PixelCanvas 视图控制
       zoom: 4,
       pan: { x: 0, y: 0 },
-      gridVisible: true,
       containerSize: { width: 320, height: 320 },
       canvasReady: false,
 
@@ -508,6 +489,12 @@ export default {
   computed: {
     accentColor() {
       return "#4F7FFF";
+    },
+    pageHeaderTitle() {
+      if (this.clockMode === "animation") {
+        return "动态时钟";
+      }
+      return "静态时钟";
     },
 
     allPixelsForPreview() {
@@ -626,17 +613,21 @@ export default {
   height: 88rpx;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 0 20rpx;
+  justify-content: center;
+  padding: 0 32rpx;
   border-bottom: 2rpx solid var(--border-primary);
   background-color: var(--bg-elevated);
+  position: relative;
 }
 
-.header-left {
+.nav-left {
+  position: absolute;
+  left: 32rpx;
+  width: 80rpx;
+  height: 80rpx;
   display: flex;
   align-items: center;
-  gap: 16rpx;
-  flex: 1;
+  justify-content: flex-start;
 }
 
 .back-btn {
@@ -659,22 +650,19 @@ export default {
   color: var(--text-primary);
 }
 
-.header-info {
-  display: flex;
-  flex-direction: column;
-  gap: 4rpx;
-  margin-right: 20rpx;
-}
-
-.header-title {
+.nav-title {
   font-size: 32rpx;
-  font-weight: 300;
-  color: var(--text-primary);
+  font-weight: 600;
+  color: var(--color-text-primary);
 }
 
-.header-subtitle {
-  font-size: 22rpx;
-  color: var(--text-secondary);
+.project-name {
+  font-size: 36rpx;
+  font-weight: 700;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .header-actions-inline {
@@ -757,40 +745,66 @@ export default {
   overflow: hidden;
 }
 
-.canvas-toolbar {
+.canvas-placeholder {
+  width: 100%;
+  aspect-ratio: 1;
+  background: #000000;
+}
+
+.preview-caption {
   display: flex;
-  flex-direction: row;
   align-items: center;
   justify-content: space-between;
-  padding: 8rpx 16rpx;
+  gap: 16rpx;
+  padding: 14rpx 20rpx 18rpx;
   background: var(--bg-tertiary);
   border-bottom: 1rpx solid var(--border-color);
 }
 
-.toolbar-group {
+.preview-caption-info {
+  flex: 1;
+  min-width: 0;
   display: flex;
-  flex-direction: row;
+  flex-direction: column;
   gap: 4rpx;
 }
 
-.tb-btn {
-  width: 64rpx;
-  height: 64rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 12rpx;
-  background: transparent;
+.preview-caption-title {
+  font-size: 24rpx;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.preview-caption-text {
+  font-size: 22rpx;
   color: var(--text-secondary);
 }
 
-.tb-btn.active {
-  background: var(--accent-color, #4f7fff);
-  color: white;
+.preview-actions {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  flex-shrink: 0;
 }
 
-.tb-btn.disabled {
-  opacity: 0.3;
+.preview-actions .action-btn-sm {
+  width: auto;
+  min-width: 118rpx;
+  height: 64rpx;
+  padding: 0 18rpx;
+  gap: 10rpx;
+  border-radius: 18rpx;
+}
+
+.preview-actions .action-btn-sm text {
+  font-size: 24rpx;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1;
+}
+
+.preview-actions .action-btn-sm.primary text {
+  color: #ffffff;
 }
 
 .canvas-wrapper {
@@ -1262,31 +1276,6 @@ export default {
 
 .setting-slider {
   flex: 1;
-}
-
-.color-picker {
-  display: flex;
-  gap: 8rpx;
-  flex-wrap: wrap;
-}
-
-.color-item {
-  width: 52rpx;
-  height: 52rpx;
-  border-radius: 12rpx;
-  border: 3rpx solid transparent;
-  transition: var(--transition-base);
-  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.2);
-}
-
-.color-item:active {
-  transform: scale(0.95);
-}
-
-.color-item.active {
-  border-color: var(--accent-primary);
-  box-shadow: 0 0 16rpx var(--accent-primary);
-  transform: scale(1.05);
 }
 
 .toggle-switch {

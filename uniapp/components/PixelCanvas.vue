@@ -1,5 +1,6 @@
 <template>
-  <canvas 
+  <canvas
+    v-if="touchEnabled"
     :canvas-id="canvasId"
     :id="canvasId"
     type="2d"
@@ -8,6 +9,13 @@
     @touchmove.stop.prevent="handleTouchMove"
     @touchend="handleTouchEnd"
     @touchcancel="handleTouchEnd"
+  ></canvas>
+  <canvas
+    v-else
+    :canvas-id="canvasId"
+    :id="canvasId"
+    type="2d"
+    class="pixel-canvas"
   ></canvas>
 </template>
 
@@ -65,6 +73,10 @@ export default {
     isDarkMode: {
       type: Boolean,
       default: false
+    },
+    touchEnabled: {
+      type: Boolean,
+      default: true
     },
     canvasId: {
       type: String,
@@ -254,12 +266,13 @@ export default {
       
       // 绘制网格
       if (this.gridVisible && this.zoom > 1.5) {
-        const gridColor = this.isDarkMode ? '#ffffff' : '#000000'
+        const gridColor = this.isDarkMode ? '#f3f5f9' : '#4a4a4a'
         
         // 细网格线
-        ctx.lineWidth = 0.05
+        const gridLineWidth = this.isDarkMode ? 0.16 : 0.14
+        ctx.lineWidth = gridLineWidth
         ctx.strokeStyle = gridColor
-        ctx.globalAlpha = this.isDarkMode ? 0.1 : 0.15
+        ctx.globalAlpha = this.isDarkMode ? 0.36 : 0.22
         
         ctx.beginPath()
         for (let x = 0; x <= this.width; x++) {
@@ -272,19 +285,12 @@ export default {
         }
         ctx.stroke()
         
-        // 粗网格线（64x64板子边界）
-        ctx.lineWidth = 0.15
+        // 板子外边界更明显，便于看清 64x64 范围
+        ctx.lineWidth = gridLineWidth
         ctx.strokeStyle = gridColor
-        ctx.globalAlpha = this.isDarkMode ? 0.2 : 0.3
+        ctx.globalAlpha = this.isDarkMode ? 0.36 : 0.22
         ctx.beginPath()
-        for (let x = 0; x <= this.width; x += 64) {
-          ctx.moveTo(x, 0)
-          ctx.lineTo(x, this.height)
-        }
-        for (let y = 0; y <= this.height; y += 64) {
-          ctx.moveTo(0, y)
-          ctx.lineTo(this.width, y)
-        }
+        ctx.rect(0, 0, this.width, this.height)
         ctx.stroke()
         
         ctx.globalAlpha = 1

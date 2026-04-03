@@ -16,7 +16,8 @@ enum DeviceMode {
 enum NativeEffectType : uint8_t {
   NATIVE_EFFECT_NONE = 0,
   NATIVE_EFFECT_BREATH = 1,
-  NATIVE_EFFECT_RHYTHM = 2
+  NATIVE_EFFECT_RHYTHM = 2,
+  NATIVE_EFFECT_EYES = 3
 };
 
 enum BreathWaveform : uint8_t {
@@ -101,6 +102,7 @@ public:
   static void setNativeEffectNone();
   static void activateBreathEffect(const BreathEffectConfig& config);
   static void activateRhythmEffect(const RhythmEffectConfig& config);
+  static void activateEyesEffect(const EyesConfig& config);
   static void renderNativeEffect();
 
   // Loading 动画控制
@@ -111,6 +113,8 @@ public:
   static MatrixPanel_I2S_DMA* dma_display;
   static DeviceMode currentMode;
   static DeviceMode lastBusinessMode;
+  static String currentBusinessModeTag;
+  static String lastBusinessModeTag;
   static NativeEffectType nativeEffectType;
   static BreathEffectConfig breathEffectConfig;
   static RhythmEffectConfig rhythmEffectConfig;

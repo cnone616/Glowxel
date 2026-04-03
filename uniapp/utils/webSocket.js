@@ -326,6 +326,22 @@ class WebSocket {
   }
 
   /**
+   * 设置眼睛模式配置
+   * @param {object} config - 眼睛模式配置对象
+   */
+  async setEyesConfig(config) {
+    return this.send({ cmd: "set_eyes_config", config });
+  }
+
+  /**
+   * 触发眼睛模式互动动作
+   * @param {string} action - 互动动作
+   */
+  async eyesInteract(action) {
+    return this.send({ cmd: "eyes_interact", action });
+  }
+
+  /**
    * 清空屏幕
    */
   async clear() {

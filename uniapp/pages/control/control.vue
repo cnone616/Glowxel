@@ -59,76 +59,75 @@
       </view>
       <!-- 已连接：显示设备功能 -->
       <template v-if="connectionStatus === 'connected'">
-        <!-- 设备模式 -->
-        <view class="section-title">设备模式</view>
+        <!-- 设备功能 -->
+        <view class="section-title">设备功能</view>
         <view class="card">
           <view class="mode-grid">
-            <view
-              class="mode-item"
-              @click="switchMode('clock')"
-            >
+            <view class="mode-item" @click="switchMode('eyes')">
+              <view class="mode-icon-wrap">
+                <Icon name="browse" :size="40" color="#4F7FFF" />
+              </view>
+              <text class="mode-name">像素眼</text>
+            </view>
+            <view class="mode-item" @click="switchMode('clock')">
               <view class="mode-icon-wrap">
                 <Icon name="time" :size="40" color="#4F7FFF" />
               </view>
               <text class="mode-name">静态时钟</text>
             </view>
-            <view
-              class="mode-item"
-              @click="switchMode('animation')"
-            >
+            <view class="mode-item" @click="switchMode('animation')">
               <view class="mode-icon-wrap">
                 <Icon name="play" :size="40" color="#4F7FFF" />
               </view>
               <text class="mode-name">动态时钟</text>
             </view>
-            <view
-              class="mode-item"
-              @click="switchMode('canvas')"
-            >
+            <view class="mode-item" @click="switchMode('canvas')">
               <view class="mode-icon-wrap">
                 <Icon name="picture" :size="40" color="#4F7FFF" />
               </view>
               <text class="mode-name">画板模式</text>
             </view>
-            <view
-              class="mode-item"
-              @click="switchMode('tetris')"
-            >
+            <view class="mode-item" @click="switchMode('tetris')">
               <view class="mode-icon-wrap">
-                <Icon
-                  name="a-Grid-ninejiugongge"
-                  :size="40"
-                  color="#4F7FFF"
-                />
+                <Icon name="a-Grid-ninejiugongge" :size="40" color="#4F7FFF" />
               </view>
               <text class="mode-name">方块屏保</text>
             </view>
-            <view
-              class="mode-item"
-              @click="switchMode('text_display')"
-            >
+            <view class="mode-item" @click="switchMode('text_display')">
               <view class="mode-icon-wrap">
                 <Icon name="text" :size="40" color="#4F7FFF" />
               </view>
               <text class="mode-name">文本展示</text>
             </view>
-            <view
-              class="mode-item"
-              @click="switchMode('breath_effect')"
-            >
+            <view class="mode-item" @click="switchMode('breath_effect')">
               <view class="mode-icon-wrap">
                 <Icon name="prompt" :size="40" color="#4F7FFF" />
               </view>
-              <text class="mode-name">呼吸灯</text>
+              <text class="mode-name">环绕灯</text>
             </view>
-            <view
-              class="mode-item"
-              @click="switchMode('rhythm_effect')"
-            >
+            <view class="mode-item" @click="switchMode('rhythm_effect')">
               <view class="mode-icon-wrap">
                 <Icon name="task" :size="40" color="#4F7FFF" />
               </view>
               <text class="mode-name">律动</text>
+            </view>
+            <view class="mode-item" @click="openFeatureEditor('countdown')">
+              <view class="mode-icon-wrap">
+                <Icon name="time" :size="40" color="#4F7FFF" />
+              </view>
+              <text class="mode-name">倒计时</text>
+            </view>
+            <view class="mode-item" @click="openFeatureEditor('stopwatch')">
+              <view class="mode-icon-wrap">
+                <Icon name="task" :size="40" color="#4F7FFF" />
+              </view>
+              <text class="mode-name">秒表</text>
+            </view>
+            <view class="mode-item" @click="openFeatureEditor('notification')">
+              <view class="mode-icon-wrap">
+                <Icon name="prompt" :size="40" color="#4F7FFF" />
+              </view>
+              <text class="mode-name">通知提醒</text>
             </view>
           </view>
         </view>
@@ -315,11 +314,23 @@ export default {
       return this.deviceStore?.connected || false;
     },
     primaryActionLabel() {
+      if (this.deviceMode === "countdown") {
+        return "编辑倒计时";
+      }
+      if (this.deviceMode === "stopwatch") {
+        return "编辑秒表";
+      }
+      if (this.deviceMode === "notification") {
+        return "编辑通知提醒";
+      }
       if (this.deviceMode === "text_display") {
         return "编辑文本展示";
       }
+      if (this.deviceMode === "eyes") {
+        return "编辑像素眼";
+      }
       if (this.deviceMode === "breath_effect") {
-        return "编辑呼吸灯";
+        return "编辑环绕灯";
       }
       if (this.deviceMode === "rhythm_effect") {
         return "编辑律动";
@@ -333,11 +344,23 @@ export default {
       return "自定义时钟样式";
     },
     primaryActionDesc() {
+      if (this.deviceMode === "countdown") {
+        return "编辑倒计时样式、时间和进度";
+      }
+      if (this.deviceMode === "stopwatch") {
+        return "编辑秒表样式、圈次和强调色";
+      }
+      if (this.deviceMode === "notification") {
+        return "编辑提醒规则和触发后的展示内容";
+      }
       if (this.deviceMode === "text_display") {
         return "编辑文本、方向、速度和颜色";
       }
+      if (this.deviceMode === "eyes") {
+        return "设置表情、配色和参数";
+      }
       if (this.deviceMode === "breath_effect") {
-        return "编辑亮度区间、周期、波形和颜色";
+        return "编辑顺逆时针、内外层扫和颜色";
       }
       if (this.deviceMode === "rhythm_effect") {
         return "编辑 BPM、强度、方向和色彩";
@@ -448,7 +471,9 @@ export default {
         businessMode: false,
       });
 
-      if (mode === "clock" || mode === "animation") {
+      if (mode === "eyes") {
+        this.openSpiritScreen();
+      } else if (mode === "clock" || mode === "animation") {
         this.editClockWithMode(mode);
       } else if (mode === "text_display") {
         this.editEffectWithMode("text_display");
@@ -476,11 +501,23 @@ export default {
 
     openPrimaryEditor() {
       if (
+        this.deviceMode === "countdown" ||
+        this.deviceMode === "stopwatch" ||
+        this.deviceMode === "notification"
+      ) {
+        this.openFeatureEditor(this.deviceMode);
+        return;
+      }
+      if (
         this.deviceMode === "text_display" ||
         this.deviceMode === "breath_effect" ||
         this.deviceMode === "rhythm_effect"
       ) {
         this.editEffect();
+        return;
+      }
+      if (this.deviceMode === "eyes") {
+        this.openSpiritScreen();
         return;
       }
       if (this.deviceMode === "tetris") {
@@ -506,6 +543,12 @@ export default {
       });
     },
 
+    openSpiritScreen() {
+      uni.navigateTo({
+        url: "/pages/spirit-screen/spirit-screen",
+      });
+    },
+
     editEffectWithMode(mode) {
       uni.navigateTo({
         url: `/pages/effect-editor/effect-editor?mode=${mode}`,
@@ -520,6 +563,19 @@ export default {
       ) {
         this.editEffectWithMode(this.deviceMode);
       }
+    },
+
+    openFeatureEditor(feature) {
+      if (feature === "notification") {
+        uni.navigateTo({
+          url: "/pages/notification-list/notification-list",
+        });
+        return;
+      }
+
+      uni.navigateTo({
+        url: `/pages/feature-editor/feature-editor?feature=${feature}`,
+      });
     },
 
     importJSON() {
@@ -1022,7 +1078,7 @@ export default {
 }
 
 .mode-item {
-  width: calc((100% - 32rpx) / 3);
+  width: calc((100% - 48rpx) / 4);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1030,10 +1086,6 @@ export default {
   padding: 24rpx 8rpx;
   border-radius: 20rpx;
   transition: all 0.2s;
-}
-
-.mode-item:active {
-  transform: scale(0.96);
 }
 
 .mode-icon-wrap {
@@ -1050,7 +1102,7 @@ export default {
 
 .mode-name {
   font-size: 24rpx;
-  color: #4f7fff;
+  color: #5f6f91;
   font-weight: 600;
 }
 

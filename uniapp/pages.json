@@ -115,6 +115,24 @@
       }
     },
     {
+      "path": "pages/spirit-screen/spirit-screen",
+      "style": {
+        "navigationStyle": "custom",
+        "navigationBarTextStyle": "white",
+        "backgroundColor": "#1a1a1a",
+        "enablePullDownRefresh": false
+      }
+    },
+    {
+      "path": "pages/feature-editor/feature-editor",
+      "style": {
+        "navigationStyle": "custom",
+        "navigationBarTextStyle": "white",
+        "backgroundColor": "#1a1a1a",
+        "enablePullDownRefresh": false
+      }
+    },
+    {
       "path": "pages/canvas-editor/canvas-editor",
       "style": {
         "navigationStyle": "custom",
@@ -125,6 +143,24 @@
     },
     {
       "path": "pages/tetris-settings/tetris-settings",
+      "style": {
+        "navigationStyle": "custom",
+        "navigationBarTextStyle": "white",
+        "backgroundColor": "#1a1a1a",
+        "enablePullDownRefresh": false
+      }
+    },
+    {
+      "path": "pages/notification-list/notification-list",
+      "style": {
+        "navigationStyle": "custom",
+        "navigationBarTextStyle": "white",
+        "backgroundColor": "#1a1a1a",
+        "enablePullDownRefresh": false
+      }
+    },
+    {
+      "path": "pages/notification-editor/notification-editor",
       "style": {
         "navigationStyle": "custom",
         "navigationBarTextStyle": "white",

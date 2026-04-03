@@ -14,6 +14,8 @@ let gifAnimationId = null;
 let isGifPlaying = false;
 let gifSpeed = 1;
 let isGifFile = false;
+let savedAnimationPresets = [];
+let selectedSavedPresetIndex = -1;
 
 // 颜色预设（和小程序一致）
 const presetColors = [
@@ -261,6 +263,7 @@ function showGifControls() {
   document.getElementById('gifControls').style.display = 'block';
   document.getElementById('copyESP32AnimBtn').style.display = 'inline-block';
   document.getElementById('copyCompressedAnimBtn').style.display = 'inline-block';
+  document.getElementById('savePresetBtn').style.display = 'inline-block';
 }
 
 // 隐藏 GIF 控制面板
@@ -268,6 +271,7 @@ function hideGifControls() {
   document.getElementById('gifControls').style.display = 'none';
   document.getElementById('copyESP32AnimBtn').style.display = 'none';
   document.getElementById('copyCompressedAnimBtn').style.display = 'none';
+  document.getElementById('savePresetBtn').style.display = 'none';
   stopGif();
 }
 
@@ -415,6 +419,288 @@ function adjustGifSpeed(delta) {
 
 function updateGifSpeed() {
   gifSpeed = parseFloat(document.getElementById('gifSpeed').value) || 1;
+}
+
+function buildAdjustedFramePixels(frameCanvas) {
+  const width = parseInt(document.getElementById('imageWidth').value);
+  const height = parseInt(document.getElementById('imageHeight').value);
+  const offsetX = parseInt(document.getElementById('imageX').value);
+  const offsetY = parseInt(document.getElementById('imageY').value);
+
+  const tempCanvas = document.createElement('canvas');
+  tempCanvas.width = PANEL_WIDTH;
+  tempCanvas.height = PANEL_HEIGHT;
+  const tempCtx = tempCanvas.getContext('2d');
+  tempCtx.fillStyle = '#000000';
+  tempCtx.fillRect(0, 0, PANEL_WIDTH, PANEL_HEIGHT);
+  tempCtx.imageSmoothingEnabled = false;
+  tempCtx.drawImage(frameCanvas, offsetX, offsetY, width, height);
+
+  const imageData = tempCtx.getImageData(0, 0, PANEL_WIDTH, PANEL_HEIGHT);
+  return imageData.data;
+}
+
+function rgbaToCompactPixels(rgbaData) {
+  const pixels = [];
+  for (let y = 0; y < PANEL_HEIGHT; y++) {
+    for (let x = 0; x < PANEL_WIDTH; x++) {
+      const index = (y * PANEL_WIDTH + x) * 4;
+      const r = rgbaData[index];
+      const g = rgbaData[index + 1];
+      const b = rgbaData[index + 2];
+      if (r > 0 || g > 0 || b > 0) {
+        pixels.push([x, y, r, g, b]);
+      }
+    }
+  }
+  return pixels;
+}
+
+function diffCompactPixels(currentRgba, previousRgba) {
+  const pixels = [];
+  for (let y = 0; y < PANEL_HEIGHT; y++) {
+    for (let x = 0; x < PANEL_WIDTH; x++) {
+      const index = (y * PANEL_WIDTH + x) * 4;
+      const currentR = currentRgba[index];
+      const currentG = currentRgba[index + 1];
+      const currentB = currentRgba[index + 2];
+      if (
+        currentR !== previousRgba[index] ||
+        currentG !== previousRgba[index + 1] ||
+        currentB !== previousRgba[index + 2]
+      ) {
+        pixels.push([x, y, currentR, currentG, currentB]);
+      }
+    }
+  }
+  return pixels;
+}
+
+function buildCompactAnimationData() {
+  if (gifFrames.length === 0) {
+    return null;
+  }
+
+  const maxFrameCount = Math.min(8, gifFrames.length);
+  const compactFrames = [];
+  let previousRgba = null;
+
+  for (let i = 0; i < maxFrameCount; i++) {
+    const frame = gifFrames[i];
+    const adjustedRgba = buildAdjustedFramePixels(frame.canvas);
+    const fullPixels = rgbaToCompactPixels(adjustedRgba);
+    let compactFrame = {
+      t: 1,
+      d: Math.max(50, Math.round(frame.delay / gifSpeed)),
+      c: fullPixels.length,
+      p: fullPixels,
+    };
+
+    if (previousRgba !== null) {
+      const diffPixels = diffCompactPixels(adjustedRgba, previousRgba);
+      if (diffPixels.length <= fullPixels.length * 0.5) {
+        compactFrame = {
+          t: 0,
+          d: Math.max(50, Math.round(frame.delay / gifSpeed)),
+          c: diffPixels.length,
+          p: diffPixels,
+        };
+      }
+    }
+
+    compactFrames.push(compactFrame);
+    previousRgba = adjustedRgba;
+  }
+
+  return {
+    f: compactFrames.length,
+    d: compactFrames,
+  };
+}
+
+function createCanvasFromCompactFrameData(compactFrame) {
+  const frameCanvas = document.createElement('canvas');
+  frameCanvas.width = PANEL_WIDTH;
+  frameCanvas.height = PANEL_HEIGHT;
+  const frameCtx = frameCanvas.getContext('2d');
+  frameCtx.fillStyle = '#000000';
+  frameCtx.fillRect(0, 0, PANEL_WIDTH, PANEL_HEIGHT);
+
+  const pixels = compactFrame.p;
+  for (let i = 0; i < pixels.length; i++) {
+    const pixel = pixels[i];
+    frameCtx.fillStyle = `rgb(${pixel[2]}, ${pixel[3]}, ${pixel[4]})`;
+    frameCtx.fillRect(pixel[0], pixel[1], 1, 1);
+  }
+
+  return frameCanvas;
+}
+
+function buildPreviewFramesFromCompactData(compactData) {
+  const frames = [];
+  const state = new Uint8ClampedArray(PANEL_WIDTH * PANEL_HEIGHT * 4);
+
+  for (let i = 0; i < compactData.d.length; i++) {
+    const compactFrame = compactData.d[i];
+
+    if (compactFrame.t === 1) {
+      state.fill(0);
+    }
+
+    for (let j = 0; j < compactFrame.p.length; j++) {
+      const pixel = compactFrame.p[j];
+      const x = pixel[0];
+      const y = pixel[1];
+      const index = (y * PANEL_WIDTH + x) * 4;
+      state[index] = pixel[2];
+      state[index + 1] = pixel[3];
+      state[index + 2] = pixel[4];
+      state[index + 3] = 255;
+    }
+
+    const frameCanvas = document.createElement('canvas');
+    frameCanvas.width = PANEL_WIDTH;
+    frameCanvas.height = PANEL_HEIGHT;
+    const frameCtx = frameCanvas.getContext('2d');
+    const frameImage = frameCtx.createImageData(PANEL_WIDTH, PANEL_HEIGHT);
+    frameImage.data.set(state);
+    frameCtx.putImageData(frameImage, 0, 0);
+
+    frames.push({
+      canvas: frameCanvas,
+      delay: compactFrame.d,
+      index: i,
+      width: PANEL_WIDTH,
+      height: PANEL_HEIGHT,
+    });
+  }
+
+  return frames;
+}
+
+function estimateCompactDataMemory(compactData) {
+  let pixelCount = 0;
+  for (let i = 0; i < compactData.d.length; i++) {
+    pixelCount += compactData.d[i].c;
+  }
+  return {
+    kb: (pixelCount * 5 / 1024).toFixed(1),
+  };
+}
+
+function applySavedAnimationPreset(compactData, presetIndex) {
+  const previewFrames = buildPreviewFramesFromCompactData(compactData);
+  gifFrames = previewFrames;
+  currentFrameIndex = 0;
+  isGifFile = true;
+  selectedSavedPresetIndex = presetIndex;
+  document.getElementById('showImage').checked = true;
+  document.getElementById('imageWidth').value = 64;
+  document.getElementById('imageHeight').value = 64;
+  document.getElementById('imageX').value = 0;
+  document.getElementById('imageY').value = 0;
+  uploadedImage = previewFrames[0].canvas;
+  window.currentGifESP32Data = {
+    frameCount: compactData.f,
+    statistics: {
+      compressionRatio: 'N/A',
+      estimatedMemory: estimateCompactDataMemory(compactData),
+    },
+    esp32Format: compactData,
+  };
+
+  showImagePreview(previewFrames[0].canvas.toDataURL());
+  showGifControls();
+  updateGifFrameInfo();
+  renderSavedAnimationPresetList();
+  updateDisplay();
+}
+
+async function saveAnimationPreset() {
+  const compactData = buildCompactAnimationData();
+  if (compactData === null) {
+    alert('没有可保存的 GIF 动画数据');
+    return;
+  }
+
+  try {
+    const response = await fetch('/api/animation-presets/append', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(compactData),
+    });
+
+    const result = await response.json();
+    if (!response.ok) {
+      alert(`保存失败: ${result.error}`);
+      return;
+    }
+
+    await loadSavedAnimationPresets();
+    applySavedAnimationPreset(compactData, result.index);
+    alert(`动画已追加到预设文件，第 ${result.index + 1} 条`);
+  } catch (error) {
+    alert('保存失败: 请使用 preset_server.py 打开页面');
+  }
+}
+
+function renderSavedAnimationPresetList() {
+  const list = document.getElementById('savedPresetList');
+  list.innerHTML = '';
+
+  if (savedAnimationPresets.length === 0) {
+    list.innerHTML = '<div class="preset-empty">还没有保存的动画数据</div>';
+    return;
+  }
+
+  for (let i = 0; i < savedAnimationPresets.length; i++) {
+    const preset = savedAnimationPresets[i];
+    const item = document.createElement('div');
+    item.className = 'preset-item';
+    if (i === selectedSavedPresetIndex) {
+      item.classList.add('active');
+    }
+    item.onclick = () => applySavedAnimationPreset(preset, i);
+
+    const thumb = document.createElement('canvas');
+    thumb.className = 'preset-thumb';
+    thumb.width = 64;
+    thumb.height = 64;
+    const thumbCtx = thumb.getContext('2d');
+    const previewFrames = buildPreviewFramesFromCompactData(preset);
+    thumbCtx.imageSmoothingEnabled = false;
+    thumbCtx.drawImage(previewFrames[0].canvas, 0, 0, 64, 64);
+
+    const meta = document.createElement('div');
+    meta.className = 'preset-meta';
+    const totalPixels = preset.d.reduce((sum, frame) => sum + frame.c, 0);
+    meta.innerHTML = `
+      <div class="preset-name">动画 ${i + 1}</div>
+      <div class="preset-desc">帧数 ${preset.f} / 像素 ${totalPixels}</div>
+    `;
+
+    item.appendChild(thumb);
+    item.appendChild(meta);
+    list.appendChild(item);
+  }
+}
+
+async function loadSavedAnimationPresets() {
+  const list = document.getElementById('savedPresetList');
+  try {
+    const response = await fetch('/api/animation-presets');
+    const result = await response.json();
+    if (!response.ok) {
+      list.innerHTML = `<div class="preset-error">读取失败: ${result.error}</div>`;
+      return;
+    }
+    savedAnimationPresets = result;
+    renderSavedAnimationPresetList();
+  } catch (error) {
+    list.innerHTML = '<div class="preset-error">请使用 preset_server.py 打开页面，当前无法读取预设文件</div>';
+  }
 }
 
 // 绘制函数
@@ -684,25 +970,11 @@ function copyFullJSON() {
 
 // 复制 ESP32 差分动画数据（简单压缩版）
 function copyESP32AnimationData() {
-  if (!window.currentGifESP32Data) {
+  const compactData = buildCompactAnimationData();
+  if (compactData === null) {
     alert('没有 GIF 动画数据');
     return;
   }
-  
-  const esp32Data = window.currentGifESP32Data;
-  const esp32Format = esp32Data.esp32Format;
-
-  // 应用当前速度倍率到每帧delay, 保证导出数据和预览一致
-  // 限制最低50ms防止过快刷新
-  const speedAdjustedFrames = esp32Format.d.map(frame => ({
-    ...frame,
-    d: Math.max(50, Math.round(frame.d / gifSpeed))
-  }));
-
-  const compactData = {
-    f: esp32Format.f,
-    d: speedAdjustedFrames
-  };
   
   const jsonStr = JSON.stringify(compactData);
   const sizeKB = (jsonStr.length / 1024).toFixed(1);
@@ -714,7 +986,12 @@ function copyESP32AnimationData() {
   }
 
   navigator.clipboard.writeText(jsonStr).then(() => {
-    const stats = esp32Data.statistics;
+    const stats = window.currentGifESP32Data && window.currentGifESP32Data.statistics
+      ? window.currentGifESP32Data.statistics
+      : { compressionRatio: 'N/A', estimatedMemory: estimateCompactDataMemory(compactData) };
+    const compressionRatioText = stats.compressionRatio === 'N/A'
+      ? 'N/A'
+      : `${stats.compressionRatio}:1`;
     const message = `ESP32 紧凑动画数据已复制
 
 数据大小: ${sizeKB} KB
@@ -726,9 +1003,9 @@ function copyESP32AnimationData() {
 • d[i].p: 像素数组 [x,y,r,g,b]
 
 优化统计:
-• 帧数: ${esp32Format.f}
-• 原始帧数: ${esp32Data.frameCount}
-• 压缩比: ${stats.compressionRatio}:1
+• 帧数: ${compactData.f}
+• 原始帧数: ${compactData.f}
+• 压缩比: ${compressionRatioText}
 • 内存: ${stats.estimatedMemory.kb} KB
 
 ESP32 渲染逻辑:
@@ -800,6 +1077,7 @@ function downloadConfig() {
 // 初始化
 document.getElementById('dateInput').valueAsDate = new Date();
 initColorPickers();
+loadSavedAnimationPresets();
 
 // 加载保存的配置
 function loadSavedConfig() {

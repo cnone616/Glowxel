@@ -483,6 +483,9 @@
         <hr />
 
         <button class="secondary" onclick="saveConfig()">保存配置</button>
+        <button id="savePresetBtn" onclick="saveAnimationPreset()" style="display: none">
+          保存当前动画到预设文件
+        </button>
         <button onclick="copyFullJSON()">复制完整 JSON</button>
         <button class="secondary" onclick="copyPixelData()">
           仅复制像素数据
@@ -510,6 +513,16 @@
           class="config-output"
           style="display: none"
         ></div>
+
+        <div class="preset-section">
+          <div class="preset-header">
+            <div class="preset-title">已保存动画列表</div>
+            <button class="small secondary" onclick="loadSavedAnimationPresets()">
+              刷新列表
+            </button>
+          </div>
+          <div id="savedPresetList" class="saved-preset-list"></div>
+        </div>
       </div>
     </div>
 

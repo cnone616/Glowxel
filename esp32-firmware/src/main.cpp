@@ -9,6 +9,7 @@
 #include "ota_manager.h"
 #include "tetris_effect.h"
 #include "ble_config.h"
+#include "eyes_effect.h"
 
 void setup() {
   Serial.begin(115200);
@@ -31,6 +32,7 @@ void setup() {
   ConfigManager::init();
   WiFiManager::init();
   AnimationManager::init();
+  EyesEffect::init();
 
   // 只有 WiFi 连接成功才启动 HTTP/WebSocket 服务
   if (!WiFiManager::isConfigMode()) {
@@ -49,6 +51,9 @@ void setup() {
       DisplayManager::displayClock();
     } else if (DisplayManager::currentMode == MODE_CANVAS) {
       DisplayManager::renderCanvas();
+    } else if (DisplayManager::currentMode == MODE_ANIMATION &&
+               DisplayManager::currentBusinessModeTag == "eyes") {
+      DisplayManager::activateEyesEffect(ConfigManager::eyesConfig);
     }
   }
   
