@@ -13,12 +13,12 @@
         />
       </view>
       <view class="nav-title">
-        <text class="project-name">像素眼</text>
+        <text class="project-name">桌面宠物</text>
       </view>
     </view>
 
     <view class="canvas-section">
-      <view class="preview-canvas-container">
+      <view v-if="!previewHidden" class="preview-canvas-container">
         <PixelCanvas
           v-if="previewCanvasReady"
           :width="64"
@@ -35,6 +35,10 @@
           canvas-id="spiritPreviewCanvas"
         />
       </view>
+      <view
+        v-else
+        class="preview-canvas-container preview-canvas-placeholder"
+      ></view>
       <view class="preview-caption">
         <view class="preview-caption-info">
           <text class="preview-title">64 x 64 动态预览</text>
@@ -76,14 +80,10 @@
                 <text>{{ item.label }}</text>
               </view>
             </view>
-            <text class="form-tip">{{ expressionModeDescription }}</text>
           </view>
 
           <view v-show="expressionModeValue === 'manual'" class="card">
-            <view class="card-title-section">
-              <text class="card-title">指定表情</text>
-              <text class="card-subtitle">21 个表情</text>
-            </view>
+            <text class="card-title">指定表情</text>
             <view class="expression-grid">
               <view
                 v-for="item in expressionOptions"
@@ -100,10 +100,7 @@
 
         <view v-show="currentTab === 1" class="tab-panel">
           <view class="card">
-            <view class="card-title-section">
-              <text class="card-title">眼睛颜色</text>
-              <text class="card-subtitle">使用现成颜色面板</text>
-            </view>
+            <text class="card-title">眼睛颜色</text>
             <ColorPanelPicker
               :value="eyesConfig.style.eyeColor"
               label="眼睛颜色"
@@ -113,10 +110,7 @@
           </view>
 
           <view class="card">
-            <view class="card-title-section">
-              <text class="card-title">时间显示</text>
-              <text class="card-subtitle">顶部 5x3 像素字</text>
-            </view>
+            <text class="card-title">时间显示</text>
             <view class="form-row inline-row">
               <text class="form-label">显示时间</text>
               <switch
@@ -133,15 +127,44 @@
                 @change="handleTimeSecondsChange"
               />
             </view>
+            <view class="form-row">
+              <text class="form-label">
+                时间横向位置 {{ eyesConfig.layout.timeX }}
+              </text>
+              <slider
+                :value="eyesConfig.layout.timeX"
+                min="0"
+                :max="timeXMax"
+                step="1"
+                activeColor="#4F7FFF"
+                @change="handleTimeXChange"
+              />
+            </view>
+            <view class="form-row">
+              <text class="form-label">
+                时间纵向位置 {{ eyesConfig.layout.timeY }}
+              </text>
+              <slider
+                :value="eyesConfig.layout.timeY"
+                min="0"
+                max="12"
+                step="1"
+                activeColor="#4F7FFF"
+                @change="handleTimeYChange"
+              />
+            </view>
+            <ColorPanelPicker
+              :value="eyesConfig.style.timeColor"
+              label="时间颜色"
+              :preset-colors="timeColorOptions"
+              @input="handleTimeColorChange"
+            />
           </view>
         </view>
 
         <view v-show="currentTab === 2" class="tab-panel">
           <view class="card">
-            <view class="card-title-section">
-              <text class="card-title">参数调整</text>
-              <text class="card-subtitle">数值越大越活跃</text>
-            </view>
+            <text class="card-title">参数调整</text>
 
             <view class="form-row">
               <text class="form-label">
@@ -189,7 +212,7 @@
           <view class="card">
             <view class="card-title-section">
               <text class="card-title">互动预览</text>
-              <text class="card-subtitle">只影响当前预览</text>
+              <text class="card-subtitle">仅预览</text>
             </view>
             <view class="option-row option-row-wrap">
               <view class="option-btn" @click="triggerPreviewOnlyAction('blink')">
@@ -227,7 +250,7 @@
       </view>
     </view>
 
-    <Toast ref="toastRef" />
+    <Toast ref="toastRef" @show="previewHidden = true" @hide="onToastHide" />
   </view>
 </template>
 
@@ -266,7 +289,6 @@ const EXPRESSION_OPTIONS = [
   { label: "惊叹", value: "Awe" },
   { label: "兴奋", value: "Excited" },
   { label: "坚定", value: "Determined" },
-  { label: "疑惑", value: "Confused" },
 ];
 
 const PRESETS = {
@@ -282,7 +304,7 @@ const PRESETS = {
   Skeptic: { offsetX: 0, offsetY: -3, height: 13, width: 20, slopeTop: 0.3, slopeBottom: 0, radiusTop: 1, radiusBottom: 5 },
   Frustrated: { offsetX: 2, offsetY: -3, height: 6, width: 20, slopeTop: 0, slopeBottom: 0, radiusTop: 0, radiusBottom: 5 },
   Unimpressed: { offsetX: 2, offsetY: 0, height: 6, width: 20, slopeTop: 0, slopeBottom: 0, radiusTop: 1, radiusBottom: 5 },
-  Sleepy: { offsetX: 0, offsetY: -1, height: 7, width: 20, slopeTop: -0.5, slopeBottom: -0.5, radiusTop: 2, radiusBottom: 2 },
+  Sleepy: { offsetX: 0, offsetY: -1, height: 7, width: 20, slopeTop: -0.5, slopeBottom: 0, radiusTop: 2, radiusBottom: 1.5 },
   Suspicious: { offsetX: 0, offsetY: 0, height: 11, width: 20, slopeTop: 0, slopeBottom: 0, radiusTop: 4, radiusBottom: 2 },
   Squint: { offsetX: 3, offsetY: 0, height: 10, width: 10, slopeTop: 0, slopeBottom: 0, radiusTop: 3, radiusBottom: 3 },
   Furious: { offsetX: -1, offsetY: 0, height: 15, width: 20, slopeTop: 0.4, slopeBottom: 0, radiusTop: 1, radiusBottom: 4 },
@@ -290,7 +312,6 @@ const PRESETS = {
   Awe: { offsetX: 1, offsetY: 0, height: 18, width: 23, slopeTop: -0.1, slopeBottom: 0.1, radiusTop: 6, radiusBottom: 6 },
   Excited: { offsetX: 0, offsetY: -2, height: 24, width: 22, slopeTop: 0.05, slopeBottom: -0.05, radiusTop: 7, radiusBottom: 7 },
   Determined: { offsetX: 0, offsetY: 0, height: 15, width: 20, slopeTop: 0.3, slopeBottom: 0, radiusTop: 2, radiusBottom: 2 },
-  Confused: { offsetX: 0, offsetY: 0, height: 18, width: 20, slopeTop: -0.25, slopeBottom: 0.15, radiusTop: 5, radiusBottom: 5 },
 };
 
 const FONT_3X5 = {
@@ -314,6 +335,7 @@ function createDefaultEyesConfig() {
       eyeSpacing: 14,
       eyeWidth: 16,
       eyeHeight: 10,
+      timeX: 22,
       timeY: 4,
     },
     behavior: {
@@ -506,14 +528,15 @@ export default {
       isSending: false,
       contentHeight: "calc(100vh - 88rpx - 520rpx - 112rpx)",
       previewCanvasReady: false,
+      previewHidden: false,
       previewZoom: 4,
       previewOffset: { x: 16, y: 16 },
       previewContainerSize: { width: 320, height: 320 },
       previewPixels: new Map(),
       previewTimer: null,
       currentTab: 0,
-      tabs: ["表情", "眼神设置", "参数调整"],
-      tabIconNames: ["browse", "prompt", "task"],
+      tabs: ["表情", "时钟", "参数"],
+      tabIconNames: ["browse", "time", "task"],
       expressionModeOptions: [
         { label: "自动切换", value: "auto" },
         { label: "指定表情", value: "manual" },
@@ -530,6 +553,14 @@ export default {
         { name: "雾蓝", hex: "#8ebcff" },
         { name: "霓虹蓝", hex: "#52b7ff" },
       ],
+      timeColorOptions: [
+        { name: "冰白", hex: "#f4fbff" },
+        { name: "浅蓝", hex: "#d8f3ff" },
+        { name: "雾青", hex: "#bfe9ff" },
+        { name: "天青", hex: "#8fd8ff" },
+        { name: "薄荷", hex: "#b8fff1" },
+        { name: "暖白", hex: "#fff2d6" },
+      ],
     };
   },
   computed: {
@@ -544,21 +575,15 @@ export default {
     },
     previewSubtitle() {
       if (this.eyesConfig.behavior.autoSwitch) {
-        return `预览中：${this.previewExpressionLabel}`;
+        return `自动：${this.previewExpressionLabel}`;
       }
-      return `当前固定：${this.selectedExpressionLabel}`;
+      return `固定：${this.selectedExpressionLabel}`;
     },
     expressionModeValue() {
       return this.eyesConfig.behavior.autoSwitch ? "auto" : "manual";
     },
     expressionModeLabel() {
       return this.eyesConfig.behavior.autoSwitch ? "自动切换" : "指定表情";
-    },
-    expressionModeDescription() {
-      if (this.eyesConfig.behavior.autoSwitch) {
-        return "自动切换会自己变换表情。";
-      }
-      return "指定表情会固定当前选择。";
     },
     previewExpressionLabel() {
       const matched = this.expressionOptions.find(
@@ -586,6 +611,17 @@ export default {
     motionAmplitudeLevel() {
       return this.idleMoveToLevel(this.eyesConfig.behavior.idleMove);
     },
+    timePreviewText() {
+      return this.eyesConfig.time.showSeconds ? "12:34:56" : "12:34";
+    },
+    timeXMax() {
+      const glyphWidth = 3;
+      const spacing = 1;
+      const textLength = this.timePreviewText.length;
+      const totalWidth =
+        textLength * glyphWidth + Math.max(0, textLength - 1) * spacing;
+      return Math.max(0, 64 - totalWidth);
+    },
   },
   onLoad() {
     this.deviceStore = useDeviceStore();
@@ -608,6 +644,11 @@ export default {
   methods: {
     handleBack() {
       uni.navigateBack();
+    },
+    onToastHide() {
+      if (!this.isSending) {
+        this.previewHidden = false;
+      }
     },
 
     initPreviewCanvas() {
@@ -662,10 +703,31 @@ export default {
           this.eyesConfig = createDefaultEyesConfig();
           return;
         }
-        this.eyesConfig = cloneEyesConfig(parsedConfig);
-        this.eyesConfig.layout.timeY = 4;
+        const nextConfig = createDefaultEyesConfig();
+        nextConfig.layout = {
+          ...nextConfig.layout,
+          ...parsedConfig.layout,
+        };
+        nextConfig.behavior = {
+          ...nextConfig.behavior,
+          ...parsedConfig.behavior,
+        };
+        nextConfig.interaction = {
+          ...nextConfig.interaction,
+          ...parsedConfig.interaction,
+        };
+        nextConfig.time = {
+          ...nextConfig.time,
+          ...parsedConfig.time,
+        };
+        nextConfig.style = {
+          ...nextConfig.style,
+          ...parsedConfig.style,
+        };
+        nextConfig.layout.timeX = clamp(nextConfig.layout.timeX, 0, this.timeXMax);
+        this.eyesConfig = nextConfig;
       } catch (error) {
-        console.error("读取像素眼配置失败:", error);
+        console.error("读取桌面宠物配置失败:", error);
         this.eyesConfig = createDefaultEyesConfig();
       }
     },
@@ -677,6 +739,7 @@ export default {
       );
       if (!matched) {
         this.selectedEyesExpression = "Normal";
+        uni.setStorageSync(EYES_EXPRESSION_STORAGE_KEY, "Normal");
         return;
       }
       this.selectedEyesExpression = matched.value;
@@ -685,7 +748,7 @@ export default {
     saveDraft() {
       this.saveEyesConfig();
       this.saveSelectedExpression();
-      this.toast.showSuccess("像素眼草稿已保存");
+      this.toast.showSuccess("桌面宠物草稿已保存");
     },
 
     saveEyesConfig() {
@@ -716,18 +779,15 @@ export default {
         const ws = this.deviceStore.getWebSocket();
         await ws.setMode("eyes");
         await ws.setEyesConfig(cloneEyesConfig(this.eyesConfig));
-        if (
-          !this.eyesConfig.behavior.autoSwitch &&
-          this.selectedEyesExpression !== "Normal"
-        ) {
+        if (!this.eyesConfig.behavior.autoSwitch) {
           await ws.eyesInteract(`set_expression:${this.selectedEyesExpression}`);
         }
         this.saveEyesConfig();
         this.saveSelectedExpression();
         this.deviceStore.setDeviceMode("eyes", { businessMode: true });
-        this.toast.showSuccess("像素眼已发送到设备");
+        this.toast.showSuccess("桌面宠物已发送到设备");
       } catch (error) {
-        console.error("发送像素眼失败:", error);
+        console.error("发送桌面宠物失败:", error);
         this.toast.showError("发送失败：" + error.message);
       } finally {
         this.isSending = false;
@@ -745,10 +805,13 @@ export default {
     handleExpressionModeChange(value) {
       this.eyesConfig.behavior.autoSwitch = value === "auto";
       if (this.eyesConfig.behavior.autoSwitch) {
+        this.previewRuntime.expression = this.chooseNextPreviewExpression();
         this.previewRuntime.lastExpressionAt = Date.now();
-        this.previewRuntime.nextExpressionAfterMs = 0;
+        this.scheduleNextExpression();
+        this.previewRuntime.actionExpireAt = 0;
       } else {
         this.previewRuntime.expression = this.selectedEyesExpression;
+        this.previewRuntime.actionExpireAt = 0;
       }
       this.saveEyesConfig();
       this.renderPreviewFrame();
@@ -757,16 +820,46 @@ export default {
     handleEyeColorChange(value) {
       this.eyesConfig.style.eyeColor = value;
       this.saveEyesConfig();
+      this.renderPreviewFrame();
     },
 
     handleTimeShowChange(event) {
       this.eyesConfig.time.show = event.detail.value;
       this.saveEyesConfig();
+      this.renderPreviewFrame();
     },
 
     handleTimeSecondsChange(event) {
       this.eyesConfig.time.showSeconds = event.detail.value;
+      this.eyesConfig.layout.timeX = clamp(
+        this.eyesConfig.layout.timeX,
+        0,
+        this.timeXMax,
+      );
       this.saveEyesConfig();
+      this.renderPreviewFrame();
+    },
+
+    handleTimeXChange(event) {
+      this.eyesConfig.layout.timeX = clamp(
+        Number(event.detail.value),
+        0,
+        this.timeXMax,
+      );
+      this.saveEyesConfig();
+      this.renderPreviewFrame();
+    },
+
+    handleTimeYChange(event) {
+      this.eyesConfig.layout.timeY = Number(event.detail.value);
+      this.saveEyesConfig();
+      this.renderPreviewFrame();
+    },
+
+    handleTimeColorChange(value) {
+      this.eyesConfig.style.timeColor = value;
+      this.saveEyesConfig();
+      this.renderPreviewFrame();
     },
 
     handleBlinkIntervalChange(event) {
@@ -995,11 +1088,7 @@ export default {
       this.previewRuntime.targetRightLookOffsetY = 0;
 
       let asymmetryChance = 22;
-      if (
-        activeExpression === "Confused" ||
-        activeExpression === "Skeptic" ||
-        activeExpression === "Worried"
-      ) {
+      if (activeExpression === "Skeptic" || activeExpression === "Worried") {
         asymmetryChance = 34;
       }
 
@@ -1149,19 +1238,12 @@ export default {
         preset.offsetY = -0.5;
         preset.width += 5;
         preset.height += 6;
-      } else if (expression === "Confused") {
-        preset.offsetY -= 1.4;
-        preset.height += 2.8;
-        preset.slopeTop -= 0.08;
-        preset.slopeBottom += 0.04;
       }
 
       if (expression === "Normal") {
         preset.height += trianglePulse(now, 2200, isLeftEye ? 0.18 : 0.62) * 1.3;
       } else if (expression === "Happy" || expression === "Glee") {
         preset.offsetY += trianglePulse(now, 1500, isLeftEye ? 0.24 : 0.52) * 0.7;
-      } else if (expression === "Confused") {
-        preset.height += trianglePulse(now, 2100, isLeftEye ? 0.18 : 0.61) * 1.1;
       }
 
       return preset;
@@ -1361,12 +1443,10 @@ export default {
       }
     },
 
-    drawTinyText(pixelMap, text, y, color) {
+    drawTinyText(pixelMap, text, x, y, color) {
       const glyphWidth = 3;
       const spacing = 1;
-      const totalWidth =
-        text.length * glyphWidth + Math.max(0, text.length - 1) * spacing;
-      let cursorX = Math.floor((64 - totalWidth) / 2);
+      let cursorX = clamp(x, 0, 63);
 
       for (const char of text) {
         const glyph = FONT_3X5[char];
@@ -1397,6 +1477,7 @@ export default {
       this.drawTinyText(
         pixelMap,
         text,
+        clamp(this.eyesConfig.layout.timeX, 0, this.timeXMax),
         this.eyesConfig.layout.timeY,
         this.eyesConfig.style.timeColor,
       );
@@ -1502,6 +1583,10 @@ export default {
   aspect-ratio: 1;
   position: relative;
   overflow: hidden;
+  background-color: #000000;
+}
+
+.preview-canvas-placeholder {
   background-color: #000000;
 }
 
@@ -1617,14 +1702,6 @@ export default {
 
 .form-row {
   margin-top: 18rpx;
-}
-
-.form-tip {
-  display: block;
-  margin-top: 14rpx;
-  font-size: 22rpx;
-  line-height: 1.5;
-  color: var(--text-secondary);
 }
 
 .inline-row {

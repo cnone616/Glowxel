@@ -8,6 +8,51 @@
 #include "clock_font_renderer.h"
 #include "websocket_command_handlers.h"
 
+namespace {
+struct ClientTextMessageState {
+  uint32_t clientId;
+  String fragmentBuffer;
+  bool inUse;
+};
+
+constexpr size_t kClientTextStateCount = 4;
+ClientTextMessageState gClientTextStates[kClientTextStateCount] = {};
+
+ClientTextMessageState* getClientTextState(uint32_t clientId, bool createIfMissing) {
+  for (size_t i = 0; i < kClientTextStateCount; i++) {
+    if (gClientTextStates[i].inUse && gClientTextStates[i].clientId == clientId) {
+      return &gClientTextStates[i];
+    }
+  }
+
+  if (!createIfMissing) {
+    return nullptr;
+  }
+
+  for (size_t i = 0; i < kClientTextStateCount; i++) {
+    if (!gClientTextStates[i].inUse) {
+      gClientTextStates[i].clientId = clientId;
+      gClientTextStates[i].fragmentBuffer = "";
+      gClientTextStates[i].inUse = true;
+      return &gClientTextStates[i];
+    }
+  }
+
+  return nullptr;
+}
+
+void clearClientTextState(uint32_t clientId) {
+  ClientTextMessageState* state = getClientTextState(clientId, false);
+  if (state == nullptr) {
+    return;
+  }
+
+  state->fragmentBuffer = "";
+  state->clientId = 0;
+  state->inUse = false;
+}
+}
+
 // 静态成员初始化
 AsyncWebSocket WebSocketHandler::ws("/ws");
 unsigned long WebSocketHandler::lastBinaryReceiveTime = 0;
@@ -29,6 +74,9 @@ const char* WebSocketHandler::getCurrentModeString() {
   if (DisplayManager::currentMode == MODE_ANIMATION) {
     return "animation";
   }
+  if (DisplayManager::currentMode == MODE_THEME) {
+    return "theme";
+  }
   if (DisplayManager::currentMode == MODE_TRANSFERRING) {
     return "transferring";
   }
@@ -46,6 +94,7 @@ void WebSocketHandler::onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *c
     Serial.printf("WebSocket 客户端已连接: %u\n", client->id());
     DisplayManager::clientConnected = true;
     lastMessageTime = millis();
+    clearClientTextState(client->id());
     
     // 连接时不切换模式，保持当前状态
 
@@ -57,6 +106,7 @@ void WebSocketHandler::onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *c
   else if (type == WS_EVT_DISCONNECT) {
     Serial.printf("WebSocket 客户端已断开: %u\n", client->id());
     DisplayManager::clientConnected = false;
+    clearClientTextState(client->id());
 
     if (DisplayManager::currentMode == MODE_CANVAS) {
       DisplayManager::currentMode = DisplayManager::lastBusinessMode;
@@ -69,9 +119,13 @@ void WebSocketHandler::onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *c
 
       if (DisplayManager::currentMode == MODE_CLOCK) {
         DisplayManager::displayClock(true);
-    } else if (DisplayManager::currentMode == MODE_ANIMATION) {
+      } else if (DisplayManager::currentMode == MODE_THEME) {
+        DisplayManager::displayTheme(true);
+      } else if (DisplayManager::currentMode == MODE_ANIMATION) {
         if (DisplayManager::currentBusinessModeTag == "eyes") {
           DisplayManager::activateEyesEffect(ConfigManager::eyesConfig);
+        } else if (DisplayManager::currentBusinessModeTag == "ambient_effect") {
+          DisplayManager::activateAmbientEffect(DisplayManager::ambientEffectConfig);
         } else if (AnimationManager::currentGIF != nullptr) {
           AnimationManager::currentGIF->isPlaying = true;
           AnimationManager::currentGIF->currentFrame = 0;
@@ -297,18 +351,24 @@ void WebSocketHandler::handleJsonCommand(AsyncWebSocketClient *client, uint8_t *
   Serial.printf("收到 WebSocket 数据: %d bytes, final=%d, index=%llu, total=%llu\n",
     len, info->final, info->index, info->len);
 
+  ClientTextMessageState* clientState = getClientTextState(client->id(), true);
+  if (clientState == nullptr) {
+    client->text("{\"error\":\"message state unavailable\"}");
+    return;
+  }
+
   // === 分片重组逻辑 ===
   if (info->index == 0) {
     // 第一个分片，清空缓冲区
-    fragmentBuffer = "";
-    isReceivingFragments = !info->final || (info->len > len);
-    if (isReceivingFragments) {
+    clientState->fragmentBuffer = "";
+    bool isFragmentedMessage = !info->final || (info->len > len);
+    if (isFragmentedMessage) {
       Serial.printf("开始接收分片数据，总大小: %llu bytes\n", info->len);
     }
   }
 
   // 追加当前分片数据到缓冲区
-  fragmentBuffer += String((char*)data, len);
+  clientState->fragmentBuffer += String((char*)data, len);
 
   // 如果还没收完，等待后续分片
   if (!info->final || (info->index + len) < info->len) {
@@ -317,8 +377,7 @@ void WebSocketHandler::handleJsonCommand(AsyncWebSocketClient *client, uint8_t *
   }
 
   // === 完整消息已收齐，开始解析 ===
-  isReceivingFragments = false;
-  size_t totalLen = fragmentBuffer.length();
+  size_t totalLen = clientState->fragmentBuffer.length();
   Serial.printf("完整消息已收齐: %d bytes\n", totalLen);
 
   // 根据实际数据大小动态分配 JSON 内存
@@ -329,7 +388,7 @@ void WebSocketHandler::handleJsonCommand(AsyncWebSocketClient *client, uint8_t *
   // - 含大量数组的数据(如 animation_frame 的像素数组): ~8倍原始大小
   //   因为每个数组元素(数字)在 ArduinoJson 中占 16 字节
   // frame_chunk 是纯数字嵌套数组，实际只需 4 倍；其他命令用 8 倍
-  bool isChunkCmd = (fragmentBuffer.indexOf("frame_chunk") > 0);
+  bool isChunkCmd = (clientState->fragmentBuffer.indexOf("frame_chunk") > 0);
   size_t multiplier = isChunkCmd ? 4 : 8;
   size_t maxJsonSize = totalLen * multiplier + 2048;
 
@@ -345,15 +404,15 @@ void WebSocketHandler::handleJsonCommand(AsyncWebSocketClient *client, uint8_t *
   if (maxJsonSize > freeHeap * 0.85) {
     Serial.printf("内存不足: 需要 %d bytes，可用 %d bytes\n", maxJsonSize, freeHeap);
     client->text("{\"error\":\"insufficient memory\",\"needed\":" + String(maxJsonSize) + ",\"available\":" + String(freeHeap) + "}");
-    fragmentBuffer = "";
+    clientState->fragmentBuffer = "";
     return;
   }
 
   DynamicJsonDocument doc(maxJsonSize);
-  DeserializationError error = deserializeJson(doc, fragmentBuffer.c_str(), totalLen);
+  DeserializationError error = deserializeJson(doc, clientState->fragmentBuffer.c_str(), totalLen);
 
   // 解析完成后立即释放缓冲区
-  fragmentBuffer = "";
+  clientState->fragmentBuffer = "";
 
   if (error) {
     Serial.print("JSON解析失败: ");
@@ -380,6 +439,7 @@ void WebSocketHandler::handleJsonCommand(AsyncWebSocketClient *client, JsonDocum
     WebSocketCommandHandlers::handleBasicCommand(client, doc, response, getCurrentModeString()) ||
     WebSocketCommandHandlers::handleModeCommand(client, doc, response) ||
     WebSocketCommandHandlers::handleClockCommand(client, doc, response) ||
+    WebSocketCommandHandlers::handleThemeCommand(client, doc, response) ||
     WebSocketCommandHandlers::handleEffectCommand(client, doc, response) ||
     WebSocketCommandHandlers::handleEyesCommand(client, doc, response) ||
     WebSocketCommandHandlers::handleAnimationCommand(client, doc, response, responseSent) ||

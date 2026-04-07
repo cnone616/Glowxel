@@ -41,6 +41,77 @@ namespace {
 
     return true;
   }
+
+  const char* ambientPresetToString(uint8_t preset) {
+    if (preset == AMBIENT_PRESET_AURORA) {
+      return "aurora_flow";
+    }
+    if (preset == AMBIENT_PRESET_PLASMA) {
+      return "plasma_wave";
+    }
+    if (preset == AMBIENT_PRESET_MATRIX_RAIN) {
+      return "matrix_rain";
+    }
+    if (preset == AMBIENT_PRESET_FIREFLY_SWARM) {
+      return "firefly_swarm";
+    }
+    if (preset == AMBIENT_PRESET_METEOR_SHOWER) {
+      return "meteor_shower";
+    }
+    if (preset == AMBIENT_PRESET_OCEAN_CURRENT) {
+      return "ocean_current";
+    }
+    if (preset == AMBIENT_PRESET_NEON_GRID) {
+      return "neon_grid";
+    }
+    if (preset == AMBIENT_PRESET_SUNSET_BLUSH) {
+      return "sunset_blush";
+    }
+    if (preset == AMBIENT_PRESET_STARFIELD_DRIFT) {
+      return "starfield_drift";
+    }
+    return "";
+  }
+
+  bool ambientPresetFromString(const String& value, uint8_t& preset) {
+    if (value == "aurora_flow") {
+      preset = AMBIENT_PRESET_AURORA;
+      return true;
+    }
+    if (value == "plasma_wave") {
+      preset = AMBIENT_PRESET_PLASMA;
+      return true;
+    }
+    if (value == "matrix_rain") {
+      preset = AMBIENT_PRESET_MATRIX_RAIN;
+      return true;
+    }
+    if (value == "firefly_swarm") {
+      preset = AMBIENT_PRESET_FIREFLY_SWARM;
+      return true;
+    }
+    if (value == "meteor_shower") {
+      preset = AMBIENT_PRESET_METEOR_SHOWER;
+      return true;
+    }
+    if (value == "ocean_current") {
+      preset = AMBIENT_PRESET_OCEAN_CURRENT;
+      return true;
+    }
+    if (value == "neon_grid") {
+      preset = AMBIENT_PRESET_NEON_GRID;
+      return true;
+    }
+    if (value == "sunset_blush") {
+      preset = AMBIENT_PRESET_SUNSET_BLUSH;
+      return true;
+    }
+    if (value == "starfield_drift") {
+      preset = AMBIENT_PRESET_STARFIELD_DRIFT;
+      return true;
+    }
+    return false;
+  }
 }
 
 bool WebSocketCommandHandlers::handleBasicCommand(
@@ -66,8 +137,13 @@ bool WebSocketCommandHandlers::handleBasicCommand(
       response["effectMode"] = "breath_effect";
     } else if (DisplayManager::nativeEffectType == NATIVE_EFFECT_RHYTHM) {
       response["effectMode"] = "rhythm_effect";
+    } else if (TetrisEffect::isActive) {
+      response["effectMode"] = "tetris";
     } else if (DisplayManager::nativeEffectType == NATIVE_EFFECT_EYES) {
       response["effectMode"] = "eyes";
+    } else if (DisplayManager::nativeEffectType == NATIVE_EFFECT_AMBIENT) {
+      response["effectMode"] = "ambient_effect";
+      response["effectPreset"] = ambientPresetToString(DisplayManager::ambientEffectConfig.preset);
     } else {
       response["effectMode"] = "none";
     }
@@ -109,6 +185,9 @@ bool WebSocketCommandHandlers::handleModeCommand(
     }
     if (mode == MODE_TRANSFERRING) {
       return "transferring";
+    }
+    if (mode == MODE_THEME) {
+      return "theme";
     }
     return "unknown";
   };
@@ -182,6 +261,18 @@ bool WebSocketCommandHandlers::handleModeCommand(
       return setAnimationBusinessMode("animation", "switched to animation mode", true);
     }
 
+    if (mode == "theme") {
+      DisplayManager::currentMode = MODE_THEME;
+      DisplayManager::lastBusinessMode = MODE_THEME;
+      DisplayManager::currentBusinessModeTag = "theme";
+      DisplayManager::lastBusinessModeTag = "theme";
+      ConfigManager::saveClockConfig();
+      DisplayManager::displayTheme(true);
+      Serial.printf("模式切换: %s -> theme\n", modeToString(fromMode));
+      response["message"] = "switched to theme mode";
+      return true;
+    }
+
     if (mode == "text_display") {
       return setAnimationBusinessMode("text_display", "switched to text display mode", true);
     }
@@ -209,6 +300,19 @@ bool WebSocketCommandHandlers::handleModeCommand(
 
       Serial.printf("模式切换: %s -> rhythm_effect\n", modeToString(fromMode));
       response["message"] = "switched to rhythm effect mode";
+      return true;
+    }
+
+    if (mode == "ambient_effect") {
+      DisplayManager::currentMode = MODE_ANIMATION;
+      DisplayManager::lastBusinessMode = MODE_ANIMATION;
+      DisplayManager::currentBusinessModeTag = "ambient_effect";
+      DisplayManager::lastBusinessModeTag = "ambient_effect";
+      ConfigManager::saveClockConfig();
+      DisplayManager::activateAmbientEffect(DisplayManager::ambientEffectConfig);
+
+      Serial.printf("模式切换: %s -> ambient_effect\n", modeToString(fromMode));
+      response["message"] = "switched to ambient effect mode";
       return true;
     }
 
@@ -382,6 +486,7 @@ namespace {
            layout.containsKey("eyeSpacing") &&
            layout.containsKey("eyeWidth") &&
            layout.containsKey("eyeHeight") &&
+           layout.containsKey("timeX") &&
            layout.containsKey("timeY");
   }
 
@@ -420,17 +525,18 @@ bool WebSocketCommandHandlers::handleEffectCommand(
   if (cmd == "set_breath_effect") {
     if (!doc.containsKey("speed") ||
         !doc.containsKey("loop") ||
-        !doc.containsKey("minBrightness") ||
-        !doc.containsKey("maxBrightness") ||
-        !doc.containsKey("periodMs") ||
-        !doc.containsKey("waveform") ||
-        !doc.containsKey("color")) {
+        !doc.containsKey("motion") ||
+        !doc.containsKey("scope") ||
+        !doc.containsKey("colorMode") ||
+        !doc.containsKey("colorA") ||
+        !doc.containsKey("colorB")) {
       setErrorResponse(response, "missing breath effect fields");
       return true;
     }
 
-    JsonObject color = doc["color"].as<JsonObject>();
-    if (!ensureColorObject(color)) {
+    JsonObject colorA = doc["colorA"].as<JsonObject>();
+    JsonObject colorB = doc["colorB"].as<JsonObject>();
+    if (!ensureColorObject(colorA) || !ensureColorObject(colorB)) {
       setErrorResponse(response, "missing breath color fields");
       return true;
     }
@@ -438,23 +544,46 @@ bool WebSocketCommandHandlers::handleEffectCommand(
     BreathEffectConfig config;
     config.speed = doc["speed"].as<uint8_t>();
     config.loop = doc["loop"].as<bool>();
-    config.minBrightness = doc["minBrightness"].as<uint8_t>();
-    config.maxBrightness = doc["maxBrightness"].as<uint8_t>();
-    config.periodMs = doc["periodMs"].as<uint16_t>();
-    String waveform = doc["waveform"].as<String>();
-    if (waveform == "sine") {
-      config.waveform = BREATH_WAVE_SINE;
-    } else if (waveform == "triangle") {
-      config.waveform = BREATH_WAVE_TRIANGLE;
-    } else if (waveform == "square") {
-      config.waveform = BREATH_WAVE_SQUARE;
+    String motion = doc["motion"].as<String>();
+    if (motion == "clockwise") {
+      config.motion = BREATH_MOTION_CLOCKWISE;
+    } else if (motion == "counterclockwise") {
+      config.motion = BREATH_MOTION_COUNTERCLOCKWISE;
+    } else if (motion == "inward") {
+      config.motion = BREATH_MOTION_INWARD;
+    } else if (motion == "outward") {
+      config.motion = BREATH_MOTION_OUTWARD;
     } else {
-      setErrorResponse(response, "invalid breath waveform");
+      setErrorResponse(response, "invalid breath motion");
       return true;
     }
-    config.colorR = color["r"].as<uint8_t>();
-    config.colorG = color["g"].as<uint8_t>();
-    config.colorB = color["b"].as<uint8_t>();
+
+    String scope = doc["scope"].as<String>();
+    if (scope == "single_ring") {
+      config.scope = BREATH_SCOPE_SINGLE_RING;
+    } else if (scope == "full_screen") {
+      config.scope = BREATH_SCOPE_FULL_SCREEN;
+    } else {
+      setErrorResponse(response, "invalid breath scope");
+      return true;
+    }
+
+    String colorMode = doc["colorMode"].as<String>();
+    if (colorMode == "solid") {
+      config.colorMode = BREATH_COLOR_SOLID;
+    } else if (colorMode == "gradient") {
+      config.colorMode = BREATH_COLOR_GRADIENT;
+    } else {
+      setErrorResponse(response, "invalid breath color mode");
+      return true;
+    }
+
+    config.colorAR = colorA["r"].as<uint8_t>();
+    config.colorAG = colorA["g"].as<uint8_t>();
+    config.colorAB = colorA["b"].as<uint8_t>();
+    config.colorBR = colorB["r"].as<uint8_t>();
+    config.colorBG = colorB["g"].as<uint8_t>();
+    config.colorBB = colorB["b"].as<uint8_t>();
 
     DisplayManager::currentMode = MODE_ANIMATION;
     DisplayManager::lastBusinessMode = MODE_ANIMATION;
@@ -543,6 +672,50 @@ bool WebSocketCommandHandlers::handleEffectCommand(
     return true;
   }
 
+  if (cmd == "set_ambient_effect") {
+    if (!doc.containsKey("preset") ||
+        !doc.containsKey("speed") ||
+        !doc.containsKey("intensity") ||
+        !doc.containsKey("loop")) {
+      setErrorResponse(response, "missing ambient effect fields");
+      return true;
+    }
+
+    String presetText = doc["preset"].as<String>();
+    uint8_t preset = AMBIENT_PRESET_AURORA;
+    if (!ambientPresetFromString(presetText, preset)) {
+      setErrorResponse(response, "invalid ambient preset");
+      return true;
+    }
+
+    AmbientEffectConfig config;
+    config.preset = preset;
+    config.speed = doc["speed"].as<uint8_t>();
+    config.intensity = doc["intensity"].as<uint8_t>();
+    config.loop = doc["loop"].as<bool>();
+    if (config.speed < 1) config.speed = 1;
+    if (config.speed > 10) config.speed = 10;
+    if (config.intensity < 10) config.intensity = 10;
+    if (config.intensity > 100) config.intensity = 100;
+
+    DisplayManager::ambientEffectConfig = config;
+    ConfigManager::saveAmbientEffectConfig();
+    DisplayManager::currentMode = MODE_ANIMATION;
+    DisplayManager::lastBusinessMode = MODE_ANIMATION;
+    DisplayManager::currentBusinessModeTag = "ambient_effect";
+    DisplayManager::lastBusinessModeTag = "ambient_effect";
+    ConfigManager::saveClockConfig();
+    TetrisEffect::isActive = false;
+    if (AnimationManager::currentGIF != nullptr) {
+      AnimationManager::currentGIF->isPlaying = false;
+    }
+    DisplayManager::activateAmbientEffect(config);
+
+    response["message"] = "ambient effect applied";
+    response["preset"] = ambientPresetToString(config.preset);
+    return true;
+  }
+
   (void)client;
   return false;
 }
@@ -600,6 +773,7 @@ bool WebSocketCommandHandlers::handleEyesCommand(
     nextConfig.layout.eyeSpacing = layout["eyeSpacing"].as<int>();
     nextConfig.layout.eyeWidth = layout["eyeWidth"].as<int>();
     nextConfig.layout.eyeHeight = layout["eyeHeight"].as<int>();
+    nextConfig.layout.timeX = layout["timeX"].as<int>();
     nextConfig.layout.timeY = layout["timeY"].as<int>();
 
     nextConfig.behavior.autoSwitch = behavior["autoSwitch"].as<bool>();
@@ -790,6 +964,47 @@ bool WebSocketCommandHandlers::handleClockCommand(
   }
 
   response["message"] = "clock config updated";
+  return true;
+}
+
+bool WebSocketCommandHandlers::handleThemeCommand(
+  AsyncWebSocketClient* client,
+  JsonDocument& doc,
+  StaticJsonDocument<512>& response
+) {
+  (void)client;
+
+  String cmd = doc["cmd"].as<String>();
+  if (cmd != "set_theme_config") {
+    return false;
+  }
+
+  if (!doc.containsKey("themeId")) {
+    setErrorResponse(response, "missing themeId");
+    return true;
+  }
+
+  const char* themeId = doc["themeId"];
+  if (themeId == nullptr || themeId[0] == '\0') {
+    setErrorResponse(response, "invalid themeId");
+    return true;
+  }
+
+  snprintf(
+    ConfigManager::themeConfig.themeId,
+    sizeof(ConfigManager::themeConfig.themeId),
+    "%s",
+    themeId
+  );
+  ConfigManager::saveThemeConfig();
+  DisplayManager::currentMode = MODE_THEME;
+  DisplayManager::lastBusinessMode = MODE_THEME;
+  DisplayManager::currentBusinessModeTag = "theme";
+  DisplayManager::lastBusinessModeTag = "theme";
+  ConfigManager::saveClockConfig();
+  DisplayManager::displayTheme(true);
+
+  response["message"] = "theme config updated";
   return true;
 }
 

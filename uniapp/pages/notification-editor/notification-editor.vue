@@ -41,17 +41,28 @@
       ></view>
       <view class="preview-caption">
         <view class="preview-caption-info">
+          <view class="preview-status-chip" :class="previewStatusClass">
+            <text class="preview-status-chip-text">{{ previewStatusLabel }}</text>
+          </view>
           <text class="preview-caption-title">64 x 64 模拟预览</text>
           <text class="preview-caption-text">{{ previewCaptionText }}</text>
         </view>
         <view class="preview-actions">
-          <view class="action-btn-sm primary" @click="saveReminder">
+          <view
+            class="action-btn-sm primary"
+            :class="{ disabled: isSending }"
+            @click="saveReminder"
+          >
             <Icon name="save" :size="36" color="#fff" />
             <text>保存</text>
           </view>
-          <view class="action-btn-sm primary" @click="saveAndApply">
+          <view
+            class="action-btn-sm primary"
+            :class="{ disabled: isSending }"
+            @click="saveAndApply"
+          >
             <Icon name="top" :size="36" color="#fff" />
-            <text>发送</text>
+            <text>{{ isSending ? "发送中" : "发送" }}</text>
           </view>
         </view>
       </view>
@@ -221,6 +232,14 @@
       </view>
     </scroll-view>
 
+    <view v-if="isSending" class="sending-overlay" @touchmove.stop.prevent>
+      <view class="sending-modal">
+        <view class="sending-spinner"></view>
+        <text class="sending-title">正在发送提醒...</text>
+        <text class="sending-tip">设备应用完成后会自动恢复当前预览</text>
+      </view>
+    </view>
+
     <Toast ref="toastRef" @show="previewHidden = true" @hide="onToastHide" />
   </view>
 </template>
@@ -336,7 +355,7 @@ export default {
     },
     previewCaptionText() {
       if (!this.reminderReady || !this.reminder) {
-        return "正在加载提醒预览";
+        return "预览加载中，完成后会展示提醒触发效果";
       }
       if (this.reminder.contentType === "text") {
         return "先设置提醒时间，再设计文字出现方式与节奏";
@@ -345,6 +364,24 @@ export default {
         return "适合固定节日、祝福和简洁型通知画面";
       }
       return "预览触发后的动效节奏，适合庆祝或强调型提醒";
+    },
+    previewStatusLabel() {
+      if (this.isSending) {
+        return "发送中";
+      }
+      if (!this.previewCanvasReady || !this.reminderReady) {
+        return "预览加载中";
+      }
+      return "模拟预览";
+    },
+    previewStatusClass() {
+      if (this.isSending) {
+        return "is-sending";
+      }
+      if (!this.previewCanvasReady || !this.reminderReady) {
+        return "is-loading";
+      }
+      return "is-preview";
     },
   },
   watch: {
@@ -401,7 +438,18 @@ export default {
     this.initPreviewCanvas();
     this.refreshPreview();
   },
+  onShow() {
+    if (!this.isSending) {
+      this.previewHidden = false;
+    }
+    if (this.reminderReady) {
+      this.refreshPreview();
+    }
+  },
   onUnload() {
+    this.stopPreviewPlayback();
+  },
+  onHide() {
     this.stopPreviewPlayback();
   },
   methods: {
@@ -409,7 +457,9 @@ export default {
       uni.navigateBack();
     },
     onToastHide() {
-      this.previewHidden = false;
+      if (!this.isSending) {
+        this.previewHidden = false;
+      }
     },
     initPreviewCanvas() {
       const systemInfo = uni.getSystemInfoSync();
@@ -635,6 +685,32 @@ export default {
   gap: 4rpx;
 }
 
+.preview-status-chip {
+  display: inline-flex;
+  width: fit-content;
+  padding: 6rpx 12rpx;
+  border-radius: 999rpx;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.preview-status-chip.is-loading {
+  background: rgba(255, 214, 102, 0.14);
+}
+
+.preview-status-chip.is-preview {
+  background: rgba(79, 127, 255, 0.14);
+}
+
+.preview-status-chip.is-sending {
+  background: rgba(52, 211, 153, 0.16);
+}
+
+.preview-status-chip-text {
+  font-size: 20rpx;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
 .preview-caption-title {
   font-size: 24rpx;
   font-weight: 600;
@@ -671,6 +747,58 @@ export default {
   font-size: 24rpx;
   font-weight: 600;
   color: #ffffff;
+}
+
+.action-btn-sm.disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.sending-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.sending-modal {
+  min-width: 420rpx;
+  padding: 60rpx 50rpx;
+  border-radius: 24rpx;
+  background: var(--bg-elevated);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24rpx;
+}
+
+.sending-spinner {
+  width: 60rpx;
+  height: 60rpx;
+  border-radius: 50%;
+  border: 6rpx solid rgba(79, 127, 255, 0.2);
+  border-top-color: var(--accent-primary);
+  animation: spin 0.8s linear infinite;
+}
+
+.sending-title {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.sending-tip {
+  font-size: 24rpx;
+  color: var(--text-secondary);
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .content {

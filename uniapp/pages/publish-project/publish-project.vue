@@ -235,6 +235,8 @@ import statusBarMixin from "../../mixins/statusBar.js";
 import Icon from "../../components/Icon.vue";
 import Toast from "../../components/Toast.vue";
 
+import { PERLER_BOARD_SIZE } from "../../constants/perler.js";
+
 export default {
   mixins: [statusBarMixin],
   components: {
@@ -353,8 +355,8 @@ export default {
 
   methods: {
     getBoardCount() {
-      const boardsX = Math.ceil(this.canvasData.width / 64);
-      const boardsY = Math.ceil(this.canvasData.height / 64);
+      const boardsX = Math.ceil(this.canvasData.width / PERLER_BOARD_SIZE);
+      const boardsY = Math.ceil(this.canvasData.height / PERLER_BOARD_SIZE);
       return boardsX * boardsY;
     },
 

@@ -1,12 +1,14 @@
 # Glowxel / RenLight 仓库导览
 
-这是一个围绕像素创作、社区发布、设备联动和 ESP32 灯板显示的多端仓库，当前包含 5 个主模块：
+Glowxel 是一个围绕像素创作、社区发布、设备控制和 ESP32 灯板显示的多端仓库。
 
-- `website/`：官网与在线创作站
-- `admin/`：后台管理
-- `server/`：Express + MySQL 后端
-- `uniapp/`：小程序 / H5 / App 客户端
-- `esp32-firmware/`：ESP32 固件，驱动 64x64 HUB75 面板
+## 主模块
+
+- `website/`
+- `admin/`
+- `server/`
+- `uniapp/`
+- `esp32-firmware/`
 
 ## 目录结构
 
@@ -20,28 +22,21 @@ Glowxel/
 ├── website/
 ├── DEPLOY.md
 ├── README.md
-└── task.md
+└── 硬件指南/
 ```
 
-## 当前状态
+## 当前主线
 
-当前已完成并验证的主链：
+当前仓库主线分为 4 个方向：
 
-- `website`
-  - `npm test` 通过
-- `admin`
-  - `npm test` 通过
-- `server`
-  - `npm test` 通过
-  - 已补最小接口测试、管理员密码 `bcrypt` 迁移、数据库迁移脚本
-- `esp32-firmware`
-  - `platformio run` 通过
-- `uniapp`
-  - 代码主链完整
-  - `npm test` 已补代码级 API 配置检查
-  - 当前仓库未内置 `uni` CLI，本机未做微信小程序 / H5 编译验证
-
-详细状态见 [当前仓库状态与收口说明](/Users/aflylong/Desktop/project/Glowxel/docs/当前仓库状态与收口说明.md)。
+1. `website`
+   - 官网、社区、在线创作、图纸工作台
+2. `uniapp`
+   - 用户主操作端，承接设备控制、编辑与同步
+3. `esp32-firmware`
+   - 设备真实显示、主题、效果与设备网页
+4. `server + admin`
+   - 数据、管理、上传与交付支撑
 
 ## 快速开始
 
@@ -53,11 +48,6 @@ npm install
 npm run dev
 ```
 
-环境变量：
-
-- `VITE_API_BASE_URL`
-- `VITE_API_PROXY_TARGET`
-
 ### `admin`
 
 ```bash
@@ -65,11 +55,6 @@ cd admin
 npm install
 npm run dev
 ```
-
-环境变量：
-
-- `VITE_API_BASE_URL`
-- `VITE_API_PROXY_TARGET`
 
 ### `server`
 
@@ -79,27 +64,9 @@ npm install
 npm run dev
 ```
 
-常用命令：
-
-```bash
-npm run migrate
-npm run test
-```
-
 ### `uniapp`
 
-推荐使用 HBuilderX 导入 `uniapp/` 运行到微信开发者工具。
-
-如果本机已安装 `uni` CLI，也可以使用：
-
-```bash
-cd uniapp
-npm install
-npm run dev:h5
-# 或 npm run dev:mp-weixin
-```
-
-当前统一接口入口位于 [api.js](/Users/aflylong/Desktop/project/Glowxel/uniapp/config/api.js)。
+推荐使用 HBuilderX 导入 `uniapp/` 后运行到微信开发者工具或 H5。
 
 ### `esp32-firmware`
 
@@ -110,50 +77,12 @@ platformio run --target upload
 platformio device monitor
 ```
 
-## 设备联动现状
+## 文档入口
 
-固件入口是 [main.cpp](/Users/aflylong/Desktop/project/Glowxel/esp32-firmware/src/main.cpp)。
+优先查看：
 
-### 配网方式
-
-- 已保存 WiFi 时走 STA 模式
-- 未保存 WiFi 时进入 BLE 配网模式
-- BLE 设备名：`RenLight-Setup`
-- 小程序配网页面：`pages/ble-config/ble-config.vue`
-- 设备仍保留 `GET /clear-wifi` 作为重置网络入口
-
-### 设备模式
-
-- `clock`
-- `animation`
-- `canvas`
-- `transferring`
-
-### WebSocket
-
-- 路径：`ws://<设备IP>/ws`
-- 连接后会返回当前模式
-- 当前命令处理已按类别拆分，不再全部堆在单一大文件中
-
-### 时钟编辑能力
-
-- 完整时钟配置主链在 `uniapp`
-- `website` 当前仅保留时钟能力说明页，不提供完整设备时钟编辑
-
-## 工程化现状
-
-已落地：
-
-- 敏感信息已从仓库中清理
-- `server` 管理员密码已改为 `bcrypt`
-- `server` 已有最小测试集
-- 已新增基础 CI 工作流
-- `server` 已新增数据库迁移机制
-- 多端接口地址入口已统一收口
-
-## 推荐先看
-
-- [当前仓库状态与收口说明](/Users/aflylong/Desktop/project/Glowxel/docs/当前仓库状态与收口说明.md)
-- [环境配置约定](/Users/aflylong/Desktop/project/Glowxel/docs/env-config.md)
-- [部署文档](/Users/aflylong/Desktop/project/Glowxel/DEPLOY.md)
-- [项目架构与接口文档](/Users/aflylong/Desktop/project/Glowxel/docs/项目架构与接口文档.md)
+1. [文档与页面索引.md](/Users/aflylong/Desktop/project/Glowxel/docs/文档与页面索引.md)
+2. [项目架构与接口文档.md](/Users/aflylong/Desktop/project/Glowxel/docs/项目架构与接口文档.md)
+3. [开发路线图.md](/Users/aflylong/Desktop/project/Glowxel/docs/开发路线图.md)
+4. [env-config.md](/Users/aflylong/Desktop/project/Glowxel/docs/env-config.md)
+5. [DEPLOY.md](/Users/aflylong/Desktop/project/Glowxel/DEPLOY.md)

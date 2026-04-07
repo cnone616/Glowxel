@@ -6,6 +6,7 @@ import {
   getCurrentDateText,
   getCurrentWeekText,
 } from "../../../utils/clockCanvas.js";
+import { getClockThemePreviewPixels } from "../../../utils/clockThemeRenderer.js";
 
 export default {
   methods: {
@@ -403,7 +404,7 @@ export default {
       return allPixels;
     },
 
-    getPreviewPixels() {
+    getDefaultPreviewPixels() {
       const pixels = new Map();
 
       if (this.config.time.show) {
@@ -446,6 +447,23 @@ export default {
       }
 
       return pixels;
+    },
+
+    getPreviewPixels() {
+      const themePixels = getClockThemePreviewPixels({
+        themeId: this.displayClockThemeId,
+        config: this.config,
+        timeText: this.getTimeText(),
+        dateText: this.getDateText(),
+        weekText: this.getWeekText(),
+        hasImage: !!this.imagePixels,
+      });
+
+      if (themePixels) {
+        return themePixels;
+      }
+
+      return this.getDefaultPreviewPixels();
     },
   },
 };

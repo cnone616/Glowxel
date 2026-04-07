@@ -205,7 +205,7 @@ export default {
       ctx.clearRect(0, 0, width, height)
       
       // 背景色 - 根据主题模式设置
-      ctx.fillStyle = this.isDarkMode ? '#1a1a1a' : '#FFFFFF'
+      ctx.fillStyle = this.isDarkMode ? '#000000' : '#FFFFFF'
       ctx.fillRect(0, 0, width, height)
       
       ctx.save()
@@ -266,13 +266,13 @@ export default {
       
       // 绘制网格
       if (this.gridVisible && this.zoom > 1.5) {
-        const gridColor = this.isDarkMode ? '#f3f5f9' : '#4a4a4a'
+        const gridColor = this.isDarkMode ? '#f8fbff' : '#4a4a4a'
         
-        // 细网格线
-        const gridLineWidth = this.isDarkMode ? 0.16 : 0.14
+        // 深色预览下加重网格，确保 64x64 边界足够清晰
+        const gridLineWidth = this.isDarkMode ? 0.2 : 0.14
         ctx.lineWidth = gridLineWidth
         ctx.strokeStyle = gridColor
-        ctx.globalAlpha = this.isDarkMode ? 0.36 : 0.22
+        ctx.globalAlpha = this.isDarkMode ? 0.5 : 0.22
         
         ctx.beginPath()
         for (let x = 0; x <= this.width; x++) {
@@ -286,9 +286,9 @@ export default {
         ctx.stroke()
         
         // 板子外边界更明显，便于看清 64x64 范围
-        ctx.lineWidth = gridLineWidth
+        ctx.lineWidth = this.isDarkMode ? 0.28 : gridLineWidth
         ctx.strokeStyle = gridColor
-        ctx.globalAlpha = this.isDarkMode ? 0.36 : 0.22
+        ctx.globalAlpha = this.isDarkMode ? 0.82 : 0.22
         ctx.beginPath()
         ctx.rect(0, 0, this.width, this.height)
         ctx.stroke()

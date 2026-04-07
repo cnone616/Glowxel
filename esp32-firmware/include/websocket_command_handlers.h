@@ -25,6 +25,12 @@ namespace WebSocketCommandHandlers {
     StaticJsonDocument<512>& response
   );
 
+  bool handleThemeCommand(
+    AsyncWebSocketClient* client,
+    JsonDocument& doc,
+    StaticJsonDocument<512>& response
+  );
+
   bool handleAnimationCommand(
     AsyncWebSocketClient* client,
     JsonDocument& doc,

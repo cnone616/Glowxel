@@ -12,7 +12,40 @@
         />
       </view>
       <view class="nav-title">
-        <text class="project-name">方块屏保</text>
+        <text class="project-name">俄罗斯方块时钟</text>
+      </view>
+    </view>
+
+    <view class="canvas-section">
+      <view class="preview-canvas-container">
+        <PixelCanvas
+          v-if="previewCanvasReady"
+          :width="64"
+          :height="64"
+          :pixels="currentPreviewPixels"
+          :zoom="previewZoom"
+          :offset-x="previewOffset.x"
+          :offset-y="previewOffset.y"
+          :canvas-width="previewContainerSize.width"
+          :canvas-height="previewContainerSize.height"
+          :grid-visible="true"
+          :is-dark-mode="true"
+          :touch-enabled="false"
+          canvas-id="tetrisPreviewCanvas"
+        />
+      </view>
+      <view class="preview-caption">
+        <view class="preview-status-chip" :class="{ sending: isSending }">
+          <text class="preview-status-chip-text">{{
+            isSending ? "发送中" : config.showClock ? "下落拼时" : "堆叠待机"
+          }}</text>
+        </view>
+        <text class="preview-title">64 x 64 方块预览</text>
+          <text class="preview-subtitle">{{
+          config.showClock
+            ? "预览俄罗斯方块成组下落并逐步拼出当前时间"
+            : "预览空闲状态下的堆叠、掉落和持续重组效果"
+        }}</text>
       </view>
     </view>
 
@@ -21,7 +54,7 @@
         <view class="action-strip">
           <view class="action-strip-info">
             <text class="action-strip-title">调整完成后发送到设备</text>
-            <text class="action-strip-text">当前配置会作为方块屏保显示</text>
+            <text class="action-strip-text">按经典俄罗斯方块时钟的方式逐块下落并拼出时间</text>
           </view>
           <view class="preview-actions">
             <view
@@ -35,10 +68,19 @@
           </view>
         </view>
 
-        <!-- 模式 -->
-        <view class="card">
+        <view v-if="config.showClock" class="card">
           <view class="card-title-section">
-            <text class="card-title">模式</text>
+            <text class="card-title">当前状态</text>
+          </view>
+          <text class="card-tip-text"
+            >当前会朝时间目标自动拼装，分钟变化后会重新开始下落并重组。</text
+          >
+        </view>
+
+        <!-- 模式 -->
+        <view v-if="!config.showClock" class="card">
+          <view class="card-title-section">
+            <text class="card-title">待机方式</text>
           </view>
           <view class="option-row">
             <view
@@ -121,7 +163,7 @@
         <!-- 显示时间 -->
         <view class="card">
           <view class="card-title-section">
-            <text class="card-title">显示时间</text>
+            <text class="card-title">方块拼时间</text>
             <view
               class="toggle-switch"
               @click="config.showClock = !config.showClock"
@@ -167,6 +209,8 @@ import { useToast } from "../../composables/useToast.js";
 import statusBarMixin from "../../mixins/statusBar.js";
 import Icon from "../../components/Icon.vue";
 import Toast from "../../components/Toast.vue";
+import PixelCanvas from "../../components/PixelCanvas.vue";
+import { buildTetrisPreviewFrames } from "../../utils/tetrisClockPreview.js";
 
 const TETRIS_SHAPES = {
   0: [
@@ -218,13 +262,21 @@ export default {
   components: {
     Icon,
     Toast,
+    PixelCanvas,
   },
   data() {
     return {
       deviceStore: null,
       toast: null,
-      contentHeight: "calc(100vh - 88rpx)",
+      contentHeight: "calc(100vh - 88rpx - 520rpx)",
       isSending: false,
+      previewCanvasReady: false,
+      previewZoom: 4,
+      previewOffset: { x: 0, y: 0 },
+      previewContainerSize: { width: 320, height: 320 },
+      previewFrameMaps: [],
+      previewFrameIndex: 0,
+      previewTimer: null,
       config: {
         clearMode: true,
         cellSize: 2,
@@ -243,6 +295,34 @@ export default {
       ],
     };
   },
+  computed: {
+    currentPreviewPixels() {
+      if (this.previewFrameMaps.length === 0) {
+        return new Map();
+      }
+      if (this.previewFrameIndex >= this.previewFrameMaps.length) {
+        return this.previewFrameMaps[0];
+      }
+      return this.previewFrameMaps[this.previewFrameIndex];
+    },
+    previewInterval() {
+      if (this.config.speed === "slow") {
+        return 150;
+      }
+      if (this.config.speed === "fast") {
+        return 86;
+      }
+      return 116;
+    },
+  },
+  watch: {
+    config: {
+      deep: true,
+      handler() {
+        this.refreshPreview();
+      },
+    },
+  },
   onLoad() {
     this.deviceStore = useDeviceStore();
     this.deviceStore.init();
@@ -256,14 +336,59 @@ export default {
     if (this.$refs.toastRef) {
       this.toast.setToastInstance(this.$refs.toastRef);
     }
-    const systemInfo = uni.getSystemInfoSync();
-    const statusBarHeight = systemInfo.statusBarHeight || 0;
-    const reservedHeight = 88;
-    this.contentHeight = `${systemInfo.windowHeight - statusBarHeight - reservedHeight}px`;
+    this.initPreviewCanvas();
+  },
+  onUnload() {
+    this.stopPreview();
   },
   methods: {
     handleBack() {
       uni.navigateBack();
+    },
+    initPreviewCanvas() {
+      const systemInfo = uni.getSystemInfoSync();
+      const statusBarHeight = systemInfo.statusBarHeight || 0;
+      const query = uni.createSelectorQuery().in(this);
+      query
+        .select(".preview-canvas-container")
+        .boundingClientRect((rect) => {
+          if (rect) {
+            this.previewContainerSize = {
+              width: rect.width,
+              height: rect.height,
+            };
+            const nextHeight =
+              systemInfo.windowHeight - statusBarHeight - 88 - rect.height - 90;
+            this.contentHeight = `${Math.max(120, nextHeight)}px`;
+          }
+          this.previewCanvasReady = true;
+          this.refreshPreview();
+        })
+        .exec();
+    },
+    refreshPreview() {
+      if (!this.previewCanvasReady) {
+        return;
+      }
+      this.previewFrameMaps = buildTetrisPreviewFrames(this.config);
+      this.previewFrameIndex = 0;
+      this.startPreview();
+    },
+    startPreview() {
+      this.stopPreview();
+      if (this.previewFrameMaps.length <= 1) {
+        return;
+      }
+      this.previewTimer = setInterval(() => {
+        this.previewFrameIndex =
+          (this.previewFrameIndex + 1) % this.previewFrameMaps.length;
+      }, this.previewInterval);
+    },
+    stopPreview() {
+      if (this.previewTimer) {
+        clearInterval(this.previewTimer);
+        this.previewTimer = null;
+      }
     },
     togglePiece(idx) {
       const i = this.config.pieces.indexOf(idx);
@@ -381,6 +506,56 @@ export default {
   flex: 1;
 }
 
+.canvas-section {
+  padding: 24rpx 24rpx 16rpx;
+  background: linear-gradient(180deg, rgba(17, 24, 39, 0.98), rgba(10, 14, 24, 0.98));
+  border-bottom: 2rpx solid rgba(148, 163, 184, 0.14);
+}
+
+.preview-canvas-container {
+  width: 100%;
+  height: 420rpx;
+  border-radius: 28rpx;
+  overflow: hidden;
+  background: radial-gradient(circle at 50% 30%, rgba(59, 130, 246, 0.18), rgba(15, 23, 42, 0.98));
+  border: 2rpx solid rgba(148, 163, 184, 0.2);
+}
+
+.preview-caption {
+  margin-top: 18rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+}
+
+.preview-status-chip {
+  display: inline-flex;
+  align-self: flex-start;
+  padding: 8rpx 16rpx;
+  border-radius: 999rpx;
+  background: rgba(59, 130, 246, 0.16);
+}
+
+.preview-status-chip.sending {
+  background: rgba(245, 158, 11, 0.18);
+}
+
+.preview-status-chip-text {
+  font-size: 20rpx;
+  color: #dbeafe;
+}
+
+.preview-title {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #f8fafc;
+}
+
+.preview-subtitle {
+  font-size: 22rpx;
+  color: #94a3b8;
+}
+
 .content-wrapper {
   padding: 24rpx;
 }
@@ -481,6 +656,12 @@ export default {
 
 .card-subtitle {
   font-size: 24rpx;
+  color: var(--text-secondary);
+}
+
+.card-tip-text {
+  font-size: 24rpx;
+  line-height: 1.6;
   color: var(--text-secondary);
 }
 

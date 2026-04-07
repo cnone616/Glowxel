@@ -1,5 +1,6 @@
 import { challengeAPI, templateAPI } from "../../../api/index.js";
 import { ARTKAL_COLORS_FULL } from "../../../data/artkal-colors-full.js";
+import { PERLER_BOARD_SIZE } from "../../../constants/perler.js";
 
 export default {
   methods: {
@@ -14,7 +15,7 @@ export default {
     },
 
     getPaddedSize(value) {
-      return Math.ceil(value / 64) * 64;
+      return Math.ceil(value / PERLER_BOARD_SIZE) * PERLER_BOARD_SIZE;
     },
 
     parseTemplateSize(sizeText) {

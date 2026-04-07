@@ -41,11 +41,18 @@
       ></view>
       <view class="preview-caption">
         <view class="preview-caption-info">
+          <view class="preview-status-chip" :class="previewStatusClass">
+            <text class="preview-status-chip-text">{{ previewStatusLabel }}</text>
+          </view>
           <text class="preview-title">64 x 64 模拟预览</text>
           <text class="preview-subtitle">{{ previewSubtitle }}</text>
         </view>
         <view class="preview-actions">
-          <view class="action-btn-sm" @click="saveDraft">
+          <view
+            class="action-btn-sm"
+            :class="{ disabled: isSending }"
+            @click="saveDraft"
+          >
             <Icon name="save" :size="36" color="var(--color-text-primary)" />
             <text>保存</text>
           </view>
@@ -65,8 +72,20 @@
       <view class="content-wrapper">
       <view v-if="effectType === 'text_display'" class="card">
         <view class="card-title-section">
-          <text class="card-title">文本展示参数</text>
-          <text class="card-subtitle">支持中文与背景色</text>
+          <text class="card-title">像素信息屏</text>
+          <text class="card-subtitle">参考 AWTRIX 与 HUB75 信息屏的横幅展示</text>
+        </view>
+
+        <view class="piece-grid">
+          <view
+            v-for="preset in textPresets"
+            :key="preset.key"
+            class="piece-item"
+            :class="{ active: selectedTextPresetKey === preset.key }"
+            @click="applyTextPreset(preset)"
+          >
+            <text class="piece-name">{{ preset.label }}</text>
+          </view>
         </view>
 
         <view class="form-row">
@@ -76,6 +95,7 @@
             class="text-input"
             maxlength="20"
             placeholder="请输入文本"
+            @input="handleTextContentInput"
           />
         </view>
 
@@ -174,8 +194,8 @@
 
       <view v-if="effectType === 'breath_effect'" class="card">
         <view class="card-title-section">
-          <text class="card-title">环绕灯参数</text>
-          <text class="card-subtitle">转圈、层扫与配色</text>
+          <text class="card-title">矩阵流光</text>
+          <text class="card-subtitle">参考 WLED 边缘追光与矩阵彗尾流光</text>
         </view>
 
         <view class="piece-grid">
@@ -259,7 +279,7 @@
           <text class="form-label">主色</text>
           <ColorPanelPicker
             :value="breathConfig.colorA"
-            label="环绕灯主色"
+            label="流光主色"
             :preset-colors="colorOptions"
             @input="handleBreathColorSelect"
           />
@@ -272,7 +292,7 @@
           <text class="form-label">渐变次色</text>
           <ColorPanelPicker
             :value="breathConfig.colorB"
-            label="环绕灯次色"
+            label="流光次色"
             :preset-colors="colorOptions"
             @input="handleBreathColorBSelect"
           />
@@ -281,8 +301,8 @@
 
       <view v-if="effectType === 'rhythm_effect'" class="card">
         <view class="card-title-section">
-          <text class="card-title">律动参数</text>
-          <text class="card-subtitle">快速方式</text>
+          <text class="card-title">音频频谱</text>
+          <text class="card-subtitle">参考 ESP32_FFT_VU 的柱阵频谱和峰值保持</text>
         </view>
 
         <view class="piece-grid">
@@ -373,7 +393,7 @@
           <text class="form-label">主色</text>
           <ColorPanelPicker
             :value="rhythmConfig.colorA"
-            label="律动主色"
+            label="频谱主色"
             :preset-colors="colorOptions"
             @input="handleRhythmColorASelect"
           />
@@ -383,7 +403,7 @@
           <text class="form-label">次色</text>
           <ColorPanelPicker
             :value="rhythmConfig.colorB"
-            label="律动次色"
+            label="频谱次色"
             :preset-colors="colorOptions"
             @input="handleRhythmColorBSelect"
           />
@@ -396,8 +416,16 @@
       canvas-id="textRenderCanvas"
       id="textRenderCanvas"
       type="2d"
-      style="position: fixed; left: -9999px; top: -9999px; width: 64px; height: 64px; opacity: 0"
+      style="position: fixed; left: -9999px; top: -9999px; width: 256px; height: 256px; opacity: 0"
     />
+
+    <view v-if="isSending" class="sending-overlay" @touchmove.stop.prevent>
+      <view class="sending-modal">
+        <view class="sending-spinner"></view>
+        <text class="sending-title">正在发送效果...</text>
+        <text class="sending-tip">设备应用完成后会自动恢复当前预览</text>
+      </view>
+    </view>
 
     <Toast ref="toastRef" @show="previewHidden = true" @hide="onToastHide" />
   </view>
@@ -413,14 +441,16 @@ import { useDeviceStore } from "../../store/device.js";
 import { useToast } from "../../composables/useToast.js";
 import { uploadAnimationFrames } from "../../utils/animationUploader.js";
 import {
+  drawTextToPixels,
+  drawTinyTextToPixels,
+  getTextWidth,
+  getTinyTextWidth,
+} from "../../utils/clockCanvas.js";
+import {
   buildBreathFrames,
   buildRhythmFrames,
   hexToRgb,
 } from "../../utils/effectFrameBuilders.js";
-import {
-  drawClockCharToPixels,
-  getClockFont,
-} from "../../utils/clockCanvas.js";
 
 const TEXT_CONFIG_KEY = "text_display_config";
 const BREATH_CONFIG_KEY = "breath_effect_config";
@@ -439,18 +469,46 @@ function fillPreviewRect(pixelMap, x, y, width, height, color) {
   }
 }
 
-function isPreviewAsciiChar(char) {
-  return typeof char === "string" && /^[\x20-\x7E]$/.test(char);
+function rgbToHexString(r, g, b) {
+  return `#${r.toString(16).padStart(2, "0")}${g
+    .toString(16)
+    .padStart(2, "0")}${b.toString(16).padStart(2, "0")}`;
 }
 
-function getPreviewTextFontId(font) {
-  if (font === "mono") {
-    return "retro_5x7";
+function blendHexColor(colorA, colorB, alpha) {
+  const rgbA = hexToRgb(colorA);
+  const rgbB = hexToRgb(colorB);
+  const safeAlpha = Math.max(0, Math.min(1, alpha));
+  return rgbToHexString(
+    Math.round(rgbA.r * (1 - safeAlpha) + rgbB.r * safeAlpha),
+    Math.round(rgbA.g * (1 - safeAlpha) + rgbB.g * safeAlpha),
+    Math.round(rgbA.b * (1 - safeAlpha) + rgbB.b * safeAlpha),
+  );
+}
+
+function addTextEffectDecor(pixelMap, cfg, accentColor) {
+  const edgeColor = blendHexColor(cfg.bgColor, accentColor, 0.24);
+  const frameColor = blendHexColor(cfg.bgColor, accentColor, 0.18);
+  const chipColor = blendHexColor(cfg.bgColor, accentColor, 0.28);
+  const panelColor = blendHexColor(cfg.bgColor, "#ffffff", 0.06);
+  fillPreviewRect(pixelMap, 0, 0, 64, 64, cfg.bgColor);
+  fillPreviewRect(pixelMap, 0, 0, 64, 1, edgeColor);
+  fillPreviewRect(pixelMap, 0, 63, 64, 1, edgeColor);
+  fillPreviewRect(pixelMap, 0, 0, 1, 64, frameColor);
+  fillPreviewRect(pixelMap, 63, 0, 1, 64, frameColor);
+  fillPreviewRect(pixelMap, 3, 3, 58, 8, panelColor);
+  fillPreviewRect(pixelMap, 4, 13, 56, 33, panelColor);
+  fillPreviewRect(pixelMap, 4, 49, 56, 11, panelColor);
+  fillPreviewRect(pixelMap, 5, 4, 14, 6, chipColor);
+  fillPreviewRect(pixelMap, 47, 4, 10, 6, chipColor);
+  fillPreviewRect(pixelMap, 6, 58, 52, 1, edgeColor);
+}
+
+function normalizeDisplayText(text) {
+  if (typeof text !== "string") {
+    return "";
   }
-  if (font === "serif") {
-    return "rounded_4x6";
-  }
-  return "classic_5x7";
+  return text.toUpperCase().replace(/\s+/g, " ").trim();
 }
 
 export default {
@@ -468,6 +526,7 @@ export default {
       isSending: false,
       contentHeight: "calc(100vh - 88rpx - 520rpx)",
       effectType: "text_display",
+      selectedTextPresetKey: "",
       selectedBreathPresetKey: "",
       selectedRhythmPresetKey: "",
       previewFrameMaps: [],
@@ -507,9 +566,9 @@ export default {
         { label: "渐变", value: "gradient" },
       ],
       rhythmModeOptions: [
-        { label: "脉冲", value: "pulse" },
-        { label: "渐变", value: "gradient" },
-        { label: "跳变", value: "jump" },
+        { label: "柱阵", value: "pulse" },
+        { label: "瀑布", value: "gradient" },
+        { label: "爆闪", value: "jump" },
       ],
       colorOptions: [
         { name: "青色", hex: "#64c8ff" },
@@ -527,10 +586,87 @@ export default {
         { name: "灰色", hex: "#333333" },
         { name: "深蓝", hex: "#102038" },
       ],
+      textPresets: [
+        {
+          key: "neon_banner",
+          label: "AWTRIX 横幅",
+          config: {
+            text: "HELLO GLOWXEL",
+            font: "sans",
+            x: 64,
+            y: 34,
+            speed: 4,
+            direction: "left",
+            loop: true,
+            color: "#64c8ff",
+            bgColor: "#000000",
+          },
+        },
+        {
+          key: "terminal_feed",
+          label: "HUB75 播报",
+          config: {
+            text: "SYSTEM ONLINE",
+            font: "mono",
+            x: 64,
+            y: 30,
+            speed: 3,
+            direction: "left",
+            loop: true,
+            color: "#00ff9d",
+            bgColor: "#000000",
+          },
+        },
+        {
+          key: "warning_sign",
+          label: "状态告警牌",
+          config: {
+            text: "WARNING",
+            font: "serif",
+            x: 32,
+            y: 34,
+            speed: 2,
+            direction: "up",
+            loop: true,
+            color: "#ffdc00",
+            bgColor: "#1a1a1a",
+          },
+        },
+        {
+          key: "vertical_drop",
+          label: "纵向弹幕",
+          config: {
+            text: "PIXEL FLOW",
+            font: "mono",
+            x: 12,
+            y: 64,
+            speed: 4,
+            direction: "up",
+            loop: true,
+            color: "#c864ff",
+            bgColor: "#000000",
+          },
+        },
+        {
+          key: "soft_board",
+          label: "夜间信息牌",
+          config: {
+            text: "GOOD NIGHT",
+            font: "serif",
+            x: 64,
+            y: 34,
+            speed: 2,
+            direction: "right",
+            loop: true,
+            color: "#ffffff",
+            bgColor: "#102038",
+          },
+        },
+      ],
       breathPresets: [
         {
           key: "clockwise_single",
-          label: "顺时针单圈",
+          label: "WLED 单环",
           config: {
             speed: 5,
             loop: true,
@@ -542,8 +678,21 @@ export default {
           },
         },
         {
+          key: "neon_comet",
+          label: "WLED 彗尾",
+          config: {
+            speed: 8,
+            loop: true,
+            motion: "clockwise",
+            scope: "single_ring",
+            colorMode: "gradient",
+            colorA: "#64c8ff",
+            colorB: "#c864ff",
+          },
+        },
+        {
           key: "counter_gradient",
-          label: "逆时针渐变",
+          label: "反向流光",
           config: {
             speed: 6,
             loop: true,
@@ -555,8 +704,21 @@ export default {
           },
         },
         {
+          key: "aurora_tide",
+          label: "满屏流光",
+          config: {
+            speed: 5,
+            loop: true,
+            motion: "counterclockwise",
+            scope: "full_screen",
+            colorMode: "gradient",
+            colorA: "#00ff9d",
+            colorB: "#64c8ff",
+          },
+        },
+        {
           key: "inward_single",
-          label: "外向内层扫",
+          label: "内收单环",
           config: {
             speed: 4,
             loop: true,
@@ -568,8 +730,21 @@ export default {
           },
         },
         {
+          key: "glacier_core",
+          label: "核心脉冲",
+          config: {
+            speed: 4,
+            loop: true,
+            motion: "inward",
+            scope: "full_screen",
+            colorMode: "solid",
+            colorA: "#64c8ff",
+            colorB: "#64c8ff",
+          },
+        },
+        {
           key: "outward_single",
-          label: "内向外层扫",
+          label: "外放单环",
           config: {
             speed: 4,
             loop: true,
@@ -581,8 +756,21 @@ export default {
           },
         },
         {
+          key: "solar_flare",
+          label: "暖色扩散",
+          config: {
+            speed: 6,
+            loop: true,
+            motion: "outward",
+            scope: "full_screen",
+            colorMode: "gradient",
+            colorA: "#ff6464",
+            colorB: "#ffdc00",
+          },
+        },
+        {
           key: "clockwise_full",
-          label: "顺时针全屏",
+          label: "整屏巡航",
           config: {
             speed: 7,
             loop: true,
@@ -595,7 +783,7 @@ export default {
         },
         {
           key: "outward_full",
-          label: "内向外全屏",
+          label: "冷色扩散",
           config: {
             speed: 5,
             loop: false,
@@ -606,11 +794,24 @@ export default {
             colorB: "#64c8ff",
           },
         },
+        {
+          key: "violet_mirror",
+          label: "紫色镜流",
+          config: {
+            speed: 5,
+            loop: true,
+            motion: "outward",
+            scope: "single_ring",
+            colorMode: "gradient",
+            colorA: "#c864ff",
+            colorB: "#ffffff",
+          },
+        },
       ],
       rhythmPresets: [
         {
           key: "left_wave",
-          label: "左向波浪",
+          label: "FFT 柱阵",
           config: {
             bpm: 110,
             speed: 5,
@@ -623,8 +824,22 @@ export default {
           },
         },
         {
+          key: "aurora_flow",
+          label: "FFT 柔瀑",
+          config: {
+            bpm: 72,
+            speed: 3,
+            loop: true,
+            direction: "left",
+            strength: 58,
+            mode: "gradient",
+            colorA: "#64c8ff",
+            colorB: "#00ff9d",
+          },
+        },
+        {
           key: "right_sweep",
-          label: "右扫渐变",
+          label: "扫频频谱",
           config: {
             bpm: 96,
             speed: 4,
@@ -637,8 +852,22 @@ export default {
           },
         },
         {
+          key: "cyber_scan",
+          label: "高能柱阵",
+          config: {
+            bpm: 126,
+            speed: 6,
+            loop: true,
+            direction: "right",
+            strength: 78,
+            mode: "pulse",
+            colorA: "#6464ff",
+            colorB: "#c864ff",
+          },
+        },
+        {
           key: "top_drop",
-          label: "上落脉冲",
+          label: "冲顶频峰",
           config: {
             bpm: 132,
             speed: 6,
@@ -651,8 +880,22 @@ export default {
           },
         },
         {
+          key: "lava_surge",
+          label: "暖色频峰",
+          config: {
+            bpm: 92,
+            speed: 4,
+            loop: true,
+            direction: "up",
+            strength: 82,
+            mode: "pulse",
+            colorA: "#ffa500",
+            colorB: "#ff6464",
+          },
+        },
+        {
           key: "bottom_jump",
-          label: "下冲跳变",
+          label: "爆闪模式",
           config: {
             bpm: 148,
             speed: 7,
@@ -665,8 +908,22 @@ export default {
           },
         },
         {
+          key: "matrix_rain",
+          label: "矩阵频瀑",
+          config: {
+            bpm: 104,
+            speed: 6,
+            loop: true,
+            direction: "down",
+            strength: 76,
+            mode: "gradient",
+            colorA: "#00ff9d",
+            colorB: "#64c8ff",
+          },
+        },
+        {
           key: "calm_flow",
-          label: "平静流光",
+          label: "冷色缓频",
           config: {
             bpm: 78,
             speed: 3,
@@ -679,8 +936,22 @@ export default {
           },
         },
         {
+          key: "strobe_grid",
+          label: "白蓝爆频",
+          config: {
+            bpm: 164,
+            speed: 8,
+            loop: true,
+            direction: "right",
+            strength: 94,
+            mode: "jump",
+            colorA: "#ffffff",
+            colorB: "#64c8ff",
+          },
+        },
+        {
           key: "single_hit",
-          label: "单次节拍",
+          label: "单击冲击",
           config: {
             bpm: 120,
             speed: 5,
@@ -731,12 +1002,12 @@ export default {
     },
     pageTitle() {
       if (this.effectType === "text_display") {
-        return "文本展示";
+        return "像素信息屏";
       }
       if (this.effectType === "breath_effect") {
-        return "环绕灯";
+        return "矩阵流光";
       }
-      return "律动";
+      return "音频频谱";
     },
     currentPreviewPixels() {
       if (this.previewFrameMaps.length === 0) {
@@ -748,10 +1019,40 @@ export default {
       return this.previewFrameMaps[this.previewFrameIndex];
     },
     previewSubtitle() {
+      if (!this.previewCanvasReady) {
+        return "预览网格加载中，完成后会自动播放当前效果";
+      }
+      if (this.effectType === "text_display") {
+        return "参考 AWTRIX 与 HUB75 的信息屏排版、滚动和阅读层级";
+      }
+      if (this.effectType === "breath_effect") {
+        return "参考 WLED 与 led-matrix 的流光、彗尾和整屏扫动层次";
+      }
+      if (this.effectType === "rhythm_effect") {
+        return "参考 ESP32_FFT_VU 的柱阵频谱、峰值保持和扫频节奏";
+      }
       if (this.previewFrameMaps.length > 1) {
         return "自动播放当前参数生成的效果";
       }
       return "显示当前参数对应的静态结果";
+    },
+    previewStatusLabel() {
+      if (this.isSending) {
+        return "发送中";
+      }
+      if (!this.previewCanvasReady) {
+        return "预览加载中";
+      }
+      return "模拟预览";
+    },
+    previewStatusClass() {
+      if (this.isSending) {
+        return "is-sending";
+      }
+      if (!this.previewCanvasReady) {
+        return "is-loading";
+      }
+      return "is-preview";
     },
   },
   watch: {
@@ -806,19 +1107,28 @@ export default {
     this.initPreviewCanvas();
     this.schedulePreviewRefresh();
   },
-  onUnload() {
-    this.stopPreviewPlayback();
-    if (this.previewRefreshTimer) {
-      clearTimeout(this.previewRefreshTimer);
-      this.previewRefreshTimer = null;
+  onShow() {
+    if (!this.isSending) {
+      this.previewHidden = false;
     }
+    if (this.previewCanvasReady) {
+      this.schedulePreviewRefresh();
+    }
+  },
+  onUnload() {
+    this.cleanupPreviewTimers();
+  },
+  onHide() {
+    this.cleanupPreviewTimers();
   },
   methods: {
     handleBack() {
       uni.navigateBack();
     },
     onToastHide() {
-      this.previewHidden = false;
+      if (!this.isSending) {
+        this.previewHidden = false;
+      }
     },
     initPreviewCanvas() {
       const systemInfo = uni.getSystemInfoSync();
@@ -887,12 +1197,7 @@ export default {
       const token = this.previewRefreshToken + 1;
       this.previewRefreshToken = token;
       try {
-        let frames;
-        if (this.effectType === "text_display") {
-          frames = this.buildTextPreviewFrames();
-        } else {
-          frames = await this.buildFrames();
-        }
+        const frames = await this.buildFrames();
         if (token !== this.previewRefreshToken) {
           return;
         }
@@ -939,30 +1244,56 @@ export default {
         this.previewTimer = null;
       }
     },
+    cleanupPreviewTimers() {
+      this.stopPreviewPlayback();
+      if (this.previewRefreshTimer) {
+        clearTimeout(this.previewRefreshTimer);
+        this.previewRefreshTimer = null;
+      }
+    },
 
+    applyTextPreset(preset) {
+      if (!preset || !preset.config) {
+        return;
+      }
+      this.textConfig = { ...preset.config };
+      this.selectedTextPresetKey = preset.key;
+    },
     handleTextFontSelect(value) {
       this.textConfig.font = value;
+      this.selectedTextPresetKey = "";
     },
     handleTextDirectionSelect(value) {
       this.textConfig.direction = value;
+      this.selectedTextPresetKey = "";
     },
     handleTextLoopToggle() {
       this.textConfig.loop = !this.textConfig.loop;
+      this.selectedTextPresetKey = "";
+    },
+    handleTextContentInput(e) {
+      this.textConfig.text = e.detail.value;
+      this.selectedTextPresetKey = "";
     },
     handleTextSpeedChange(e) {
       this.textConfig.speed = Number(e.detail.value);
+      this.selectedTextPresetKey = "";
     },
     handleTextXChange(e) {
       this.textConfig.x = Number(e.detail.value);
+      this.selectedTextPresetKey = "";
     },
     handleTextYChange(e) {
       this.textConfig.y = Number(e.detail.value);
+      this.selectedTextPresetKey = "";
     },
     handleTextColorSelect(hex) {
       this.textConfig.color = hex;
+      this.selectedTextPresetKey = "";
     },
     handleTextBgColorSelect(hex) {
       this.textConfig.bgColor = hex;
+      this.selectedTextPresetKey = "";
     },
 
     handleBreathMotionSelect(value) {
@@ -1137,171 +1468,193 @@ export default {
         .toString(16)
         .padStart(2, "0")}${color.b.toString(16).padStart(2, "0")}`;
     },
-    drawPreviewUnsupportedChar(char, x, y, color, pixelMap) {
-      if (char === " ") {
-        return 6;
-      }
-      fillPreviewRect(pixelMap, x, y, 6, 1, color);
-      fillPreviewRect(pixelMap, x, y + 1, 1, 6, color);
-      fillPreviewRect(pixelMap, x + 5, y + 1, 1, 6, color);
-      fillPreviewRect(pixelMap, x + 1, y + 6, 4, 1, color);
-      fillPreviewRect(pixelMap, x + 2, y + 2, 2, 2, color);
-      return 7;
-    },
-    drawPreviewTextToMap(cfg, drawX, drawY) {
-      const pixelMap = new Map();
-      const bg = this.ensureColorHex(cfg.bgColor);
-      const fg = this.ensureColorHex(cfg.color);
-      const fontId = getPreviewTextFontId(cfg.font);
-      const font = getClockFont(fontId);
-
-      if (bg !== "#000000") {
-        fillPreviewRect(pixelMap, 0, 0, 64, 64, bg);
-      }
-
-      let cursorX = drawX;
-      const baseY = drawY - Math.floor(font.height / 2);
-
-      for (let i = 0; i < cfg.text.length; i++) {
-        const char = cfg.text[i];
-        if (isPreviewAsciiChar(char)) {
-          cursorX += drawClockCharToPixels(
-            char,
-            cursorX,
-            baseY,
-            fg,
-            pixelMap,
-            fontId,
-            1,
-          );
-          continue;
-        }
-        cursorX += this.drawPreviewUnsupportedChar(char, cursorX, baseY, fg, pixelMap);
-      }
-
-      return pixelMap;
-    },
-    buildTextPreviewFrames() {
-      const cfg = { ...this.textConfig };
-      cfg.color = this.ensureColorHex(cfg.color);
-      cfg.bgColor = this.ensureColorHex(cfg.bgColor);
-
-      const frameCount = cfg.loop ? 20 : 1;
-      const step = Number(cfg.speed) * 2;
-      const frames = [];
-
-      for (let i = 0; i < frameCount; i++) {
-        const offset = i * step;
-        let drawX = Number(cfg.x);
-        let drawY = Number(cfg.y);
-
-        if (cfg.direction === "left") {
-          drawX = Number(cfg.x) - offset;
-        } else if (cfg.direction === "right") {
-          drawX = Number(cfg.x) + offset;
-        } else if (cfg.direction === "up") {
-          drawY = Number(cfg.y) - offset;
-        } else if (cfg.direction === "down") {
-          drawY = Number(cfg.y) + offset;
-        }
-
-        const map = this.drawPreviewTextToMap(cfg, drawX, drawY);
-        const pixels = [];
-        map.forEach((color, key) => {
-          const coord = key.split(",");
-          const rgb = hexToRgb(color);
-          pixels.push(
-            Number(coord[0]),
-            Number(coord[1]),
-            rgb.r,
-            rgb.g,
-            rgb.b,
-          );
-        });
-
-        frames.push({
-          type: 1,
-          delay: Math.max(40, 220 - Number(cfg.speed) * 15),
-          totalPixels: pixels.length / 5,
-          pixels: new Uint8Array(pixels),
-        });
-      }
-
-      return frames;
-    },
-
-    async renderTextFrameToPixels(cfg, drawX, drawY) {
-      const ctx = uni.createCanvasContext("textRenderCanvas", this);
-      const bg = this.ensureColorHex(cfg.bgColor);
-      const fg = this.ensureColorHex(cfg.color);
-
-      ctx.setFillStyle(bg);
-      ctx.fillRect(0, 0, 64, 64);
-      ctx.setFillStyle(fg);
-
+    getTextDisplayFontProfile(cfg) {
       if (cfg.font === "mono") {
-        ctx.setFontSize(15);
-      } else if (cfg.font === "serif") {
-        ctx.setFontSize(16);
+        return {
+          measure(text) {
+            return getTinyTextWidth(text, 2);
+          },
+          draw(text, x, y, color, pixelMap) {
+            drawTinyTextToPixels(text, x, y, color, pixelMap, 2, "left");
+          },
+          height: 10,
+          source: "HUB75",
+        };
+      }
+      return {
+        measure(text) {
+          return getTextWidth(text, 1);
+        },
+        draw(text, x, y, color, pixelMap) {
+          drawTextToPixels(text, x, y, color, 1, pixelMap, "left");
+        },
+        height: 7,
+        source: cfg.font === "serif" ? "SIGN" : "AWTRIX",
+      };
+    },
+    getTextFrameMetrics(cfg) {
+      const profile = this.getTextDisplayFontProfile(cfg);
+      const text = normalizeDisplayText(cfg.text);
+      const step = Math.max(1, Math.round(0.6 + Number(cfg.speed) * 0.55));
+      const textWidth = profile.measure(text);
+      const textHeight = profile.height;
+      let distance = 0;
+
+      if (cfg.direction === "left") {
+        distance = Math.max(step, Number(cfg.x) - (-textWidth - 8));
+      } else if (cfg.direction === "right") {
+        distance = Math.max(step, 72 - Number(cfg.x));
+      } else if (cfg.direction === "up") {
+        distance = Math.max(step, Number(cfg.y) - (-textHeight - 8));
+      } else if (cfg.direction === "down") {
+        distance = Math.max(step, 72 - Number(cfg.y));
       } else {
-        ctx.setFontSize(16);
+        throw new Error("文本方向参数错误");
       }
 
-      if (ctx.setTextBaseline) {
-        ctx.setTextBaseline("middle");
+      return {
+        step,
+        frameCount: cfg.loop ? Math.max(28, Math.ceil(distance / step) + 8) : 1,
+        textWidth,
+        textHeight,
+        source: profile.source,
+      };
+    },
+    getTextFramePosition(cfg, metrics, frameIndex) {
+      const travel = metrics.step * frameIndex;
+      if (cfg.direction === "left") {
+        return { drawX: Number(cfg.x) - travel, drawY: Number(cfg.y) };
       }
-
-      ctx.fillText(cfg.text, drawX, drawY);
-
-      await new Promise((resolve) => {
-        ctx.draw(false, () => {
-          setTimeout(resolve, 20);
-        });
-      });
-
-      const imageData = await new Promise((resolve, reject) => {
-        uni.canvasGetImageData({
-          canvasId: "textRenderCanvas",
-          x: 0,
-          y: 0,
-          width: 64,
-          height: 64,
-          success: resolve,
-          fail: reject,
-        });
-      });
-
-      const bgRgb = hexToRgb(bg);
-      const includeAll = bg !== "#000000";
+      if (cfg.direction === "right") {
+        return { drawX: Number(cfg.x) + travel, drawY: Number(cfg.y) };
+      }
+      if (cfg.direction === "up") {
+        return { drawX: Number(cfg.x), drawY: Number(cfg.y) - travel };
+      }
+      return { drawX: Number(cfg.x), drawY: Number(cfg.y) + travel };
+    },
+    buildFrameFromPixelMap(pixelMap, delay) {
       const bytes = [];
-      const rgba = imageData.data;
-      let p = 0;
-
-      for (let y = 0; y < 64; y++) {
-        for (let x = 0; x < 64; x++) {
-          const srcR = rgba[p];
-          const srcG = rgba[p + 1];
-          const srcB = rgba[p + 2];
-          const srcA = rgba[p + 3] / 255;
-          p += 4;
-
-          const r = Math.round(srcR * srcA + bgRgb.r * (1 - srcA));
-          const g = Math.round(srcG * srcA + bgRgb.g * (1 - srcA));
-          const b = Math.round(srcB * srcA + bgRgb.b * (1 - srcA));
-
-          if (includeAll || r > 0 || g > 0 || b > 0) {
-            bytes.push(x, y, r, g, b);
-          }
-        }
-      }
-
+      pixelMap.forEach((color, key) => {
+        const [x, y] = key.split(",").map(Number);
+        const rgb = hexToRgb(color.startsWith("rgb") ? this.rgbStringToHex(color) : color);
+        bytes.push(x, y, rgb.r, rgb.g, rgb.b);
+      });
       const pixelBytes = new Uint8Array(bytes);
       return {
         type: 1,
-        delay: Math.max(40, 220 - Number(cfg.speed) * 15),
+        delay,
         totalPixels: pixelBytes.length / 5,
         pixels: pixelBytes,
       };
+    },
+
+    buildNativeBreathPayload() {
+      const colorA = hexToRgb(this.ensureColorHex(this.breathConfig.colorA));
+      const colorB = hexToRgb(this.ensureColorHex(this.breathConfig.colorB));
+      return {
+        cmd: "set_breath_effect",
+        speed: Number(this.breathConfig.speed),
+        loop: this.breathConfig.loop,
+        motion: this.breathConfig.motion,
+        scope: this.breathConfig.scope,
+        colorMode: this.breathConfig.colorMode,
+        colorA: {
+          r: colorA.r,
+          g: colorA.g,
+          b: colorA.b,
+        },
+        colorB: {
+          r: colorB.r,
+          g: colorB.g,
+          b: colorB.b,
+        },
+      };
+    },
+    renderTextDisplayFrame(cfg, metrics, frameIndex) {
+      const pixelMap = new Map();
+      const accentColor = cfg.color;
+      const guideColor = blendHexColor(cfg.bgColor, accentColor, 0.42);
+      const softColor = blendHexColor(cfg.bgColor, accentColor, 0.26);
+      const profile = this.getTextDisplayFontProfile(cfg);
+      const text = normalizeDisplayText(cfg.text);
+      const position = this.getTextFramePosition(cfg, metrics, frameIndex);
+
+      addTextEffectDecor(pixelMap, cfg, accentColor);
+      drawTinyTextToPixels(metrics.source, 7, 5, accentColor, pixelMap, 1, "left");
+      drawTinyTextToPixels(
+        String(Math.max(1, Number(cfg.speed))).padStart(2, "0"),
+        49,
+        5,
+        guideColor,
+        pixelMap,
+        1,
+        "left",
+      );
+
+      for (let index = 0; index < 5; index += 1) {
+        const color = (frameIndex + index) % 5 < 2 ? accentColor : softColor;
+        fillPreviewRect(pixelMap, 48 + index * 2, 8, 1, 1, color);
+      }
+
+      fillPreviewRect(pixelMap, 57, 17 + (frameIndex % 16), 2, 3, accentColor);
+      fillPreviewRect(pixelMap, 5, 19 + ((frameIndex + 8) % 14), 1, 8, softColor);
+      fillPreviewRect(pixelMap, 6, 44, 52, 1, softColor);
+
+      profile.draw(text, position.drawX, position.drawY, accentColor, pixelMap);
+      if (cfg.loop) {
+        if (cfg.direction === "left") {
+          profile.draw(
+            text,
+            position.drawX + metrics.textWidth + 12,
+            position.drawY,
+            guideColor,
+            pixelMap,
+          );
+        } else if (cfg.direction === "right") {
+          profile.draw(
+            text,
+            position.drawX - metrics.textWidth - 12,
+            position.drawY,
+            guideColor,
+            pixelMap,
+          );
+        }
+      }
+
+      const tickerText = `${metrics.source} ${text} `;
+      const tickerWidth = getTinyTextWidth(tickerText, 1);
+      const tickerX =
+        56 - ((frameIndex * Math.max(1, Math.round(Number(cfg.speed)))) % (tickerWidth + 10));
+      drawTinyTextToPixels(tickerText, tickerX, 52, guideColor, pixelMap, 1, "left");
+      drawTinyTextToPixels(
+        tickerText,
+        tickerX + tickerWidth + 10,
+        52,
+        guideColor,
+        pixelMap,
+        1,
+        "left",
+      );
+
+      if (cfg.direction === "left" || cfg.direction === "right") {
+        const arrowX = cfg.direction === "left" ? 7 : 54;
+        fillPreviewRect(pixelMap, arrowX, 57, 3, 1, guideColor);
+        fillPreviewRect(
+          pixelMap,
+          arrowX + (cfg.direction === "left" ? 0 : 2),
+          56,
+          1,
+          3,
+          guideColor,
+        );
+      } else {
+        const arrowY = cfg.direction === "up" ? 16 : 39;
+        fillPreviewRect(pixelMap, 8, arrowY, 1, 3, guideColor);
+        fillPreviewRect(pixelMap, 7, arrowY + (cfg.direction === "up" ? 0 : 2), 3, 1, guideColor);
+      }
+
+      return pixelMap;
     },
 
     async buildTextFrames() {
@@ -1313,32 +1666,33 @@ export default {
         throw new Error("文本内容不能为空");
       }
 
-      const frameCount = cfg.loop ? 20 : 1;
-      const step = Number(cfg.speed) * 2;
+      const metrics = this.getTextFrameMetrics(cfg);
       const frames = [];
+      const delay = Math.max(42, 168 - Number(cfg.speed) * 10);
 
-      for (let i = 0; i < frameCount; i++) {
-        const offset = i * step;
-        let drawX = Number(cfg.x);
-        let drawY = Number(cfg.y);
-
-        if (cfg.direction === "left") {
-          drawX = Number(cfg.x) - offset;
-        } else if (cfg.direction === "right") {
-          drawX = Number(cfg.x) + offset;
-        } else if (cfg.direction === "up") {
-          drawY = Number(cfg.y) - offset;
-        } else if (cfg.direction === "down") {
-          drawY = Number(cfg.y) + offset;
-        } else {
-          throw new Error("文本方向参数错误");
-        }
-
-        const frame = await this.renderTextFrameToPixels(cfg, drawX, drawY);
-        frames.push(frame);
+      for (let i = 0; i < metrics.frameCount; i++) {
+        const pixelMap = this.renderTextDisplayFrame(
+          cfg,
+          metrics,
+          i,
+        );
+        frames.push(this.buildFrameFromPixelMap(pixelMap, delay));
       }
 
       return frames;
+    },
+
+    rgbStringToHex(value) {
+      const match = /rgb\((\d+),\s*(\d+),\s*(\d+)\)/i.exec(value);
+      if (!match) {
+        return "#000000";
+      }
+      const r = Number(match[1]);
+      const g = Number(match[2]);
+      const b = Number(match[3]);
+      return `#${r.toString(16).padStart(2, "0")}${g
+        .toString(16)
+        .padStart(2, "0")}${b.toString(16).padStart(2, "0")}`;
     },
 
     async buildFrames() {
@@ -1371,8 +1725,7 @@ export default {
       try {
         const ws = this.deviceStore.getWebSocket();
         if (this.effectType === "breath_effect") {
-          const frames = await this.buildFrames();
-          await uploadAnimationFrames(ws, frames, this.effectType);
+          await ws.send(this.buildNativeBreathPayload());
         } else if (this.effectType === "rhythm_effect") {
           const colorA = hexToRgb(this.ensureColorHex(this.rhythmConfig.colorA));
           const colorB = hexToRgb(this.ensureColorHex(this.rhythmConfig.colorB));
@@ -1537,6 +1890,32 @@ export default {
   gap: 4rpx;
 }
 
+.preview-status-chip {
+  display: inline-flex;
+  width: fit-content;
+  padding: 6rpx 12rpx;
+  border-radius: 999rpx;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.preview-status-chip.is-loading {
+  background: rgba(255, 214, 102, 0.14);
+}
+
+.preview-status-chip.is-preview {
+  background: rgba(79, 127, 255, 0.14);
+}
+
+.preview-status-chip.is-sending {
+  background: rgba(52, 211, 153, 0.16);
+}
+
+.preview-status-chip-text {
+  font-size: 20rpx;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
 .preview-title {
   font-size: 24rpx;
   font-weight: 600;
@@ -1571,8 +1950,60 @@ export default {
   line-height: 1;
 }
 
+.preview-actions .action-btn-sm.disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
 .preview-actions .action-btn-sm.primary text {
   color: #ffffff;
+}
+
+.sending-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.sending-modal {
+  min-width: 420rpx;
+  padding: 60rpx 50rpx;
+  border-radius: 24rpx;
+  background: var(--bg-elevated);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24rpx;
+}
+
+.sending-spinner {
+  width: 60rpx;
+  height: 60rpx;
+  border-radius: 50%;
+  border: 6rpx solid rgba(79, 127, 255, 0.2);
+  border-top-color: var(--accent-primary);
+  animation: spin 0.8s linear infinite;
+}
+
+.sending-title {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.sending-tip {
+  font-size: 24rpx;
+  color: var(--text-secondary);
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .content {

@@ -1,7 +1,7 @@
 <template>
   <div class="login">
     <div class="login-card">
-      <h1>登录 RenLight</h1>
+      <h1>登录光格像素工坊</h1>
       <p class="subtitle">当前 Web 端使用账号密码登录</p>
       <form @submit.prevent="handleLogin">
         <input

@@ -1,5 +1,6 @@
 #include "tetris_effect.h"
 #include "display_manager.h"
+#include <time.h>
 
 // 静态成员初始化
 bool TetrisEffect::isActive = false;
@@ -8,17 +9,27 @@ int TetrisEffect::cellSize = 2;
 int TetrisEffect::dropSpeed = 150;
 bool TetrisEffect::showClock = true;
 uint8_t TetrisEffect::piecesMask = 0x7F;
-uint8_t TetrisEffect::board[TETRIS_MAX][TETRIS_MAX];
+uint8_t (*TetrisEffect::board)[TETRIS_MAX] = nullptr;
 int TetrisEffect::cols = 32;
 int TetrisEffect::rows = 32;
 int TetrisEffect::curType = 0;
 int TetrisEffect::curRot = 0;
 int TetrisEffect::curX = 0;
 int TetrisEffect::curY = 0;
+int TetrisEffect::targetX = 0;
 uint8_t TetrisEffect::curColor = 1;
 unsigned long TetrisEffect::lastDropTime = 0;
 bool TetrisEffect::needsRender = true;
-uint8_t TetrisEffect::prevDisplay[TETRIS_MAX][TETRIS_MAX];
+uint8_t (*TetrisEffect::prevDisplay)[TETRIS_MAX] = nullptr;
+uint8_t (*TetrisEffect::targetMap)[TETRIS_MAX / 8] = nullptr;
+int TetrisEffect::lastClockMinute = -1;
+int TetrisEffect::lastClockHour = -1;
+bool TetrisEffect::holdClockFrame = false;
+
+namespace {
+constexpr size_t kTetrisBoardBytes = TETRIS_MAX * TETRIS_MAX * sizeof(uint8_t);
+constexpr size_t kTetrisTargetMapBytes = TETRIS_MAX * (TETRIS_MAX / 8) * sizeof(uint8_t);
+}
 
 // 7种方块的4种旋转，用16bit编码4x4网格（从左上到右下，行优先）
 const uint16_t TetrisEffect::pieces[7][4] = {
@@ -49,7 +60,43 @@ const uint8_t TetrisEffect::colors[7][3] = {
   { 240, 160, 0 }    // L - 橙色
 };
 
+bool TetrisEffect::ensureBuffers() {
+  if (board == nullptr) {
+    board = static_cast<uint8_t (*)[TETRIS_MAX]>(malloc(kTetrisBoardBytes));
+    if (board == nullptr) {
+      return false;
+    }
+  }
+
+  if (prevDisplay == nullptr) {
+    prevDisplay = static_cast<uint8_t (*)[TETRIS_MAX]>(malloc(kTetrisBoardBytes));
+    if (prevDisplay == nullptr) {
+      free(board);
+      board = nullptr;
+      return false;
+    }
+  }
+
+  if (targetMap == nullptr) {
+    targetMap = static_cast<uint8_t (*)[TETRIS_MAX / 8]>(malloc(kTetrisTargetMapBytes));
+    if (targetMap == nullptr) {
+      free(prevDisplay);
+      prevDisplay = nullptr;
+      free(board);
+      board = nullptr;
+      return false;
+    }
+  }
+
+  return true;
+}
+
 void TetrisEffect::init(bool clearMode, int cellSz, int speed, bool clock, uint8_t mask) {
+  if (!ensureBuffers()) {
+    isActive = false;
+    return;
+  }
+
   doClearLines = clearMode;
   cellSize = constrain(cellSz, 1, 3);
   dropSpeed = constrain(speed, 30, 1000);
@@ -58,7 +105,14 @@ void TetrisEffect::init(bool clearMode, int cellSz, int speed, bool clock, uint8
   cols = 64 / cellSize;
   rows = 64 / cellSize;
   resetBoard();
-  memset(prevDisplay, 0, sizeof(prevDisplay));
+  memset(targetMap, 0, kTetrisTargetMapBytes);
+  memset(prevDisplay, 0, kTetrisBoardBytes);
+  lastClockMinute = -1;
+  lastClockHour = -1;
+  holdClockFrame = false;
+  if (showClock) {
+    rebuildClockTarget();
+  }
   spawnPiece();
   lastDropTime = millis();
   needsRender = true;
@@ -66,7 +120,24 @@ void TetrisEffect::init(bool clearMode, int cellSz, int speed, bool clock, uint8
 }
 
 void TetrisEffect::resetBoard() {
-  memset(board, 0, sizeof(board));
+  if (board == nullptr) {
+    return;
+  }
+  memset(board, 0, kTetrisBoardBytes);
+}
+
+bool TetrisEffect::getTargetCell(int x, int y) {
+  if (x < 0 || x >= TETRIS_MAX || y < 0 || y >= TETRIS_MAX) {
+    return false;
+  }
+  return (targetMap[y][x / 8] & (1 << (x % 8))) != 0;
+}
+
+void TetrisEffect::setTargetCell(int x, int y) {
+  if (x < 0 || x >= TETRIS_MAX || y < 0 || y >= TETRIS_MAX) {
+    return;
+  }
+  targetMap[y][x / 8] |= (1 << (x % 8));
 }
 
 // 从16bit编码中提取4x4格子中的4个有效格子坐标
@@ -82,6 +153,45 @@ void TetrisEffect::getPieceCells(int type, int rot, int cells[4][2]) {
       }
     }
   }
+}
+
+int TetrisEffect::pieceMinX(int type, int rot) {
+  int cells[4][2];
+  getPieceCells(type, rot, cells);
+  int minValue = 4;
+  for (int i = 0; i < 4; i++) {
+    if (cells[i][0] < minValue) {
+      minValue = cells[i][0];
+    }
+  }
+  return minValue;
+}
+
+int TetrisEffect::pieceMaxX(int type, int rot) {
+  int cells[4][2];
+  getPieceCells(type, rot, cells);
+  int maxValue = 0;
+  for (int i = 0; i < 4; i++) {
+    if (cells[i][0] > maxValue) {
+      maxValue = cells[i][0];
+    }
+  }
+  return maxValue;
+}
+
+int TetrisEffect::computeSpawnX(int type, int rot, int finalX) {
+  const int minOffset = pieceMinX(type, rot);
+  const int maxOffset = pieceMaxX(type, rot);
+  const int minSpawnX = -minOffset;
+  const int maxSpawnX = cols - 1 - maxOffset;
+  int startX = finalX + random(-6, 7);
+  if (startX < minSpawnX) {
+    startX = minSpawnX;
+  }
+  if (startX > maxSpawnX) {
+    startX = maxSpawnX;
+  }
+  return startX;
 }
 
 bool TetrisEffect::canMove(int type, int rot, int x, int y) {
@@ -105,6 +215,29 @@ void TetrisEffect::spawnPiece() {
   if (count == 0) { enabled[0] = 0; count = 1; }
   curType = enabled[random(count)];
   curColor = curType + 1;
+
+  if (showClock) {
+    int clockRot = 0;
+    int clockX = 0;
+    if (buildClockPlacement(clockRot, clockX)) {
+      holdClockFrame = false;
+      curRot = clockRot;
+      targetX = clockX;
+      curX = computeSpawnX(curType, curRot, targetX);
+      if (!canMove(curType, curRot, curX, -2)) {
+        curX = targetX;
+      }
+      curY = -2;
+      needsRender = true;
+      return;
+    }
+    holdClockFrame = true;
+    curRot = 0;
+    curX = 0;
+    curY = -100;
+    needsRender = true;
+    return;
+  }
 
   // AI 选位：遍历所有旋转和水平位置，找最佳放置点
   int bestRot = 0, bestX = 0;
@@ -204,9 +337,193 @@ void TetrisEffect::spawnPiece() {
   }
 
   curRot = bestRot;
-  curX = bestX;
+  targetX = bestX;
+  curX = computeSpawnX(curType, curRot, targetX);
+  if (!canMove(curType, curRot, curX, -2)) {
+    curX = targetX;
+  }
   curY = -2;
   needsRender = true;
+}
+
+void TetrisEffect::rebuildClockTarget() {
+  if (targetMap == nullptr) {
+    return;
+  }
+  memset(targetMap, 0, kTetrisTargetMapBytes);
+
+  struct tm timeinfo;
+  if (!getLocalTime(&timeinfo, 0)) {
+    return;
+  }
+
+  lastClockHour = timeinfo.tm_hour;
+  lastClockMinute = timeinfo.tm_min;
+
+  static const uint8_t digitPatterns[10][5][3] = {
+    {{1,1,1},{1,0,1},{1,0,1},{1,0,1},{1,1,1}},
+    {{0,1,0},{1,1,0},{0,1,0},{0,1,0},{1,1,1}},
+    {{1,1,1},{0,0,1},{1,1,1},{1,0,0},{1,1,1}},
+    {{1,1,1},{0,0,1},{0,1,1},{0,0,1},{1,1,1}},
+    {{1,0,1},{1,0,1},{1,1,1},{0,0,1},{0,0,1}},
+    {{1,1,1},{1,0,0},{1,1,1},{0,0,1},{1,1,1}},
+    {{1,1,1},{1,0,0},{1,1,1},{1,0,1},{1,1,1}},
+    {{1,1,1},{0,0,1},{0,1,0},{0,1,0},{0,1,0}},
+    {{1,1,1},{1,0,1},{1,1,1},{1,0,1},{1,1,1}},
+    {{1,1,1},{1,0,1},{1,1,1},{0,0,1},{1,1,1}},
+  };
+
+  const int glyphUnits = 17;
+  int scale = 1;
+  for (int tryScale = 1; tryScale <= 6; tryScale++) {
+    if (glyphUnits * tryScale <= cols - 2 && 5 * tryScale <= rows - 2) {
+      scale = tryScale;
+    }
+  }
+
+  const int totalWidth = glyphUnits * scale;
+  const int totalHeight = 5 * scale;
+  const int startX = (cols - totalWidth) / 2;
+  const int startY = (rows - totalHeight) / 2;
+  char timeBuffer[5];
+  snprintf(timeBuffer, sizeof(timeBuffer), "%02d%02d", timeinfo.tm_hour, timeinfo.tm_min);
+
+  int cursorX = startX;
+  for (int digitIndex = 0; digitIndex < 4; digitIndex++) {
+    int value = timeBuffer[digitIndex] - '0';
+    for (int row = 0; row < 5; row++) {
+      for (int col = 0; col < 3; col++) {
+        if (digitPatterns[value][row][col] == 0) continue;
+        for (int sy = 0; sy < scale; sy++) {
+          for (int sx = 0; sx < scale; sx++) {
+            int px = cursorX + col * scale + sx;
+            int py = startY + row * scale + sy;
+            if (px >= 0 && px < cols && py >= 0 && py < rows) {
+              setTargetCell(px, py);
+            }
+          }
+        }
+      }
+    }
+    cursorX += 3 * scale + scale;
+    if (digitIndex == 1) {
+      for (int sy = 0; sy < scale; sy++) {
+        int topY = startY + scale + sy;
+        int bottomY = startY + scale * 3 + sy;
+        for (int sx = 0; sx < scale; sx++) {
+          int px = cursorX + sx;
+          if (px >= 0 && px < cols) {
+            if (topY >= 0 && topY < rows) {
+              setTargetCell(px, topY);
+            }
+            if (bottomY >= 0 && bottomY < rows) {
+              setTargetCell(px, bottomY);
+            }
+          }
+        }
+      }
+      cursorX += scale + scale;
+    }
+  }
+}
+
+bool TetrisEffect::buildClockPlacement(int& outRot, int& outX) {
+  int bestRot = 0;
+  int bestX = 0;
+  int bestScore = -999999;
+
+  for (int rot = 0; rot < 4; rot++) {
+    for (int x = -2; x < cols; x++) {
+      int y = -2;
+      if (!canMove(curType, rot, x, y)) continue;
+      while (canMove(curType, rot, x, y + 1)) y++;
+
+      int cells[4][2];
+      getPieceCells(curType, rot, cells);
+      int score = 0;
+      bool valid = true;
+
+      for (int i = 0; i < 4; i++) {
+        int nx = x + cells[i][0];
+        int ny = y + cells[i][1];
+        if (nx < 0 || nx >= cols || ny < 0 || ny >= rows) {
+          valid = false;
+          break;
+        }
+        if (!getTargetCell(nx, ny)) {
+          valid = false;
+          break;
+        }
+        score += 2000;
+        if (ny + 1 >= rows || board[ny + 1][nx] != 0 || !getTargetCell(nx, ny + 1)) {
+          score += 40;
+        }
+        if (nx > 0 && board[ny][nx - 1] != 0) score += 18;
+        if (nx + 1 < cols && board[ny][nx + 1] != 0) score += 18;
+      }
+      if (!valid) {
+        continue;
+      }
+
+      for (int i = 0; i < 4; i++) {
+        int nx = x + cells[i][0];
+        int ny = y + cells[i][1];
+        board[ny][nx] = curColor;
+      }
+
+      int holes = 0;
+      for (int col = 0; col < cols; col++) {
+        bool seenTargetBlock = false;
+        for (int row = 0; row < rows; row++) {
+          if (getTargetCell(col, row) && board[row][col] != 0) {
+            seenTargetBlock = true;
+          } else if (seenTargetBlock && getTargetCell(col, row) && board[row][col] == 0) {
+            holes++;
+          }
+        }
+      }
+      score -= holes * 180;
+
+      for (int row = 0; row < rows; row++) {
+        int filledInTarget = 0;
+        int targetCount = 0;
+        for (int col = 0; col < cols; col++) {
+          if (getTargetCell(col, row)) {
+            targetCount++;
+            if (board[row][col] != 0) {
+              filledInTarget++;
+            }
+          }
+        }
+        score += filledInTarget * 8;
+        if (targetCount > 0 && filledInTarget == targetCount) {
+          score += 120;
+        }
+      }
+
+      for (int i = 0; i < 4; i++) {
+        int nx = x + cells[i][0];
+        int ny = y + cells[i][1];
+        board[ny][nx] = 0;
+      }
+
+      score += y * 4;
+
+      if (score > bestScore) {
+        bestScore = score;
+        bestRot = rot;
+        bestX = x;
+      }
+    }
+  }
+
+  if (bestScore <= -999999) {
+    return false;
+  }
+
+  outRot = bestRot;
+  outX = bestX;
+  return true;
 }
 
 void TetrisEffect::lockPiece() {
@@ -243,10 +560,38 @@ int TetrisEffect::clearLines() {
 
 void TetrisEffect::update() {
   if (!isActive) return;
+  if (board == nullptr || prevDisplay == nullptr || targetMap == nullptr) return;
+
+  if (showClock) {
+    struct tm timeinfo;
+    if (getLocalTime(&timeinfo, 0)) {
+      if (timeinfo.tm_min != lastClockMinute || timeinfo.tm_hour != lastClockHour) {
+        resetBoard();
+        memset(prevDisplay, 0, kTetrisBoardBytes);
+        rebuildClockTarget();
+        holdClockFrame = false;
+        spawnPiece();
+        needsRender = true;
+      }
+    }
+    if (holdClockFrame) {
+      return;
+    }
+  }
 
   unsigned long now = millis();
   if (now - lastDropTime < (unsigned long)dropSpeed) return;
   lastDropTime = now;
+
+  if (curX != targetX) {
+    int step = curX < targetX ? 1 : -1;
+    if (canMove(curType, curRot, curX + step, curY)) {
+      curX += step;
+      needsRender = true;
+    } else {
+      targetX = curX;
+    }
+  }
 
   // 尝试下落
   if (canMove(curType, curRot, curX, curY + 1)) {
@@ -256,7 +601,7 @@ void TetrisEffect::update() {
     // 贴合锁定
     lockPiece();
 
-    if (doClearLines) {
+    if (doClearLines && !showClock) {
       // 消除模式：填满一行就消除
       clearLines();
     }
@@ -280,11 +625,12 @@ void TetrisEffect::update() {
 
 void TetrisEffect::render(MatrixPanel_I2S_DMA* display) {
   if (!isActive || !needsRender) return;
+  if (board == nullptr || prevDisplay == nullptr) return;
   needsRender = false;
 
   // 构建当前帧的合成状态（board + 当前下落方块）
   uint8_t curDisplay[TETRIS_MAX][TETRIS_MAX];
-  memcpy(curDisplay, board, sizeof(board));
+  memcpy(curDisplay, board, kTetrisBoardBytes);
 
   int cells[4][2];
   getPieceCells(curType, curRot, cells);
@@ -304,9 +650,31 @@ void TetrisEffect::render(MatrixPanel_I2S_DMA* display) {
       uint8_t c = curDisplay[y][x];
       if (c > 0) {
         const uint8_t* rgb = colors[c - 1];
+        uint8_t highlightR = min(255, rgb[0] + 40);
+        uint8_t highlightG = min(255, rgb[1] + 40);
+        uint8_t highlightB = min(255, rgb[2] + 40);
+        uint8_t shadowR = rgb[0] / 2;
+        uint8_t shadowG = rgb[1] / 2;
+        uint8_t shadowB = rgb[2] / 2;
         for (int dy = 0; dy < cellSize; dy++) {
           for (int dx = 0; dx < cellSize; dx++) {
-            display->drawPixelRGB888(x * cellSize + dx, y * cellSize + dy, rgb[0], rgb[1], rgb[2]);
+            uint8_t drawR = rgb[0];
+            uint8_t drawG = rgb[1];
+            uint8_t drawB = rgb[2];
+
+            if (cellSize >= 2) {
+              if (dy == 0 || dx == 0) {
+                drawR = highlightR;
+                drawG = highlightG;
+                drawB = highlightB;
+              } else if (dy == cellSize - 1 || dx == cellSize - 1) {
+                drawR = shadowR;
+                drawG = shadowG;
+                drawB = shadowB;
+              }
+            }
+
+            display->drawPixelRGB888(x * cellSize + dx, y * cellSize + dy, drawR, drawG, drawB);
           }
         }
       } else {
@@ -320,11 +688,7 @@ void TetrisEffect::render(MatrixPanel_I2S_DMA* display) {
   }
 
   // 保存当前帧状态
-  memcpy(prevDisplay, curDisplay, sizeof(prevDisplay));
+  memcpy(prevDisplay, curDisplay, kTetrisBoardBytes);
 
   // 时钟在方块上层叠加
-  if (showClock) {
-    DisplayManager::drawClockOverlay();
-  }
 }
-

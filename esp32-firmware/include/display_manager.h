@@ -5,25 +5,65 @@
 #include <ESP32-HUB75-MatrixPanel-I2S-DMA.h>
 #include "config_manager.h"
 
+class CaptureMatrixPanel : public MatrixPanel_I2S_DMA {
+public:
+  using MatrixPanel_I2S_DMA::MatrixPanel_I2S_DMA;
+
+  void drawPixel(int16_t x, int16_t y, uint16_t color) override;
+  void fillScreen(uint16_t color) override;
+  void drawPixelRGB888(int16_t x, int16_t y, uint8_t r, uint8_t g, uint8_t b);
+  void fillScreenRGB888(uint8_t r, uint8_t g, uint8_t b);
+  void clearScreen();
+};
+
+class BufferMatrixPanel : public MatrixPanel_I2S_DMA {
+public:
+  using MatrixPanel_I2S_DMA::MatrixPanel_I2S_DMA;
+
+  void setTargetBuffer(uint16_t* buffer, int width, int height);
+  void drawPixel(int16_t x, int16_t y, uint16_t color) override;
+  void fillScreen(uint16_t color) override;
+  void drawPixelRGB888(int16_t x, int16_t y, uint8_t r, uint8_t g, uint8_t b);
+  void clearScreen();
+
+private:
+  uint16_t* targetBuffer = nullptr;
+  int targetWidth = 0;
+  int targetHeight = 0;
+};
+
 // 设备模式（枚举值不能改，NVS 里存的是数字）
 enum DeviceMode {
   MODE_CLOCK,        // 0: 静态时钟背景模式（默认）
   MODE_ANIMATION,    // 1: 动态壁纸模式
   MODE_CANVAS,       // 2: 画板模式
-  MODE_TRANSFERRING  // 3: 传输模式（临时状态，不保存到 NVS）
+  MODE_TRANSFERRING, // 3: 传输模式（临时状态，不保存到 NVS）
+  MODE_THEME         // 4: 主题模式
 };
 
 enum NativeEffectType : uint8_t {
   NATIVE_EFFECT_NONE = 0,
   NATIVE_EFFECT_BREATH = 1,
   NATIVE_EFFECT_RHYTHM = 2,
-  NATIVE_EFFECT_EYES = 3
+  NATIVE_EFFECT_EYES = 3,
+  NATIVE_EFFECT_AMBIENT = 4
 };
 
-enum BreathWaveform : uint8_t {
-  BREATH_WAVE_SINE = 0,
-  BREATH_WAVE_TRIANGLE = 1,
-  BREATH_WAVE_SQUARE = 2
+enum BreathMotion : uint8_t {
+  BREATH_MOTION_CLOCKWISE = 0,
+  BREATH_MOTION_COUNTERCLOCKWISE = 1,
+  BREATH_MOTION_INWARD = 2,
+  BREATH_MOTION_OUTWARD = 3
+};
+
+enum BreathScope : uint8_t {
+  BREATH_SCOPE_SINGLE_RING = 0,
+  BREATH_SCOPE_FULL_SCREEN = 1
+};
+
+enum BreathColorMode : uint8_t {
+  BREATH_COLOR_SOLID = 0,
+  BREATH_COLOR_GRADIENT = 1
 };
 
 enum RhythmDirection : uint8_t {
@@ -39,16 +79,30 @@ enum RhythmMode : uint8_t {
   RHYTHM_MODE_JUMP = 2
 };
 
+enum AmbientEffectPreset : uint8_t {
+  AMBIENT_PRESET_AURORA = 0,
+  AMBIENT_PRESET_PLASMA = 1,
+  AMBIENT_PRESET_MATRIX_RAIN = 2,
+  AMBIENT_PRESET_FIREFLY_SWARM = 3,
+  AMBIENT_PRESET_METEOR_SHOWER = 4,
+  AMBIENT_PRESET_OCEAN_CURRENT = 5,
+  AMBIENT_PRESET_NEON_GRID = 6,
+  AMBIENT_PRESET_SUNSET_BLUSH = 7,
+  AMBIENT_PRESET_STARFIELD_DRIFT = 8
+};
+
 struct BreathEffectConfig {
   uint8_t speed;
   bool loop;
-  uint8_t minBrightness;
-  uint8_t maxBrightness;
-  uint16_t periodMs;
-  uint8_t waveform;
-  uint8_t colorR;
-  uint8_t colorG;
-  uint8_t colorB;
+  uint8_t motion;
+  uint8_t scope;
+  uint8_t colorMode;
+  uint8_t colorAR;
+  uint8_t colorAG;
+  uint8_t colorAB;
+  uint8_t colorBR;
+  uint8_t colorBG;
+  uint8_t colorBB;
 };
 
 struct RhythmEffectConfig {
@@ -66,12 +120,22 @@ struct RhythmEffectConfig {
   uint8_t colorBB;
 };
 
+struct AmbientEffectConfig {
+  uint8_t preset;
+  uint8_t speed;
+  uint8_t intensity;
+  bool loop;
+};
+
 class DisplayManager {
 public:
   static void init();
   static void setupMatrix();
+  static bool rebuildMatrix(bool doubleBuffered, bool showBootLogo);
+  static bool enableDoubleBuffer();
   static void drawBackground();       // 独立：清屏+画像素背景或Logo
   static void displayClock(bool force = false);
+  static void displayTheme(bool force = false);
   static void drawClockOverlay();  // 不清屏，只叠加时钟文字
   static void drawPixels(const PixelData* pixels, int pixelCount, bool clearFirst = false);
   static void renderCanvas();
@@ -103,14 +167,20 @@ public:
   static void activateBreathEffect(const BreathEffectConfig& config);
   static void activateRhythmEffect(const RhythmEffectConfig& config);
   static void activateEyesEffect(const EyesConfig& config);
+  static void activateAmbientEffect(const AmbientEffectConfig& config);
   static void renderNativeEffect();
 
   // Loading 动画控制
   static void startLoadingAnimation();
   static void stopLoadingAnimation();
   static void updateLoadingAnimation();
+  static void clearLiveFrame(uint16_t color = 0);
+  static void writeLiveFramePixel565(int x, int y, uint16_t color);
+  static void writeLiveFramePixelRGB888(int x, int y, uint8_t r, uint8_t g, uint8_t b);
+  static MatrixPanel_I2S_DMA* beginOffscreenFrame(uint16_t* targetBuffer, uint16_t clearColor = 0);
+  static void presentOffscreenFrame(const uint16_t* targetBuffer);
 
-  static MatrixPanel_I2S_DMA* dma_display;
+  static CaptureMatrixPanel* dma_display;
   static DeviceMode currentMode;
   static DeviceMode lastBusinessMode;
   static String currentBusinessModeTag;
@@ -118,6 +188,7 @@ public:
   static NativeEffectType nativeEffectType;
   static BreathEffectConfig breathEffectConfig;
   static RhythmEffectConfig rhythmEffectConfig;
+  static AmbientEffectConfig ambientEffectConfig;
   static unsigned long nativeEffectStartTime;
   static int currentBrightness;
   static bool clientConnected;
@@ -126,9 +197,12 @@ public:
   static uint8_t canvasBuffer[64][64][3]; // [y][x][rgb]
   static uint16_t backgroundBuffer[64][64]; // 静态背景缓存，用于时钟脏区恢复
   static uint16_t animationBuffer[64][64];  // 动画帧缓存，避免清屏闪烁
+  static uint16_t liveFrameBuffer[64][64];  // 当前真实显示帧，用于板载网页预览
   static bool canvasInitialized;
   static bool backgroundValid;
   static bool animationBufferValid;
+  static bool liveFrameValid;
+  static bool doubleBufferEnabled;
   static bool receivingPixels;  // 正在接收背景像素，暂不刷新时钟
   
   // 黑色像素坐标存储

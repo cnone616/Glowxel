@@ -133,6 +133,15 @@
       }
     },
     {
+      "path": "pages/ambient-editor/ambient-editor",
+      "style": {
+        "navigationStyle": "custom",
+        "navigationBarTextStyle": "white",
+        "backgroundColor": "#1a1a1a",
+        "enablePullDownRefresh": false
+      }
+    },
+    {
       "path": "pages/canvas-editor/canvas-editor",
       "style": {
         "navigationStyle": "custom",

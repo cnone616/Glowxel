@@ -284,15 +284,29 @@ function buildTextHeadlineFrame(reminder) {
   const pixels = createFrame();
   decorateReminderFrame(pixels, reminder);
   fillRect(pixels, 8, 18, 48, 18, "#132032");
+  strokeRect(pixels, 8, 18, 48, 18, reminder.accentColor);
   drawMixedLabel(pixels, reminder.text.slice(0, 8), 32, 24, "#ffffff", "center");
   drawTinyTextToPixels(getRepeatLabel(reminder.repeatMode), 32, 46, reminder.accentColor, pixels, 2, "center");
   drawBarGlow(pixels, 10, 54, 44, reminder.accentColor);
+  addSparkleSet(pixels, [[14, 20], [50, 20]], "#ffffff");
   return pixels;
 }
 
 function drawBarGlow(pixels, x, y, width, color) {
   fillRect(pixels, x, y, width, 2, color);
   fillRect(pixels, x + 4, y - 2, width - 8, 1, color);
+}
+
+function addSparkle(pixels, x, y, color) {
+  setPixel(pixels, x, y, color);
+  setPixel(pixels, x - 1, y, color);
+  setPixel(pixels, x + 1, y, color);
+  setPixel(pixels, x, y - 1, color);
+  setPixel(pixels, x, y + 1, color);
+}
+
+function addSparkleSet(pixels, points, color) {
+  points.forEach(([x, y]) => addSparkle(pixels, x, y, color));
 }
 
 function buildTextBadgeFrame(reminder) {
@@ -302,19 +316,22 @@ function buildTextBadgeFrame(reminder) {
   strokeRect(pixels, 10, 20, 44, 24, reminder.accentColor);
   drawMixedLabel(pixels, reminder.text.slice(0, 8), 32, 28, "#ffffff", "center");
   drawMixedLabel(pixels, reminder.reminderName.slice(0, 8), 32, 48, reminder.accentColor, "center");
+  addSparkleSet(pixels, [[16, 24], [48, 24]], reminder.accentColor);
   return pixels;
 }
 
 function buildTickerFrames(reminder) {
   const frames = [];
   const maxOffset = reminder.text.length * 6 + 64;
-  for (let step = 0; step < 12; step += 1) {
+  for (let step = 0; step < 14; step += 1) {
     const pixels = createFrame();
     decorateReminderFrame(pixels, reminder);
     fillRect(pixels, 6, 24, 52, 14, "#111d2d");
-    const offsetX = 64 - Math.floor((maxOffset / 12) * step);
+    strokeRect(pixels, 6, 24, 52, 14, reminder.accentColor);
+    const offsetX = 64 - Math.floor((maxOffset / 14) * step);
     drawMixedLabel(pixels, reminder.text, offsetX, 28, "#ffffff", "left");
     drawTinyTextToPixels("TICKER", 32, 46, reminder.accentColor, pixels, 1, "center");
+    fillRect(pixels, 8 + (step * 3) % 44, 39, 8, 1, reminder.accentColor);
     frames.push({ pixels, delay: 90 });
   }
   return frames;
@@ -325,6 +342,7 @@ function buildStaticBadgeFrame(reminder) {
   decorateReminderFrame(pixels, reminder);
   drawPattern(pixels, ICON_PATTERNS[reminder.icon], 24, 18, reminder.accentColor, 2);
   drawMixedLabel(pixels, reminder.text.slice(0, 8), 32, 46, "#ffffff", "center");
+  drawBarGlow(pixels, 12, 54, 40, reminder.accentColor);
   return pixels;
 }
 
@@ -337,6 +355,7 @@ function buildStaticPosterFrame(reminder) {
   drawPattern(pixels, ICON_PATTERNS[reminder.icon], 18, 18, reminder.accentColor, 2);
   drawMixedLabel(pixels, reminder.text.slice(0, 8), 32, 48, "#ffffff", "center");
   drawTinyTextToPixels(getRepeatLabel(reminder.repeatMode), 32, 55, "#8aa0c0", pixels, 1, "center");
+  addSparkleSet(pixels, [[14, 14], [50, 14]], "#ffffff");
   return pixels;
 }
 
@@ -352,12 +371,13 @@ function buildStaticCornerFrame(reminder) {
   setPixel(pixels, 56, 18, reminder.accentColor);
   setPixel(pixels, 55, 18, reminder.accentColor);
   setPixel(pixels, 56, 19, reminder.accentColor);
+  addSparkleSet(pixels, [[14, 24], [50, 24]], "#ffffff");
   return pixels;
 }
 
 function buildPulseFrames(reminder) {
   const frames = [];
-  const radii = [0, 1, 2, 3, 2, 1];
+  const radii = [0, 1, 2, 3, 4, 3, 2, 1];
 
   radii.forEach((radius) => {
     const pixels = createFrame();
@@ -365,6 +385,9 @@ function buildPulseFrames(reminder) {
     drawPattern(pixels, ICON_PATTERNS[reminder.icon], 24, 18, reminder.accentColor, 2);
     if (radius > 0) {
       strokeRect(pixels, 24 - radius * 2, 18 - radius * 2, 16 + radius * 4, 16 + radius * 4, reminder.accentColor);
+    }
+    if (radius > 1) {
+      addSparkleSet(pixels, [[16, 18], [48, 18], [16, 46], [48, 46]], "#ffffff");
     }
     drawMixedLabel(pixels, reminder.text.slice(0, 8), 32, 48, "#ffffff", "center");
     frames.push({ pixels, delay: 110 });
@@ -379,7 +402,8 @@ function buildFireworksFrames(reminder) {
     [[8, 18], [54, 18], [14, 48], [50, 48]],
     [[10, 14], [52, 14], [10, 52], [52, 52], [32, 16]],
     [[6, 22], [58, 22], [18, 54], [46, 54], [32, 12], [32, 56]],
-    [[12, 18], [52, 18], [14, 46], [50, 46]],
+    [[12, 18], [52, 18], [14, 46], [50, 46], [22, 12], [42, 12]],
+    [[16, 16], [48, 16], [16, 48], [48, 48]],
   ];
 
   sparkSets.forEach((sparkSet, index) => {
@@ -388,9 +412,7 @@ function buildFireworksFrames(reminder) {
     drawPattern(pixels, ICON_PATTERNS[reminder.icon], 24, 18, reminder.accentColor, 2);
     sparkSet.forEach((point, pointIndex) => {
       const color = pointIndex % 2 === 0 ? "#ffffff" : reminder.accentColor;
-      setPixel(pixels, point[0], point[1], color);
-      setPixel(pixels, point[0] + 1, point[1], color);
-      setPixel(pixels, point[0], point[1] + 1, color);
+      addSparkle(pixels, point[0], point[1], color);
     });
     drawMixedLabel(pixels, reminder.text.slice(0, 8), 32, 48, "#ffffff", "center");
     frames.push({ pixels, delay: index === 0 ? 140 : 90 });
@@ -417,6 +439,7 @@ function buildOrbitFrames(reminder) {
       setPixel(pixels, point[0], point[1], color);
       setPixel(pixels, point[0] + 1, point[1], color);
     });
+    strokeRect(pixels, 20, 14, 24, 24, "#1e2d45");
     drawMixedLabel(pixels, reminder.text.slice(0, 8), 32, 48, "#ffffff", "center");
     frames.push({ pixels, delay: 100 });
   });

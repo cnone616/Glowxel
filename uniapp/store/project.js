@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { generateId } from '../utils/index.js'
+import { PERLER_BOARD_SIZE } from '../constants/perler.js'
 
 export const useProjectStore = defineStore('project', {
   state: () => ({
@@ -317,8 +318,8 @@ export const useProjectStore = defineStore('project', {
       const paddedWidth = proj.paddedWidth || proj.width
       const paddedHeight = proj.paddedHeight || proj.height
       
-      const boardsX = Math.ceil(paddedWidth / 64)
-      const boardsY = Math.ceil(paddedHeight / 64)
+      const boardsX = Math.ceil(paddedWidth / PERLER_BOARD_SIZE)
+      const boardsY = Math.ceil(paddedHeight / PERLER_BOARD_SIZE)
       const totalBoards = boardsX * boardsY
 
       let sumCompletion = 0

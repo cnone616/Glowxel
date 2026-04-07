@@ -5,6 +5,7 @@ const routes = [
   { path: '/community', name: 'Community', component: () => import('@/views/Community.vue') },
   { path: '/workspace', name: 'Workspace', component: () => import('@/views/Workspace.vue') },
   { path: '/create', name: 'Create', component: () => import('@/views/Create.vue') },
+  { path: '/pattern-workbench', name: 'PatternWorkbench', component: () => import('@/views/PatternWorkbench.vue') },
   { path: '/clock-editor', name: 'ClockEditor', component: () => import('@/views/ClockEditor.vue') },
   { path: '/device-control', name: 'DeviceControl', component: () => import('@/views/DeviceControl.vue') },
   { path: '/editor/:id?', name: 'Editor', component: () => import('@/views/Editor.vue'), meta: { auth: true } },
