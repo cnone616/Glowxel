@@ -5,6 +5,25 @@
 #include <time.h>
 #include <math.h>
 
+namespace {
+const char* kNtpServerPrimary = "ntp.aliyun.com";
+const char* kNtpServerSecondary = "ntp.tencent.com";
+const char* kNtpServerFallback = "pool.ntp.org";
+const long kGmtOffsetSec = 8 * 3600;
+const int kDaylightOffsetSec = 0;
+const unsigned long kNtpRetryIntervalMs = 15000;
+
+void requestTimeSync() {
+  configTime(
+    kGmtOffsetSec,
+    kDaylightOffsetSec,
+    kNtpServerPrimary,
+    kNtpServerSecondary,
+    kNtpServerFallback
+  );
+}
+}
+
 // 画WiFi扇形图标，弧线两端圆头
 static void drawWifiIcon(int cx, int cy, int maxR, uint16_t color) {
   auto* d = DisplayManager::dma_display;
@@ -92,6 +111,8 @@ static void drawStatusBadge(int cx, int cy, bool success) {
 bool WiFiManager::config_mode = false;
 String WiFiManager::saved_ssid = "";
 String WiFiManager::saved_password = "";
+unsigned long WiFiManager::last_ntp_retry_at = 0;
+bool WiFiManager::ntp_sync_logged = false;
 
 void WiFiManager::init() {
   Serial.println("3. 连接WiFi...");
@@ -99,11 +120,6 @@ void WiFiManager::init() {
 }
 
 void WiFiManager::setupWiFi() {
-  // NTP 时间服务器
-  const char* ntpServer = "pool.ntp.org";
-  const long gmtOffset_sec = 8 * 3600; // 中国时区 UTC+8
-  const int daylightOffset_sec = 0;
-  
   ConfigManager::preferences.begin("wifi", false);
   saved_ssid = ConfigManager::preferences.getString("ssid", "");
   saved_password = ConfigManager::preferences.getString("password", "");
@@ -127,23 +143,11 @@ void WiFiManager::setupWiFi() {
       Serial.println(WiFi.localIP());
       config_mode = false;
       
-      // 同步NTP时间
-      configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
-      Serial.println("正在同步网络时间...");
-
-      // 等待NTP同步完成，最多10秒
-      struct tm timeinfo;
-      int ntpRetry = 0;
-      while (!getLocalTime(&timeinfo) && ntpRetry < 20) {
-        delay(500);
-        ntpRetry++;
-        Serial.print(".");
-      }
-      if (ntpRetry < 20) {
-        Serial.println("\nNTP时间同步成功");
-      } else {
-        Serial.println("\nNTP同步超时，继续启动");
-      }
+      // 发起 NTP 同步但不阻塞启动，后续由主循环继续重试。
+      requestTimeSync();
+      last_ntp_retry_at = millis();
+      ntp_sync_logged = false;
+      Serial.println("已发起网络时间同步，后台更新中");
       
       // 在LED上显示WiFi大图标 + 右下角绿色勾徽章
       DisplayManager::dma_display->clearScreen();
@@ -154,7 +158,7 @@ void WiFiManager::setupWiFi() {
       String ip = WiFi.localIP().toString();
       DisplayManager::drawTinyTextCentered(ip.c_str(), 46, DisplayManager::dma_display->color565(150, 150, 150));
       
-      delay(2000);
+      delay(600);
 
       // 不强制覆盖模式，ConfigManager::loadClockConfig() 已从 Preferences 恢复
       // AnimationManager::init() 会从 LittleFS 加载动画数据并自动播放
@@ -195,4 +199,46 @@ bool WiFiManager::isConfigMode() {
 
 String WiFiManager::getDeviceIP() {
   return WiFi.localIP().toString();
+}
+
+bool WiFiManager::isTimeSynced() {
+  struct tm timeinfo;
+  return getLocalTime(&timeinfo, 0);
+}
+
+void WiFiManager::showTimeSyncScreen() {
+  if (DisplayManager::dma_display == nullptr) {
+    return;
+  }
+
+  DisplayManager::dma_display->clearScreen();
+  drawWifiIcon(32, 28, 23, DisplayManager::dma_display->color565(59, 130, 246));
+  drawStatusBadge(32, 28, true);
+  DisplayManager::drawTinyTextCentered("SYNC TIME", 46, DisplayManager::dma_display->color565(220, 220, 220));
+  DisplayManager::drawTinyTextCentered("WAIT", 53, DisplayManager::dma_display->color565(150, 150, 150));
+  DisplayManager::dma_display->flipDMABuffer();
+}
+
+void WiFiManager::tick() {
+  if (config_mode || WiFi.status() != WL_CONNECTED) {
+    ntp_sync_logged = false;
+    return;
+  }
+
+  if (isTimeSynced()) {
+    if (!ntp_sync_logged) {
+      ntp_sync_logged = true;
+      Serial.println("NTP时间同步成功");
+    }
+    return;
+  }
+
+  const unsigned long now = millis();
+  if (now - last_ntp_retry_at < kNtpRetryIntervalMs) {
+    return;
+  }
+
+  last_ntp_retry_at = now;
+  Serial.println("NTP 未同步，后台重试...");
+  requestTimeSync();
 }

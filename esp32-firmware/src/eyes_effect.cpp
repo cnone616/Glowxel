@@ -161,7 +161,7 @@ static const EyeShapePreset kEyePresets[EYE_EXPRESSION_COUNT] = {
   {0.0f, -3.0f, 13.0f, 20.0f, 0.3f, 0.0f, 1.0f, 5.0f},  // Skeptic
   {2.0f, -3.0f, 6.0f, 20.0f, 0.0f, 0.0f, 0.0f, 5.0f},   // Frustrated
   {2.0f, 0.0f, 6.0f, 20.0f, 0.0f, 0.0f, 1.0f, 5.0f},    // Unimpressed
-  {0.0f, -1.0f, 7.0f, 20.0f, -0.5f, -0.5f, 2.0f, 2.0f}, // Sleepy
+  {0.0f, -1.0f, 7.0f, 20.0f, -0.5f, 0.0f, 2.0f, 1.5f},  // Sleepy
   {0.0f, 0.0f, 11.0f, 20.0f, 0.0f, 0.0f, 4.0f, 2.0f},   // Suspicious
   {3.0f, 0.0f, 10.0f, 10.0f, 0.0f, 0.0f, 3.0f, 3.0f},   // Squint
   {-1.0f, 0.0f, 15.0f, 20.0f, 0.4f, 0.0f, 1.0f, 4.0f},  // Furious
@@ -171,11 +171,12 @@ static const EyeShapePreset kEyePresets[EYE_EXPRESSION_COUNT] = {
   {0.0f, 0.0f, 15.0f, 20.0f, 0.3f, 0.0f, 2.0f, 2.0f},   // Determined
   {0.0f, 0.0f, 18.0f, 20.0f, -0.25f, 0.15f, 5.0f, 5.0f} // Confused
 };
-
 static const float kReferenceEyeSize = 20.0f;
 static const unsigned long kBlinkDurationMs = 150;
+static const unsigned long kEyesFrameIntervalMs = 42;
 
 EyesRuntimeState s_state = {};
+unsigned long s_lastEyesRenderAt = 0;
 
 static uint8_t clampByte(int value) {
   if (value < 0) {
@@ -375,7 +376,7 @@ static void configureVariationLayers(
 
   if (expression == EYE_EXPRESSION_SLEEPY) {
     layerA = makeVariationLayer(
-      makeShapeDelta(0.0f, isLeftEye ? -0.2f : 0.3f, isLeftEye ? 1.1f : 0.7f, 0.0f, 0.0f, isLeftEye ? -0.06f : -0.03f, 0.0f, 0.0f),
+      makeShapeDelta(0.0f, isLeftEye ? -0.2f : 0.3f, isLeftEye ? 1.1f : 0.7f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f),
       isLeftEye ? 2200UL : 2600UL,
       isLeftEye ? 0.12f : 0.58f,
       false
@@ -951,6 +952,7 @@ static void startExpressionTransition(EyeExpressionId nextExpression, unsigned l
 
 static void resetState() {
   unsigned long now = millis();
+  s_lastEyesRenderAt = 0;
   s_state.lookX = 0.0f;
   s_state.lookY = 0.0f;
   s_state.targetLookX = 0.0f;
@@ -1218,6 +1220,7 @@ static bool containsShapePoint(const RasterEyeShape& shape, float sampleX, float
 }
 
 static void drawEye(
+  MatrixPanel_I2S_DMA* display,
   float centerX,
   float centerY,
   const EyesConfig& config,
@@ -1248,7 +1251,7 @@ static void drawEye(
       }
 
       if (containsShapePoint(shape, sampleX, sampleY)) {
-        DisplayManager::dma_display->drawPixelRGB888(x, y, eyeR, eyeG, eyeB);
+        display->drawPixel(x, y, display->color565(eyeR, eyeG, eyeB));
       }
     }
   }
@@ -1306,7 +1309,7 @@ static void updateBlink(const EyesConfig& config, unsigned long now) {
   }
 }
 
-static void drawTimeOverlay(const EyesConfig& config) {
+static void drawTimeOverlay(MatrixPanel_I2S_DMA* display, const EyesConfig& config) {
   if (!config.time.show) {
     return;
   }
@@ -1330,11 +1333,21 @@ static void drawTimeOverlay(const EyesConfig& config) {
     return;
   }
 
-  uint16_t color = DisplayManager::dma_display->color565(r, g, b);
+  uint16_t color = display->color565(r, g, b);
   int width = getClockTextWidth(buffer, CLOCK_FONT_MINIMAL_3X5, 1);
-  int x = (DisplayManager::PANEL_RES_X - width) / 2;
+  int maxX = DisplayManager::PANEL_RES_X - width;
+  if (maxX < 0) {
+    maxX = 0;
+  }
+  int x = config.layout.timeX;
+  if (x < 0) {
+    x = 0;
+  }
+  if (x > maxX) {
+    x = maxX;
+  }
   drawClockText(
-    DisplayManager::dma_display,
+    display,
     buffer,
     x,
     config.layout.timeY,
@@ -1567,9 +1580,15 @@ bool triggerAction(const char* action) {
 }
 
 void render() {
+  unsigned long now = millis();
+  if (s_lastEyesRenderAt > 0 &&
+      now - s_lastEyesRenderAt < kEyesFrameIntervalMs) {
+    return;
+  }
+  s_lastEyesRenderAt = now;
+
   const EyesConfig& config = ConfigManager::eyesConfig;
   updateRuntime(config);
-  unsigned long now = millis();
 
   uint8_t eyeR = 0;
   uint8_t eyeG = 0;
@@ -1577,8 +1596,13 @@ void render() {
   if (!parseHexColor(config.style.eyeColor, eyeR, eyeG, eyeB)) {
     return;
   }
-
-  DisplayManager::dma_display->clearScreen();
+  MatrixPanel_I2S_DMA* offscreen = DisplayManager::beginOffscreenFrame(
+    &DisplayManager::animationBuffer[0][0],
+    0
+  );
+  if (offscreen == nullptr) {
+    return;
+  }
 
   float totalWidth = (float)config.layout.eyeWidth * 2.0f + (float)config.layout.eyeSpacing;
   float leftCenterX = ((float)DisplayManager::PANEL_RES_X - totalWidth) * 0.5f +
@@ -1603,6 +1627,7 @@ void render() {
   EyeRenderTransform rightTransform = buildLookTransform(config, false);
 
   drawEye(
+    offscreen,
     leftCenterX,
     centerY,
     config,
@@ -1616,6 +1641,7 @@ void render() {
     eyeB
   );
   drawEye(
+    offscreen,
     rightCenterX,
     centerY,
     config,
@@ -1629,7 +1655,8 @@ void render() {
     eyeB
   );
 
-  drawTimeOverlay(config);
+  drawTimeOverlay(offscreen, config);
+  DisplayManager::presentOffscreenFrame(&DisplayManager::animationBuffer[0][0]);
 }
 
 }  // namespace EyesEffect

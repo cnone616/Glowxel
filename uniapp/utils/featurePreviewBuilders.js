@@ -95,6 +95,53 @@ function drawBarProgress(pixels, x, y, width, height, ratio, color, trackColor) 
   fillRect(pixels, x, y, Math.max(1, Math.round(width * ratio)), height, color);
 }
 
+function addSparkles(pixels, points, color) {
+  points.forEach(([x, y]) => {
+    setPixel(pixels, x, y, color);
+    setPixel(pixels, x - 1, y, color);
+    setPixel(pixels, x + 1, y, color);
+    setPixel(pixels, x, y - 1, color);
+    setPixel(pixels, x, y + 1, color);
+  });
+}
+
+function drawRainDrop(pixels, x, y, color, highlightColor) {
+  setPixel(pixels, x, y, color);
+  setPixel(pixels, x, y + 1, color);
+  setPixel(pixels, x + 1, y + 1, highlightColor);
+}
+
+function drawSnowFlake(pixels, x, y, color) {
+  setPixel(pixels, x, y, color);
+  setPixel(pixels, x - 1, y, color);
+  setPixel(pixels, x + 1, y, color);
+  setPixel(pixels, x, y - 1, color);
+  setPixel(pixels, x, y + 1, color);
+}
+
+function drawPulseHalo(pixels, centerX, centerY, radius, color) {
+  for (let offset = -radius; offset <= radius; offset += 1) {
+    setPixel(pixels, centerX + offset, centerY - radius, color);
+    setPixel(pixels, centerX + offset, centerY + radius, color);
+    setPixel(pixels, centerX - radius, centerY + offset, color);
+    setPixel(pixels, centerX + radius, centerY + offset, color);
+  }
+}
+
+function drawSweepDots(pixels, x, y, width, frameIndex, color, mutedColor) {
+  for (let index = 0; index < width; index += 1) {
+    const active = (frameIndex + index) % 7 < 2;
+    setPixel(pixels, x + index, y, active ? color : mutedColor);
+  }
+}
+
+function drawScanBars(pixels, x, y, width, rowCount, color) {
+  for (let row = 0; row < rowCount; row += 1) {
+    const barWidth = Math.max(8, width - row * 4);
+    fillRect(pixels, x + row * 2, y + row * 3, barWidth, 1, color);
+  }
+}
+
 function drawRingProgress(pixels, x, y, size, ratio, color, trackColor) {
   for (let row = 0; row < size; row++) {
     for (let col = 0; col < size; col++) {
@@ -129,6 +176,41 @@ function drawBadge(pixels, x, y, text, color, backgroundColor) {
   const width = Math.min(56, Math.max(12, text.length * 8 + 4));
   fillRect(pixels, x, y, width, 8, backgroundColor);
   drawTinyTextToPixels(text, x + Math.floor(width / 2), y + 1, color, pixels, 1, "center");
+}
+
+function drawInsetFrame(pixels, x, y, width, height, outerColor, innerColor) {
+  strokeRect(pixels, x, y, width, height, outerColor);
+  if (width > 2 && height > 2) {
+    strokeRect(pixels, x + 1, y + 1, width - 2, height - 2, innerColor);
+  }
+}
+
+function drawCheckeredBar(pixels, x, y, width, height, colorA, colorB) {
+  for (let row = 0; row < height; row += 1) {
+    for (let col = 0; col < width; col += 1) {
+      const color = (row + col) % 2 === 0 ? colorA : colorB;
+      setPixel(pixels, x + col, y + row, color);
+    }
+  }
+}
+
+function drawVerticalMeter(pixels, x, y, width, height, ratio, color, trackColor) {
+  fillRect(pixels, x, y, width, height, trackColor);
+  const activeHeight = Math.max(1, Math.round(height * ratio));
+  fillRect(pixels, x, y + height - activeHeight, width, activeHeight, color);
+  for (let row = y; row < y + height; row += 4) {
+    fillRect(pixels, x, row, width, 1, "#0d1522");
+  }
+}
+
+function drawTickerDots(pixels, x, y, count, color, mutedColor) {
+  for (let index = 0; index < count; index += 1) {
+    fillRect(pixels, x + index * 4, y, 2, 2, index % 3 === 0 ? color : mutedColor);
+  }
+}
+
+function clonePixels(pixels) {
+  return new Map(pixels);
 }
 
 function sanitizeAsciiLabel(value, fallback) {
@@ -392,30 +474,49 @@ export function buildWeatherPreview(config) {
       "#d8d3a4",
     );
     drawPattern(pixels, NOTIFICATION_PATTERNS.moon, 42, 4, "#f7f0aa", 2);
+    addSparkles(
+      pixels,
+      [
+        [24, 10],
+        [34, 16],
+        [40, 26],
+      ],
+      "#ffe7a6",
+    );
   }
 
   if (layout === "standard") {
     fillRect(pixels, 0, 0, 64, 64, "#08111c");
-    strokeRect(pixels, 4, 4, 56, 56, "#142438");
+    drawInsetFrame(pixels, 4, 4, 56, 56, "#142438", "#0f1d2d");
     drawCornerMarks(pixels, 4, 4, 56, 56, accentColor);
-    fillRect(pixels, 8, 16, 24, 24, "#122336");
-    fillRect(pixels, 36, 16, 20, 16, "#101b2b");
+    fillRect(pixels, 8, 14, 24, 26, "#122336");
+    fillRect(pixels, 34, 14, 24, 18, "#101b2b");
+    fillRect(pixels, 34, 36, 24, 10, "#0e1826");
     drawBadge(pixels, 6, 6, cityLabel, "#d8e4f6", "#1a2536");
     drawPattern(pixels, weatherPattern, 6, 16, accentColor, 2);
     drawClockTextToPixels(
       formatTemp(config && config.temperature, unit),
-      44,
-      18,
+      46,
+      17,
       tempColor,
       pixels,
       "rounded_4x6",
       2,
       "center",
     );
-    drawTinyTextToPixels("TEMP", 46, 35, "#879eb8", pixels, 1, "center");
-    drawTinyTextToPixels(`${humidity}%`, 19, 46, humidityColor, pixels, 2, "center");
-    drawTinyTextToPixels(unit === "fahrenheit" ? "FAH" : "CEL", 47, 46, "#9db0c7", pixels, 1, "center");
-    drawStripedBar(pixels, 8, 55, 48, 4, humidity / 100, humidityColor, "#1a2538");
+    drawTinyTextToPixels("TEMP", 46, 31, "#879eb8", pixels, 1, "center");
+    drawTinyTextToPixels(unit === "fahrenheit" ? "FAH" : "CEL", 46, 39, "#9db0c7", pixels, 1, "center");
+    drawTinyTextToPixels(`${humidity}%`, 18, 46, humidityColor, pixels, 2, "center");
+    drawVerticalMeter(pixels, 53, 38, 3, 14, humidity / 100, humidityColor, "#1a2538");
+    drawStripedBar(pixels, 8, 55, 44, 4, humidity / 100, humidityColor, "#1a2538");
+    addSparkles(
+      pixels,
+      [
+        [38, 12],
+        [52, 12],
+      ],
+      "#d9ecff",
+    );
   } else if (layout === "detail") {
     fillRect(pixels, 0, 0, 64, 64, "#07111c");
     strokeRect(pixels, 4, 4, 56, 56, "#142438");
@@ -438,6 +539,7 @@ export function buildWeatherPreview(config) {
     drawTinyTextToPixels(`${humidity}%`, 46, 40, humidityColor, pixels, 2, "center");
     drawStripedBar(pixels, 10, 50, 44, 4, humidity / 100, humidityColor, "#1a2538");
     drawTinyTextToPixels("AIR", 12, 57, "#7188a5", pixels, 1, "left");
+    drawSignalBars(pixels, 42, 56, [4, 8, 12], accentColor);
   } else if (layout === "night") {
     fillRect(pixels, 8, 18, 22, 20, "#0b1523");
     drawPattern(pixels, weatherPattern, 8, 20, accentColor, 2);
@@ -454,6 +556,15 @@ export function buildWeatherPreview(config) {
     drawTinyTextToPixels(cityLabel, 30, 8, "#9db0c7", pixels, 1, "center");
     drawTinyTextToPixels(`${humidity}%`, 42, 40, humidityColor, pixels, 2, "center");
     drawStripedBar(pixels, 12, 54, 40, 3, humidity / 100, humidityColor, "#162236");
+    addSparkles(
+      pixels,
+      [
+        [14, 10],
+        [20, 14],
+        [46, 12],
+      ],
+      "#f8f0c0",
+    );
   }
 
   return pixels;
@@ -493,71 +604,101 @@ export function buildCountdownPreview(config) {
       : formatTimeFromSeconds(remainSeconds);
 
   if (style === "hourglass") {
-    fillRect(pixels, 0, 0, 64, 64, "#09111b");
-    strokeRect(pixels, 6, 6, 52, 52, "#142438");
-    drawPattern(pixels, COUNTDOWN_PATTERNS.hourglass, 24, 8, mainColor, 2);
-    fillRect(pixels, 26, 14, 12, Math.max(2, Math.round(10 * progress)), mainColor);
-    fillRect(pixels, 28, 30, 8, Math.max(2, Math.round(10 * (1 - progress))), mainColor);
+    fillRect(pixels, 0, 0, 64, 64, "#07101a");
+    drawInsetFrame(pixels, 4, 4, 56, 56, "#18293d", "#102033");
+    drawCornerMarks(pixels, 4, 4, 56, 56, "#2b4060");
     drawClockTextToPixels(
       timeText,
       32,
-      38,
+      8,
       "#ffffff",
       pixels,
       "minimal_3x5",
       3,
       "center",
     );
-    drawTinyTextToPixels("SAND", 32, 50, "#91a6be", pixels, 1, "center");
-    drawStripedBar(pixels, 8, 56, 48, 4, progress, mainColor, "#1a2538");
+    drawPattern(pixels, COUNTDOWN_PATTERNS.hourglass, 24, 18, mainColor, 2);
+    fillRect(pixels, 26, 24, 12, Math.max(2, Math.round(10 * progress)), mainColor);
+    fillRect(pixels, 28, 40, 8, Math.max(2, Math.round(10 * (1 - progress))), mainColor);
+    fillRect(pixels, 24, 34, 16, 1, "#dcecff");
+    fillRect(pixels, 30, 35, 4, 2, "#dcecff");
+    drawStripedBar(pixels, 10, 55, 44, 4, progress, mainColor, "#152131");
+    drawTinyTextToPixels("LEFT", 32, 48, "#8ca4be", pixels, 1, "center");
+    addSparkles(
+      pixels,
+      [
+        [18, 20],
+        [46, 20],
+      ],
+      "#d7e5ff",
+    );
   } else if (style === "sprint") {
-    fillRect(pixels, 0, 0, 64, 64, "#120d12");
-    fillRect(pixels, 6, 10, 52, 44, "#1b131d");
-    drawPattern(pixels, COUNTDOWN_PATTERNS.sprint, 8, 14, mainColor, 2);
-    drawStripedBar(pixels, 8, 50, 48, 5, progress, mainColor, "#291726");
+    fillRect(pixels, 0, 0, 64, 64, "#110d13");
+    drawInsetFrame(pixels, 4, 4, 56, 56, "#311b2d", "#20111d");
+    drawCornerMarks(pixels, 4, 4, 56, 56, "#553046");
     drawClockTextToPixels(
       timeText,
-      42,
-      20,
+      32,
+      8,
       "#ffffff",
       pixels,
       "minimal_3x5",
       3,
       "center",
     );
-    drawTinyTextToPixels("RUSH", 42, 36, "#ffcfdb", pixels, 2, "center");
+    for (let row = 18; row < 50; row += 5) {
+      fillRect(pixels, 10, row, 3, 2, "#ffdbe6");
+      fillRect(pixels, 51, row + 2, 3, 2, "#ffdbe6");
+    }
+    drawPattern(pixels, COUNTDOWN_PATTERNS.sprint, 21, 20, mainColor, 2);
+    drawStripedBar(pixels, 14, 48, 36, 6, progress, mainColor, "#2b1a28");
+    drawBarProgress(pixels, 54, 18, 3, 28, progress, mainColor, "#2b1a28");
+    drawTinyTextToPixels("GO", 16, 40, "#ffdbe6", pixels, 2, "center");
+    addSparkles(
+      pixels,
+      [
+        [18, 22],
+        [46, 22],
+      ],
+      "#fff0f4",
+    );
   } else if (style === "ring") {
     fillRect(pixels, 0, 0, 64, 64, "#07111c");
-    drawRingProgress(pixels, 12, 8, 40, progress, mainColor, "#152232");
-    strokeRect(pixels, 16, 12, 32, 32, "#203040");
+    drawInsetFrame(pixels, 4, 4, 56, 56, "#18293d", "#112132");
+    drawCornerMarks(pixels, 4, 4, 56, 56, "#2b4060");
+    drawRingProgress(pixels, 8, 8, 48, progress, mainColor, "#152232");
     drawClockTextToPixels(
       timeText,
       32,
-      24,
-      "#ffffff",
-      pixels,
-      "minimal_3x5",
-      2,
-      "center",
-    );
-    drawTinyTextToPixels("LEFT", 32, 48, mainColor, pixels, 2, "center");
-  } else if (style === "bar") {
-    fillRect(pixels, 0, 0, 64, 64, "#08111c");
-    strokeRect(pixels, 6, 8, 52, 48, "#162236");
-    drawClockTextToPixels(
-      timeText,
-      32,
-      16,
+      25,
       "#ffffff",
       pixels,
       "minimal_3x5",
       3,
       "center",
     );
-    drawTinyTextToPixels("PROGRESS", 32, 28, "#8ea5c0", pixels, 1, "center");
-    drawStripedBar(pixels, 12, 34, 40, 12, progress, mainColor, "#162236");
-    drawProgressTicks(pixels, 12, 48, 40, "#50647e");
-    drawTinyTextToPixels(`${Math.round(progress * 100)}%`, 32, 52, mainColor, pixels, 2, "center");
+    drawTinyTextToPixels("SYNC", 32, 47, "#8ca4be", pixels, 1, "center");
+    drawStripedBar(pixels, 14, 55, 36, 3, progress, mainColor, "#152232");
+    addSparkles(pixels, [[32, 49]], mainColor);
+  } else if (style === "bar") {
+    fillRect(pixels, 0, 0, 64, 64, "#08111c");
+    drawInsetFrame(pixels, 4, 4, 56, 56, "#162236", "#0e1a28");
+    drawCornerMarks(pixels, 4, 4, 56, 56, "#28405f");
+    drawClockTextToPixels(
+      timeText,
+      32,
+      8,
+      "#ffffff",
+      pixels,
+      "minimal_3x5",
+      3,
+      "center",
+    );
+    fillRect(pixels, 12, 24, 40, 16, "#101a28");
+    drawStripedBar(pixels, 12, 24, 40, 16, progress, mainColor, "#101a28");
+    drawProgressTicks(pixels, 12, 44, 40, "#50647e");
+    drawTinyTextToPixels(`${Math.round(progress * 100)}%`, 32, 50, mainColor, pixels, 2, "center");
+    drawTickerDots(pixels, 16, 18, 8, "#8ca4be", "#33475f");
   }
 
   return pixels;
@@ -576,78 +717,96 @@ export function buildStopwatchPreview(config) {
     config && config.previewSeconds,
     config && config.showMilliseconds,
   );
+  const timeSize = config && config.showMilliseconds ? 2 : 3;
 
   if (style === "training") {
     fillRect(pixels, 0, 0, 64, 64, "#08111c");
-    strokeRect(pixels, 6, 8, 52, 48, "#162236");
-    fillRect(pixels, 8, 12, 18, 24, "#102030");
-    drawPattern(pixels, STOPWATCH_PATTERN, 8, 12, accentColor, 2);
+    drawInsetFrame(pixels, 4, 4, 56, 56, "#162236", "#0f1a28");
+    drawCornerMarks(pixels, 4, 4, 56, 56, "#28405f");
+    drawPattern(pixels, STOPWATCH_PATTERN, 8, 18, accentColor, 2);
     drawClockTextToPixels(
       timeText,
-      42,
-      18,
+      38,
+      10,
       "#ffffff",
       pixels,
       "minimal_3x5",
-      2,
+      timeSize,
       "center",
     );
-    drawTinyTextToPixels("TRAIN", 42, 32, "#8ea5c0", pixels, 1, "center");
-    drawTinyTextToPixels("LAP", 10, 46, accentColor, pixels, 2, "left");
+    drawTinyTextToPixels("LAP", 10, 8, accentColor, pixels, 2, "left");
     drawTinyTextToPixels(
       String(config && config.lapCount ? config.lapCount : 3),
-      46,
-      46,
+      22,
+      8,
       "#ffffff",
       pixels,
       2,
       "center",
     );
+    drawSignalBars(pixels, 28, 56, [4, 8, 12, 16], accentColor);
+    drawStripedBar(pixels, 10, 44, 44, 4, 0.76, accentColor, "#162236");
+    drawTickerDots(pixels, 10, 14, 7, accentColor, "#33475f");
   } else if (style === "racing") {
     fillRect(pixels, 0, 0, 64, 64, "#140d0d");
-    fillRect(pixels, 8, 10, 48, 40, "#221414");
-    drawBadge(pixels, 6, 6, "RACE", "#ffffff", "#2b1212");
-    for (let row = 14; row < 46; row += 4) {
-      setPixel(pixels, 12, row, "#ffffff");
-      setPixel(pixels, 13, row, "#ffffff");
-      setPixel(pixels, 51, row + 2, "#ffffff");
-      setPixel(pixels, 52, row + 2, "#ffffff");
-    }
+    drawInsetFrame(pixels, 4, 4, 56, 56, "#2b1212", "#1c0e0e");
+    drawCornerMarks(pixels, 4, 4, 56, 56, "#663737");
+    drawCheckeredBar(pixels, 10, 16, 4, 34, "#ffffff", "#140d0d");
+    drawCheckeredBar(pixels, 50, 16, 4, 34, "#ffffff", "#140d0d");
     drawClockTextToPixels(
       timeText,
       32,
-      22,
+      10,
       "#ffffff",
       pixels,
       "minimal_3x5",
-      3,
+      timeSize,
       "center",
     );
-    drawStripedBar(pixels, 8, 54, 48, 4, 0.72, accentColor, "#302010");
+    drawTinyTextToPixels("RACE", 32, 18, accentColor, pixels, 1, "center");
+    drawStripedBar(pixels, 12, 48, 40, 5, 0.72, accentColor, "#302010");
+    addSparkles(
+      pixels,
+      [
+        [16, 18],
+        [48, 18],
+      ],
+      "#ffdbc0",
+    );
   } else if (style === "lap_focus") {
     fillRect(pixels, 0, 0, 64, 64, "#08111c");
-    strokeRect(pixels, 6, 8, 52, 48, "#162236");
-    drawBadge(pixels, 6, 6, "BEST", "#7ddf8a", "#10261a");
-    drawClockTextToPixels(
-      timeText,
-      32,
-      20,
+    drawInsetFrame(pixels, 4, 4, 56, 56, "#162236", "#0f1a28");
+    drawCornerMarks(pixels, 4, 4, 56, 56, "#28405f");
+    drawTinyTextToPixels("LAP", 10, 8, "#7ddf8a", pixels, 2, "left");
+    drawTinyTextToPixels(
+      String(config && config.lapCount ? config.lapCount : 3),
+      22,
+      8,
       "#ffffff",
       pixels,
-      "minimal_3x5",
       2,
       "center",
     );
-    drawSignalBars(pixels, 10, 52, [6, 10, 14, 9], accentColor);
-    drawTinyTextToPixels("BEST", 24, 46, "#7ddf8a", pixels, 2, "center");
-    drawTinyTextToPixels(
-      String(config && config.lapCount ? config.lapCount : 3),
-      48,
-      46,
-      accentColor,
+    drawClockTextToPixels(
+      timeText,
+      32,
+      12,
+      "#ffffff",
       pixels,
-      2,
+      "minimal_3x5",
+      timeSize,
       "center",
+    );
+    drawSignalBars(pixels, 10, 54, [6, 10, 14, 9], accentColor);
+    drawStripedBar(pixels, 28, 46, 24, 6, 0.58, accentColor, "#162236");
+    drawVerticalMeter(pixels, 52, 18, 3, 20, 0.58, accentColor, "#162236");
+    addSparkles(
+      pixels,
+      [
+        [14, 18],
+        [50, 18],
+      ],
+      "#9dd8ff",
     );
   }
 
@@ -680,10 +839,27 @@ export function buildNotificationPreview(config) {
     repeatLabel = "WKDY";
   }
 
-  const repeatBadgeWidth = Math.min(56, Math.max(12, repeatLabel.length * 8 + 4));
-  drawBadge(pixels, 4, 4, timeText, "#ffffff", "#1a2536");
-  drawBadge(pixels, 64 - repeatBadgeWidth - 4, 4, repeatLabel, accentColor, "#1a2536");
-  drawPattern(pixels, notificationPattern, 22, 16, accentColor, 2);
+  fillRect(pixels, 0, 0, 64, 64, "#08111c");
+  drawInsetFrame(pixels, 4, 4, 56, 56, "#162236", "#0f1a28");
+  drawCornerMarks(pixels, 4, 4, 56, 56, accentColor);
+  fillRect(pixels, 8, 14, 48, 6, "#101a28");
+  fillRect(pixels, 10, 22, 44, 22, "#0f1724");
+  fillRect(pixels, 8, 48, 48, 8, "#101a28");
+  fillRect(pixels, 8, 22, 2, 22, accentColor);
+  fillRect(pixels, 54, 22, 2, 22, accentColor);
+  fillRect(pixels, 12, 24, 40, 18, "#111c2b");
+  drawClockTextToPixels(
+    timeText,
+    32,
+    9,
+    "#ffffff",
+    pixels,
+    "minimal_3x5",
+    2,
+    "center",
+  );
+  drawTinyTextToPixels(repeatLabel, 32, 16, accentColor, pixels, 1, "center");
+  drawPattern(pixels, notificationPattern, 24, 25, accentColor, 2);
   drawClockTextToPixels(
     message,
     32,
@@ -694,18 +870,325 @@ export function buildNotificationPreview(config) {
     2,
     "center",
   );
-  drawBarProgress(pixels, 12, 58, 40, 2, 1, accentColor, "#1a2538");
+  drawStripedBar(pixels, 12, 57, 40, 2, 1, accentColor, "#1a2538");
+  drawTickerDots(pixels, 12, 52, 8, accentColor, "#33475f");
+  addSparkles(
+    pixels,
+    [
+      [14, 10],
+      [50, 10],
+    ],
+    "#dbe9ff",
+  );
 
   if (icon === "fireworks") {
-    setPixel(pixels, 12, 14, "#ff6464");
-    setPixel(pixels, 16, 18, "#ffd24d");
-    setPixel(pixels, 50, 12, "#64c8ff");
-    setPixel(pixels, 46, 18, "#ffffff");
+    addSparkles(
+      pixels,
+      [
+        [12, 14],
+        [16, 18],
+        [50, 12],
+        [46, 18],
+      ],
+      "#ffffff",
+    );
   }
 
   if (icon === "christmas") {
     setPixel(pixels, 32, 14, "#ffd24d");
   }
 
+  if (icon === "heart" || icon === "birthday") {
+    addSparkles(
+      pixels,
+      [
+        [16, 18],
+        [48, 18],
+      ],
+      "#ffd7e7",
+    );
+  }
+
   return pixels;
+}
+
+export function buildWeatherPreviewFrames(config) {
+  const frames = [];
+  const weatherType = config && typeof config.weatherType === "string"
+    ? config.weatherType
+    : "sunny";
+  const layout = config && typeof config.layout === "string"
+    ? config.layout
+    : "standard";
+  const accentColor = config && typeof config.accentColor === "string"
+    ? config.accentColor
+    : "#64c8ff";
+  const humidityColor = config && typeof config.humidityColor === "string"
+    ? config.humidityColor
+    : "#6ed0ff";
+  let iconCenterX = 14;
+  let iconCenterY = 24;
+  let tickerX = 8;
+  let tickerY = 54;
+  let tickerWidth = 44;
+
+  if (layout === "detail") {
+    iconCenterX = 42;
+    iconCenterY = 22;
+    tickerX = 10;
+    tickerY = 49;
+    tickerWidth = 44;
+  } else if (layout === "night") {
+    iconCenterX = 16;
+    iconCenterY = 28;
+    tickerX = 12;
+    tickerY = 53;
+    tickerWidth = 40;
+  }
+
+  for (let frameIndex = 0; frameIndex < 18; frameIndex += 1) {
+    const pixels = clonePixels(buildWeatherPreview(config));
+    const pulse = 0.5 + 0.5 * Math.sin((frameIndex / 16) * Math.PI * 2);
+    drawSweepDots(pixels, tickerX, tickerY, tickerWidth, frameIndex, humidityColor, "#203245");
+
+    if (weatherType === "sunny") {
+      if (pulse > 0.55) {
+        drawPulseHalo(
+          pixels,
+          iconCenterX,
+          iconCenterY,
+          9 + (frameIndex % 2),
+          pulse > 0.82 ? "#fff2a8" : "#ffd965",
+        );
+      }
+      addSparkles(
+        pixels,
+        [
+          [iconCenterX - 4 + (frameIndex % 3), iconCenterY - 10],
+          [iconCenterX + 8, iconCenterY + (frameIndex % 2)],
+          [iconCenterX - 10, iconCenterY + 6],
+        ],
+        pulse > 0.45 ? "#fff5c2" : "#ffd24d",
+      );
+    } else if (weatherType === "rainy") {
+      for (let index = 0; index < 5; index += 1) {
+        const offset = (frameIndex * 2 + index * 3) % 14;
+        const dropX = iconCenterX - 8 + index * 4;
+        const dropY = iconCenterY + 6 + offset;
+        drawRainDrop(pixels, dropX, dropY, "#8ddcff", "#d7f4ff");
+        if (offset > 10) {
+          setPixel(pixels, dropX - 1, iconCenterY + 20, "#b8ecff");
+          setPixel(pixels, dropX + 1, iconCenterY + 20, "#b8ecff");
+        }
+      }
+    } else if (weatherType === "snow") {
+      for (let index = 0; index < 4; index += 1) {
+        const flakeX = 10 + index * 12 + ((frameIndex + index) % 3);
+        const flakeY = 14 + ((frameIndex * 2 + index * 5) % 28);
+        drawSnowFlake(pixels, flakeX, flakeY, "#eef8ff");
+      }
+    } else if (weatherType === "thunder") {
+      if (frameIndex % 6 === 1 || frameIndex % 6 === 2) {
+        fillRect(pixels, iconCenterX + 6, iconCenterY - 4, 2, 7, "#fff3a0");
+        fillRect(pixels, iconCenterX + 4, iconCenterY + 2, 5, 2, "#fff3a0");
+        addSparkles(
+          pixels,
+          [
+            [iconCenterX + 1, iconCenterY - 8],
+            [iconCenterX + 11, iconCenterY - 10],
+            [iconCenterX + 14, iconCenterY - 2],
+          ],
+          frameIndex % 6 === 1 ? "#fffbea" : "#ffd966",
+        );
+      }
+    } else if (weatherType === "cloudy") {
+      fillRect(pixels, iconCenterX - 12 + (frameIndex % 5), iconCenterY - 2, 6, 1, "#dbeafe");
+      fillRect(pixels, iconCenterX + 2 - (frameIndex % 4), iconCenterY + 4, 5, 1, "#dbeafe");
+      fillRect(pixels, iconCenterX - 4 + ((frameIndex + 1) % 3), iconCenterY + 9, 4, 1, accentColor);
+    }
+
+    frames.push({
+      pixels,
+      delay: weatherType === "thunder" ? 100 : 110,
+    });
+  }
+
+  return frames;
+}
+
+export function buildCountdownPreviewFrames(config) {
+  const frames = [];
+  const baseProgress = Math.max(0, Math.min(1, Number(config && config.progress)));
+  const style = config && typeof config.displayStyle === "string"
+    ? config.displayStyle
+    : "hourglass";
+  const accentColor = config && config.colorMode === "fixed" && typeof config.accentColor === "string"
+    ? config.accentColor
+    : null;
+
+  for (let frameIndex = 0; frameIndex < 18; frameIndex += 1) {
+    const drift = frameIndex / 15;
+    const pulseOffset = Math.sin((frameIndex / 18) * Math.PI * 2) * 0.02;
+    const currentProgress = Math.max(0, Math.min(1, baseProgress - drift * 0.08 + pulseOffset));
+    const currentConfig = {
+      ...config,
+      progress: currentProgress,
+    };
+    const pixels = clonePixels(buildCountdownPreview(currentConfig));
+    const currentAccentColor = accentColor !== null
+      ? accentColor
+      : currentProgress > 0.5
+        ? "#3fe07d"
+        : currentProgress > 0.2
+          ? "#ffd24d"
+          : "#ff6464";
+
+    if (style === "hourglass") {
+      const streamY = 34 + (frameIndex % 6);
+      fillRect(pixels, 31, streamY, 2, 2, "#ffffff");
+      fillRect(pixels, 28, 43, 8 + (frameIndex % 3), 1, currentAccentColor);
+      if (frameIndex % 3 === 0) {
+        addSparkles(pixels, [[32, 18], [20, 28], [44, 28]], "#eaf4ff");
+      }
+    } else if (style === "ring") {
+      const orbitStep = frameIndex % 12;
+      const orbitPoints = [
+        [14, 8], [26, 8], [38, 8], [50, 10],
+        [55, 22], [55, 34], [53, 46], [44, 54],
+        [32, 55], [20, 54], [10, 46], [8, 32],
+      ];
+      const orbitPoint = orbitPoints[orbitStep];
+      if (orbitPoint) {
+        drawSnowFlake(pixels, orbitPoint[0], orbitPoint[1], currentAccentColor);
+      }
+      addSparkles(
+        pixels,
+        [
+          [10 + (frameIndex % 6), 10],
+          [54 - (frameIndex % 6), 54],
+        ],
+        currentAccentColor,
+      );
+    } else if (style === "sprint") {
+      fillRect(pixels, 12 + (frameIndex % 8) * 5, 46, 3, 1, "#ffe5ec");
+      fillRect(pixels, 15 + (frameIndex % 7) * 5, 44, 2, 1, currentAccentColor);
+      fillRect(pixels, 8 + (frameIndex % 10) * 5, 20, 2, 1, "#fff4f7");
+    } else if (style === "bar") {
+      fillRect(pixels, 14 + (frameIndex % 10) * 3, 22, 2, 2, "#dbeafe");
+      drawSweepDots(pixels, 13, 43, 38, frameIndex, currentAccentColor, "#3b4d62");
+      if (frameIndex % 4 < 2) {
+        setPixel(pixels, 11, 24 + (frameIndex % 6), currentAccentColor);
+        setPixel(pixels, 52, 34 - (frameIndex % 6), currentAccentColor);
+      }
+    }
+
+    frames.push({
+      pixels,
+      delay: 100,
+    });
+  }
+
+  return frames;
+}
+
+export function buildStopwatchPreviewFrames(config) {
+  const frames = [];
+  const baseSeconds = Math.max(0, Number(config && config.previewSeconds));
+  const style =
+    config && typeof config.displayStyle === "string"
+      ? config.displayStyle
+      : "training";
+  const accentColor =
+    config && typeof config.accentColor === "string"
+      ? config.accentColor
+      : "#ffa500";
+
+  for (let frameIndex = 0; frameIndex < 18; frameIndex += 1) {
+    const currentConfig = {
+      ...config,
+      previewSeconds: baseSeconds + frameIndex * 0.09,
+    };
+    const pixels = clonePixels(buildStopwatchPreview(currentConfig));
+    drawSweepDots(pixels, 10, 58, 44, frameIndex, accentColor, "#3c4a5d");
+
+    if (style === "training") {
+      fillRect(pixels, 28 + (frameIndex % 6) * 4, 44, 2, 1, "#dff6ff");
+      fillRect(pixels, 8 + (frameIndex % 4) * 4, 52 - (frameIndex % 3), 2, 2, accentColor);
+    } else if (style === "racing") {
+      const sideY = 18 + (frameIndex * 2 % 24);
+      fillRect(pixels, 10, sideY, 4, 1, "#ffffff");
+      fillRect(pixels, 50, 40 - (frameIndex * 2 % 24), 4, 1, "#ffffff");
+      addSparkles(pixels, [[18 + (frameIndex % 5), 20], [46 - (frameIndex % 5), 20]], "#ffe8d7");
+    } else if (style === "lap_focus") {
+      fillRect(pixels, 52, 18 + (frameIndex % 12), 3, 3, accentColor);
+      fillRect(pixels, 28 + (frameIndex % 5) * 4, 46, 3, 2, "#dff6ff");
+    }
+
+    frames.push({
+      pixels,
+      delay: 90,
+    });
+  }
+
+  return frames;
+}
+
+export function buildNotificationPreviewFrames(config) {
+  const frames = [];
+  const accentColor = config && typeof config.accentColor === "string"
+    ? config.accentColor
+    : "#ffb020";
+  const icon = config && typeof config.icon === "string" ? config.icon : "drink";
+
+  for (let frameIndex = 0; frameIndex < 16; frameIndex += 1) {
+    const pixels = clonePixels(buildNotificationPreview(config));
+    const pulse = frameIndex % 4 < 2;
+
+    fillRect(pixels, 8, 22, 2, 22, pulse ? accentColor : "#2b3a50");
+    fillRect(pixels, 54, 22, 2, 22, pulse ? accentColor : "#2b3a50");
+    fillRect(pixels, 12 + (frameIndex % 8) * 5, 52, 2, 1, accentColor);
+    drawSweepDots(pixels, 12, 57, 40, frameIndex, accentColor, "#314257");
+    if (frameIndex % 5 < 2) {
+      fillRect(pixels, 12 + (frameIndex % 6) * 6, 14, 4, 1, "#ffffff");
+    }
+
+    if (icon === "fireworks") {
+      addSparkles(
+        pixels,
+        [
+          [18 + (frameIndex % 4), 18],
+          [46 - (frameIndex % 3), 16 + (frameIndex % 2)],
+        ],
+        "#ffffff",
+      );
+    } else if (icon === "heart" || icon === "birthday") {
+      addSparkles(
+        pixels,
+        [
+          [18, 20 + (frameIndex % 3)],
+          [46, 20 + ((frameIndex + 1) % 3)],
+        ],
+        "#ffd7e7",
+      );
+    } else if (icon === "drink" || icon === "break") {
+      fillRect(pixels, 22 + (frameIndex % 4), 41, 20, 1, "#fdf3cf");
+      fillRect(pixels, 24 + (frameIndex % 4), 42, 16, 1, accentColor);
+    } else {
+      addSparkles(
+        pixels,
+        [
+          [14 + (frameIndex % 4), 12],
+          [50 - (frameIndex % 4), 12],
+        ],
+        "#dbe9ff",
+      );
+    }
+
+    frames.push({
+      pixels,
+      delay: 120,
+    });
+  }
+
+  return frames;
 }

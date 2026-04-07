@@ -326,6 +326,7 @@ export default {
     },
 
     async convertImageToPixels(imageData) {
+      const conversionToken = ++this._imageConvertToken;
       const targetWidth = this.config.image.width;
       const targetHeight = this.config.image.height;
 
@@ -341,6 +342,9 @@ export default {
         .select("#imageProcessCanvas")
         .fields({ node: true, size: true })
         .exec((res) => {
+          if (conversionToken !== this._imageConvertToken) {
+            return;
+          }
           if (!res || !res[0] || !res[0].node) {
             console.error("图片处理 Canvas 查询失败");
             this.toast.showError("Canvas 未就绪");
@@ -352,6 +356,9 @@ export default {
           const img = canvas.createImage();
 
           img.onload = () => {
+            if (conversionToken !== this._imageConvertToken) {
+              return;
+            }
             console.log("图片加载成功，原始尺寸:", img.width, "x", img.height);
             try {
               const originalWidth = canvas.width;
@@ -402,6 +409,9 @@ export default {
           };
 
           img.onerror = (err) => {
+            if (conversionToken !== this._imageConvertToken) {
+              return;
+            }
             console.error("图片加载失败:", err);
             this.toast.showError("图片加载失败");
           };
@@ -492,6 +502,7 @@ export default {
     },
 
     removeImage() {
+      this._imageConvertToken += 1;
       this.stopGifAnimation();
       this.config.image.data = null;
       this.config.image.show = false;

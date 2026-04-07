@@ -24,6 +24,45 @@ export const useDeviceStore = defineStore('device', {
   },
 
   actions: {
+    resolveDeviceModeFromStatus(data) {
+      if (!data || typeof data !== 'object') {
+        return null
+      }
+
+      if (typeof data.mode !== 'string') {
+        return null
+      }
+
+      if (data.mode === 'animation' && typeof data.effectMode === 'string') {
+        if (
+          data.effectMode === 'text_display' ||
+          data.effectMode === 'breath_effect' ||
+          data.effectMode === 'rhythm_effect' ||
+          data.effectMode === 'tetris' ||
+          data.effectMode === 'ambient_effect' ||
+          data.effectMode === 'eyes'
+        ) {
+          return data.effectMode
+        }
+      }
+
+      if (
+        data.mode === 'clock' ||
+        data.mode === 'animation' ||
+        data.mode === 'theme' ||
+        data.mode === 'canvas' ||
+        data.mode === 'tetris' ||
+        data.mode === 'weather' ||
+        data.mode === 'countdown' ||
+        data.mode === 'stopwatch' ||
+        data.mode === 'notification'
+      ) {
+        return data.mode
+      }
+
+      return null
+    },
+
     // 初始化
     init() {
       if (!this.webSocket) {
@@ -54,6 +93,7 @@ export const useDeviceStore = defineStore('device', {
     setupCallbacks() {
       this.webSocket.onConnect(() => {
         this.connected = true
+        this.error = null
       })
 
       this.webSocket.onDisconnect(() => {
@@ -62,8 +102,7 @@ export const useDeviceStore = defineStore('device', {
       })
 
       this.webSocket.onError((err) => {
-        this.connected = false
-        this.deviceInfo = null
+        this.error = err || null
       })
 
       this.webSocket.onMessage((data) => {
@@ -72,6 +111,15 @@ export const useDeviceStore = defineStore('device', {
         }
         if (data.status === 'connected') {
           this.deviceInfo = data
+        }
+        const resolvedMode = this.resolveDeviceModeFromStatus(data)
+        if (resolvedMode) {
+          this.deviceMode = resolvedMode
+          uni.setStorageSync(DEVICE_MODE_KEY, resolvedMode)
+          if (resolvedMode !== 'canvas') {
+            this.lastBusinessMode = resolvedMode
+            uni.setStorageSync(DEVICE_LAST_BUSINESS_MODE_KEY, resolvedMode)
+          }
         }
       })
     },
@@ -112,11 +160,13 @@ export const useDeviceStore = defineStore('device', {
 
       try {
         await this.webSocket.connect(ip)
-        try {
-          await this.webSocket.getStatus()
-        } catch (statusErr) {
-          console.warn('连接成功，但获取设备状态失败:', statusErr)
-        }
+        setTimeout(async () => {
+          try {
+            await this.webSocket.getStatus()
+          } catch (statusErr) {
+            console.warn('后台获取设备状态失败:', statusErr)
+          }
+        }, 800)
         return { success: true }
       } catch (err) {
         console.error('连接失败:', err)

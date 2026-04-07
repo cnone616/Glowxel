@@ -1,0 +1,812 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Pacman Theme Preview</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0a0c10;
+      --panel: #12161d;
+      --line: rgba(255, 255, 255, 0.08);
+      --text: #f3f6fb;
+      --subtle: #98a2b3;
+      --accent: #ffd54a;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      background:
+        radial-gradient(circle at top, rgba(72, 122, 255, 0.12), transparent 36%),
+        radial-gradient(circle at bottom, rgba(255, 213, 74, 0.08), transparent 42%),
+        var(--bg);
+      font-family: "SF Pro Display", "PingFang SC", "Helvetica Neue", sans-serif;
+      color: var(--text);
+    }
+
+    .shell {
+      width: min(92vw, 700px);
+      padding: 24px;
+      border-radius: 24px;
+      background: rgba(18, 22, 29, 0.92);
+      border: 1px solid var(--line);
+      box-shadow: 0 24px 80px rgba(0, 0, 0, 0.38);
+    }
+
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+
+    .title {
+      font-size: 18px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+    }
+
+    .hint {
+      font-size: 13px;
+      color: var(--subtle);
+    }
+
+    .content {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 220px;
+      gap: 20px;
+      align-items: start;
+    }
+
+    .display-wrap {
+      display: grid;
+      place-items: center;
+      padding: 20px;
+      border-radius: 20px;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.01));
+      border: 1px solid var(--line);
+    }
+
+    canvas {
+      width: min(72vw, 448px);
+      height: min(72vw, 448px);
+      max-width: 448px;
+      max-height: 448px;
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+      background: #000;
+      border-radius: 16px;
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+    }
+
+    .side {
+      display: grid;
+      gap: 12px;
+    }
+
+    .card {
+      padding: 14px 16px;
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--line);
+    }
+
+    .card-title {
+      margin-bottom: 8px;
+      font-size: 13px;
+      color: var(--subtle);
+      letter-spacing: 0.04em;
+    }
+
+    .status {
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    .buttons {
+      display: grid;
+      gap: 10px;
+    }
+
+    button {
+      appearance: none;
+      border: 0;
+      border-radius: 12px;
+      padding: 11px 14px;
+      font-size: 14px;
+      font-weight: 600;
+      color: #0a0c10;
+      background: var(--accent);
+      cursor: pointer;
+    }
+
+    button.secondary {
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--text);
+    }
+
+    @media (max-width: 720px) {
+      .content {
+        grid-template-columns: 1fr;
+      }
+
+      .side {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <div class="header">
+      <div>
+        <div class="title">吃豆人主题网页预览</div>
+        <div class="hint">直接看结尾的 <code>GAME WIN</code> 是否落在原日期那一行</div>
+      </div>
+      <div class="hint">64 × 64</div>
+    </div>
+
+    <div class="content">
+      <div class="display-wrap">
+        <canvas id="screen" width="64" height="64"></canvas>
+      </div>
+
+      <div class="side">
+        <div class="card">
+          <div class="card-title">当前状态</div>
+          <div class="status" id="status">初始化中...</div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">当前路线</div>
+          <div class="status" id="currentRouteMeta">准备生成...</div>
+          <div class="status" id="currentRouteText" style="margin-top:8px; word-break:break-all; font-family:monospace; font-size:12px;"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">操作</div>
+          <div class="buttons">
+            <button id="replay">重新播放</button>
+            <button id="jumpWin" class="secondary">直接跳到 GAME WIN</button>
+            <button id="refreshSamples" class="secondary">刷新路线样本</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:20px;">
+      <div class="card-title">路线样本</div>
+      <div class="status" id="routeSamples" style="display:grid; gap:10px;"></div>
+    </div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById("screen");
+    const ctx = canvas.getContext("2d");
+    const statusEl = document.getElementById("status");
+    const currentRouteMetaEl = document.getElementById("currentRouteMeta");
+    const currentRouteTextEl = document.getElementById("currentRouteText");
+    const routeSamplesEl = document.getElementById("routeSamples");
+    const replayButton = document.getElementById("replay");
+    const jumpWinButton = document.getElementById("jumpWin");
+    const refreshSamplesButton = document.getElementById("refreshSamples");
+
+    const PACMAN_DIRECTION_RIGHT = 0;
+    const PACMAN_DIRECTION_DOWN = 1;
+    const PACMAN_DIRECTION_LEFT = 2;
+    const PACMAN_DIRECTION_UP = 3;
+
+    const PACMAN_BLOCK_EMPTY = 0;
+    const PACMAN_BLOCK_FOOD = 1;
+    const PACMAN_BLOCK_WALL = 2;
+    const PACMAN_BLOCK_GATE = 3;
+    const PACMAN_BLOCK_SUPER_FOOD = 4;
+    const PACMAN_BLOCK_CLOCK = 5;
+    const PACMAN_BLOCK_GHOST = 6;
+    const PACMAN_BLOCK_START = 7;
+
+    const winPalette = [
+      [255, 214, 64],
+      [255, 124, 94],
+      [255, 92, 214],
+      [112, 214, 255],
+      [128, 255, 118],
+      [255, 255, 255]
+    ];
+    const winDurationMs = 3000;
+
+    const fallbackRouteDirections = "LLLLLLDDRRRRLUURRRRRRRRDDLLLLRUDRRDDDRDLDDDRDDLLLUULRRLDDLLLLLLLLUURRRRLDULLUUULURUU"
+      .split("")
+      .map((char) => {
+        if (char === "R") return PACMAN_DIRECTION_RIGHT;
+        if (char === "D") return PACMAN_DIRECTION_DOWN;
+        if (char === "L") return PACMAN_DIRECTION_LEFT;
+        return PACMAN_DIRECTION_UP;
+      });
+
+    const mapTemplate = [
+      [4, 1, 1, 1, 1, 1, 7, 1, 1, 1, 1, 4],
+      [1, 2, 2, 1, 2, 2, 2, 2, 1, 2, 2, 1],
+      [1, 1, 1, 1, 1, 2, 2, 1, 1, 1, 1, 1],
+      [2, 1, 5, 5, 5, 5, 5, 5, 5, 5, 1, 2],
+      [2, 1, 5, 5, 5, 5, 5, 5, 5, 5, 1, 2],
+      [3, 1, 5, 5, 5, 5, 5, 5, 5, 5, 1, 3],
+      [3, 1, 5, 5, 5, 5, 5, 5, 5, 5, 1, 3],
+      [2, 1, 5, 5, 5, 5, 5, 5, 5, 5, 1, 2],
+      [2, 1, 5, 5, 5, 5, 5, 5, 5, 5, 1, 2],
+      [1, 1, 1, 1, 1, 2, 2, 1, 1, 1, 1, 1],
+      [1, 2, 2, 1, 2, 2, 2, 2, 1, 2, 2, 1],
+      [4, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 4]
+    ];
+
+    const pixelFont = {
+      "0": ["111","101","101","101","111"],
+      "1": ["010","110","010","010","111"],
+      "2": ["111","001","111","100","111"],
+      "3": ["111","001","111","001","111"],
+      "4": ["101","101","111","001","001"],
+      "5": ["111","100","111","001","111"],
+      "6": ["111","100","111","101","111"],
+      "7": ["111","001","010","010","010"],
+      "8": ["111","101","111","101","111"],
+      "9": ["111","101","111","001","111"],
+      "A": ["010","101","111","101","101"],
+      "E": ["111","100","110","100","111"],
+      "G": ["111","100","101","101","111"],
+      "I": ["111","010","010","010","111"],
+      "M": ["101","111","111","101","101"],
+      "N": ["101","111","111","111","101"],
+      "P": ["110","101","110","100","100"],
+      "R": ["110","101","110","101","101"],
+      "T": ["111","010","010","010","010"],
+      "U": ["101","101","101","101","111"],
+      "W": ["101","101","111","111","101"],
+      ":": ["0","1","0","1","0"],
+      " ": ["0","0","0","0","0"]
+    };
+
+    const state = {};
+
+    function resetState() {
+      state.map = mapTemplate.map((row) => row.slice());
+      state.x = 32;
+      state.y = 2;
+      state.direction = PACMAN_DIRECTION_RIGHT;
+      state.mouthOpen = false;
+      state.stepCount = 0;
+      state.routeIndex = 0;
+      state.showSeconds = true;
+      state.lastSecondBlinkAt = performance.now();
+      state.showingWin = false;
+      state.winPhaseStartedAt = 0;
+      state.invincible = false;
+      state.invincibleStartAt = 0;
+      state.lastMoveAt = performance.now();
+      state.routeDirections = buildVariedRoute(state.map);
+      state.routeProfile = describeRouteProfile(state.routeDirections.meta);
+      state.routeText = routeToText(state.routeDirections);
+      currentRouteMetaEl.textContent =
+        `${state.routeDirections.length} 步 | ${state.routeProfile}`;
+      currentRouteTextEl.textContent = state.routeText;
+    }
+
+    function isVisibleTarget(block) {
+      return block === PACMAN_BLOCK_FOOD ||
+        block === PACMAN_BLOCK_GATE ||
+        block === PACMAN_BLOCK_SUPER_FOOD;
+    }
+
+    function countEdibleBlocks() {
+      let count = 0;
+      for (let row = 0; row < 12; row += 1) {
+        for (let col = 0; col < 12; col += 1) {
+          if (isVisibleTarget(state.map[row][col])) {
+            count += 1;
+          }
+        }
+      }
+      return count;
+    }
+
+    function allowsMovement(block) {
+      return ![PACMAN_BLOCK_WALL, PACMAN_BLOCK_CLOCK].includes(block);
+    }
+
+    function getQuadrantIndex(x, y) {
+      let quadrant = 0;
+      if (x >= 6) quadrant += 1;
+      if (y >= 6) quadrant += 2;
+      return quadrant;
+    }
+
+    function targetComesBefore(a, b, quadrant, variant) {
+      const baseX = (quadrant % 2) * 6;
+      const baseY = Math.floor(quadrant / 2) * 6;
+      const ax = a.x - baseX;
+      const ay = a.y - baseY;
+      const bx = b.x - baseX;
+      const by = b.y - baseY;
+
+      if (variant === 0) {
+        if (ay !== by) return ay < by;
+        return (ay % 2 === 0) ? (ax < bx) : (ax > bx);
+      }
+
+      if (variant === 1) {
+        if (ay !== by) return ay < by;
+        return (ay % 2 === 0) ? (ax > bx) : (ax < bx);
+      }
+
+      if (variant === 2) {
+        if (ax !== bx) return ax < bx;
+        return (ax % 2 === 0) ? (ay < by) : (ay > by);
+      }
+
+      if (ax !== bx) return ax > bx;
+      return (ax % 2 === 0) ? (ay < by) : (ay > by);
+    }
+
+    function sortTargets(targets, quadrant, variant) {
+      targets.sort((a, b) => targetComesBefore(a, b, quadrant, variant) ? -1 : 1);
+    }
+
+    function shuffleQuadrants(items) {
+      const list = items.slice();
+      for (let index = list.length - 1; index > 0; index -= 1) {
+        const swapIndex = Math.floor(Math.random() * (index + 1));
+        const temp = list[index];
+        list[index] = list[swapIndex];
+        list[swapIndex] = temp;
+      }
+      return list;
+    }
+
+    function buildPathBetweenCells(map, startX, startY, targetX, targetY) {
+      const queue = [{ x: startX, y: startY }];
+      const visited = Array.from({ length: 12 }, () => Array(12).fill(false));
+      const prevX = Array.from({ length: 12 }, () => Array(12).fill(-1));
+      const prevY = Array.from({ length: 12 }, () => Array(12).fill(-1));
+      const prevDirection = Array.from({ length: 12 }, () => Array(12).fill(PACMAN_DIRECTION_RIGHT));
+      const dx = [1, 0, -1, 0];
+      const dy = [0, 1, 0, -1];
+      const directions = [
+        PACMAN_DIRECTION_RIGHT,
+        PACMAN_DIRECTION_DOWN,
+        PACMAN_DIRECTION_LEFT,
+        PACMAN_DIRECTION_UP
+      ];
+
+      visited[startY][startX] = true;
+
+      while (queue.length > 0) {
+        const current = queue.shift();
+        if (current.x === targetX && current.y === targetY) {
+          break;
+        }
+
+        for (let index = 0; index < 4; index += 1) {
+          const nextX = current.x + dx[index];
+          const nextY = current.y + dy[index];
+          if (nextX < 0 || nextX >= 12 || nextY < 0 || nextY >= 12) {
+            continue;
+          }
+          if (visited[nextY][nextX]) {
+            continue;
+          }
+          if (!allowsMovement(map[nextY][nextX])) {
+            continue;
+          }
+
+          visited[nextY][nextX] = true;
+          prevX[nextY][nextX] = current.x;
+          prevY[nextY][nextX] = current.y;
+          prevDirection[nextY][nextX] = directions[index];
+          queue.push({ x: nextX, y: nextY });
+        }
+      }
+
+      if (!visited[targetY][targetX]) {
+        return null;
+      }
+
+      const reversed = [];
+      let cursorX = targetX;
+      let cursorY = targetY;
+      while (!(cursorX === startX && cursorY === startY)) {
+        reversed.push(prevDirection[cursorY][cursorX]);
+        const nextCursorX = prevX[cursorY][cursorX];
+        const nextCursorY = prevY[cursorY][cursorX];
+        cursorX = nextCursorX;
+        cursorY = nextCursorY;
+      }
+
+      return reversed.reverse();
+    }
+
+    function buildVariedRoute(map) {
+      const quadrantTargets = [[], [], [], []];
+      for (let row = 0; row < 12; row += 1) {
+        for (let col = 0; col < 12; col += 1) {
+          if (!isVisibleTarget(map[row][col])) {
+            continue;
+          }
+          quadrantTargets[getQuadrantIndex(col, row)].push({ x: col, y: row });
+        }
+      }
+
+      const quadrantOrder = shuffleQuadrants([0, 1, 2, 3]);
+      const routeDirections = [];
+      const variants = [];
+      let currentX = 6;
+      let currentY = 0;
+
+      for (const quadrant of quadrantOrder) {
+        const variant = Math.floor(Math.random() * 4);
+        variants.push(variant);
+        const targets = quadrantTargets[quadrant].slice();
+        sortTargets(targets, quadrant, variant);
+
+        for (const target of targets) {
+          const path = buildPathBetweenCells(map, currentX, currentY, target.x, target.y);
+          if (!path) {
+            const fallback = fallbackRouteDirections.slice();
+            fallback.meta = {
+              quadrantOrder: [0, 1, 2, 3],
+              variants: [0, 0, 0, 0],
+              fallback: true
+            };
+            return fallback;
+          }
+          routeDirections.push(...path);
+          currentX = target.x;
+          currentY = target.y;
+        }
+      }
+
+      routeDirections.meta = {
+        quadrantOrder,
+        variants,
+        fallback: false
+      };
+      return routeDirections;
+    }
+
+    function describeRouteProfile(meta) {
+      if (!meta) {
+        return "";
+      }
+      if (meta.fallback) {
+        return "回退到固定路线";
+      }
+      const names = ["左上", "右上", "左下", "右下"];
+      return meta.quadrantOrder.map((quadrant, index) =>
+        `${names[quadrant]}-${meta.variants[index] + 1}`
+      ).join(" / ");
+    }
+
+    function routeToText(route) {
+      return route.map((direction) => {
+        if (direction === PACMAN_DIRECTION_RIGHT) return "R";
+        if (direction === PACMAN_DIRECTION_DOWN) return "D";
+        if (direction === PACMAN_DIRECTION_LEFT) return "L";
+        return "U";
+      }).join("");
+    }
+
+    function renderRouteSamples() {
+      const samples = [];
+      for (let index = 0; index < 6; index += 1) {
+        const route = buildVariedRoute(mapTemplate.map((row) => row.slice()));
+        samples.push({
+          index: index + 1,
+          steps: route.length,
+          profile: describeRouteProfile(route.meta),
+          text: routeToText(route)
+        });
+      }
+
+      routeSamplesEl.innerHTML = samples.map((sample) => `
+        <div style="padding:10px 12px; border:1px solid rgba(255,255,255,0.08); border-radius:12px; background:rgba(255,255,255,0.02);">
+          <div style="font-size:13px; color:#f3f6fb; margin-bottom:6px;">样本 ${sample.index} | ${sample.steps} 步</div>
+          <div style="font-size:12px; color:#98a2b3; margin-bottom:6px;">${sample.profile}</div>
+          <div style="font-family:monospace; font-size:12px; color:#dbe4f3; word-break:break-all;">${sample.text}</div>
+        </div>
+      `).join("");
+    }
+
+    function getNextBlock(direction) {
+      const gridX = Math.floor((state.x - 2) / 5);
+      const gridY = Math.floor((state.y - 2) / 5);
+      let nextX = gridX;
+      let nextY = gridY;
+
+      if (direction === PACMAN_DIRECTION_RIGHT) nextX += 1;
+      if (direction === PACMAN_DIRECTION_LEFT) nextX -= 1;
+      if (direction === PACMAN_DIRECTION_DOWN) nextY += 1;
+      if (direction === PACMAN_DIRECTION_UP) nextY -= 1;
+
+      if (nextX < 0 || nextX >= 12 || nextY < 0 || nextY >= 12) {
+        return PACMAN_BLOCK_WALL;
+      }
+      return state.map[nextY][nextX];
+    }
+
+    function advanceStep(now) {
+      if (state.showingWin) {
+        if (now - state.winPhaseStartedAt >= winDurationMs) {
+          resetState();
+        }
+        return;
+      }
+
+      if (now - state.lastMoveAt < 52) {
+        return;
+      }
+      state.lastMoveAt = now;
+
+      const movingAlongX =
+        state.direction === PACMAN_DIRECTION_LEFT || state.direction === PACMAN_DIRECTION_RIGHT;
+      const alignedToBlock = movingAlongX
+        ? ((state.x - 2) % 5 === 0)
+        : ((state.y - 2) % 5 === 0);
+
+      if (alignedToBlock) {
+        const gridX = Math.floor((state.x - 2) / 5);
+        const gridY = Math.floor((state.y - 2) / 5);
+        const currentBlock = state.map[gridY][gridX];
+
+        if (currentBlock === PACMAN_BLOCK_SUPER_FOOD) {
+          state.invincible = true;
+          state.invincibleStartAt = now;
+        }
+
+        if (isVisibleTarget(currentBlock) || currentBlock === PACMAN_BLOCK_START) {
+          state.map[gridY][gridX] = PACMAN_BLOCK_EMPTY;
+        }
+
+        if (countEdibleBlocks() === 0) {
+          state.showingWin = true;
+          state.winPhaseStartedAt = now;
+          return;
+        }
+
+        if (state.routeIndex >= state.routeDirections.length) {
+          resetState();
+          return;
+        }
+
+        state.direction = state.routeDirections[state.routeIndex];
+        state.routeIndex += 1;
+      }
+
+      if (!alignedToBlock) {
+        moveByDirection();
+      } else if (allowsMovement(getNextBlock(state.direction))) {
+        moveByDirection();
+      }
+
+      if (state.invincible && now - state.invincibleStartAt >= 7000) {
+        state.invincible = false;
+      }
+
+      if (state.stepCount % 3 === 0) {
+        state.mouthOpen = !state.mouthOpen;
+      }
+      state.stepCount += 1;
+    }
+
+    function moveByDirection() {
+      if (state.direction === PACMAN_DIRECTION_RIGHT) state.x += 1;
+      if (state.direction === PACMAN_DIRECTION_LEFT) state.x -= 1;
+      if (state.direction === PACMAN_DIRECTION_DOWN) state.y += 1;
+      if (state.direction === PACMAN_DIRECTION_UP) state.y -= 1;
+    }
+
+    function rgb(r, g, b) {
+      return `rgb(${r}, ${g}, ${b})`;
+    }
+
+    function fillRect(x, y, w, h, color) {
+      ctx.fillStyle = color;
+      ctx.fillRect(x, y, w, h);
+    }
+
+    function setPixel(x, y, color) {
+      fillRect(x, y, 1, 1, color);
+    }
+
+    function drawRect(x, y, w, h, color) {
+      fillRect(x, y, w, 1, color);
+      fillRect(x, y + h - 1, w, 1, color);
+      fillRect(x, y, 1, h, color);
+      fillRect(x + w - 1, y, 1, h, color);
+    }
+
+    function drawMap() {
+      const wall = rgb(0, 42, 170);
+      const food = rgb(255, 206, 124);
+      const superFood = rgb(255, 242, 102);
+
+      fillRect(0, 0, 64, 64, "#000");
+      drawRect(0, 0, 64, 64, wall);
+      drawRect(1, 1, 62, 62, wall);
+
+      for (let row = 0; row < 12; row += 1) {
+        for (let col = 0; col < 12; col += 1) {
+          const block = state.map[row][col];
+          const px = col * 5 + 2;
+          const py = row * 5 + 2;
+
+          if (block === PACMAN_BLOCK_FOOD) {
+            fillRect(px + 1, py + 2, 3, 1, food);
+          } else if (block === PACMAN_BLOCK_WALL || block === PACMAN_BLOCK_CLOCK) {
+            fillRect(px, py, 5, 5, wall);
+          } else if (block === PACMAN_BLOCK_GATE) {
+            fillRect(px + 1, py + 2, 3, 1, food);
+          } else if (block === PACMAN_BLOCK_SUPER_FOOD) {
+            fillRect(px + 1, py + 1, 3, 3, superFood);
+          }
+        }
+      }
+    }
+
+    const openFrame = [
+      [0,1,1,1,0],
+      [1,1,0,1,1],
+      [1,1,1,1,1],
+      [1,1,1,1,1],
+      [0,1,1,1,0]
+    ];
+
+    const closedFrame = [
+      [0,1,1,1,1],
+      [1,1,0,1,0],
+      [1,1,1,0,0],
+      [1,1,1,1,0],
+      [0,1,1,1,1]
+    ];
+
+    function rotateFrame(frame) {
+      return frame[0].map((_, index) => frame.map((row) => row[index]).reverse());
+    }
+
+    function flipFrame(frame) {
+      return frame.map((row) => row.slice().reverse());
+    }
+
+    function drawPacman() {
+      let frame = state.mouthOpen ? openFrame : closedFrame;
+      if (state.direction === PACMAN_DIRECTION_LEFT) {
+        frame = flipFrame(frame);
+      } else if (state.direction === PACMAN_DIRECTION_DOWN) {
+        frame = flipFrame(rotateFrame(flipFrame(frame)));
+      } else if (state.direction === PACMAN_DIRECTION_UP) {
+        frame = rotateFrame(frame);
+      }
+
+      let color = rgb(255, 214, 64);
+      if (state.invincible && state.stepCount % 2 === 0) {
+        const pulse = winPalette[Math.floor((performance.now() / 120) % winPalette.length)];
+        color = rgb(pulse[0], pulse[1], pulse[2]);
+      }
+
+      for (let row = 0; row < 5; row += 1) {
+        for (let col = 0; col < 5; col += 1) {
+          if (frame[row][col]) {
+            setPixel(state.x + col, state.y + row, color);
+          }
+        }
+      }
+    }
+
+    function drawGlyph(text, x, y, color) {
+      let cursorX = x;
+      for (const char of text) {
+        const glyph = pixelFont[char] || pixelFont[" "];
+        const width = glyph[0].length;
+        ctx.fillStyle = color;
+        for (let row = 0; row < glyph.length; row += 1) {
+          for (let col = 0; col < width; col += 1) {
+            if (glyph[row][col] === "1") {
+              setPixel(cursorX + col, y + row, color);
+            }
+          }
+        }
+        cursorX += width + 1;
+      }
+    }
+
+    function measureGlyphText(text) {
+      let width = 0;
+      for (let index = 0; index < text.length; index += 1) {
+        const glyph = pixelFont[text[index]] || pixelFont[" "];
+        width += glyph[0].length;
+        if (index !== text.length - 1) {
+          width += 1;
+        }
+      }
+      return width;
+    }
+
+    function drawGlyphCentered(text, areaX, areaWidth, y, color) {
+      const textWidth = measureGlyphText(text);
+      const startX = areaX + Math.floor((areaWidth - textWidth) / 2);
+      drawGlyph(text, startX, y, color);
+    }
+
+    function drawClockArea(now) {
+      fillRect(14, 19, 36, 26, "#000");
+      fillRect(14, 34, 36, 12, "#000");
+
+      drawGlyph("09", 16, 22, rgb(255, 214, 64));
+      drawGlyph("46", 35, 22, rgb(255, 214, 64));
+
+      const showColon = !state.showingWin && state.showSeconds;
+      if (showColon) {
+        drawGlyph(":", 31, 23, rgb(255, 214, 64));
+      }
+
+      if (state.showingWin) {
+        const paletteIndex = Math.floor((now - state.winPhaseStartedAt) / 120) % winPalette.length;
+        const [r, g, b] = winPalette[paletteIndex];
+        drawGlyphCentered("GAME WIN", 14, 36, 36, rgb(r, g, b));
+      } else {
+        drawGlyph("APR 7 TUE", 15, 36, rgb(173, 213, 85));
+      }
+    }
+
+    function render(now) {
+      if (!state.showingWin && now - state.lastSecondBlinkAt >= 1000) {
+        state.showSeconds = !state.showSeconds;
+        state.lastSecondBlinkAt = now;
+      }
+
+      advanceStep(now);
+      drawMap();
+      drawPacman();
+      drawClockArea(now);
+
+      const remaining = countEdibleBlocks();
+      statusEl.textContent = state.showingWin
+        ? "已进入 GAME WIN 阶段，正在按日期行位置做彩色轮换。"
+        : `吃豆进行中：已走 ${state.routeIndex}/${state.routeDirections.length} 步，剩余豆子 ${remaining}。本轮路线：${state.routeProfile}`;
+
+      requestAnimationFrame(render);
+    }
+
+    replayButton.addEventListener("click", () => {
+      resetState();
+    });
+
+    jumpWinButton.addEventListener("click", () => {
+      resetState();
+      state.showingWin = true;
+      state.winPhaseStartedAt = performance.now();
+      for (let row = 0; row < 12; row += 1) {
+        for (let col = 0; col < 12; col += 1) {
+          if (isVisibleTarget(state.map[row][col]) || state.map[row][col] === PACMAN_BLOCK_START) {
+            state.map[row][col] = PACMAN_BLOCK_EMPTY;
+          }
+        }
+      }
+    });
+
+    refreshSamplesButton.addEventListener("click", () => {
+      renderRouteSamples();
+    });
+
+    resetState();
+    renderRouteSamples();
+    requestAnimationFrame(render);
+  </script>
+</body>
+</html>

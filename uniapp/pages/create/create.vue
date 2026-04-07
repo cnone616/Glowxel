@@ -124,7 +124,9 @@
                       >{{ customWidth }}×{{ customHeight }}</text
                     >
                   </view>
-                  <text v-else class="size-hint">最大640×640像素</text>
+                  <text v-else class="size-hint"
+                    >最大{{ maxDimension }}×{{ maxDimension }}像素</text
+                  >
                 </view>
 
                 <view class="custom-size-inputs">
@@ -161,7 +163,7 @@
                       : "快捷尺寸 (正方形)"
                   }}</text>
                   <text class="size-hint">{{
-                    contentRatio ? "按图片内容比例" : "64的倍数标准尺寸"
+                    contentRatio ? "按图片内容比例" : "52的倍数标准尺寸"
                   }}</text>
                 </view>
 
@@ -436,6 +438,11 @@ import Toast from "../../components/Toast.vue";
 import ImageCropper from "../../components/ImageCropper.vue";
 import createProjectSourceMixin from "./mixins/projectSourceMixin.js";
 import createImagePreviewMixin from "./mixins/imagePreviewMixin.js";
+import {
+  PERLER_BOARD_SIZE,
+  PERLER_MAX_DIMENSION,
+  PERLER_SIZE_PRESETS,
+} from "../../constants/perler.js";
 
 export default {
   mixins: [statusBarMixin, createProjectSourceMixin, createImagePreviewMixin],
@@ -450,8 +457,8 @@ export default {
       toast: null,
 
       name: "",
-      customWidth: 64,
-      customHeight: 64,
+      customWidth: PERLER_BOARD_SIZE,
+      customHeight: PERLER_BOARD_SIZE,
       selectedPreset: "set24",
       selectedColors: new Set(ARTKAL_OFFICIAL_SETS.set24.colors),
       step: 0,
@@ -473,18 +480,9 @@ export default {
       isNameFocused: false,
 
       presets: ARTKAL_PRESETS,
-      defaultSizePresets: [
-        { width: 64, height: 64 },
-        { width: 128, height: 128 },
-        { width: 192, height: 192 },
-        { width: 256, height: 256 },
-        { width: 320, height: 320 },
-        { width: 384, height: 384 },
-        { width: 448, height: 448 },
-        { width: 512, height: 512 },
-        { width: 576, height: 576 },
-        { width: 640, height: 640 },
-      ],
+      boardSize: PERLER_BOARD_SIZE,
+      maxDimension: PERLER_MAX_DIMENSION,
+      defaultSizePresets: PERLER_SIZE_PRESETS,
       contentRatio: null, // 图片内容宽高比 { w, h }（最简比例）
     };
   },
@@ -495,24 +493,24 @@ export default {
       return this.defaultSizePresets;
     },
 
-    // 计算填充后的宽度（向上取整到64的倍数）
+    // 计算填充后的宽度（向上取整到52的倍数）
     paddedWidth() {
-      return Math.ceil(this.customWidth / 64) * 64;
+      return Math.ceil(this.customWidth / this.boardSize) * this.boardSize;
     },
 
-    // 计算填充后的高度（向上取整到64的倍数）
+    // 计算填充后的高度（向上取整到52的倍数）
     paddedHeight() {
-      return Math.ceil(this.customHeight / 64) * 64;
+      return Math.ceil(this.customHeight / this.boardSize) * this.boardSize;
     },
 
     // 计算横向板子数量
     boardsX() {
-      return Math.ceil(this.customWidth / 64);
+      return Math.ceil(this.customWidth / this.boardSize);
     },
 
     // 计算纵向板子数量
     boardsY() {
-      return Math.ceil(this.customHeight / 64);
+      return Math.ceil(this.customHeight / this.boardSize);
     },
 
     // 总板子数量
@@ -529,16 +527,16 @@ export default {
             this.imageFile &&
             this.customWidth > 0 &&
             this.customHeight > 0 &&
-            this.paddedWidth <= 640 &&
-            this.paddedHeight <= 640
+            this.paddedWidth <= this.maxDimension &&
+            this.paddedHeight <= this.maxDimension
           );
         } else {
           // 空白画布第1步：需要设置尺寸
           return (
             this.customWidth > 0 &&
             this.customHeight > 0 &&
-            this.paddedWidth <= 640 &&
-            this.paddedHeight <= 640
+            this.paddedWidth <= this.maxDimension &&
+            this.paddedHeight <= this.maxDimension
           );
         }
       }
@@ -616,8 +614,8 @@ export default {
   methods: {
     resetForm() {
       this.name = "";
-      this.customWidth = 64;
-      this.customHeight = 64;
+      this.customWidth = this.boardSize;
+      this.customHeight = this.boardSize;
       this.selectedPreset = "set24";
       this.selectedColors = new Set(ARTKAL_OFFICIAL_SETS.set24.colors);
       this.imageFile = null;
@@ -639,13 +637,17 @@ export default {
       if (this.customHeight < 1) this.customHeight = 1;
 
       // 检查是否超过最大限制
-      if (this.paddedWidth > 640) {
-        this.customWidth = 640;
-        this.toast.showError("宽度最大为640像素（10块板子）");
+      if (this.paddedWidth > this.maxDimension) {
+        this.customWidth = this.maxDimension;
+        this.toast.showError(
+          `宽度最大为${this.maxDimension}像素（${this.maxDimension / this.boardSize}块板子）`,
+        );
       }
-      if (this.paddedHeight > 640) {
-        this.customHeight = 640;
-        this.toast.showError("高度最大为640像素（10块板子）");
+      if (this.paddedHeight > this.maxDimension) {
+        this.customHeight = this.maxDimension;
+        this.toast.showError(
+          `高度最大为${this.maxDimension}像素（${this.maxDimension / this.boardSize}块板子）`,
+        );
       }
     },
 

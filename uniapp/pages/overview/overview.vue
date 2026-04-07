@@ -353,6 +353,7 @@ import Icon from "../../components/Icon.vue";
 import Toast from "../../components/Toast.vue";
 import ConfirmModal from "../../components/ConfirmModal.vue";
 import overviewActionMixin from "./mixins/overviewActionMixin.js";
+import { PERLER_BOARD_SIZE } from "../../constants/perler.js";
 
 export default {
   mixins: [statusBarMixin, overviewActionMixin],
@@ -400,15 +401,15 @@ export default {
     cols() {
       // 使用填充后的宽度计算板子数量
       const paddedWidth =
-        this.project?.paddedWidth || this.project?.width || 64;
-      return Math.ceil(paddedWidth / 64);
+        this.project?.paddedWidth || this.project?.width || PERLER_BOARD_SIZE;
+      return Math.ceil(paddedWidth / PERLER_BOARD_SIZE);
     },
 
     rows() {
       // 使用填充后的高度计算板子数量
       const paddedHeight =
-        this.project?.paddedHeight || this.project?.height || 64;
-      return Math.ceil(paddedHeight / 64);
+        this.project?.paddedHeight || this.project?.height || PERLER_BOARD_SIZE;
+      return Math.ceil(paddedHeight / PERLER_BOARD_SIZE);
     },
 
     rowLabels() {
@@ -546,16 +547,16 @@ export default {
 
     getBoardPixels(boardX, boardY) {
       const local = new Map();
-      const startX = boardX * 64;
-      const startY = boardY * 64;
+      const startX = boardX * PERLER_BOARD_SIZE;
+      const startY = boardY * PERLER_BOARD_SIZE;
 
       this.pixels.forEach((color, key) => {
         const [px, py] = key.split(",").map(Number);
         if (
           px >= startX &&
-          px < startX + 64 &&
+          px < startX + PERLER_BOARD_SIZE &&
           py >= startY &&
-          py < startY + 64
+          py < startY + PERLER_BOARD_SIZE
         ) {
           local.set(`${px - startX},${py - startY}`, color);
         }
@@ -568,8 +569,8 @@ export default {
       // 计算整个项目有多少个看板
       const paddedWidth = this.project.paddedWidth || this.project.width;
       const paddedHeight = this.project.paddedHeight || this.project.height;
-      const boardsX = Math.ceil(paddedWidth / 64);
-      const boardsY = Math.ceil(paddedHeight / 64);
+      const boardsX = Math.ceil(paddedWidth / PERLER_BOARD_SIZE);
+      const boardsY = Math.ceil(paddedHeight / PERLER_BOARD_SIZE);
 
       // 容器尺寸（需要通过CSS变量或固定值）
       // 假设容器是正方形，宽高相等，这里用百分比计算

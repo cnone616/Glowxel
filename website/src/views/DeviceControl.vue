@@ -3,7 +3,7 @@
     <div class="container">
       <div class="page-header">
         <h1 class="page-title">设备控制</h1>
-        <p class="page-desc">在网页直接连接 RenLight 设备并进行基础控制</p>
+        <p class="page-desc">在网页直接连接光格像素工坊设备并进行基础控制</p>
       </div>
 
       <div class="card">

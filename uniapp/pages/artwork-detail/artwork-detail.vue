@@ -232,6 +232,8 @@ import ArtworkCard from "../../components/ArtworkCard.vue";
 import Modal from "../../components/Modal.vue";
 import Input from "../../components/Input.vue";
 
+import { PERLER_BOARD_SIZE } from "../../constants/perler.js";
+
 export default {
   mixins: [statusBarMixin],
   components: {
@@ -316,7 +318,7 @@ export default {
     },
 
     getPaddedSize(value) {
-      return Math.ceil(value / 64) * 64;
+      return Math.ceil(value / PERLER_BOARD_SIZE) * PERLER_BOARD_SIZE;
     },
 
     buildArtworkPixelsMap(pixelList) {

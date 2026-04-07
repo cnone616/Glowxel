@@ -6,6 +6,9 @@
 
 - 首页、社区、挑战、模板、个人主页
 - 在线创作页与像素编辑页
+- 图纸工作台：`/pattern-workbench`
+- 网页设备控制页：`/device-control`
+- Web 时钟编辑页：`/clock-editor`
 - 作品详情、挑战详情
 - 登录与基础个人资料编辑
 - 静态硬件指南页：`public/hardware-guide.html`
@@ -23,18 +26,19 @@ npm run preview
 
 ```text
 website/
-├── public/              # 纯静态资源
-├── src/api/             # HTTP 接口封装
-├── src/components/      # 公共组件
-├── src/data/            # 颜色等静态数据
-├── src/router/          # 路由
-├── src/utils/           # 图片/导出工具
-├── src/views/           # 页面
-└── vite.config.js
+├── public/
+├── src/api/
+├── src/components/
+├── src/data/
+├── src/modules/
+├── src/router/
+├── src/stores/
+├── src/utils/
+└── src/views/
 ```
 
-## 说明
+## 相关文档
 
-- 当前站点使用真实后端接口，不再以 Mock 站点为主描述
-- `dist/` 为构建产物目录
-- 如果修改了首页硬件入口，请同步检查 `public/hardware-guide.html`
+1. [项目架构与接口文档.md](/Users/aflylong/Desktop/project/Glowxel/docs/项目架构与接口文档.md)
+2. [开发路线图.md](/Users/aflylong/Desktop/project/Glowxel/docs/开发路线图.md)
+3. [env-config.md](/Users/aflylong/Desktop/project/Glowxel/docs/env-config.md)

@@ -1,3 +1,5 @@
+import { PERLER_BOARD_SIZE } from "../../../constants/perler.js";
+
 export default {
   methods: {
     handleSave() {
@@ -200,7 +202,7 @@ export default {
             canvas.height = thumbnailSize;
             ctx.clearRect(0, 0, thumbnailSize, thumbnailSize);
 
-            const scale = thumbnailSize / 64;
+            const scale = thumbnailSize / PERLER_BOARD_SIZE;
             this.displayPixels.forEach((color, key) => {
               const [x, y] = key.split(",").map(Number);
               ctx.fillStyle = color;

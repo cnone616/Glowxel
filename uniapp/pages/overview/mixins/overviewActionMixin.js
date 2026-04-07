@@ -4,6 +4,7 @@ import {
   saveImageToAlbum,
 } from "../../../utils/exportCanvas.js";
 import { getCloudProjects, deleteCloudProject } from "../../../api/project.js";
+import { PERLER_BOARD_SIZE } from "../../../constants/perler.js";
 
 export default {
   methods: {
@@ -14,8 +15,8 @@ export default {
         const boardPixels = this.getBoardPixels(board.x, board.y);
         const tempFilePath = await exportCanvasAsImage({
           pixels: boardPixels,
-          width: 64,
-          height: 64,
+          width: PERLER_BOARD_SIZE,
+          height: PERLER_BOARD_SIZE,
           projectName: `${this.project?.name || "未命名"} - ${board.id}`,
           palette: this.project?.palette,
           cellSize: 30,

@@ -23,7 +23,7 @@
           v-if="previewCanvasReady && featureReady"
           :width="64"
           :height="64"
-          :pixels="previewPixels"
+          :pixels="currentPreviewPixels"
           :zoom="previewZoom"
           :offset-x="previewOffset.x"
           :offset-y="previewOffset.y"
@@ -41,11 +41,18 @@
       ></view>
       <view class="preview-caption">
         <view class="preview-caption-info">
+          <view class="preview-status-chip" :class="previewStatusClass">
+            <text class="preview-status-chip-text">{{ previewStatusLabel }}</text>
+          </view>
           <text class="preview-title">64 x 64 模拟预览</text>
           <text class="preview-subtitle">{{ previewSubtitle }}</text>
         </view>
         <view class="preview-actions">
-          <view class="action-btn-sm" @click="saveDraft">
+          <view
+            class="action-btn-sm"
+            :class="{ disabled: isSending }"
+            @click="saveDraft"
+          >
             <Icon name="save" :size="36" color="var(--color-text-primary)" />
             <text>保存</text>
           </view>
@@ -668,6 +675,14 @@
     </scroll-view>
 
     <Toast ref="toastRef" @show="previewHidden = true" @hide="onToastHide" />
+
+    <view v-if="isSending" class="sending-overlay" @touchmove.stop.prevent>
+      <view class="sending-modal">
+        <view class="sending-spinner"></view>
+        <text class="sending-title">正在发送功能预览...</text>
+        <text class="sending-tip">请保持设备在线，发送完成后会自动恢复页面</text>
+      </view>
+    </view>
   </view>
 </template>
 
@@ -681,12 +696,12 @@ import PixelCanvas from "../../components/PixelCanvas.vue";
 import ColorPanelPicker from "../../components/ColorPanelPicker.vue";
 import { uploadAnimationFrames } from "../../utils/animationUploader.js";
 import {
-  buildCountdownPreview,
-  buildNotificationPreview,
-  buildStopwatchPreview,
-  buildWeatherPreview,
+  buildCountdownPreviewFrames,
+  buildNotificationPreviewFrames,
+  buildStopwatchPreviewFrames,
+  buildWeatherPreviewFrames,
 } from "../../utils/featurePreviewBuilders.js";
-import { pixelMapToAnimationFrame } from "../../utils/pixelAnimationFrames.js";
+import { pixelPreviewFramesToAnimationFrames } from "../../utils/pixelAnimationFrames.js";
 
 const WEATHER_DRAFT_KEY = "weather_feature_draft";
 const COUNTDOWN_DRAFT_KEY = "countdown_feature_draft";
@@ -766,6 +781,12 @@ export default {
       previewZoom: 4,
       previewOffset: { x: 16, y: 16 },
       previewContainerSize: { width: 320, height: 320 },
+      previewFrameMaps: [],
+      previewFrameDelays: [],
+      previewFrameIndex: 0,
+      previewTimer: null,
+      previewRefreshTimer: null,
+      previewRefreshToken: 0,
       selectedWeatherPresetKey: "",
       selectedCountdownPresetKey: "",
       selectedStopwatchPresetKey: "",
@@ -834,10 +855,10 @@ export default {
       weatherPresets: [
         {
           key: "sunny-standard",
-          label: "晴空温度",
-          tag: "清爽",
-          hint: "主图标居中，温湿度分层",
-          colors: ["#FFD24D", "#FFFFFF", "#64C8FF"],
+          label: "AWTRIX 晴天卡",
+          tag: "信息卡",
+          hint: "主温度大字，天气图标和湿度分层",
+          colors: ["#FFD24D", "#DFF7FF", "#64C8FF"],
           config: {
             weatherType: "sunny",
             layout: "standard",
@@ -852,10 +873,10 @@ export default {
         },
         {
           key: "rain-detail",
-          label: "雨天详情",
-          tag: "信息型",
-          hint: "适合显示湿度和低温",
-          colors: ["#64C8FF", "#FFFFFF", "#7DD3FC"],
+          label: "AWTRIX 雨天卡",
+          tag: "播报",
+          hint: "适合显示湿度偏高和降温场景",
+          colors: ["#64C8FF", "#DFF7FF", "#7DD3FC"],
           config: {
             weatherType: "rainy",
             layout: "detail",
@@ -870,9 +891,9 @@ export default {
         },
         {
           key: "night-cloud",
-          label: "夜间多云",
+          label: "夜间天气卡",
           tag: "夜景",
-          hint: "月夜配色更柔和",
+          hint: "月夜配色更柔和，适合床头氛围",
           colors: ["#9AABFF", "#F9F7D1", "#A0E9FF"],
           config: {
             weatherType: "cloudy",
@@ -890,9 +911,9 @@ export default {
       countdownPresets: [
         {
           key: "quick-break",
-          label: "5分钟休息",
-          tag: "短时",
-          hint: "沙漏居中，适合快节奏提示",
+          label: "沙漏倒数",
+          tag: "沙漏",
+          hint: "适合五分钟休息和短时提醒",
           colors: ["#64C8FF", "#C7EEFF"],
           config: {
             hours: 0,
@@ -906,9 +927,9 @@ export default {
         },
         {
           key: "focus-ring",
-          label: "25分钟专注",
-          tag: "专注",
-          hint: "环形进度更适合长时专注",
+          label: "环形倒数",
+          tag: "环形",
+          hint: "长时专注时更容易一眼看出进度",
           colors: ["#7DDF8A", "#D5FFD8"],
           config: {
             hours: 0,
@@ -924,7 +945,7 @@ export default {
           key: "event-sprint",
           label: "冲刺倒数",
           tag: "冲刺",
-          hint: "红色压迫感更强，适合末段",
+          hint: "末段压迫感更强，适合比赛或整点",
           colors: ["#FF6464", "#FFD2D2"],
           config: {
             hours: 0,
@@ -940,9 +961,9 @@ export default {
       stopwatchPresets: [
         {
           key: "training",
-          label: "训练模式",
+          label: "训练计时板",
           tag: "训练",
-          hint: "主读数大，圈次做辅助",
+          hint: "主读数最大，圈次和节奏做辅助",
           colors: ["#FFB020", "#FFE3A4"],
           config: {
             displayStyle: "training",
@@ -954,9 +975,9 @@ export default {
         },
         {
           key: "racing",
-          label: "竞速模式",
+          label: "竞速计时板",
           tag: "竞速",
-          hint: "高对比，更突出冲线感",
+          hint: "高对比布局，更突出冲线速度感",
           colors: ["#FF6464", "#FFD2D2"],
           config: {
             displayStyle: "racing",
@@ -968,9 +989,9 @@ export default {
         },
         {
           key: "lap-focus",
-          label: "圈次模式",
-          tag: "分段",
-          hint: "圈次更醒目，适合间歇训练",
+          label: "圈速计时板",
+          tag: "圈次",
+          hint: "圈次更醒目，适合分段和间歇训练",
           colors: ["#64C8FF", "#C7EEFF"],
           config: {
             displayStyle: "lap_focus",
@@ -984,9 +1005,9 @@ export default {
       notificationPresets: [
         {
           key: "drink",
-          label: "喝水提醒",
+          label: "喝水提醒卡",
           tag: "日常",
-          hint: "杯子图标配短文案，识别快",
+          hint: "杯子图标配短文案，远看也容易识别",
           colors: ["#64C8FF", "#C7EEFF"],
           config: {
             icon: "drink",
@@ -999,9 +1020,9 @@ export default {
         },
         {
           key: "break",
-          label: "休息提醒",
+          label: "休息提醒卡",
           tag: "办公",
-          hint: "中场休息类提醒更柔和",
+          hint: "适合久坐场景，语义更直接",
           colors: ["#7DDF8A", "#D5FFD8"],
           config: {
             icon: "break",
@@ -1014,9 +1035,9 @@ export default {
         },
         {
           key: "fireworks",
-          label: "新年烟花",
+          label: "烟花庆祝卡",
           tag: "节日",
-          hint: "烟花居中，文案更有庆祝感",
+          hint: "烟花主图更适合整屏庆祝卡片",
           colors: ["#FFB020", "#FFE3A4"],
           config: {
             icon: "fireworks",
@@ -1029,9 +1050,9 @@ export default {
         },
         {
           key: "birthday",
-          label: "生日祝福",
+          label: "生日祝福卡",
           tag: "庆祝",
-          hint: "蛋糕主题适合单次提醒",
+          hint: "蛋糕主题更适合一次性的庆祝提醒",
           colors: ["#FF6FAE", "#FFD0E4"],
           config: {
             icon: "birthday",
@@ -1044,9 +1065,9 @@ export default {
         },
         {
           key: "christmas",
-          label: "圣诞提醒",
-          tag: "节气",
-          hint: "节日树形更适合暖色氛围",
+          label: "圣诞祝福卡",
+          tag: "节日",
+          hint: "节日树形更适合暖色氛围和祝福卡",
           colors: ["#7DDF8A", "#FFD24D"],
           config: {
             icon: "christmas",
@@ -1061,95 +1082,110 @@ export default {
     };
   },
   computed: {
+    currentPreviewPixels() {
+      if (this.previewFrameMaps.length === 0) {
+        return new Map();
+      }
+      if (this.previewFrameIndex >= this.previewFrameMaps.length) {
+        return this.previewFrameMaps[0];
+      }
+      return this.previewFrameMaps[this.previewFrameIndex];
+    },
     pageTitle() {
       if (this.featureType === "weather") {
-        return "天气";
+        return "天气看板";
       }
       if (this.featureType === "countdown") {
-        return "倒计时";
+        return "倒数看板";
       }
       if (this.featureType === "stopwatch") {
-        return "秒表";
+        return "计时看板";
       }
       if (this.featureType === "notification") {
-        return "通知提醒";
+        return "提醒看板";
       }
       return "扩展功能";
     },
     featureGuideTitle() {
       if (this.featureType === "weather") {
-        return "天气主题逻辑";
+        return "天气信息卡";
       }
       if (this.featureType === "countdown") {
-        return "倒计时主题逻辑";
+        return "倒数整屏卡";
       }
       if (this.featureType === "stopwatch") {
-        return "秒表主题逻辑";
+        return "训练计时板";
       }
       if (this.featureType === "notification") {
-        return "通知提醒展示逻辑";
+        return "提醒信息卡";
       }
       return "功能说明";
     },
     featureGuideTag() {
       if (this.featureType === "weather") {
-        return "信息主题";
+        return "AWTRIX";
       }
       if (this.featureType === "countdown") {
-        return "时间氛围";
+        return "倒数屏";
       }
       if (this.featureType === "stopwatch") {
-        return "运动感";
+        return "计时板";
       }
       if (this.featureType === "notification") {
-        return "到点展示";
+        return "提醒卡";
       }
       return "说明";
     },
     featureGuideText() {
       if (this.featureType === "weather") {
-        return "预览会优先突出天气图标和温度主读数，再用湿度和城市标签补充信息，目标是更像成熟的小型信息卡，而不是把数据简单堆在一起。";
+        return "这里直接按 AWTRIX 一类成熟信息卡的层级来做，先保证天气状态和温度一眼能读，再把城市和湿度放到辅助层。";
       }
       if (this.featureType === "countdown") {
-        return "预览会强化剩余时间的紧迫感和节奏变化，沙漏、环形、冲刺和条形四种样式都应该一眼看懂当前状态，而不是只看见一个数字。";
+        return "这里按成熟倒数屏的做法，把剩余时间、进度结构和整屏张力一起成立，不再只是放一串数字。";
       }
       if (this.featureType === "stopwatch") {
-        return "预览会更偏运动设备风格，主时间必须最醒目，圈次、训练或竞速标签只做辅助，让画面既专业又不杂乱。";
+        return "这里直接对标训练和竞速计时板，主时间最大最醒目，圈次和节奏只做辅助，不再走杂乱堆叠。";
       }
       if (this.featureType === "notification") {
-        return "这里配置的是到指定时间后屏幕展示什么内容，不是让控制页常驻显示时间；预览会优先表达图标、文案和主题。";
+        return "这里按成熟提醒卡的结构来做，重点是图标、文案和主题氛围一起成立，而不是普通弹字提示。";
       }
       return "";
     },
     previewSubtitle() {
+      if (!this.previewCanvasReady) {
+        return "预览网格加载中，完成后可直接查看当前功能布局";
+      }
       if (this.featureType === "weather") {
-        return "预览天气卡片的主信息层级和氛围布局";
+        return "预览 AWTRIX 风格天气卡的主信息层级和整屏观感";
       }
       if (this.featureType === "countdown") {
-        return "预览剩余时间、进度张力和主题样式";
+        return "预览倒数屏的大字读数、进度结构和整体氛围";
       }
       if (this.featureType === "stopwatch") {
-        return "预览主时间读数、圈次信息和运动主题";
+        return "预览训练计时板的主读数、圈次信息和竞速感";
       }
       if (this.featureType === "notification") {
-        return "预览触发后屏幕展示的图标、文案与主题";
+        return "预览提醒卡触发后的整屏图标、文案和主题";
       }
       return "";
     },
-    previewPixels() {
-      if (this.featureType === "weather") {
-        return buildWeatherPreview(this.weatherConfig);
+    previewStatusLabel() {
+      if (this.isSending) {
+        return "发送中";
       }
-      if (this.featureType === "countdown") {
-        return buildCountdownPreview(this.countdownConfig);
+      if (!this.previewCanvasReady) {
+        return "预览加载中";
       }
-      if (this.featureType === "stopwatch") {
-        return buildStopwatchPreview(this.stopwatchConfig);
+      return "模拟预览";
+    },
+    previewStatusClass() {
+      if (this.isSending) {
+        return "is-sending";
       }
-      if (this.featureType === "notification") {
-        return buildNotificationPreview(this.notificationConfig);
+      if (!this.previewCanvasReady) {
+        return "is-loading";
       }
-      return new Map();
+      return "is-preview";
     },
     countdownDurationLabel() {
       const totalSeconds =
@@ -1184,6 +1220,43 @@ export default {
       );
     },
   },
+  watch: {
+    weatherConfig: {
+      deep: true,
+      handler() {
+        if (this.featureType === "weather") {
+          this.schedulePreviewRefresh();
+        }
+      },
+    },
+    countdownConfig: {
+      deep: true,
+      handler() {
+        if (this.featureType === "countdown") {
+          this.schedulePreviewRefresh();
+        }
+      },
+    },
+    stopwatchConfig: {
+      deep: true,
+      handler() {
+        if (this.featureType === "stopwatch") {
+          this.schedulePreviewRefresh();
+        }
+      },
+    },
+    notificationConfig: {
+      deep: true,
+      handler() {
+        if (this.featureType === "notification") {
+          this.schedulePreviewRefresh();
+        }
+      },
+    },
+    featureType() {
+      this.schedulePreviewRefresh();
+    },
+  },
   onLoad(options) {
     this.toast = useToast();
     this.deviceStore = useDeviceStore();
@@ -1191,13 +1264,6 @@ export default {
 
     if (!options || typeof options.feature !== "string") {
       this.invalidFeature = true;
-      return;
-    }
-
-    if (options.feature === "notification") {
-      uni.redirectTo({
-        url: "/pages/notification-list/notification-list",
-      });
       return;
     }
 
@@ -1232,13 +1298,84 @@ export default {
     }
 
     this.initPreviewCanvas();
+    this.schedulePreviewRefresh();
+  },
+  onShow() {
+    if (!this.isSending) {
+      this.previewHidden = false;
+    }
+    if (this.previewCanvasReady) {
+      this.schedulePreviewRefresh();
+    }
+  },
+  onHide() {
+    this.cleanupPreviewTimers();
+  },
+  onUnload() {
+    this.cleanupPreviewTimers();
   },
   methods: {
     handleBack() {
       uni.navigateBack();
     },
     onToastHide() {
-      this.previewHidden = false;
+      if (!this.isSending) {
+        this.previewHidden = false;
+      }
+    },
+    schedulePreviewRefresh() {
+      if (this.previewRefreshTimer) {
+        clearTimeout(this.previewRefreshTimer);
+        this.previewRefreshTimer = null;
+      }
+      this.previewRefreshTimer = setTimeout(() => {
+        this.refreshPreviewFrames();
+      }, 80);
+    },
+    refreshPreviewFrames() {
+      const token = this.previewRefreshToken + 1;
+      this.previewRefreshToken = token;
+      const frames = this.buildFeaturePreviewFrames();
+      if (token !== this.previewRefreshToken) {
+        return;
+      }
+      this.previewFrameMaps = frames.map((frame) => frame.pixels);
+      this.previewFrameDelays = frames.map((frame) => frame.delay);
+      this.previewFrameIndex = 0;
+      this.startPreviewPlayback();
+    },
+    startPreviewPlayback() {
+      this.stopPreviewPlayback();
+      if (this.previewFrameMaps.length <= 1) {
+        return;
+      }
+      const playNext = () => {
+        const delay = this.previewFrameDelays[this.previewFrameIndex];
+        const safeDelay = typeof delay === "number" ? delay : 120;
+        this.previewTimer = setTimeout(() => {
+          if (this.previewFrameMaps.length === 0) {
+            return;
+          }
+          const nextIndex = this.previewFrameIndex + 1;
+          this.previewFrameIndex =
+            nextIndex >= this.previewFrameMaps.length ? 0 : nextIndex;
+          playNext();
+        }, safeDelay);
+      };
+      playNext();
+    },
+    stopPreviewPlayback() {
+      if (this.previewTimer) {
+        clearTimeout(this.previewTimer);
+        this.previewTimer = null;
+      }
+    },
+    cleanupPreviewTimers() {
+      this.stopPreviewPlayback();
+      if (this.previewRefreshTimer) {
+        clearTimeout(this.previewRefreshTimer);
+        this.previewRefreshTimer = null;
+      }
     },
     initPreviewCanvas() {
       const systemInfo = uni.getSystemInfoSync();
@@ -1354,8 +1491,23 @@ export default {
 
       this.toast.showSuccess("草稿已保存");
     },
+    buildFeaturePreviewFrames() {
+      if (this.featureType === "weather") {
+        return buildWeatherPreviewFrames(this.weatherConfig);
+      }
+      if (this.featureType === "countdown") {
+        return buildCountdownPreviewFrames(this.countdownConfig);
+      }
+      if (this.featureType === "stopwatch") {
+        return buildStopwatchPreviewFrames(this.stopwatchConfig);
+      }
+      if (this.featureType === "notification") {
+        return buildNotificationPreviewFrames(this.notificationConfig);
+      }
+      return [{ pixels: new Map(), delay: 180 }];
+    },
     buildFeatureFrames() {
-      return [pixelMapToAnimationFrame(this.previewPixels, 220)];
+      return pixelPreviewFramesToAnimationFrames(this.buildFeaturePreviewFrames(), 180);
     },
     async saveAndApply() {
       if (this.isSending) {
@@ -1588,6 +1740,32 @@ export default {
   gap: 4rpx;
 }
 
+.preview-status-chip {
+  display: inline-flex;
+  width: fit-content;
+  padding: 6rpx 12rpx;
+  border-radius: 999rpx;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.preview-status-chip.is-loading {
+  background: rgba(255, 214, 102, 0.14);
+}
+
+.preview-status-chip.is-preview {
+  background: rgba(79, 127, 255, 0.14);
+}
+
+.preview-status-chip.is-sending {
+  background: rgba(52, 211, 153, 0.16);
+}
+
+.preview-status-chip-text {
+  font-size: 20rpx;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
 .preview-title {
   font-size: 24rpx;
   font-weight: 600;
@@ -1620,6 +1798,58 @@ export default {
   font-weight: 600;
   color: var(--text-primary);
   line-height: 1;
+}
+
+.preview-actions .action-btn-sm.disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.sending-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.sending-modal {
+  min-width: 420rpx;
+  padding: 60rpx 50rpx;
+  border-radius: 24rpx;
+  background: var(--bg-elevated);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24rpx;
+}
+
+.sending-spinner {
+  width: 60rpx;
+  height: 60rpx;
+  border-radius: 50%;
+  border: 6rpx solid rgba(79, 127, 255, 0.2);
+  border-top-color: var(--accent-primary);
+  animation: spin 0.8s linear infinite;
+}
+
+.sending-title {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.sending-tip {
+  font-size: 24rpx;
+  color: var(--text-secondary);
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .content {

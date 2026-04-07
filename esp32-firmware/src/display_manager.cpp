@@ -1,27 +1,45 @@
 #include "display_manager.h"
 #include "clock_font_renderer.h"
 #include "eyes_effect.h"
+#include "theme_renderer.h"
+#include "wifi_manager.h"
 #include <time.h>
 #include <math.h>
 
 // 静态成员初始化
-MatrixPanel_I2S_DMA* DisplayManager::dma_display = nullptr;
+CaptureMatrixPanel* DisplayManager::dma_display = nullptr;
 DeviceMode DisplayManager::currentMode = MODE_CANVAS;
 DeviceMode DisplayManager::lastBusinessMode = MODE_CLOCK;
 String DisplayManager::currentBusinessModeTag = "clock";
 String DisplayManager::lastBusinessModeTag = "clock";
 NativeEffectType DisplayManager::nativeEffectType = NATIVE_EFFECT_NONE;
-BreathEffectConfig DisplayManager::breathEffectConfig = {5, true, 10, 100, 1800, BREATH_WAVE_SINE, 100, 200, 255};
+BreathEffectConfig DisplayManager::breathEffectConfig = {
+  5,
+  true,
+  BREATH_MOTION_CLOCKWISE,
+  BREATH_SCOPE_SINGLE_RING,
+  BREATH_COLOR_SOLID,
+  100,
+  200,
+  255,
+  255,
+  255,
+  255
+};
 RhythmEffectConfig DisplayManager::rhythmEffectConfig = {120, 5, true, RHYTHM_DIR_LEFT, 70, RHYTHM_MODE_PULSE, 100, 200, 255, 255, 100, 100};
+AmbientEffectConfig DisplayManager::ambientEffectConfig = {AMBIENT_PRESET_AURORA, 6, 72, true};
 unsigned long DisplayManager::nativeEffectStartTime = 0;
 int DisplayManager::currentBrightness = 50;
 bool DisplayManager::clientConnected = false;
 uint8_t DisplayManager::canvasBuffer[64][64][3];
 uint16_t DisplayManager::backgroundBuffer[64][64];
 uint16_t DisplayManager::animationBuffer[64][64];
+uint16_t DisplayManager::liveFrameBuffer[64][64];
 bool DisplayManager::canvasInitialized = false;
 bool DisplayManager::backgroundValid = false;
 bool DisplayManager::animationBufferValid = false;
+bool DisplayManager::liveFrameValid = false;
+bool DisplayManager::doubleBufferEnabled = false;
 bool DisplayManager::receivingPixels = false;
 DisplayManager::BlackPixel* DisplayManager::blackPixels = nullptr;
 int DisplayManager::blackPixelCount = 0;
@@ -37,20 +55,191 @@ const int DisplayManager::PANEL_RES_Y = 64;
 const int DisplayManager::PANEL_CHAIN = 1;
 const int DisplayManager::MAX_PIXELS = PANEL_RES_X * PANEL_RES_Y;
 
+static BufferMatrixPanel* s_offscreenDisplay = nullptr;
+
+static void presentFrame() {
+  if (DisplayManager::dma_display == nullptr) {
+    return;
+  }
+  DisplayManager::dma_display->flipDMABuffer();
+}
+
+void CaptureMatrixPanel::drawPixel(int16_t x, int16_t y, uint16_t color) {
+  MatrixPanel_I2S_DMA::drawPixel(x, y, color);
+  DisplayManager::writeLiveFramePixel565(x, y, color);
+}
+
+void CaptureMatrixPanel::fillScreen(uint16_t color) {
+  MatrixPanel_I2S_DMA::fillScreen(color);
+  DisplayManager::clearLiveFrame(color);
+}
+
+void CaptureMatrixPanel::drawPixelRGB888(int16_t x, int16_t y, uint8_t r, uint8_t g, uint8_t b) {
+  MatrixPanel_I2S_DMA::drawPixelRGB888(x, y, r, g, b);
+  DisplayManager::writeLiveFramePixelRGB888(x, y, r, g, b);
+}
+
+void CaptureMatrixPanel::fillScreenRGB888(uint8_t r, uint8_t g, uint8_t b) {
+  MatrixPanel_I2S_DMA::fillScreenRGB888(r, g, b);
+  DisplayManager::clearLiveFrame(MatrixPanel_I2S_DMA::color565(r, g, b));
+}
+
+void CaptureMatrixPanel::clearScreen() {
+  MatrixPanel_I2S_DMA::clearScreen();
+  DisplayManager::clearLiveFrame(0);
+}
+
+void BufferMatrixPanel::setTargetBuffer(uint16_t* buffer, int width, int height) {
+  targetBuffer = buffer;
+  targetWidth = width;
+  targetHeight = height;
+}
+
+void BufferMatrixPanel::drawPixel(int16_t x, int16_t y, uint16_t color) {
+  if (targetBuffer == nullptr) {
+    return;
+  }
+  if (x < 0 || x >= targetWidth || y < 0 || y >= targetHeight) {
+    return;
+  }
+  targetBuffer[y * targetWidth + x] = color;
+}
+
+void BufferMatrixPanel::fillScreen(uint16_t color) {
+  if (targetBuffer == nullptr) {
+    return;
+  }
+  for (int y = 0; y < targetHeight; y++) {
+    for (int x = 0; x < targetWidth; x++) {
+      targetBuffer[y * targetWidth + x] = color;
+    }
+  }
+}
+
+void BufferMatrixPanel::drawPixelRGB888(int16_t x, int16_t y, uint8_t r, uint8_t g, uint8_t b) {
+  drawPixel(x, y, MatrixPanel_I2S_DMA::color565(r, g, b));
+}
+
+void BufferMatrixPanel::clearScreen() {
+  fillScreen(0);
+}
+
+void DisplayManager::clearLiveFrame(uint16_t color) {
+  liveFrameValid = true;
+  if (color == 0) {
+    memset(liveFrameBuffer, 0, sizeof(liveFrameBuffer));
+    return;
+  }
+
+  for (int y = 0; y < PANEL_RES_Y; y++) {
+    for (int x = 0; x < PANEL_RES_X; x++) {
+      liveFrameBuffer[y][x] = color;
+    }
+  }
+}
+
+void DisplayManager::writeLiveFramePixel565(int x, int y, uint16_t color) {
+  if (x < 0 || x >= PANEL_RES_X || y < 0 || y >= PANEL_RES_Y) {
+    return;
+  }
+  liveFrameBuffer[y][x] = color;
+  liveFrameValid = true;
+}
+
+void DisplayManager::writeLiveFramePixelRGB888(int x, int y, uint8_t r, uint8_t g, uint8_t b) {
+  writeLiveFramePixel565(x, y, MatrixPanel_I2S_DMA::color565(r, g, b));
+}
+
+MatrixPanel_I2S_DMA* DisplayManager::beginOffscreenFrame(uint16_t* targetBuffer, uint16_t clearColor) {
+  if (targetBuffer == nullptr) {
+    return nullptr;
+  }
+
+  if (s_offscreenDisplay == nullptr) {
+    HUB75_I2S_CFG mxconfig(PANEL_RES_X, PANEL_RES_Y, PANEL_CHAIN);
+    mxconfig.gpio.e = 18;
+    mxconfig.clkphase = false;
+    s_offscreenDisplay = new BufferMatrixPanel(mxconfig);
+  }
+
+  if (s_offscreenDisplay == nullptr) {
+    return nullptr;
+  }
+
+  s_offscreenDisplay->setTargetBuffer(targetBuffer, PANEL_RES_X, PANEL_RES_Y);
+  s_offscreenDisplay->fillScreen(clearColor);
+  s_offscreenDisplay->setTextWrap(true);
+  s_offscreenDisplay->setCursor(0, 0);
+  s_offscreenDisplay->setTextSize(1);
+  s_offscreenDisplay->setFont(nullptr);
+  return s_offscreenDisplay;
+}
+
+void DisplayManager::presentOffscreenFrame(const uint16_t* targetBuffer) {
+  if (dma_display == nullptr || targetBuffer == nullptr) {
+    return;
+  }
+
+  bool changed = false;
+  for (int y = 0; y < PANEL_RES_Y; y++) {
+    for (int x = 0; x < PANEL_RES_X; x++) {
+      uint16_t nextColor = targetBuffer[y * PANEL_RES_X + x];
+      if (liveFrameValid && liveFrameBuffer[y][x] == nextColor) {
+        continue;
+      }
+      dma_display->drawPixel(x, y, nextColor);
+      changed = true;
+    }
+  }
+
+  if (!liveFrameValid) {
+    liveFrameValid = true;
+  }
+  if (changed) {
+    presentFrame();
+  }
+}
+
 void DisplayManager::init() {
   Serial.println("1. 初始化LED灯板...");
   setupMatrix();
 }
 
 void DisplayManager::setupMatrix() {
+  rebuildMatrix(false, true);
+}
+
+bool DisplayManager::rebuildMatrix(bool doubleBuffered, bool showBootLogo) {
+  if (dma_display != nullptr) {
+    delete dma_display;
+    dma_display = nullptr;
+  }
+
   HUB75_I2S_CFG mxconfig(PANEL_RES_X, PANEL_RES_Y, PANEL_CHAIN);
   mxconfig.gpio.e = 18;
   mxconfig.clkphase = false;
+  mxconfig.double_buff = doubleBuffered;
 
-  dma_display = new MatrixPanel_I2S_DMA(mxconfig);
-  dma_display->begin();
+  CaptureMatrixPanel* nextDisplay = new CaptureMatrixPanel(mxconfig);
+  if (nextDisplay == nullptr) {
+    Serial.println("显示实例创建失败");
+    return false;
+  }
+  if (!nextDisplay->begin()) {
+    Serial.printf("显示初始化失败，double buffer=%d\n", doubleBuffered ? 1 : 0);
+    delete nextDisplay;
+    return false;
+  }
+
+  dma_display = nextDisplay;
+  doubleBufferEnabled = doubleBuffered;
   dma_display->setBrightness8(51);
+  dma_display->setLatBlanking(2);
   dma_display->clearScreen();
+
+  if (!showBootLogo) {
+    return true;
+  }
 
   Serial.println("显示开机Logo...");
   drawLogo(12, 7);  // 开机 logo 偏上
@@ -59,8 +248,35 @@ void DisplayManager::setupMatrix() {
   dma_display->setTextColor(dma_display->color565(220, 220, 220));
   dma_display->setCursor(11, 52);
   dma_display->print("RenLight");
+  presentFrame();
   delay(2000);
   Serial.println("LED灯板初始化完成");
+  return true;
+}
+
+bool DisplayManager::enableDoubleBuffer() {
+  if (doubleBufferEnabled) {
+    return true;
+  }
+
+  Serial.println("尝试启用双缓冲显示...");
+  bool ok = rebuildMatrix(true, false);
+  if (ok) {
+    Serial.println("双缓冲已启用");
+    clearLiveFrame();
+    backgroundValid = false;
+    animationBufferValid = false;
+    return true;
+  }
+
+  Serial.println("双缓冲启用失败，恢复单缓冲");
+  bool fallbackOk = rebuildMatrix(false, false);
+  if (fallbackOk) {
+    clearLiveFrame();
+    backgroundValid = false;
+    animationBufferValid = false;
+  }
+  return false;
 }
 
 void DisplayManager::drawLogo(int x, int y) {
@@ -147,6 +363,7 @@ void DisplayManager::updateLoadingAnimation() {
 
   // 高亮当前格子
   dma_display->fillRect(x + col * step, y + row * step, bs, bs, grid[row][col]);
+  presentFrame();
 }
 
 // 前向声明
@@ -298,6 +515,7 @@ void DisplayManager::renderAnimationFrame(const PixelData* pixels, int pixelCoun
   }
 
   drawClockOverlay();
+  presentFrame();
 }
 
 void DisplayManager::renderCanvas() {
@@ -305,6 +523,7 @@ void DisplayManager::renderCanvas() {
 
   if (!canvasInitialized) {
     drawLogo(12, 12);
+    presentFrame();
     return;
   }
 
@@ -321,6 +540,7 @@ void DisplayManager::renderCanvas() {
       yield();
     }
   }
+  presentFrame();
 }
 
 void DisplayManager::clearCanvas() {
@@ -345,6 +565,7 @@ void DisplayManager::highlightCanvasColor(int r, int g, int b) {
     for (int i = 0; i < blackPixelCount; i++) {
       dma_display->drawPixelRGB888(blackPixels[i].x, blackPixels[i].y, 255, 255, 255);
     }
+    presentFrame();
     return;
   }
 
@@ -364,6 +585,7 @@ void DisplayManager::highlightCanvasColor(int r, int g, int b) {
       yield();
     }
   }
+  presentFrame();
 }
 
 void DisplayManager::highlightCanvasRow(int row) {
@@ -397,6 +619,7 @@ void DisplayManager::highlightCanvasRow(int row) {
       yield();
     }
   }
+  presentFrame();
 }
 
 void DisplayManager::renderAnimationTransition(
@@ -449,6 +672,7 @@ void DisplayManager::renderAnimationTransition(
   animationBufferValid = true;
 
   drawClockOverlay();
+  presentFrame();
 }
 
 void DisplayManager::renderAnimationTransitionBuffers(
@@ -488,6 +712,7 @@ void DisplayManager::renderAnimationTransitionBuffers(
   }
   animationBufferValid = true;
   drawClockOverlay();
+  presentFrame();
 }
 
 // 独立背景绘制：清屏 + 画像素背景或 Logo，不涉及时钟文字
@@ -509,6 +734,7 @@ void DisplayManager::drawBackground() {
     drawLogo(12, 18);
     cacheLogoBackground(12, 18);
   }
+  presentFrame();
 }
 
 void DisplayManager::displayClock(bool force) {
@@ -531,27 +757,7 @@ void DisplayManager::displayClock(bool force) {
 
   struct tm timeinfo;
   if (!getLocalTime(&timeinfo)) {
-    char placeholder[9];
-    if (cfg.showSeconds) {
-      snprintf(placeholder, sizeof(placeholder), "--:--:--");
-    } else {
-      snprintf(placeholder, sizeof(placeholder), "--:--");
-    }
-    dma_display->clearScreen();
-    if (currentMode == MODE_CLOCK && !hasCustomImage) {
-      drawLogo(12, 18);
-    }
-    if (cfg.time.show) {
-      drawClockText(
-        dma_display,
-        placeholder,
-        cfg.time.x,
-        cfg.time.y,
-        dma_display->color565(cfg.time.r, cfg.time.g, cfg.time.b),
-        cfg.font,
-        cfg.time.fontSize
-      );
-    }
+    WiFiManager::showTimeSyncScreen();
     return;
   }
 
@@ -582,6 +788,46 @@ void DisplayManager::displayClock(bool force) {
 
   // 叠加时钟文字（白色，由 clockConfig 控制）
   drawClockOverlay();
+  presentFrame();
+}
+
+void DisplayManager::displayTheme(bool force) {
+  if (receivingPixels) {
+    return;
+  }
+
+  static unsigned long s_lastThemeRenderAt = 0;
+  unsigned long now = millis();
+  uint16_t refreshInterval = getThemeRefreshIntervalMs(ConfigManager::themeConfig.themeId);
+  if (!force && now - s_lastThemeRenderAt < refreshInterval) {
+    return;
+  }
+  s_lastThemeRenderAt = now;
+
+  struct tm timeinfo;
+  struct tm* timePtr = getLocalTime(&timeinfo) ? &timeinfo : nullptr;
+
+  const PixelData* imagePixels = nullptr;
+  int imagePixelCount = 0;
+  if (themeUsesStoredImage(ConfigManager::themeConfig.themeId)) {
+    imagePixels = ConfigManager::staticImagePixels;
+    imagePixelCount = ConfigManager::staticImagePixelCount;
+  }
+
+  backgroundValid = false;
+  animationBufferValid = false;
+  MatrixPanel_I2S_DMA* offscreen = beginOffscreenFrame(&animationBuffer[0][0], 0);
+  if (offscreen == nullptr) {
+    return;
+  }
+  renderThemeFrame(
+    offscreen,
+    ConfigManager::themeConfig.themeId,
+    timePtr,
+    imagePixels,
+    imagePixelCount
+  );
+  presentOffscreenFrame(&animationBuffer[0][0]);
 }
 
 
@@ -896,10 +1142,296 @@ void DisplayManager::activateEyesEffect(const EyesConfig& config) {
   nativeEffectStartTime = millis();
 }
 
+void DisplayManager::activateAmbientEffect(const AmbientEffectConfig& config) {
+  ambientEffectConfig = config;
+  nativeEffectType = NATIVE_EFFECT_AMBIENT;
+  nativeEffectStartTime = millis();
+}
+
 static uint8_t clampByte(int value) {
   if (value < 0) return 0;
   if (value > 255) return 255;
   return (uint8_t)value;
+}
+
+static float clampUnit(float value) {
+  if (value < 0.0f) return 0.0f;
+  if (value > 1.0f) return 1.0f;
+  return value;
+}
+
+static float fractf32(float value) {
+  return value - floorf(value);
+}
+
+static float smoothstepf(float edge0, float edge1, float value) {
+  if (edge0 == edge1) {
+    return value < edge0 ? 0.0f : 1.0f;
+  }
+  float x = clampUnit((value - edge0) / (edge1 - edge0));
+  return x * x * (3.0f - 2.0f * x);
+}
+
+static float colorLuminance255(uint8_t r, uint8_t g, uint8_t b) {
+  return ((float)r * 0.2126f + (float)g * 0.7152f + (float)b * 0.0722f) / 255.0f;
+}
+
+static bool isWarmRhythmPalette(const RhythmEffectConfig& config) {
+  float warmA = (float)config.colorAR + (float)config.colorAG * 0.4f - (float)config.colorAB * 0.2f;
+  float warmB = (float)config.colorBR + (float)config.colorBG * 0.4f - (float)config.colorBB * 0.2f;
+  return warmA + warmB > 290.0f;
+}
+
+static bool isWarmBreathPalette(const BreathEffectConfig& config) {
+  float warmA = (float)config.colorAR + (float)config.colorAG * 0.4f - (float)config.colorAB * 0.2f;
+  float warmB = (float)config.colorBR + (float)config.colorBG * 0.4f - (float)config.colorBB * 0.2f;
+  return warmA + warmB > 290.0f;
+}
+
+static bool isMatrixRhythmPalette(const RhythmEffectConfig& config) {
+  int greenLeadA = (int)config.colorAG - max((int)config.colorAR, (int)config.colorAB);
+  int greenLeadB = (int)config.colorBG - max((int)config.colorBR, (int)config.colorBB);
+  return greenLeadA > 20 || greenLeadB > 20;
+}
+
+static bool isMatrixBreathPalette(const BreathEffectConfig& config) {
+  int greenLeadA = (int)config.colorAG - max((int)config.colorAR, (int)config.colorAB);
+  int greenLeadB = (int)config.colorBG - max((int)config.colorBR, (int)config.colorBB);
+  return greenLeadA > 20 || greenLeadB > 20;
+}
+
+static float columnSeedf(int index) {
+  return fractf32(sinf((float)(index + 1) * 12.9898f) * 43758.5453f);
+}
+
+static int ringPathLength(int layer) {
+  int left = layer;
+  int top = layer;
+  int right = 63 - layer;
+  int bottom = 63 - layer;
+  if (left > right || top > bottom) {
+    return 0;
+  }
+  if (left == right && top == bottom) {
+    return 1;
+  }
+  return ((right - left + 1) * 2 + (bottom - top + 1) * 2) - 4;
+}
+
+static bool ringPathIndex(int layer, int x, int y, int& outIndex) {
+  int left = layer;
+  int top = layer;
+  int right = 63 - layer;
+  int bottom = 63 - layer;
+  if (x < left || x > right || y < top || y > bottom) {
+    return false;
+  }
+  if (y == top) {
+    outIndex = x - left;
+    return true;
+  }
+  if (x == right && y > top) {
+    outIndex = (right - left + 1) + (y - top) - 1;
+    return true;
+  }
+  if (y == bottom && x < right) {
+    outIndex = (right - left + 1) + (bottom - top) + (right - x) - 1;
+    return true;
+  }
+  if (x == left && y > top && y < bottom) {
+    outIndex = (right - left + 1) * 2 + (bottom - top) + (bottom - y) - 2;
+    return true;
+  }
+  return false;
+}
+
+static unsigned long breathDurationMs(const BreathEffectConfig& config) {
+  int base = config.motion == BREATH_MOTION_INWARD || config.motion == BREATH_MOTION_OUTWARD ? 2000 : 2400;
+  int duration = base - (int)config.speed * 90;
+  if (config.scope == BREATH_SCOPE_FULL_SCREEN) {
+    duration += 220;
+  }
+  if (duration < 900) {
+    duration = 900;
+  }
+  return (unsigned long)duration;
+}
+
+static void mixRgb(
+  uint8_t ar,
+  uint8_t ag,
+  uint8_t ab,
+  uint8_t br,
+  uint8_t bg,
+  uint8_t bb,
+  float mix,
+  float scale,
+  uint8_t& outR,
+  uint8_t& outG,
+  uint8_t& outB
+) {
+  float safeMix = clampUnit(mix);
+  float safeScale = clampUnit(scale);
+  float r = ((float)ar * (1.0f - safeMix) + (float)br * safeMix) * safeScale;
+  float g = ((float)ag * (1.0f - safeMix) + (float)bg * safeMix) * safeScale;
+  float b = ((float)ab * (1.0f - safeMix) + (float)bb * safeMix) * safeScale;
+  outR = clampByte((int)roundf(r));
+  outG = clampByte((int)roundf(g));
+  outB = clampByte((int)roundf(b));
+}
+
+static void addHighlight(uint8_t& r, uint8_t& g, uint8_t& b, float amount) {
+  float safeAmount = clampUnit(amount);
+  r = clampByte((int)roundf((float)r + (255.0f - (float)r) * safeAmount));
+  g = clampByte((int)roundf((float)g + (255.0f - (float)g) * safeAmount));
+  b = clampByte((int)roundf((float)b + (255.0f - (float)b) * safeAmount));
+}
+
+struct NativeRgb {
+  uint8_t r;
+  uint8_t g;
+  uint8_t b;
+};
+
+static NativeRgb makeRgb(uint8_t r, uint8_t g, uint8_t b) {
+  NativeRgb color = {r, g, b};
+  return color;
+}
+
+static NativeRgb blendRgbColor(const NativeRgb& colorA, const NativeRgb& colorB, float alpha) {
+  float safe = clampUnit(alpha);
+  NativeRgb out = {
+    clampByte((int)roundf((float)colorA.r * (1.0f - safe) + (float)colorB.r * safe)),
+    clampByte((int)roundf((float)colorA.g * (1.0f - safe) + (float)colorB.g * safe)),
+    clampByte((int)roundf((float)colorA.b * (1.0f - safe) + (float)colorB.b * safe))
+  };
+  return out;
+}
+
+static NativeRgb scaleRgbColor(const NativeRgb& color, float scale) {
+  float safe = clampUnit(scale);
+  NativeRgb out = {
+    clampByte((int)roundf((float)color.r * safe)),
+    clampByte((int)roundf((float)color.g * safe)),
+    clampByte((int)roundf((float)color.b * safe))
+  };
+  return out;
+}
+
+static NativeRgb addHighlightColor(const NativeRgb& color, float amount) {
+  NativeRgb out = color;
+  addHighlight(out.r, out.g, out.b, amount);
+  return out;
+}
+
+static void blendIntoPixel(uint8_t& dstR, uint8_t& dstG, uint8_t& dstB, const NativeRgb& src, float alpha) {
+  float safe = clampUnit(alpha);
+  if (safe <= 0.0f) {
+    return;
+  }
+  dstR = clampByte((int)roundf((float)dstR * (1.0f - safe) + (float)src.r * safe));
+  dstG = clampByte((int)roundf((float)dstG * (1.0f - safe) + (float)src.g * safe));
+  dstB = clampByte((int)roundf((float)dstB * (1.0f - safe) + (float)src.b * safe));
+}
+
+static float rhythmAmplitudeAt(const RhythmEffectConfig& config, float phase, int speed, float strengthUnit, int band) {
+  float seed = columnSeedf(band);
+  float beatFlash = 0.5f + 0.5f * sinf(phase * 3.1415926f * (2.1f + (float)speed * 0.08f));
+  float spectrumWave =
+    0.5f +
+    0.5f *
+      sinf(
+        phase * 3.1415926f * (2.3f + (float)speed * 0.07f) +
+        (float)band * 0.44f +
+        seed * 3.1f
+      );
+  float detailWave =
+    0.5f +
+    0.5f *
+      cosf(
+        phase * 3.1415926f * (4.7f + (float)speed * 0.05f) +
+        (float)band * 0.7f +
+        seed * 4.4f
+      );
+
+  float amplitude = 0.0f;
+  if (config.mode == RHYTHM_MODE_PULSE) {
+    amplitude = 0.16f + spectrumWave * 0.48f + detailWave * 0.16f + beatFlash * 0.22f;
+  } else if (config.mode == RHYTHM_MODE_GRADIENT) {
+    bool matrixPalette = isMatrixRhythmPalette(config);
+    amplitude =
+      0.14f +
+      spectrumWave * 0.32f +
+      detailWave * 0.18f +
+      (matrixPalette ? beatFlash * 0.14f : beatFlash * 0.08f);
+  } else {
+    float gate = fractf32(phase * (1.25f + (float)speed * 0.05f) + seed);
+    amplitude = gate > 0.48f ? 0.78f + detailWave * 0.16f : 0.08f + spectrumWave * 0.12f;
+  }
+
+  return clampUnit(amplitude * (0.38f + strengthUnit * 0.92f));
+}
+
+static int rhythmHeightFromAmplitude(float amplitude) {
+  return max(4, (int)roundf(7.0f + amplitude * 43.0f));
+}
+
+static bool resolveRhythmLane(
+  uint8_t direction,
+  int x,
+  int y,
+  int& bandIndex,
+  int& thickness,
+  int& depth,
+  bool& axisVertical,
+  bool& reverseAxis
+) {
+  axisVertical = direction == RHYTHM_DIR_LEFT || direction == RHYTHM_DIR_RIGHT;
+  reverseAxis = direction == RHYTHM_DIR_RIGHT || direction == RHYTHM_DIR_DOWN;
+
+  if (axisVertical) {
+    if (x < 2 || x > 61 || y < 2 || y > 61) {
+      return false;
+    }
+    int lane = x - 2;
+    bandIndex = lane / 4;
+    thickness = lane % 4;
+    depth = reverseAxis ? y - 2 : 61 - y;
+  } else {
+    if (x < 2 || x > 61 || y < 2 || y > 61) {
+      return false;
+    }
+    int lane = y - 2;
+    bandIndex = lane / 4;
+    thickness = lane % 4;
+    depth = reverseAxis ? 61 - x : x - 2;
+  }
+
+  if (bandIndex < 0 || bandIndex >= 16 || thickness < 0 || thickness > 2 || depth < 0 || depth > 59) {
+    return false;
+  }
+  return true;
+}
+
+static float directionalPosition(uint8_t direction, int x, int y) {
+  if (direction == RHYTHM_DIR_LEFT) {
+    return (float)x / 63.0f;
+  }
+  if (direction == RHYTHM_DIR_RIGHT) {
+    return 1.0f - (float)x / 63.0f;
+  }
+  if (direction == RHYTHM_DIR_UP) {
+    return (float)y / 63.0f;
+  }
+  return 1.0f - (float)y / 63.0f;
+}
+
+static float glowPulsef(float timeValue, float offset) {
+  return 0.5f + 0.5f * sinf(timeValue + offset);
+}
+
+static float fireflySeedf(int index, float shift) {
+  return fractf32(sinf((float)(index + 1) * 17.371f + shift * 3.147f) * 24634.6345f);
 }
 
 void DisplayManager::renderNativeEffect() {
@@ -911,34 +1443,291 @@ void DisplayManager::renderNativeEffect() {
   unsigned long elapsed = now - nativeEffectStartTime;
 
   if (nativeEffectType == NATIVE_EFFECT_BREATH) {
-    if (!breathEffectConfig.loop && elapsed >= breathEffectConfig.periodMs) {
+    unsigned long durationMs = breathDurationMs(breathEffectConfig);
+    if (!breathEffectConfig.loop && elapsed >= durationMs) {
       setNativeEffectNone();
       return;
     }
 
     float phase = 0.0f;
-    if (breathEffectConfig.periodMs > 0) {
-      phase = (float)(elapsed % breathEffectConfig.periodMs) / (float)breathEffectConfig.periodMs;
+    if (durationMs > 0) {
+      phase = (float)(elapsed % durationMs) / (float)durationMs;
     }
 
-    float level = 0.0f;
-    if (breathEffectConfig.waveform == BREATH_WAVE_SINE) {
-      level = (sinf(phase * 2.0f * 3.1415926f - 3.1415926f / 2.0f) + 1.0f) * 0.5f;
-    } else if (breathEffectConfig.waveform == BREATH_WAVE_TRIANGLE) {
-      level = phase < 0.5f ? (phase * 2.0f) : (2.0f - phase * 2.0f);
-    } else {
-      level = phase < 0.5f ? 1.0f : 0.0f;
+    int speed = breathEffectConfig.speed;
+    if (speed < 1) speed = 1;
+    if (speed > 10) speed = 10;
+    float breath = 0.45f + 0.55f * sinf(phase * 2.0f * 3.1415926f - 3.1415926f / 2.0f) * 0.5f + 0.275f;
+    float timeBase = phase * 2.0f * 3.1415926f;
+    bool warmPalette = isWarmBreathPalette(breathEffectConfig);
+    bool matrixPalette = isMatrixBreathPalette(breathEffectConfig);
+    bool gradientMode = breathEffectConfig.colorMode == BREATH_COLOR_GRADIENT;
+    bool fullScreen = breathEffectConfig.scope == BREATH_SCOPE_FULL_SCREEN;
+
+    for (int y = 0; y < PANEL_RES_Y; y++) {
+      for (int x = 0; x < PANEL_RES_X; x++) {
+        uint8_t r = 0;
+        uint8_t g = 0;
+        uint8_t b = 0;
+
+        if (fullScreen && warmPalette) {
+          float waveA = 0.5f + 0.5f * sinf((float)x * 0.22f + phase * 3.1415926f * (1.8f + (float)speed * 0.06f));
+          float waveB = 0.5f + 0.5f * sinf((float)x * 0.11f - phase * 3.1415926f * (2.4f + (float)speed * 0.08f));
+          float flameHeight = roundf(10.0f + waveA * 12.0f + waveB * 18.0f + breath * 8.0f);
+          float depth = 63.0f - (float)y;
+          if (depth >= 0.0f && depth < flameHeight) {
+            float mix = clampUnit(depth / max(flameHeight - 1.0f, 1.0f));
+            float alpha = clampUnit(0.22f + mix * 0.7f);
+            uint8_t baseR = 0;
+            uint8_t baseG = 0;
+            uint8_t baseB = 0;
+            mixRgb(
+              breathEffectConfig.colorAR,
+              breathEffectConfig.colorAG,
+              breathEffectConfig.colorAB,
+              breathEffectConfig.colorBR,
+              breathEffectConfig.colorBG,
+              breathEffectConfig.colorBB,
+              clampUnit(mix * 0.85f),
+              alpha,
+              baseR,
+              baseG,
+              baseB
+            );
+            r = baseR;
+            g = baseG;
+            b = baseB;
+            addHighlight(r, g, b, clampUnit(mix * 0.3f));
+          }
+          float sparkGate = fractf32(phase * (1.3f + (float)speed * 0.05f) + (float)x * 0.17f);
+          if (sparkGate > 0.82f) {
+            float sparkY = 40.0f - roundf((sparkGate - 0.82f) * 70.0f);
+            float sparkGlow = clampUnit(1.0f - fabsf((float)y - sparkY) / 2.4f);
+            if (sparkGlow > 0.0f) {
+              addHighlight(r, g, b, sparkGlow * 0.42f);
+            }
+          }
+        } else if (fullScreen && matrixPalette) {
+          uint8_t accumR = 0;
+          uint8_t accumG = 0;
+          uint8_t accumB = 0;
+          for (int column = 0; column < 16; column++) {
+            float seed = columnSeedf(column);
+            int laneX = column * 4 + 1;
+            if (x < laneX || x > laneX + 2) {
+              continue;
+            }
+            float travel = fractf32(phase * (0.75f + (float)speed * 0.08f) + seed);
+            float headY = roundf(travel * 76.0f) - 6.0f;
+            for (int trail = 0; trail < 14; trail++) {
+              float py = headY - (float)trail;
+              if (fabsf((float)y - py) > 0.6f) {
+                continue;
+              }
+              float alpha = clampUnit((1.0f - (float)trail / 14.0f) * (0.4f + breath * 0.45f));
+              if (x == laneX + 1) {
+                alpha *= 0.72f;
+              } else if (x == laneX + 2) {
+                alpha *= trail < 4 ? 0.2f : 0.0f;
+              }
+              if (alpha <= 0.0f) {
+                continue;
+              }
+              uint8_t laneR = 0;
+              uint8_t laneG = 0;
+              uint8_t laneB = 0;
+              mixRgb(
+                breathEffectConfig.colorAR,
+                breathEffectConfig.colorAG,
+                breathEffectConfig.colorAB,
+                breathEffectConfig.colorBR,
+                breathEffectConfig.colorBG,
+                breathEffectConfig.colorBB,
+                trail < 2 ? 0.3f : 0.65f,
+                alpha,
+                laneR,
+                laneG,
+                laneB
+              );
+              if (trail < 2) {
+                addHighlight(laneR, laneG, laneB, 0.32f);
+              }
+              accumR = clampByte((int)accumR + (int)laneR);
+              accumG = clampByte((int)accumG + (int)laneG);
+              accumB = clampByte((int)accumB + (int)laneB);
+            }
+          }
+          r = accumR;
+          g = accumG;
+          b = accumB;
+          if (y >= 6 && (y - 6) % 8 == 0) {
+            uint8_t guideR = 0;
+            uint8_t guideG = 0;
+            uint8_t guideB = 0;
+            mixRgb(
+              breathEffectConfig.colorAR,
+              breathEffectConfig.colorAG,
+              breathEffectConfig.colorAB,
+              breathEffectConfig.colorBR,
+              breathEffectConfig.colorBG,
+              breathEffectConfig.colorBB,
+              0.3f,
+              0.06f,
+              guideR,
+              guideG,
+              guideB
+            );
+            r = clampByte((int)r + (int)guideR);
+            g = clampByte((int)g + (int)guideG);
+            b = clampByte((int)b + (int)guideB);
+          }
+        } else {
+          int displayLayers[16];
+          int displayCount = 0;
+          if (breathEffectConfig.scope == BREATH_SCOPE_SINGLE_RING) {
+            displayLayers[0] = 0;
+            displayLayers[1] = 1;
+            displayLayers[2] = 2;
+            displayCount = 3;
+          } else {
+            for (int i = 0; i < 16; i++) {
+              displayLayers[i] = i * 2;
+            }
+            displayCount = 16;
+          }
+
+          for (int layerIndex = 0; layerIndex < displayCount; layerIndex++) {
+            int layer = displayLayers[layerIndex];
+            int pathIndex = 0;
+            if (!ringPathIndex(layer, x, y, pathIndex)) {
+              continue;
+            }
+            int pathLength = ringPathLength(layer);
+            if (pathLength <= 0) {
+              continue;
+            }
+            float ringMix = gradientMode
+              ? (float)layerIndex / (float)max(displayCount - 1, 1)
+              : 0.0f;
+            uint8_t ringR = 0;
+            uint8_t ringG = 0;
+            uint8_t ringB = 0;
+            mixRgb(
+              breathEffectConfig.colorAR,
+              breathEffectConfig.colorAG,
+              breathEffectConfig.colorAB,
+              breathEffectConfig.colorBR,
+              breathEffectConfig.colorBG,
+              breathEffectConfig.colorBB,
+              ringMix,
+              1.0f,
+              ringR,
+              ringG,
+              ringB
+            );
+
+            float alpha = 0.0f;
+            if (breathEffectConfig.motion == BREATH_MOTION_CLOCKWISE ||
+                breathEffectConfig.motion == BREATH_MOTION_COUNTERCLOCKWISE) {
+              int direction = breathEffectConfig.motion == BREATH_MOTION_CLOCKWISE ? 1 : -1;
+              float travel = phase * (1.2f + (float)speed * 0.18f) * (float)pathLength;
+              int headIndex = ((int)roundf(travel + (float)layerIndex * 11.0f)) % pathLength;
+              int rawDelta = headIndex - pathIndex;
+              if (direction < 0) {
+                rawDelta = pathIndex - headIndex;
+              }
+              while (rawDelta < 0) {
+                rawDelta += pathLength;
+              }
+              rawDelta %= pathLength;
+              int trailLength = breathEffectConfig.scope == BREATH_SCOPE_SINGLE_RING
+                ? max(18, 34 - layerIndex * 6 + speed * 2)
+                : max(10, 24 - layerIndex + speed);
+              if (rawDelta < trailLength) {
+                float trailRatio = trailLength <= 1 ? 0.0f : (float)rawDelta / (float)(trailLength - 1);
+                float tail = powf(1.0f - trailRatio, 1.18f);
+                alpha = (0.46f + breath * 0.34f) * tail;
+                if (gradientMode) {
+                  float accentMix = clampUnit(0.2f + trailRatio * 0.8f);
+                  mixRgb(
+                    ringR,
+                    ringG,
+                    ringB,
+                    breathEffectConfig.colorBR,
+                    breathEffectConfig.colorBG,
+                    breathEffectConfig.colorBB,
+                    accentMix,
+                    alpha,
+                    r,
+                    g,
+                    b
+                  );
+                } else {
+                  mixRgb(ringR, ringG, ringB, ringR, ringG, ringB, 0.0f, alpha, r, g, b);
+                }
+                if (rawDelta < 2) {
+                  addHighlight(r, g, b, 0.18f + breath * 0.16f);
+                }
+              }
+              if (breathEffectConfig.scope == BREATH_SCOPE_FULL_SCREEN && layerIndex < 8) {
+                uint8_t baseR = 0;
+                uint8_t baseG = 0;
+                uint8_t baseB = 0;
+                mixRgb(
+                  ringR,
+                  ringG,
+                  ringB,
+                  ringR,
+                  ringG,
+                  ringB,
+                  0.0f,
+                  0.04f + ((float)(displayCount - layerIndex) / (float)displayCount) * 0.05f,
+                  baseR,
+                  baseG,
+                  baseB
+                );
+                r = clampByte((int)r + (int)baseR);
+                g = clampByte((int)g + (int)baseG);
+                b = clampByte((int)b + (int)baseB);
+              }
+            } else {
+              float travel = phase * (float)(displayCount + 4);
+              float frontIndex = breathEffectConfig.motion == BREATH_MOTION_INWARD
+                ? travel - (float)layerIndex * 0.85f
+                : travel - (float)(displayCount - 1 - layerIndex) * 0.85f;
+              float shell = clampUnit(1.0f - fabsf(frontIndex) * 0.42f);
+              float residual = clampUnit(1.0f - fabsf(frontIndex - 2.6f) * 0.18f);
+              alpha = shell * (0.42f + breath * 0.24f) + residual * 0.08f;
+              if (alpha > 0.01f) {
+                mixRgb(ringR, ringG, ringB, ringR, ringG, ringB, 0.0f, alpha, r, g, b);
+                int headIndex =
+                  ((int)roundf((phase * (0.9f + (float)speed * 0.16f) + (float)layerIndex * 0.09f) * (float)pathLength)) %
+                  pathLength;
+                int rawDelta = headIndex - pathIndex;
+                while (rawDelta < 0) {
+                  rawDelta += pathLength;
+                }
+                rawDelta %= pathLength;
+                int trailLength = max(8, 14 - abs((int)roundf(frontIndex)));
+                if (rawDelta < trailLength) {
+                  addHighlight(r, g, b, alpha * 0.28f);
+                }
+              }
+            }
+          }
+
+          bool cornerLight =
+            (x <= 5 && y <= 5) ||
+            (x >= 58 && y <= 5) ||
+            (x <= 5 && y >= 58) ||
+            (x >= 58 && y >= 58);
+          if (cornerLight) {
+            addHighlight(r, g, b, 0.18f + breath * 0.24f);
+          }
+        }
+        dma_display->drawPixelRGB888(x, y, r, g, b);
+      }
     }
-
-    int minB = breathEffectConfig.minBrightness;
-    int maxB = breathEffectConfig.maxBrightness;
-    int brightness = minB + (int)((maxB - minB) * level);
-
-    uint8_t r = clampByte((breathEffectConfig.colorR * brightness) / 100);
-    uint8_t g = clampByte((breathEffectConfig.colorG * brightness) / 100);
-    uint8_t b = clampByte((breathEffectConfig.colorB * brightness) / 100);
-
-    dma_display->fillRect(0, 0, PANEL_RES_X, PANEL_RES_Y, dma_display->color565(r, g, b));
     return;
   }
 
@@ -962,57 +1751,430 @@ void DisplayManager::renderNativeEffect() {
     if (strength < 0) strength = 0;
     if (strength > 100) strength = 100;
 
-    if (rhythmEffectConfig.mode == RHYTHM_MODE_JUMP) {
-      bool useA = ((elapsed / beatInterval) % 2) == 0;
-      uint8_t r = useA ? rhythmEffectConfig.colorAR : rhythmEffectConfig.colorBR;
-      uint8_t g = useA ? rhythmEffectConfig.colorAG : rhythmEffectConfig.colorBG;
-      uint8_t b = useA ? rhythmEffectConfig.colorAB : rhythmEffectConfig.colorBB;
-      int scaled = (strength * 255) / 100;
-      dma_display->fillRect(
-        0,
-        0,
-        PANEL_RES_X,
-        PANEL_RES_Y,
-        dma_display->color565((r * scaled) / 255, (g * scaled) / 255, (b * scaled) / 255)
-      );
-      return;
-    }
-
     int speed = rhythmEffectConfig.speed;
     if (speed < 1) speed = 1;
     if (speed > 10) speed = 10;
+    float strengthUnit = (float)strength / 100.0f;
+    float beatFlash = 0.45f + 0.55f * sinf(((float)(elapsed % beatInterval) / (float)beatInterval) * 3.1415926f * (2.0f + (float)speed * 0.08f));
+    float phase = fractf32((float)elapsed / max(beatInterval * 2.0f, 1.0f));
+    bool matrixPalette = isMatrixRhythmPalette(rhythmEffectConfig);
+    bool axisVertical =
+      rhythmEffectConfig.direction == RHYTHM_DIR_LEFT ||
+      rhythmEffectConfig.direction == RHYTHM_DIR_RIGHT;
+    bool reverseAxis =
+      rhythmEffectConfig.direction == RHYTHM_DIR_RIGHT ||
+      rhythmEffectConfig.direction == RHYTHM_DIR_DOWN;
+    NativeRgb colorA = makeRgb(
+      rhythmEffectConfig.colorAR,
+      rhythmEffectConfig.colorAG,
+      rhythmEffectConfig.colorAB
+    );
+    NativeRgb colorB = makeRgb(
+      rhythmEffectConfig.colorBR,
+      rhythmEffectConfig.colorBG,
+      rhythmEffectConfig.colorBB
+    );
+    NativeRgb backgroundColor = blendRgbColor(colorA, colorB, 0.14f + strengthUnit * 0.08f);
+    NativeRgb gridColor = scaleRgbColor(blendRgbColor(colorA, colorB, 0.5f), 0.12f);
+    int bandHeights[16];
+    int peakHeights[16];
+    int waterfallHistory[18][16];
+
+    for (int band = 0; band < 16; band++) {
+      float amplitude = rhythmAmplitudeAt(rhythmEffectConfig, phase, speed, strengthUnit, band);
+      bandHeights[band] = rhythmHeightFromAmplitude(amplitude);
+      peakHeights[band] = bandHeights[band];
+      for (int lookback = 1; lookback <= 4; lookback++) {
+        float historyPhase = fractf32(phase - (float)lookback / 20.0f);
+        int historyHeight = rhythmHeightFromAmplitude(
+          rhythmAmplitudeAt(rhythmEffectConfig, historyPhase, speed, strengthUnit, band)
+        );
+        peakHeights[band] = max(peakHeights[band], historyHeight - lookback * 2);
+      }
+      for (int row = 0; row < 18; row++) {
+        float historyPhase = fractf32(phase - (float)row / 20.0f);
+        waterfallHistory[row][band] = rhythmHeightFromAmplitude(
+          rhythmAmplitudeAt(rhythmEffectConfig, historyPhase, speed, strengthUnit, band)
+        );
+      }
+    }
 
     for (int y = 0; y < PANEL_RES_Y; y++) {
       for (int x = 0; x < PANEL_RES_X; x++) {
-        float position = 0.0f;
-        if (rhythmEffectConfig.direction == RHYTHM_DIR_LEFT) {
-          position = (float)(x + (elapsed / (12UL - speed))) / (float)PANEL_RES_X;
-        } else if (rhythmEffectConfig.direction == RHYTHM_DIR_RIGHT) {
-          position = (float)((PANEL_RES_X - 1 - x) + (elapsed / (12UL - speed))) / (float)PANEL_RES_X;
-        } else if (rhythmEffectConfig.direction == RHYTHM_DIR_UP) {
-          position = (float)(y + (elapsed / (12UL - speed))) / (float)PANEL_RES_Y;
-        } else {
-          position = (float)((PANEL_RES_Y - 1 - y) + (elapsed / (12UL - speed))) / (float)PANEL_RES_Y;
+        float diagonal = (float)(x + y) / 126.0f;
+        float backgroundPulse =
+          0.5f +
+          0.5f *
+            sinf(
+              diagonal * 3.1415926f * 2.8f -
+              phase * 3.1415926f * (2.4f + (float)speed * 0.08f)
+            );
+        NativeRgb background = blendRgbColor(backgroundColor, colorA, backgroundPulse * 0.08f);
+        uint8_t r = background.r;
+        uint8_t g = background.g;
+        uint8_t b = background.b;
+
+        if (x % 8 == 0) {
+          blendIntoPixel(r, g, b, gridColor, 0.34f);
+        }
+        if (y % 8 == 0) {
+          blendIntoPixel(r, g, b, gridColor, 0.22f);
         }
 
-        float frac = position - floorf(position);
-        float pulseWeight = rhythmEffectConfig.mode == RHYTHM_MODE_PULSE ? pulse : 1.0f;
-        float mix = frac;
-
-        int r = (int)(rhythmEffectConfig.colorAR * (1.0f - mix) + rhythmEffectConfig.colorBR * mix);
-        int g = (int)(rhythmEffectConfig.colorAG * (1.0f - mix) + rhythmEffectConfig.colorBG * mix);
-        int b = (int)(rhythmEffectConfig.colorAB * (1.0f - mix) + rhythmEffectConfig.colorBB * mix);
-
-        int scaled = (int)(strength * pulseWeight * 2.55f);
-        if (scaled > 255) scaled = 255;
-
-        dma_display->drawPixelRGB888(
+        int bandIndex = 0;
+        int thickness = 0;
+        int depth = 0;
+        bool laneVertical = false;
+        bool laneReverse = false;
+        bool onLane = resolveRhythmLane(
+          rhythmEffectConfig.direction,
           x,
           y,
-          clampByte((r * scaled) / 255),
-          clampByte((g * scaled) / 255),
-          clampByte((b * scaled) / 255)
+          bandIndex,
+          thickness,
+          depth,
+          laneVertical,
+          laneReverse
         );
+
+        if (onLane) {
+          int bandHeight = bandHeights[bandIndex];
+          int peakHeight = max(0, peakHeights[bandIndex]);
+          float bandMix =
+            rhythmEffectConfig.mode == RHYTHM_MODE_GRADIENT
+              ? (float)bandIndex / 15.0f
+              : 0.18f + rhythmAmplitudeAt(rhythmEffectConfig, phase, speed, strengthUnit, bandIndex) * 0.72f;
+          NativeRgb barColor =
+            rhythmEffectConfig.mode == RHYTHM_MODE_JUMP
+              ? blendRgbColor(colorA, colorB, (bandIndex % 2) == 0 ? 0.0f : 0.6f)
+              : blendRgbColor(colorA, colorB, clampUnit(bandMix));
+          NativeRgb glowColor = addHighlightColor(blendRgbColor(barColor, colorB, 0.35f), 0.22f);
+
+          if (rhythmEffectConfig.mode == RHYTHM_MODE_PULSE) {
+            if (depth < max(1, bandHeight)) {
+              float fillRatio = bandHeight <= 1 ? 1.0f : (float)depth / (float)(bandHeight - 1);
+              NativeRgb bodyColor = blendRgbColor(
+                scaleRgbColor(barColor, 0.46f + fillRatio * 0.18f),
+                addHighlightColor(barColor, 0.2f + fillRatio * 0.34f),
+                fillRatio
+              );
+              float alpha = clampUnit(0.18f + fillRatio * 0.72f);
+              blendIntoPixel(r, g, b, bodyColor, alpha);
+              if (thickness == 1 && depth >= bandHeight - 2) {
+                blendIntoPixel(r, g, b, glowColor, 0.32f + fillRatio * 0.16f);
+              }
+            }
+            if (depth == peakHeight) {
+              blendIntoPixel(r, g, b, glowColor, thickness == 1 ? 0.9f : 0.64f);
+            }
+            if (depth < min(6, bandHeight)) {
+              float fade = clampUnit(0.22f - (float)depth * 0.03f);
+              blendIntoPixel(r, g, b, glowColor, fade);
+            }
+          } else if (rhythmEffectConfig.mode == RHYTHM_MODE_GRADIENT) {
+            if (depth >= 6 && ((depth - 6) % 3) == 0) {
+              int row = (depth - 6) / 3;
+              if (row >= 0 && row < 18) {
+                int historyHeight = waterfallHistory[row][bandIndex];
+                float ratio = clampUnit(((float)historyHeight - 6.0f) / 44.0f);
+                NativeRgb rowColor = blendRgbColor(colorA, colorB, ratio);
+                NativeRgb rowGlow = addHighlightColor(rowColor, 0.18f + ratio * 0.24f);
+                blendIntoPixel(r, g, b, rowGlow, 0.2f + ratio * 0.7f);
+                if (row == 0) {
+                  blendIntoPixel(r, g, b, rowGlow, 0.16f + ratio * 0.18f);
+                }
+              }
+            }
+            if (matrixPalette && thickness == 1) {
+              float seed = columnSeedf(bandIndex);
+              float travel = fractf32(phase * (0.8f + (float)speed * 0.06f) + seed);
+              int head = (int)roundf(travel * 82.0f) - 9;
+              for (int trail = 0; trail < 10; trail++) {
+                if (depth == head - trail) {
+                  float fade = clampUnit(1.0f - (float)trail / 10.0f);
+                  blendIntoPixel(r, g, b, colorB, fade * 0.55f);
+                }
+              }
+            }
+          } else {
+            int safeHeight = max(2, (int)roundf((float)bandHeight * 0.72f));
+            if (depth < safeHeight) {
+              float alpha = depth > safeHeight - 3 ? 0.9f : 0.46f;
+              blendIntoPixel(r, g, b, barColor, alpha);
+              if (depth > safeHeight - 2) {
+                blendIntoPixel(r, g, b, glowColor, 0.3f);
+              }
+            }
+          }
+        }
+
+        NativeRgb hubColor = blendRgbColor(colorA, colorB, beatFlash * 0.7f);
+        int dx = abs(x - 32);
+        int dy = abs(y - 32);
+        if (dx <= 2 && dy <= 2) {
+          blendIntoPixel(r, g, b, hubColor, clampUnit(0.16f + strengthUnit * 0.2f));
+        }
+        if (rhythmEffectConfig.mode == RHYTHM_MODE_JUMP) {
+          if ((x == 32 && dy <= 3) || (y == 32 && dx <= 3)) {
+            blendIntoPixel(r, g, b, scaleRgbColor(hubColor, 0.52f), 0.72f);
+          }
+          if (dx + dy <= 2) {
+            blendIntoPixel(r, g, b, scaleRgbColor(hubColor, 0.3f), 0.46f);
+          }
+          for (int pulseIndex = 0; pulseIndex < 4; pulseIndex++) {
+            int radius = 4 + pulseIndex * 4 + (int)roundf(beatFlash * 2.0f);
+            NativeRgb pulseColor = scaleRgbColor(hubColor, 0.22f - (float)pulseIndex * 0.04f);
+            if (pulseColor.r == 0 && pulseColor.g == 0 && pulseColor.b == 0) {
+              continue;
+            }
+            bool onPulse =
+              (abs(y - (32 - radius)) == 0 && dx <= radius) ||
+              (abs(y - (32 + radius)) == 0 && dx <= radius) ||
+              (abs(x - (32 - radius)) == 0 && dy <= radius) ||
+              (abs(x - (32 + radius)) == 0 && dy <= radius);
+            if (onPulse) {
+              blendIntoPixel(r, g, b, pulseColor, 0.36f);
+            }
+          }
+        } else if (rhythmEffectConfig.mode == RHYTHM_MODE_GRADIENT) {
+          float sweepAlpha = smoothstepf(0.0f, 1.0f, 0.2f + beatFlash * 0.8f) * 0.22f;
+          NativeRgb sweepColor = blendRgbColor(colorA, colorB, 0.5f);
+          int scan = (int)roundf(fractf32(phase + (float)y / 96.0f) * 63.0f);
+          if (x == scan) {
+            blendIntoPixel(r, g, b, sweepColor, sweepAlpha * 0.6f);
+          }
+        } else if (rhythmEffectConfig.mode == RHYTHM_MODE_PULSE) {
+          static const int orbit[12][2] = {
+            {32, 8}, {44, 12}, {52, 20}, {56, 32}, {52, 44}, {44, 52},
+            {32, 56}, {20, 52}, {12, 44}, {8, 32}, {12, 20}, {20, 12}
+          };
+          int frameIndex = (int)roundf(phase * 20.0f);
+          for (int orbitIndex = 0; orbitIndex < 12; orbitIndex++) {
+            int pointIndex = (orbitIndex + frameIndex) % 12;
+            int px = orbit[pointIndex][0];
+            int py = orbit[pointIndex][1];
+            if ((x == px || x == px + 1) && y == py) {
+              NativeRgb orbitColor =
+                orbitIndex % 2 == 0
+                  ? scaleRgbColor(colorA, 0.5f + beatFlash * 0.18f)
+                  : scaleRgbColor(colorB, 0.42f + beatFlash * 0.16f);
+              blendIntoPixel(r, g, b, orbitColor, 0.9f);
+            }
+          }
+        }
+
+        float luminance = colorLuminance255(r, g, b);
+        addHighlight(r, g, b, clampUnit((1.0f - luminance) * 0.08f + beatFlash * 0.12f));
+        dma_display->drawPixelRGB888(x, y, r, g, b);
+      }
+    }
+    return;
+  }
+
+  if (nativeEffectType == NATIVE_EFFECT_AMBIENT) {
+    if (!ambientEffectConfig.loop && elapsed >= 90000UL) {
+      setNativeEffectNone();
+      return;
+    }
+
+    int speed = ambientEffectConfig.speed;
+    if (speed < 1) speed = 1;
+    if (speed > 10) speed = 10;
+
+    int intensity = ambientEffectConfig.intensity;
+    if (intensity < 0) intensity = 0;
+    if (intensity > 100) intensity = 100;
+
+    float speedUnit = (float)speed / 10.0f;
+    float intensityUnit = (float)intensity / 100.0f;
+    float timeBase = (float)elapsed * (0.00045f + speedUnit * 0.00135f);
+
+    for (int y = 0; y < PANEL_RES_Y; y++) {
+      for (int x = 0; x < PANEL_RES_X; x++) {
+        float nx = ((float)x - 31.5f) / 31.5f;
+        float ny = ((float)y - 31.5f) / 31.5f;
+        float dist = sqrtf(nx * nx + ny * ny);
+
+        uint8_t r = 0;
+        uint8_t g = 0;
+        uint8_t b = 0;
+
+        if (ambientEffectConfig.preset == AMBIENT_PRESET_AURORA) {
+          float curtainA = 0.5f + 0.5f * sinf(nx * 5.2f + timeBase * 1.9f + sinf(ny * 3.6f - timeBase * 1.1f));
+          float curtainB = 0.5f + 0.5f * sinf(nx * 7.4f - timeBase * 1.5f + ny * 5.0f);
+          float horizon = clampUnit(1.0f - ((float)y / 63.0f) * 1.18f);
+          float veil = clampUnit(curtainA * 0.55f + curtainB * 0.45f);
+          float glow = clampUnit(horizon * (0.35f + veil * (0.5f + intensityUnit * 0.35f)));
+          float accent = clampUnit(0.24f + 0.76f * glowPulsef(timeBase * 1.1f, nx * 2.5f + ny * 1.7f));
+
+          r = clampByte((int)roundf((10.0f + 70.0f * veil + 24.0f * accent) * glow));
+          g = clampByte((int)roundf((30.0f + 180.0f * veil + 28.0f * accent) * glow));
+          b = clampByte((int)roundf((50.0f + 210.0f * accent + 18.0f * veil) * glow));
+
+          if (((x + y + (int)(elapsed / 180UL)) % 29) == 0) {
+            addHighlight(r, g, b, 0.18f + intensityUnit * 0.16f);
+          }
+        } else if (ambientEffectConfig.preset == AMBIENT_PRESET_PLASMA) {
+          float plasmaA = sinf((nx * 5.8f + timeBase * 1.4f) + sinf(ny * 4.0f - timeBase * 0.9f));
+          float plasmaB = sinf((nx + ny) * 6.4f - timeBase * 1.8f);
+          float plasmaC = sinf(dist * 12.0f - timeBase * 3.0f);
+          float field = clampUnit((plasmaA + plasmaB + plasmaC + 3.0f) / 6.0f);
+          float heat = clampUnit(0.5f + 0.5f * sinf(field * 8.0f + timeBase * 2.2f));
+          float cool = clampUnit(0.5f + 0.5f * cosf(field * 7.0f - timeBase * 1.3f));
+          float glow = 0.18f + field * (0.56f + intensityUnit * 0.22f);
+
+          r = clampByte((int)roundf((40.0f + 205.0f * heat) * glow));
+          g = clampByte((int)roundf((20.0f + 150.0f * field + 45.0f * cool) * glow));
+          b = clampByte((int)roundf((60.0f + 185.0f * cool) * glow));
+          addHighlight(r, g, b, field * 0.12f);
+        } else if (ambientEffectConfig.preset == AMBIENT_PRESET_MATRIX_RAIN) {
+          float seed = columnSeedf(x);
+          float companionSeed = columnSeedf(x + 19);
+          float travel = fractf32(timeBase * (0.34f + speedUnit * 0.32f) + seed);
+          float headY = travel * (64.0f + 22.0f) - 11.0f;
+          float headYSecondary =
+            fractf32(timeBase * (0.22f + speedUnit * 0.18f) + companionSeed * 0.83f) * (64.0f + 16.0f) - 8.0f;
+          float tailLength = 10.0f + intensityUnit * 26.0f;
+          float tailDistance = headY - (float)y;
+          float secondaryDistance = headYSecondary - (float)y;
+          float tail = 0.0f;
+          float tailSecondary = 0.0f;
+          if (tailDistance >= 0.0f && tailDistance <= tailLength) {
+            tail = 1.0f - tailDistance / max(tailLength, 1.0f);
+          }
+          if (secondaryDistance >= 0.0f && secondaryDistance <= tailLength * 0.56f) {
+            tailSecondary = 1.0f - secondaryDistance / max(tailLength * 0.56f, 1.0f);
+          }
+          float headGlow = smoothstepf(4.5f, 0.0f, fabsf(headY - (float)y));
+          float secondaryHeadGlow = smoothstepf(3.2f, 0.0f, fabsf(headYSecondary - (float)y));
+          float glyph = (((y + (int)(seed * 11.0f) + (int)(elapsed / 65UL)) % 6) == 0) ? 1.0f : 0.0f;
+          float ambient = 0.03f + glowPulsef(timeBase * 0.9f, seed * 6.0f) * 0.04f;
+          float brightness = clampUnit(
+            ambient +
+            tail * (0.52f + intensityUnit * 0.28f) +
+            tailSecondary * 0.28f +
+            headGlow * 0.55f +
+            secondaryHeadGlow * 0.26f +
+            glyph * tail * 0.18f
+          );
+
+          r = clampByte((int)roundf(8.0f + 38.0f * headGlow + 16.0f * secondaryHeadGlow));
+          g = clampByte((int)roundf((26.0f + 220.0f * brightness)));
+          b = clampByte((int)roundf((8.0f + 92.0f * (tail * 0.55f + headGlow * 0.35f + tailSecondary * 0.22f))));
+          if (((x + (int)(elapsed / 42UL)) % 9) == 0 && tail > 0.16f) {
+            addHighlight(r, g, b, 0.1f + intensityUnit * 0.12f);
+          }
+        } else if (ambientEffectConfig.preset == AMBIENT_PRESET_FIREFLY_SWARM) {
+          float dusk = clampUnit(1.0f - ((float)y / 63.0f) * 0.78f);
+          float backgroundWave = 0.5f + 0.5f * sinf(ny * 6.0f - timeBase * 0.85f);
+          r = clampByte((int)roundf(2.0f + 6.0f * backgroundWave));
+          g = clampByte((int)roundf(10.0f + 18.0f * dusk));
+          b = clampByte((int)roundf(16.0f + 42.0f * dusk));
+
+          const int kFireflyCount = 9;
+          for (int i = 0; i < kFireflyCount; i++) {
+            float seedX = fireflySeedf(i, 0.0f);
+            float seedY = fireflySeedf(i, 1.3f);
+            float orbit = fireflySeedf(i, 2.7f);
+            float fx = 6.0f + seedX * 52.0f + sinf(timeBase * (0.7f + orbit * 0.8f) + seedY * 6.2831852f) * (5.0f + orbit * 10.0f);
+            float fy = 8.0f + seedY * 44.0f + cosf(timeBase * (0.9f + seedX * 0.7f) + orbit * 4.1f) * (4.0f + seedX * 9.0f);
+            float dx = (float)x - fx;
+            float dy = (float)y - fy;
+            float glow = clampUnit(1.0f - sqrtf(dx * dx + dy * dy) / (4.5f + intensityUnit * 4.0f));
+            if (glow > 0.0f) {
+              float twinkle = glowPulsef(timeBase * (1.5f + seedX), seedY * 8.0f);
+              int addR = (int)roundf(50.0f * glow * twinkle);
+              int addG = (int)roundf((140.0f + 70.0f * intensityUnit) * glow * twinkle);
+              int addB = (int)roundf(30.0f * glow * twinkle);
+              r = clampByte((int)r + addR);
+              g = clampByte((int)g + addG);
+              b = clampByte((int)b + addB);
+            }
+          }
+        } else if (ambientEffectConfig.preset == AMBIENT_PRESET_OCEAN_CURRENT) {
+          float tideA = 0.5f + 0.5f * sinf(nx * 4.6f - timeBase * 1.1f + sinf(ny * 5.0f + timeBase * 0.7f));
+          float tideB = 0.5f + 0.5f * sinf((nx - ny) * 6.2f + timeBase * 1.6f);
+          float ripple = 0.5f + 0.5f * sinf(dist * 14.0f - timeBase * 2.4f);
+          float depth = clampUnit(0.18f + ((float)y / 63.0f) * 0.52f);
+          float foam = clampUnit(1.0f - fabsf(ripple - 0.82f) * 5.5f);
+          float glow = clampUnit(0.16f + depth * 0.34f + tideA * 0.24f + tideB * 0.2f);
+
+          r = clampByte((int)roundf((6.0f + 28.0f * tideB + 42.0f * foam) * glow));
+          g = clampByte((int)roundf((36.0f + 110.0f * tideA + 40.0f * foam) * glow));
+          b = clampByte((int)roundf((70.0f + 150.0f * tideA + 36.0f * ripple) * glow));
+          addHighlight(r, g, b, foam * (0.1f + intensityUnit * 0.12f));
+        } else if (ambientEffectConfig.preset == AMBIENT_PRESET_NEON_GRID) {
+          float scanX = clampUnit(1.0f - fabsf(fractf32((float)x / 64.0f + timeBase * (0.28f + speedUnit * 0.18f)) - 0.5f) * 5.6f);
+          float scanY = clampUnit(1.0f - fabsf(fractf32((float)y / 64.0f - timeBase * (0.22f + speedUnit * 0.14f)) - 0.5f) * 5.6f);
+          float gridLine = (x % 8 == 0 || y % 8 == 0) ? 1.0f : 0.0f;
+          float junction = (x % 8 == 0 && y % 8 == 0) ? 1.0f : 0.0f;
+          float cellPulse = 0.5f + 0.5f * sinf((float)(x + y) * 0.25f + timeBase * 3.2f);
+          float brightness = clampUnit(
+            0.06f +
+            gridLine * 0.24f +
+            junction * 0.12f +
+            scanX * 0.32f +
+            scanY * 0.26f +
+            cellPulse * 0.14f
+          );
+
+          r = clampByte((int)roundf((18.0f + 120.0f * scanX + 40.0f * gridLine + 40.0f * junction) * brightness));
+          g = clampByte((int)roundf((10.0f + 70.0f * cellPulse + 30.0f * gridLine + 12.0f * junction) * brightness));
+          b = clampByte((int)roundf((30.0f + 180.0f * scanY + 100.0f * gridLine + 60.0f * junction) * brightness));
+          if (gridLine > 0.5f) {
+            addHighlight(r, g, b, 0.08f + intensityUnit * 0.1f);
+          }
+        } else if (ambientEffectConfig.preset == AMBIENT_PRESET_SUNSET_BLUSH) {
+          float sky = 1.0f - ((float)y / 63.0f);
+          float warmBand = 0.5f + 0.5f * sinf(nx * 4.2f + timeBase * 0.9f + ny * 2.0f);
+          float cloud = 0.5f + 0.5f * sinf(nx * 8.0f - timeBase * 0.6f + sinf(ny * 6.0f + timeBase * 0.5f));
+          float sunGlow = clampUnit(1.0f - sqrtf((nx * 0.92f) * (nx * 0.92f) + ((ny + 0.18f) * 1.25f) * ((ny + 0.18f) * 1.25f)) * 1.55f);
+          float haze = clampUnit(0.1f + sky * 0.35f + warmBand * 0.22f + cloud * 0.12f);
+
+          r = clampByte((int)roundf((40.0f + 185.0f * sky + 55.0f * sunGlow) * haze));
+          g = clampByte((int)roundf((16.0f + 88.0f * warmBand + 76.0f * sunGlow) * haze));
+          b = clampByte((int)roundf((20.0f + 105.0f * cloud + 70.0f * (1.0f - sky)) * haze));
+          addHighlight(r, g, b, sunGlow * (0.16f + intensityUnit * 0.14f));
+        } else if (ambientEffectConfig.preset == AMBIENT_PRESET_STARFIELD_DRIFT) {
+          float nebulaA = 0.5f + 0.5f * sinf(nx * 5.0f + timeBase * 0.45f + ny * 4.0f);
+          float nebulaB = 0.5f + 0.5f * sinf((nx - ny) * 7.2f - timeBase * 0.62f);
+          float backdrop = clampUnit(0.03f + nebulaA * 0.08f + nebulaB * 0.06f);
+          r = clampByte((int)roundf(4.0f + 16.0f * nebulaB * backdrop));
+          g = clampByte((int)roundf(6.0f + 22.0f * nebulaA * backdrop));
+          b = clampByte((int)roundf(12.0f + 46.0f * (nebulaA * 0.55f + nebulaB * 0.45f) * backdrop));
+
+          int starIndex = (x * 31 + y * 17) % 97;
+          if (starIndex < 3) {
+            float twinkle = glowPulsef(timeBase * (1.1f + (float)starIndex * 0.35f), (float)(x + y) * 0.21f);
+            float shine = 0.28f + twinkle * (0.42f + intensityUnit * 0.18f);
+            r = clampByte((int)roundf((float)r + 140.0f * shine));
+            g = clampByte((int)roundf((float)g + 150.0f * shine));
+            b = clampByte((int)roundf((float)b + 185.0f * shine));
+            if (x > 0 && starIndex == 0 && twinkle > 0.72f) {
+              r = clampByte((int)r + 32);
+              g = clampByte((int)g + 34);
+              b = clampByte((int)b + 40);
+            }
+          }
+        } else {
+          float diag = fractf32(((float)(x + y) / 96.0f) - timeBase * (0.7f + speedUnit * 0.9f));
+          float diagB =
+            fractf32(((float)x * 0.84f + (float)y * 1.18f) / 88.0f - timeBase * (0.48f + speedUnit * 0.66f) + 0.37f);
+          float streak = clampUnit(1.0f - fabsf(diag - 0.5f) * 7.6f);
+          float streakB = clampUnit(1.0f - fabsf(diagB - 0.5f) * 8.4f);
+          float sparkle = (((x * 13 + y * 7 + (int)(elapsed / 60UL)) % 43) == 0) ? 1.0f : 0.0f;
+          float haze = clampUnit(0.08f + (1.0f - dist) * 0.14f);
+          float brightness = clampUnit(haze + streak * (0.42f + intensityUnit * 0.2f) + streakB * 0.28f + sparkle * 0.32f);
+
+          r = clampByte((int)roundf((10.0f + 80.0f * streak + 52.0f * streakB + 45.0f * sparkle + 20.0f * haze) * brightness));
+          g = clampByte((int)roundf((18.0f + 120.0f * streak + 78.0f * streakB + 60.0f * sparkle + 35.0f * haze) * brightness));
+          b = clampByte((int)roundf((28.0f + 180.0f * streak + 110.0f * streakB + 90.0f * sparkle + 60.0f * haze) * brightness));
+          if (sparkle > 0.0f) {
+            addHighlight(r, g, b, 0.2f + intensityUnit * 0.15f);
+          }
+        }
+
+        dma_display->drawPixelRGB888(x, y, r, g, b);
       }
     }
     return;

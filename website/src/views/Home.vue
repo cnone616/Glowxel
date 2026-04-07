@@ -2,10 +2,10 @@
   <div class="home">
     <section class="hero">
       <div class="container">
-        <h1 class="hero-title">RenLight</h1>
-        <p class="hero-subtitle">像素创作平台 · 让创意点亮每一格</p>
+        <h1 class="hero-title">光格像素工坊</h1>
+        <p class="hero-subtitle">像素内容创作与设备连接平台</p>
         <p class="hero-desc">
-          在线设计像素图案、导入图片处理、浏览社区作品，并支持网页连接设备进行时钟配置与控制
+          提供像素内容编辑、图片生成、社区展示与设备连接能力，用户完成连接后即可直接使用设备功能
         </p>
         <div class="hero-actions">
           <router-link to="/create" class="btn btn-primary"
@@ -58,12 +58,11 @@
       </div>
     </section>
 
-    <!-- 硬件产品落地页 -->
     <section class="hardware">
       <div class="container">
-        <h2 class="section-title">RenLight 像素显示设备</h2>
+        <h2 class="section-title">设备连接与使用</h2>
         <p class="section-desc">
-          64×64 RGB LED 矩阵，配套小程序实时控制，让你的像素作品真实发光
+          设备由我们完成整机设计与调试，用户只需要连接设备、选择内容并同步显示
         </p>
         <div class="hardware-grid">
           <div
@@ -83,19 +82,11 @@
           </div>
         </div>
         <div class="center">
-          <a
-            href="https://item.taobao.com"
-            target="_blank"
-            rel="noopener"
-            class="btn btn-primary"
-            >立即购买</a
+          <router-link to="/device-control" class="btn btn-primary"
+            >连接设备</router-link
           >
-          <a
-            href="/hardware-guide.html"
-            target="_blank"
-            rel="noopener"
-            class="btn btn-outline"
-            >组装指南</a
+          <router-link to="/clock-editor" class="btn btn-outline"
+            >时钟配置</router-link
           >
         </div>
       </div>
@@ -103,12 +94,10 @@
 
     <section class="about">
       <div class="container">
-        <h2 class="section-title">关于 RenLight</h2>
+        <h2 class="section-title">关于光格像素工坊</h2>
         <p class="about-text">
-          RenLight（仁光数字科技）是一个面向像素艺术爱好者的创作平台。
-          我们提供在线像素编辑器、图片转像素工具、社区分享等功能，
-          支持将作品同步到 RenLight 像素显示设备，并可在网页端直接连接设备进行基础控制与时钟配置。
-          无论你是像素艺术新手还是资深创作者，都能在这里找到灵感、分享作品、参与社区挑战。
+          光格像素工坊面向用户提供内容编辑、图片生成、社区浏览、设备连接与常用控制能力。
+          设备本身由我们完成整机方案设计与实现，用户无需了解组装过程，连接后即可直接使用。
         </p>
       </div>
     </section>
@@ -127,8 +116,8 @@ const features = [
   },
   {
     icon: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`,
-    title: "时钟配置",
-    desc: "网页与小程序都可进行时钟参数编辑并同步设备",
+    title: "设备时钟",
+    desc: "网页与小程序都可配置时钟样式并同步到设备",
   },
   {
     icon: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>`,
@@ -142,13 +131,13 @@ const features = [
   },
   {
     icon: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>`,
-    title: "模板库",
-    desc: "丰富的预设模板，一键使用",
+    title: "设备连接",
+    desc: "连接设备后即可下发内容并进行常用控制",
   },
   {
     icon: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>`,
-    title: "创作挑战",
-    desc: "参与主题挑战，展示你的创意",
+    title: "模板与灵感",
+    desc: "浏览作品、模板和社区内容，快速开始创作",
   },
 ];
 
@@ -157,41 +146,41 @@ const artworks = ref([]);
 const hardwareSpecs = [
   {
     icon: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="2"/><path d="M8 12h8M12 8v8"/></svg>`,
-    label: "分辨率",
+    label: "显示规格",
     value: "64 × 64 像素",
   },
   {
     icon: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>`,
-    label: "像素间距",
-    value: "P2 (2mm)",
+    label: "显示形式",
+    value: "RGB 像素显示",
   },
   {
     icon: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>`,
-    label: "主控芯片",
-    value: "ESP32-S3",
-  },
-  {
-    icon: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12.55a11 11 0 0 1 14.08 0M1.42 9a16 16 0 0 1 21.16 0M8.53 16.11a6 6 0 0 1 6.95 0M12 20h.01"/></svg>`,
     label: "连接方式",
     value: "WiFi + BLE",
   },
   {
+    icon: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12.55a11 11 0 0 1 14.08 0M1.42 9a16 16 0 0 1 21.16 0M8.53 16.11a6 6 0 0 1 6.95 0M12 20h.01"/></svg>`,
+    label: "使用方式",
+    value: "连接后直接控制",
+  },
+  {
     icon: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>`,
-    label: "外壳尺寸",
-    value: "约 135 × 135mm",
+    label: "内容同步",
+    value: "网页 / 小程序",
   },
   {
     icon: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>`,
-    label: "供电",
-    value: "USB-C 5V 2A",
+    label: "应用场景",
+    value: "创作展示 / 日常互动",
   },
 ];
 
 const setupSteps = [
-  "购买硬件套件，按组装指南完成焊接和组装",
-  "下载 RenLight 小程序，蓝牙配网连接 WiFi",
-  "在编辑器设计像素图案或时钟样式",
-  "一键同步到设备，实时点亮你的作品",
+  "连接设备并完成基础配网",
+  "选择图片、像素内容或时钟样式",
+  "一键同步到设备并立即预览效果",
+  "在网页或小程序中继续调整和控制",
 ];
 
 onMounted(async () => {

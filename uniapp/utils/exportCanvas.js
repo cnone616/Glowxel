@@ -7,6 +7,7 @@ import {
   ARTKAL_COLORS_FULL,
   ARTKAL_PRESETS,
 } from "../data/artkal-colors-full.js";
+import { PERLER_BOARD_SIZE } from "../constants/perler.js";
 
 // 获取颜色代码
 function getColorCode(hex) {
@@ -336,17 +337,17 @@ function drawCanvas(ctx, canvasWidth, canvasHeight, options) {
     }
   }
 
-  // 绘制粗网格线（52x52 板子边界）
+  // 绘制粗网格线（单板边界）
   if (showGrid) {
     ctx.strokeStyle = "#000000";
     ctx.lineWidth = 2;
-    for (let x = 0; x <= width; x += 52) {
+    for (let x = 0; x <= width; x += PERLER_BOARD_SIZE) {
       ctx.beginPath();
       ctx.moveTo(offsetX + x * cellSize, offsetY);
       ctx.lineTo(offsetX + x * cellSize, offsetY + gridHeight);
       ctx.stroke();
     }
-    for (let y = 0; y <= height; y += 52) {
+    for (let y = 0; y <= height; y += PERLER_BOARD_SIZE) {
       ctx.beginPath();
       ctx.moveTo(offsetX, offsetY + y * cellSize);
       ctx.lineTo(offsetX + gridWidth, offsetY + y * cellSize);

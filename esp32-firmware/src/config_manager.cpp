@@ -3,11 +3,61 @@
 
 // 静态成员初始化
 Preferences ConfigManager::preferences;
+
+namespace {
+bool migrateLegacyDefaultClockLayout(ClockConfig& config) {
+  if (config.font != CLOCK_FONT_CLASSIC_5X7) {
+    return false;
+  }
+  if (config.showSeconds != false || config.hourFormat != 24) {
+    return false;
+  }
+  if (config.time.show != true ||
+      config.time.fontSize != 2 ||
+      config.time.x != 22 ||
+      config.time.y != 4 ||
+      config.time.r != 255 ||
+      config.time.g != 255 ||
+      config.time.b != 255) {
+    return false;
+  }
+  if (config.date.show != false ||
+      config.date.fontSize != 1 ||
+      config.date.x != 22 ||
+      config.date.y != 10 ||
+      config.date.r != 120 ||
+      config.date.g != 120 ||
+      config.date.b != 120) {
+    return false;
+  }
+  if (config.week.show != false ||
+      config.week.x != 26 ||
+      config.week.y != 47 ||
+      config.week.r != 100 ||
+      config.week.g != 100 ||
+      config.week.b != 100) {
+    return false;
+  }
+  if (config.image.show != false ||
+      config.image.x != 0 ||
+      config.image.y != 0 ||
+      config.image.width != 64 ||
+      config.image.height != 64) {
+    return false;
+  }
+
+  config.time.fontSize = 1;
+  config.time.x = 17;
+  config.time.y = 5;
+  return true;
+}
+}
+
 ClockConfig ConfigManager::clockConfig = {
   .font = CLOCK_FONT_CLASSIC_5X7,
   .showSeconds = false,
   .hourFormat = 24,
-  .time = {true, 2, 22, 4, 255, 255, 255},
+  .time = {true, 1, 17, 5, 255, 255, 255},
   .date = {false, 1, 22, 10, 120, 120, 120},
   .week = {false, 26, 47, 100, 100, 100},
   .image = {false, 0, 0, 64, 64}
@@ -16,22 +66,25 @@ ClockConfig ConfigManager::animClockConfig = {
   .font = CLOCK_FONT_CLASSIC_5X7,
   .showSeconds = false,
   .hourFormat = 24,
-  .time = {true, 2, 22, 4, 255, 255, 255},
+  .time = {true, 1, 17, 5, 255, 255, 255},
   .date = {false, 1, 22, 10, 120, 120, 120},
   .week = {false, 26, 47, 100, 100, 100},
   .image = {false, 0, 0, 64, 64}
 };
 EyesConfig ConfigManager::eyesConfig = {
-  .layout = {24, 14, 16, 10, 4},
+  .layout = {24, 14, 16, 10, 22, 4},
   .behavior = {true, 3200, 4200, 2, 45000},
   .interaction = {1200, 1800},
   .time = {true, false},
   .style = {"#9bdcff", "#1b6dff", "#d8f3ff"}
 };
+ThemeConfig ConfigManager::themeConfig = {};
 PixelData* ConfigManager::staticImagePixels = nullptr;
 int ConfigManager::staticImagePixelCount = 0;
 PixelData* ConfigManager::animImagePixels = nullptr;
 int ConfigManager::animImagePixelCount = 0;
+uint8_t* ConfigManager::pacmanRouteData = nullptr;
+uint16_t ConfigManager::pacmanRouteLength = 0;
 
 void ConfigManager::init() {
   Serial.println("2. 加载闹钟配置...");
@@ -54,6 +107,9 @@ void ConfigManager::init() {
     loadStaticImagePixels();
     loadAnimImagePixels();
     loadEyesConfig();
+    loadAmbientEffectConfig();
+    loadThemeConfig();
+    loadPacmanRoute();
     loadCanvasPixels();
   }
 }
@@ -67,6 +123,10 @@ void ConfigManager::loadClockConfig() {
 
   if (configSize == sizeof(ClockConfig)) {
     preferences.getBytes("config", &clockConfig, sizeof(ClockConfig));
+    if (migrateLegacyDefaultClockLayout(clockConfig)) {
+      Serial.println("已迁移静态时钟默认布局");
+      saveClockConfig();
+    }
     Serial.println("已加载保存的闹钟配置");
     Serial.printf("  image.show = %d\n", clockConfig.image.show);
   } else {
@@ -84,6 +144,8 @@ void ConfigManager::loadClockConfig() {
       savedBusinessMode = "canvas";
     } else if (savedMode == MODE_ANIMATION) {
       savedBusinessMode = "animation";
+    } else if (savedMode == MODE_THEME) {
+      savedBusinessMode = "theme";
     } else {
       savedBusinessMode = "clock";
     }
@@ -102,10 +164,17 @@ void ConfigManager::loadClockConfig() {
   DisplayManager::lastBusinessModeTag = savedLastBusinessMode;
   if (savedLastBusinessMode == "clock") {
     DisplayManager::lastBusinessMode = MODE_CLOCK;
+  } else if (savedLastBusinessMode == "theme") {
+    DisplayManager::lastBusinessMode = MODE_THEME;
   } else {
     DisplayManager::lastBusinessMode = MODE_ANIMATION;
   }
-  const char* modeStr = savedMode == MODE_ANIMATION ? "ANIMATION" : (savedMode == MODE_CLOCK ? "CLOCK" : "CANVAS");
+  const char* modeStr =
+    savedMode == MODE_ANIMATION
+      ? "ANIMATION"
+      : (savedMode == MODE_CLOCK
+          ? "CLOCK"
+          : (savedMode == MODE_THEME ? "THEME" : "CANVAS"));
   Serial.printf("恢复显示模式: %s\n", modeStr);
   Serial.printf("恢复业务模式: %s\n", DisplayManager::currentBusinessModeTag.c_str());
 
@@ -127,6 +196,10 @@ void ConfigManager::loadAnimClockConfig() {
   size_t configSize = preferences.getBytesLength("config");
   if (configSize == sizeof(ClockConfig)) {
     preferences.getBytes("config", &animClockConfig, sizeof(ClockConfig));
+    if (migrateLegacyDefaultClockLayout(animClockConfig)) {
+      Serial.println("已迁移动态时钟默认布局");
+      saveAnimClockConfig();
+    }
     Serial.println("anim clock config loaded");
   } else {
     Serial.println("anim clock config: using default");
@@ -270,6 +343,123 @@ void ConfigManager::saveEyesConfig() {
   Serial.println("eyes config saved");
 }
 
+void ConfigManager::loadAmbientEffectConfig() {
+  preferences.begin("ambient", true);
+
+  size_t configSize = preferences.getBytesLength("config");
+  if (configSize == sizeof(AmbientEffectConfig)) {
+    preferences.getBytes("config", &DisplayManager::ambientEffectConfig, sizeof(AmbientEffectConfig));
+    Serial.println("ambient effect config loaded");
+  } else {
+    DisplayManager::ambientEffectConfig = {AMBIENT_PRESET_AURORA, 6, 72, true};
+    Serial.println("ambient effect config: using default");
+  }
+
+  preferences.end();
+}
+
+void ConfigManager::saveAmbientEffectConfig() {
+  preferences.begin("ambient", false);
+  preferences.putBytes("config", &DisplayManager::ambientEffectConfig, sizeof(AmbientEffectConfig));
+  preferences.end();
+  Serial.println("ambient effect config saved");
+}
+
+void ConfigManager::loadThemeConfig() {
+  preferences.begin("theme", true);
+  size_t configSize = preferences.getBytesLength("config");
+  if (configSize == sizeof(ThemeConfig)) {
+    preferences.getBytes("config", &themeConfig, sizeof(ThemeConfig));
+    themeConfig.themeId[sizeof(themeConfig.themeId) - 1] = '\0';
+    Serial.printf("theme config loaded: %s\n", themeConfig.themeId);
+  } else {
+    themeConfig.themeId[0] = '\0';
+    Serial.println("theme config: using default");
+  }
+  preferences.end();
+}
+
+void ConfigManager::saveThemeConfig() {
+  preferences.begin("theme", false);
+  preferences.putBytes("config", &themeConfig, sizeof(ThemeConfig));
+  preferences.end();
+  Serial.printf("theme config saved: %s\n", themeConfig.themeId);
+}
+
+void ConfigManager::loadPacmanRoute() {
+  preferences.begin("theme", true);
+
+  uint32_t savedLength = preferences.getUInt("pcRouteLen", 0);
+  size_t savedBytes = preferences.getBytesLength("pcRouteData");
+
+  if (pacmanRouteData != nullptr) {
+    free(pacmanRouteData);
+    pacmanRouteData = nullptr;
+  }
+  pacmanRouteLength = 0;
+
+  if (savedLength > 0 && savedBytes == savedLength) {
+    pacmanRouteData = static_cast<uint8_t*>(malloc(savedLength));
+    if (pacmanRouteData != nullptr) {
+      preferences.getBytes("pcRouteData", pacmanRouteData, savedLength);
+      pacmanRouteLength = static_cast<uint16_t>(savedLength);
+      Serial.printf("pacman route loaded: %u steps\n", pacmanRouteLength);
+    } else {
+      Serial.println("pacman route load failed: out of memory");
+    }
+  } else {
+    Serial.println("pacman route: using generated route");
+  }
+
+  preferences.end();
+}
+
+bool ConfigManager::savePacmanRoute(const uint8_t* routeData, uint16_t routeLength) {
+  if (routeData == nullptr || routeLength == 0) {
+    return false;
+  }
+
+  preferences.begin("theme", false);
+  preferences.putUInt("pcRouteLen", routeLength);
+  size_t written = preferences.putBytes("pcRouteData", routeData, routeLength);
+  preferences.end();
+
+  if (written != routeLength) {
+    Serial.println("pacman route save failed");
+    return false;
+  }
+
+  if (pacmanRouteData != nullptr) {
+    free(pacmanRouteData);
+    pacmanRouteData = nullptr;
+  }
+  pacmanRouteData = static_cast<uint8_t*>(malloc(routeLength));
+  if (pacmanRouteData == nullptr) {
+    pacmanRouteLength = 0;
+    Serial.println("pacman route cache update failed");
+    return false;
+  }
+
+  memcpy(pacmanRouteData, routeData, routeLength);
+  pacmanRouteLength = routeLength;
+  Serial.printf("pacman route saved: %u steps\n", pacmanRouteLength);
+  return true;
+}
+
+void ConfigManager::clearPacmanRoute() {
+  preferences.begin("theme", false);
+  preferences.remove("pcRouteLen");
+  preferences.remove("pcRouteData");
+  preferences.end();
+
+  if (pacmanRouteData != nullptr) {
+    free(pacmanRouteData);
+    pacmanRouteData = nullptr;
+  }
+  pacmanRouteLength = 0;
+  Serial.println("pacman route cleared");
+}
+
 void ConfigManager::loadCanvasPixels() {
   DisplayManager::clearCanvas();
   preferences.begin("canvas", true);
@@ -328,6 +518,19 @@ void ConfigManager::resetToDefault() {
   preferences.clear();
   preferences.end();
 
+  preferences.begin("ambient", false);
+  preferences.clear();
+  preferences.end();
+
+  preferences.begin("theme", false);
+  preferences.clear();
+  preferences.end();
+  if (pacmanRouteData != nullptr) {
+    free(pacmanRouteData);
+    pacmanRouteData = nullptr;
+  }
+  pacmanRouteLength = 0;
+
   if (staticImagePixels != nullptr) {
     free(staticImagePixels);
     staticImagePixels = nullptr;
@@ -344,7 +547,7 @@ void ConfigManager::resetToDefault() {
     .font = CLOCK_FONT_CLASSIC_5X7,
     .showSeconds = false,
     .hourFormat = 24,
-    .time = {true, 2, 22, 4, 255, 255, 255},
+    .time = {true, 1, 17, 5, 255, 255, 255},
     .date = {false, 1, 22, 10, 120, 120, 120},
     .week = {false, 26, 47, 100, 100, 100},
     .image = {false, 0, 0, 64, 64}
@@ -354,7 +557,7 @@ void ConfigManager::resetToDefault() {
     .font = CLOCK_FONT_CLASSIC_5X7,
     .showSeconds = false,
     .hourFormat = 24,
-    .time = {true, 2, 22, 4, 255, 255, 255},
+    .time = {true, 1, 17, 5, 255, 255, 255},
     .date = {false, 1, 22, 10, 120, 120, 120},
     .week = {false, 26, 47, 100, 100, 100},
     .image = {false, 0, 0, 64, 64}
@@ -365,6 +568,7 @@ void ConfigManager::resetToDefault() {
   defaultEyesConfig.layout.eyeSpacing = 14;
   defaultEyesConfig.layout.eyeWidth = 16;
   defaultEyesConfig.layout.eyeHeight = 10;
+  defaultEyesConfig.layout.timeX = 22;
   defaultEyesConfig.layout.timeY = 4;
   defaultEyesConfig.behavior.autoSwitch = true;
   defaultEyesConfig.behavior.blinkIntervalMs = 3200;
@@ -379,6 +583,8 @@ void ConfigManager::resetToDefault() {
   memcpy(defaultEyesConfig.style.pupilColor, "#1b6dff", sizeof(defaultEyesConfig.style.pupilColor));
   memcpy(defaultEyesConfig.style.timeColor, "#d8f3ff", sizeof(defaultEyesConfig.style.timeColor));
   eyesConfig = defaultEyesConfig;
+  DisplayManager::ambientEffectConfig = {AMBIENT_PRESET_AURORA, 6, 72, true};
+  themeConfig.themeId[0] = '\0';
 
   Serial.println("配置已恢复默认");
 }

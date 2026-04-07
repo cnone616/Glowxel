@@ -1,5 +1,5 @@
 import { getColorByCode } from "@/data/artkal-colors.js";
-import logoUrl from "@/assets/images/RenLight-logo.png";
+import logoUrl from "@/assets/images/glowxel-logo.png";
 
 /**
  * 导出图案为图纸
@@ -221,7 +221,7 @@ export async function exportPattern(
   ctx.fillStyle = "#999999";
   ctx.font = "14px Arial";
   ctx.textAlign = "left";
-  ctx.fillText("RenLight", 40, canvasHeight - 40);
+  ctx.fillText("光格像素工坊", 40, canvasHeight - 40);
   ctx.fillText(new Date().toLocaleDateString("zh-CN"), 40, canvasHeight - 20);
 
   return canvas.toDataURL("image/png");

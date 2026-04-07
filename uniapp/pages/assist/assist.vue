@@ -20,7 +20,7 @@
         <scroll-view scroll-y class="row-grid-scroll">
           <view class="row-grid">
             <view
-              v-for="i in 64"
+              v-for="i in boardSize"
               :key="i - 1"
               class="row-grid-item"
               :class="{
@@ -100,7 +100,7 @@
 
     <!-- 当前信息提示 -->
     <view v-if="assistMode === 'row'" class="info-banner">
-      <text class="info-text">行 {{ currentRow + 1 }} / 64</text>
+      <text class="info-text">行 {{ currentRow + 1 }} / {{ boardSize }}</text>
     </view>
 
     <!--  
@@ -116,8 +116,8 @@
     >
       <PixelCanvas
         v-if="canvasReady"
-        :width="64"
-        :height="64"
+        :width="boardSize"
+        :height="boardSize"
         :pixels="isCalculated ? localPixels : new Map()"
         :zoom="zoom"
         :offset-x="pan.x"
@@ -345,7 +345,7 @@
 
           <view class="row-info">
             <text class="row-number">{{ currentRow + 1 }}</text>
-            <text class="row-total">/ 64</text>
+            <text class="row-total">/ {{ boardSize }}</text>
           </view>
 
           <view
@@ -409,6 +409,7 @@ import ConnectModal from "../../components/ConnectModal.vue";
 import Toast from "../../components/Toast.vue";
 import Icon from "../../components/Icon.vue";
 import assistDeviceSyncMixin from "./mixins/assistDeviceSyncMixin.js";
+import { PERLER_BOARD_SIZE } from "../../constants/perler.js";
 
 // 创建颜色查找映射
 const colorCodeMap = new Map();
@@ -472,6 +473,7 @@ export default {
       bubblePosition: { x: 0, y: 0 },
       isIndexTouching: false,
       _modeRestoredOnExit: false,
+      boardSize: PERLER_BOARD_SIZE,
 
       helpItems: [
         {
@@ -508,12 +510,12 @@ export default {
 
     boardX() {
       const colIndex = parseInt(this.boardId.slice(1)) - 1;
-      return colIndex * 64;
+      return colIndex * this.boardSize;
     },
 
     boardY() {
       const rowIndex = this.boardId.charCodeAt(0) - 65;
-      return rowIndex * 64;
+      return rowIndex * this.boardSize;
     },
 
     rowColorsMap() {
@@ -701,12 +703,12 @@ export default {
               this.canvasWidth = data.width;
               this.canvasHeight = data.height;
 
-              const fitZoomW = (data.width * 0.9) / 64;
-              const fitZoomH = (data.height * 0.9) / 64;
+              const fitZoomW = (data.width * 0.9) / this.boardSize;
+              const fitZoomH = (data.height * 0.9) / this.boardSize;
               const fitZoom = Math.min(fitZoomW, fitZoomH, 50);
 
-              const boardPixelWidth = 64 * fitZoom;
-              const boardPixelHeight = 64 * fitZoom;
+              const boardPixelWidth = this.boardSize * fitZoom;
+              const boardPixelHeight = this.boardSize * fitZoom;
 
               this.zoom = fitZoom;
               this.pan = {
@@ -746,14 +748,14 @@ export default {
         const maxW = this.canvasWidth - 26;
         const maxH = this.canvasHeight - 26;
 
-        const zoomW = maxW / 64;
-        const zoomH = maxH / 64;
+        const zoomW = maxW / this.boardSize;
+        const zoomH = maxH / this.boardSize;
 
         const newZoom = Math.max(1, Math.min(zoomW, zoomH, 10));
         this.zoom = newZoom;
 
-        const contentW = 64 * newZoom;
-        const contentH = 64 * newZoom;
+        const contentW = this.boardSize * newZoom;
+        const contentH = this.boardSize * newZoom;
         this.pan = {
           x: (this.canvasWidth - contentW) / 2,
           y: (this.canvasHeight - contentH) / 2,
@@ -770,9 +772,9 @@ export default {
         const [px, py] = key.split(",").map(Number);
         if (
           px >= this.boardX &&
-          px < this.boardX + 64 &&
+          px < this.boardX + this.boardSize &&
           py >= this.boardY &&
-          py < this.boardY + 64
+          py < this.boardY + this.boardSize
         ) {
           local.set(`${px - this.boardX},${py - this.boardY}`, color);
         }
@@ -796,7 +798,7 @@ export default {
 
     saveProgress() {
       const pixelProgress = this.calculatePixelProgress();
-      const rowProgress = this.completedRows.size / 64;
+      const rowProgress = this.completedRows.size / this.boardSize;
       const completion = Math.max(pixelProgress, rowProgress);
 
       const progress = {

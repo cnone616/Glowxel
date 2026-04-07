@@ -1,203 +1,155 @@
 <template>
   <view class="control-page">
-    <!-- 状态栏占位 -->
     <!-- #ifdef MP-WEIXIN -->
     <view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
     <!-- #endif -->
-    <!-- 导航栏 -->
     <view class="header">
       <view class="header-content">
         <text class="header-title">设备控制</text>
       </view>
     </view>
     <scroll-view scroll-y class="content">
-      <!-- 连接状态卡片 -->
-      <view class="card connection-card">
-        <view
-          v-if="connectionStatus === 'connected'"
-          class="connected-info"
-          @click="handleConnect"
-        >
-          <view class="connected-dot"></view>
-          <view class="connected-detail">
-            <text class="connected-label">已连接</text>
-            <text class="connected-ip">{{ deviceIp }}</text>
-          </view>
-          <text class="disconnect-text">断开</text>
-        </view>
-        <view v-else class="connect-actions">
-          <view class="connect-btn" @click="handleConnect">
-            <view class="connect-btn-icon">
-              <Icon name="scanning" :size="44" color="#4F7FFF" />
+      <view class="console-card">
+        <view class="console-card-header">
+          <view class="device-summary">
+            <view class="device-logo">
+              <view class="device-logo-core"></view>
             </view>
-            <view class="connect-btn-info">
-              <text class="connect-btn-label">WiFi 连接</text>
-              <text class="connect-btn-desc">输入设备 IP 地址连接</text>
+            <view class="device-summary-text">
+              <text class="device-name">Glowxel Pro</text>
+              <view class="device-status-row">
+                <view
+                  class="device-status-dot"
+                  :class="{ online: isDeviceConnected }"
+                ></view>
+                <text class="device-status-label">{{
+                  isDeviceConnected ? "已连接" : "未连接"
+                }}</text>
+                <text
+                  v-if="isDeviceConnected && deviceIp"
+                  class="device-status-ip"
+                  >{{ deviceIp }}</text
+                >
+              </view>
             </view>
-            <Icon name="direction-right" :size="28" color="#C0C0C0" />
-          </view>
-          <view class="divider"></view>
-          <view class="connect-btn" @click="goToBleConfig">
-            <view class="connect-btn-icon">
-              <Icon name="mobile-phone" :size="44" color="#4F7FFF" />
-            </view>
-            <view class="connect-btn-info">
-              <text class="connect-btn-label">蓝牙配网</text>
-              <text class="connect-btn-desc">首次使用请先配置 WiFi</text>
-            </view>
-            <Icon name="direction-right" :size="28" color="#C0C0C0" />
           </view>
         </view>
-        <view class="action-row" @click="openPrimaryEditor">
-          <Icon name="edit" :size="36" color="#4F7FFF" />
-          <view class="action-info">
-            <text class="action-label">{{ primaryActionLabel }}</text>
-            <text class="action-desc">{{ primaryActionDesc }}</text>
+
+        <view v-if="!isDeviceConnected" class="connect-entry-grid">
+          <view class="connect-entry-card" @click="handleConnect">
+            <view class="connect-entry-icon">
+              <Icon name="scanning" :size="36" color="#4F7FFF" />
+            </view>
+            <view class="connect-entry-text">
+              <text class="connect-entry-label">WiFi 连接</text>
+              <text class="connect-entry-desc">输入设备 IP 地址连接</text>
+            </view>
           </view>
-          <Icon name="direction-right" :size="28" color="#C0C0C0" />
+          <view class="connect-entry-card" @click="goToBleConfig">
+            <view class="connect-entry-icon mint">
+              <Icon name="mobile-phone" :size="36" color="#00D9D9" />
+            </view>
+            <view class="connect-entry-text">
+              <text class="connect-entry-label">蓝牙配网</text>
+              <text class="connect-entry-desc">首次使用请先配置 WiFi</text>
+            </view>
+          </view>
         </view>
       </view>
-      <!-- 已连接：显示设备功能 -->
-      <template v-if="connectionStatus === 'connected'">
-        <!-- 设备功能 -->
-        <view class="section-title">设备功能</view>
-        <view class="card">
-          <view class="mode-grid">
-            <view class="mode-item" @click="switchMode('eyes')">
-              <view class="mode-icon-wrap">
-                <Icon name="browse" :size="40" color="#4F7FFF" />
+
+      <template v-if="isDeviceConnected">
+        <view class="section-block">
+        <view class="section-header">
+          <text class="section-title">模式入口</text>
+          <text class="section-meta">{{ modeEntries.length }} 个设备模式</text>
+        </view>
+          <view class="mode-badge-grid">
+            <view
+              v-for="entry in modeEntries"
+              :key="entry.key"
+              class="mode-badge"
+              :class="[entry.variant, { active: isModeActive(entry) }]"
+              @click="handleModeSelect(entry)"
+            >
+              <view class="mode-badge-icon-shell">
+                <view class="mode-badge-icon-core">
+                  <view
+                    v-if="entry.iconType === 'canvas'"
+                    class="mode-pixel-icon"
+                  >
+                    <view
+                      v-for="index in 9"
+                      :key="index"
+                      class="mode-pixel-cell"
+                    ></view>
+                  </view>
+                  <Icon
+                    v-else
+                    :name="entry.icon"
+                    :size="42"
+                    color="#FFFFFF"
+                  />
+                </view>
               </view>
-              <text class="mode-name">像素眼</text>
-            </view>
-            <view class="mode-item" @click="switchMode('clock')">
-              <view class="mode-icon-wrap">
-                <Icon name="time" :size="40" color="#4F7FFF" />
-              </view>
-              <text class="mode-name">静态时钟</text>
-            </view>
-            <view class="mode-item" @click="switchMode('animation')">
-              <view class="mode-icon-wrap">
-                <Icon name="play" :size="40" color="#4F7FFF" />
-              </view>
-              <text class="mode-name">动态时钟</text>
-            </view>
-            <view class="mode-item" @click="switchMode('canvas')">
-              <view class="mode-icon-wrap">
-                <Icon name="picture" :size="40" color="#4F7FFF" />
-              </view>
-              <text class="mode-name">画板模式</text>
-            </view>
-            <view class="mode-item" @click="switchMode('tetris')">
-              <view class="mode-icon-wrap">
-                <Icon name="a-Grid-ninejiugongge" :size="40" color="#4F7FFF" />
-              </view>
-              <text class="mode-name">方块屏保</text>
-            </view>
-            <view class="mode-item" @click="switchMode('text_display')">
-              <view class="mode-icon-wrap">
-                <Icon name="text" :size="40" color="#4F7FFF" />
-              </view>
-              <text class="mode-name">文本展示</text>
-            </view>
-            <view class="mode-item" @click="switchMode('breath_effect')">
-              <view class="mode-icon-wrap">
-                <Icon name="prompt" :size="40" color="#4F7FFF" />
-              </view>
-              <text class="mode-name">环绕灯</text>
-            </view>
-            <view class="mode-item" @click="switchMode('rhythm_effect')">
-              <view class="mode-icon-wrap">
-                <Icon name="task" :size="40" color="#4F7FFF" />
-              </view>
-              <text class="mode-name">律动</text>
-            </view>
-            <view class="mode-item" @click="openFeatureEditor('countdown')">
-              <view class="mode-icon-wrap">
-                <Icon name="time" :size="40" color="#4F7FFF" />
-              </view>
-              <text class="mode-name">倒计时</text>
-            </view>
-            <view class="mode-item" @click="openFeatureEditor('stopwatch')">
-              <view class="mode-icon-wrap">
-                <Icon name="task" :size="40" color="#4F7FFF" />
-              </view>
-              <text class="mode-name">秒表</text>
-            </view>
-            <view class="mode-item" @click="openFeatureEditor('notification')">
-              <view class="mode-icon-wrap">
-                <Icon name="prompt" :size="40" color="#4F7FFF" />
-              </view>
-              <text class="mode-name">通知提醒</text>
+              <text class="mode-badge-name">{{ entry.name }}</text>
             </view>
           </view>
         </view>
 
-        <!-- 时钟快捷操作 -->
-        <view
-          v-if="deviceMode === 'clock' || deviceMode === 'animation'"
-          class="card"
-        >
-          <view class="action-row" @click="editClock">
-            <Icon name="edit" :size="36" color="#4F7FFF" />
-            <view class="action-info">
-              <text class="action-label">自定义时钟样式</text>
-              <text class="action-desc">编辑时钟字体、颜色和背景</text>
-            </view>
-            <Icon name="direction-right" :size="28" color="#C0C0C0" />
+        <view class="section-block" id="brightness-section">
+          <view class="section-header">
+            <text class="section-title">亮度调节</text>
+            <text class="section-meta">当前 {{ brightness }}%</text>
           </view>
-          <view class="divider"></view>
-          <view class="action-row" @click="importJSON">
-            <Icon name="add" :size="36" color="#4F7FFF" />
-            <view class="action-info">
-              <text class="action-label">导入 JSON 配置</text>
-              <text class="action-desc">从模拟器导入完整配置</text>
+          <view class="panel-card brightness-card">
+            <view class="brightness-topline">
+              <view class="panel-action-icon warm">
+                <Icon name="prompt" :size="32" color="#FBBF24" />
+              </view>
+              <view class="panel-action-text">
+                <text class="panel-action-label">屏幕亮度</text>
+                <text class="panel-action-desc">调整设备显示强度</text>
+              </view>
+              <text class="brightness-value">{{ brightness }}%</text>
             </view>
-            <Icon name="direction-right" :size="28" color="#C0C0C0" />
+            <slider
+              :value="brightness"
+              @change="handleBrightnessChange"
+              min="0"
+              max="100"
+              activeColor="#4F7FFF"
+              backgroundColor="#E2E8F0"
+              block-size="24"
+              class="brightness-slider"
+            />
           </view>
         </view>
 
-        <!-- 亮度调节 -->
-        <view class="section-title">亮度调节</view>
-        <view class="card">
-          <view class="brightness-row">
-            <Icon name="prompt" :size="36" color="#4F7FFF" />
-            <text class="brightness-label">屏幕亮度</text>
-            <text class="brightness-value">{{ brightness }}%</text>
+        <view class="section-block">
+          <view class="section-header">
+            <text class="section-title">高级</text>
+            <text class="section-meta">危险操作请谨慎</text>
           </view>
-          <slider
-            :value="brightness"
-            @change="handleBrightnessChange"
-            min="0"
-            max="100"
-            activeColor="#4F7FFF"
-            backgroundColor="#E8E8E8"
-            block-size="24"
-            class="brightness-slider"
-          />
-        </view>
-
-        <!-- 高级操作 -->
-        <view class="section-title">高级</view>
-        <view class="card">
-          <view class="action-row danger" @click="handleResetWifi">
-            <Icon name="close" :size="36" color="#FF4D4F" />
-            <view class="action-info">
-              <text class="action-label danger-text">重置网络</text>
-              <text class="action-desc">清除 WiFi 配置并重启设备</text>
+          <view class="panel-card">
+            <view class="panel-action danger" @click="handleResetWifi">
+              <view class="panel-action-icon danger">
+                <Icon name="close" :size="32" color="#FF7A45" />
+              </view>
+              <view class="panel-action-text">
+                <text class="panel-action-label danger-text">重置网络</text>
+                <text class="panel-action-desc"
+                  >清除 WiFi 配置并重启设备</text
+                >
+              </view>
+              <Icon name="direction-right" :size="28" color="#94A3B8" />
             </view>
-            <Icon name="direction-right" :size="28" color="#C0C0C0" />
           </view>
         </view>
       </template>
 
-      <!-- 底部留白 -->
       <view style="height: 120rpx"></view>
     </scroll-view>
-
-    <!-- Toast -->
     <Toast ref="toastRef" />
-
-    <!-- 连接弹窗 -->
     <ConnectModal
       :visible="showConnectModal"
       title="连接设备"
@@ -210,8 +162,6 @@
       @timeout="handleConnectTimeout"
       @update:visible="(val) => (showConnectModal = val)"
     />
-
-    <!-- JSON 导入弹窗 -->
     <JsonImportModal
       :visible="showJsonImportModal"
       :sending="jsonImportSending"
@@ -248,8 +198,6 @@ export default {
       deviceStore: null,
       toast: null,
 
-      // 连接状态
-      connectionStatus: "disconnected", // disconnected, connecting, connected
       deviceIp: "",
 
       // 设备模式
@@ -301,105 +249,155 @@ export default {
       this.brightness = savedBrightness;
     }
 
-    // 监听设备连接状态
-    this.updateConnectionStatus();
   },
 
-  onShow() {
-    this.updateConnectionStatus();
+  async onShow() {
+    this.deviceIp = this.deviceStore?.deviceIp || this.deviceIp;
+    this.deviceMode = this.deviceStore?.deviceMode || this.deviceMode;
+    if (this.deviceStore?.connected) {
+      try {
+        const status = await this.deviceStore.getWebSocket().getStatus();
+        if (status && typeof status.brightness === "number") {
+          this.brightness = Math.round((status.brightness / 178) * 100);
+        }
+        if (status && typeof status.mode === "string") {
+          this.deviceMode =
+            this.deviceStore.resolveDeviceModeFromStatus(status) ||
+            this.deviceStore.deviceMode ||
+            this.deviceMode;
+        }
+      } catch (error) {
+        console.warn("刷新设备状态失败:", error);
+      }
+    }
   },
 
   computed: {
     isDeviceConnected() {
       return this.deviceStore?.connected || false;
     },
-    primaryActionLabel() {
-      if (this.deviceMode === "countdown") {
-        return "编辑倒计时";
-      }
-      if (this.deviceMode === "stopwatch") {
-        return "编辑秒表";
-      }
-      if (this.deviceMode === "notification") {
-        return "编辑通知提醒";
-      }
-      if (this.deviceMode === "text_display") {
-        return "编辑文本展示";
-      }
-      if (this.deviceMode === "eyes") {
-        return "编辑像素眼";
-      }
-      if (this.deviceMode === "breath_effect") {
-        return "编辑环绕灯";
-      }
-      if (this.deviceMode === "rhythm_effect") {
-        return "编辑律动";
-      }
-      if (this.deviceMode === "tetris") {
-        return "编辑方块屏保";
-      }
-      if (this.deviceMode === "canvas") {
-        return "编辑画板内容";
-      }
-      return "自定义时钟样式";
-    },
-    primaryActionDesc() {
-      if (this.deviceMode === "countdown") {
-        return "编辑倒计时样式、时间和进度";
-      }
-      if (this.deviceMode === "stopwatch") {
-        return "编辑秒表样式、圈次和强调色";
-      }
-      if (this.deviceMode === "notification") {
-        return "编辑提醒规则和触发后的展示内容";
-      }
-      if (this.deviceMode === "text_display") {
-        return "编辑文本、方向、速度和颜色";
-      }
-      if (this.deviceMode === "eyes") {
-        return "设置表情、配色和参数";
-      }
-      if (this.deviceMode === "breath_effect") {
-        return "编辑顺逆时针、内外层扫和颜色";
-      }
-      if (this.deviceMode === "rhythm_effect") {
-        return "编辑 BPM、强度、方向和色彩";
-      }
-      if (this.deviceMode === "tetris") {
-        return "编辑速度、方块类型和时钟叠加";
-      }
-      if (this.deviceMode === "canvas") {
-        return "绘制像素内容并保存到设备";
-      }
-      return "编辑时钟字体、颜色和背景";
+    modeEntries() {
+      return [
+        {
+          key: "eyes",
+          name: "桌面宠物",
+          icon: "browse",
+          variant: "pink",
+          type: "mode",
+        },
+        {
+          key: "clock",
+          name: "静态时钟",
+          icon: "time",
+          variant: "cyan",
+          type: "mode",
+        },
+        {
+          key: "animation",
+          name: "动态时钟",
+          icon: "play",
+          variant: "teal",
+          type: "mode",
+        },
+        {
+          key: "theme",
+          name: "主题模式",
+          icon: "picture",
+          variant: "purple",
+          type: "mode",
+        },
+        {
+          key: "canvas",
+          name: "画板模式",
+          iconType: "canvas",
+          variant: "blue",
+          type: "mode",
+        },
+        {
+          key: "tetris",
+          name: "俄罗斯方块时钟",
+          icon: "a-Grid-ninejiugongge",
+          variant: "indigo",
+          type: "mode",
+        },
+        {
+          key: "ambient_effect",
+          name: "像素屏保",
+          icon: "picture",
+          variant: "purple",
+          type: "mode",
+        },
+        {
+          key: "text_display",
+          name: "像素信息屏",
+          icon: "text",
+          variant: "green",
+          type: "mode",
+        },
+        {
+          key: "breath_effect",
+          name: "矩阵流光",
+          icon: "prompt",
+          variant: "gold",
+          type: "mode",
+        },
+        {
+          key: "rhythm_effect",
+          name: "音频频谱",
+          icon: "task",
+          variant: "orange",
+          type: "mode",
+        },
+        {
+          key: "weather",
+          name: "天气看板",
+          icon: "picture",
+          variant: "azure",
+          type: "feature",
+        },
+        {
+          key: "countdown",
+          name: "倒数看板",
+          icon: "time",
+          variant: "red",
+          type: "feature",
+        },
+        {
+          key: "stopwatch",
+          name: "计时看板",
+          icon: "task",
+          variant: "mint",
+          type: "feature",
+        },
+        {
+          key: "notification",
+          name: "提醒看板",
+          icon: "prompt",
+          variant: "azure",
+          type: "feature",
+        },
+      ];
     },
   },
-
-  watch: {
-    isDeviceConnected(val) {
-      this.connectionStatus = val ? "connected" : "disconnected";
-    },
-  },
-
   methods: {
-    updateConnectionStatus() {
-      if (this.deviceStore?.connected) {
-        this.connectionStatus = "connected";
-      } else {
-        this.connectionStatus = "disconnected";
+    isModeActive(entry) {
+      return this.deviceMode === entry.key;
+    },
+
+    handleModeSelect(entry) {
+      if (entry.type === "feature") {
+        this.deviceMode = entry.key;
+        this.openFeatureEditor(entry.key);
+        return;
       }
+      this.switchMode(entry.key);
     },
 
     async handleConnect() {
-      if (this.connectionStatus === "connected") {
+      if (this.isDeviceConnected) {
         // 已连接，断开
         await this.deviceStore.disconnect();
-        this.connectionStatus = "disconnected";
         this.toast.showInfo("设备已断开");
-        return;
-      }
-
-      if (this.connectionStatus !== "disconnected") {
         return;
       }
 
@@ -413,8 +411,6 @@ export default {
       try {
         const result = await this.deviceStore.connect(ip);
         if (result.success) {
-          this.connectionStatus = "connected";
-
           this.$refs.connectModal.onSuccess();
           this.toast.showSuccess("已连接到 RenLight 设备");
         } else {
@@ -453,7 +449,7 @@ export default {
       uni.setStorageSync("device_brightness", this.brightness);
 
       // 如果已连接，发送亮度控制命令
-      if (this.connectionStatus === "connected") {
+      if (this.isDeviceConnected) {
         try {
           // 将 0-100 的值映射到 0-178 (70% of 255)，限制最大亮度为70%
           const maxBrightness = 178; // 255 * 0.7
@@ -473,7 +469,11 @@ export default {
 
       if (mode === "eyes") {
         this.openSpiritScreen();
-      } else if (mode === "clock" || mode === "animation") {
+      } else if (
+        mode === "clock" ||
+        mode === "animation" ||
+        mode === "theme"
+      ) {
         this.editClockWithMode(mode);
       } else if (mode === "text_display") {
         this.editEffectWithMode("text_display");
@@ -481,6 +481,8 @@ export default {
         this.editEffectWithMode("breath_effect");
       } else if (mode === "rhythm_effect") {
         this.editEffectWithMode("rhythm_effect");
+      } else if (mode === "ambient_effect") {
+        this.openAmbientEditor();
       } else if (mode === "tetris") {
         this.openTetrisSettings();
       } else if (mode === "canvas") {
@@ -489,46 +491,11 @@ export default {
     },
 
     editClockWithMode(mode) {
-      const targetMode = mode === "animation" ? "animation" : "clock";
+      const targetMode =
+        mode === "animation" || mode === "theme" ? mode : "clock";
       uni.navigateTo({
         url: `/pages/clock-editor/clock-editor?mode=${targetMode}`,
       });
-    },
-
-    editClock() {
-      this.editClockWithMode(this.deviceMode);
-    },
-
-    openPrimaryEditor() {
-      if (
-        this.deviceMode === "countdown" ||
-        this.deviceMode === "stopwatch" ||
-        this.deviceMode === "notification"
-      ) {
-        this.openFeatureEditor(this.deviceMode);
-        return;
-      }
-      if (
-        this.deviceMode === "text_display" ||
-        this.deviceMode === "breath_effect" ||
-        this.deviceMode === "rhythm_effect"
-      ) {
-        this.editEffect();
-        return;
-      }
-      if (this.deviceMode === "eyes") {
-        this.openSpiritScreen();
-        return;
-      }
-      if (this.deviceMode === "tetris") {
-        this.openTetrisSettings();
-        return;
-      }
-      if (this.deviceMode === "canvas") {
-        this.openCanvasEditor();
-        return;
-      }
-      this.editClock();
     },
 
     openTetrisSettings() {
@@ -540,6 +507,12 @@ export default {
     openCanvasEditor() {
       uni.navigateTo({
         url: "/pages/canvas-editor/canvas-editor",
+      });
+    },
+
+    openAmbientEditor() {
+      uni.navigateTo({
+        url: "/pages/ambient-editor/ambient-editor",
       });
     },
 
@@ -566,13 +539,6 @@ export default {
     },
 
     openFeatureEditor(feature) {
-      if (feature === "notification") {
-        uni.navigateTo({
-          url: "/pages/notification-list/notification-list",
-        });
-        return;
-      }
-
       uni.navigateTo({
         url: `/pages/feature-editor/feature-editor?feature=${feature}`,
       });
@@ -879,7 +845,6 @@ export default {
           try {
             // 先断开，防止 ESP32 重启后触发自动重连
             this.deviceStore.disconnect();
-            this.connectionStatus = "disconnected";
 
             const url = `http://${this.deviceIp}/clear-wifi`;
             uni.request({
@@ -927,13 +892,13 @@ export default {
   height: 100vh;
   display: flex;
   flex-direction: column;
-  background-color: #f5f5f7;
+  background: linear-gradient(180deg, #f7f8fb 0%, #f3f5f8 100%);
   overflow: hidden;
 }
 
 .header {
-  background-color: var(--color-card-background);
-  border-bottom: 2rpx solid var(--border-primary);
+  background: rgba(255, 255, 255, 0.96);
+  border-bottom: 2rpx solid #edf1f5;
   padding: 0 32rpx;
 }
 
@@ -947,222 +912,417 @@ export default {
 .header-title {
   font-size: 36rpx;
   font-weight: 700;
-  color: var(--color-text-primary);
-}
-
-.header-actions {
-  display: flex;
-  gap: 16rpx;
+  color: #0f172a;
 }
 
 .content {
   flex: 1;
-  padding: 24rpx 28rpx;
+  padding: 24rpx 24rpx 0;
   box-sizing: border-box;
   overflow-y: scroll;
 }
 
-/* 通用卡片 */
-.card {
-  background-color: #ffffff;
-  border-radius: 24rpx;
+.console-card {
   margin-bottom: 24rpx;
-  overflow: hidden;
+  padding: 28rpx;
+  border-radius: 28rpx;
+  background: #ffffff;
+  border: 2rpx solid #e9edf3;
+  box-shadow: 0 12rpx 32rpx rgba(15, 23, 42, 0.05);
+}
+
+.console-card-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 24rpx;
+}
+
+.device-summary {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+}
+
+.device-logo {
+  width: 92rpx;
+  height: 92rpx;
+  border-radius: 24rpx;
+  background: linear-gradient(180deg, #f8fafc 0%, #f2f5f9 100%);
+  border: 2rpx solid #e8edf3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.device-logo-core {
+  width: 42rpx;
+  height: 42rpx;
+  border-radius: 12rpx;
+  background: linear-gradient(135deg, #00d9d9 0%, #4f7fff 100%);
+  box-shadow: 0 10rpx 22rpx rgba(79, 127, 255, 0.2);
+}
+
+.device-summary-text {
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+}
+
+.device-name {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #111827;
+}
+
+.device-status-row {
+  display: flex;
+  align-items: center;
+  gap: 10rpx;
+  flex-wrap: wrap;
+}
+
+.device-status-dot {
+  width: 14rpx;
+  height: 14rpx;
+  border-radius: 999rpx;
+  background: #cbd5e1;
+}
+
+.device-status-dot.online {
+  background: #22c55e;
+  box-shadow: 0 0 12rpx rgba(34, 197, 94, 0.28);
+}
+
+.device-status-label,
+.device-status-ip {
+  font-size: 22rpx;
+  color: #667085;
+}
+
+.device-status-ip {
+  font-family: monospace;
+  color: #344054;
+}
+
+.connect-entry-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
+}
+
+.connect-entry-card {
+  border-radius: 24rpx;
+  background: #f7f8fb;
+  border: 2rpx solid #eaedf2;
+  padding: 22rpx;
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+}
+
+.connect-entry-icon,
+.panel-action-icon {
+  width: 72rpx;
+  height: 72rpx;
+  border-radius: 20rpx;
+  background: #ebf2ff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.panel-action-icon.warm {
+  background: #fff4df;
+}
+
+.panel-action-icon.danger {
+  background: #fff0e8;
+}
+
+.connect-entry-icon.mint,
+.panel-action-icon.mint {
+  background: #e9fbfb;
+}
+
+.panel-action-icon.blue {
+  background: rgba(79, 127, 255, 0.12);
+}
+
+.connect-entry-text,
+.panel-action-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6rpx;
+}
+
+.connect-entry-label,
+.panel-action-label {
+  font-size: 28rpx;
+  font-weight: 600;
+}
+
+.connect-entry-label,
+.panel-action-label {
+  color: #111827;
+}
+
+.connect-entry-desc,
+.panel-action-desc,
+.section-meta {
+  font-size: 22rpx;
+  color: #667085;
+}
+
+.connect-entry-desc,
+.panel-action-desc,
+.section-meta {
+  color: #64748b;
+}
+
+.section-block {
+  margin-bottom: 28rpx;
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16rpx;
+  padding: 6rpx 8rpx 16rpx;
 }
 
 .section-title {
-  font-size: 26rpx;
-  font-weight: 500;
-  color: #999;
-  padding: 20rpx 8rpx 12rpx;
+  font-size: 30rpx;
+  font-weight: 700;
+  color: #0f172a;
 }
 
-.divider {
-  height: 1rpx;
-  background-color: #f0f0f0;
-  margin: 0 32rpx;
+.mode-badge-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18rpx;
 }
 
-/* 连接状态卡片 */
-.connected-info {
-  display: flex;
-  align-items: center;
-  padding: 32rpx 32rpx;
-  gap: 20rpx;
-}
-
-.connected-dot {
-  width: 20rpx;
-  height: 20rpx;
-  border-radius: 50%;
-  background-color: #34c759;
-  box-shadow: 0 0 8rpx rgba(52, 199, 89, 0.4);
-  flex-shrink: 0;
-}
-
-.connected-detail {
-  flex: 1;
+.mode-badge {
+  border-radius: 28rpx;
+  padding: 24rpx 12rpx 18rpx;
+  border: 2rpx solid transparent;
   display: flex;
   flex-direction: column;
-  gap: 4rpx;
-}
-
-.connected-label {
-  font-size: 30rpx;
-  font-weight: 600;
-  color: #1a1a1a;
-}
-
-.connected-ip {
-  font-size: 24rpx;
-  color: #999;
-  font-family: monospace;
-}
-
-.disconnect-text {
-  font-size: 26rpx;
-  color: #ff3b30;
-  font-weight: 500;
-}
-
-.connect-actions {
-  padding: 8rpx 0;
-}
-
-.connect-btn {
-  display: flex;
   align-items: center;
-  padding: 28rpx 32rpx;
-  gap: 20rpx;
+  gap: 14rpx;
 }
 
-.connect-btn:active {
-  background-color: #f8f8f8;
+.mode-badge.active {
+  border-color: rgba(15, 23, 42, 0.18);
+  box-shadow: 0 16rpx 40rpx rgba(15, 23, 42, 0.08);
 }
 
-.connect-btn-icon {
-  width: 80rpx;
-  height: 80rpx;
-  border-radius: 20rpx;
-  background-color: #f0f4ff;
+.mode-badge-icon-shell {
+  width: 116rpx;
+  height: 116rpx;
+  padding: 8rpx;
+  border-radius: 32rpx;
   display: flex;
   align-items: center;
   justify-content: center;
-  flex-shrink: 0;
 }
 
-.connect-btn-info {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 4rpx;
-}
-
-.connect-btn-label {
-  font-size: 30rpx;
-  font-weight: 500;
-  color: #1a1a1a;
-}
-
-.connect-btn-desc {
-  font-size: 24rpx;
-  color: #999;
-}
-
-/* 模式切换 */
-.mode-grid {
-  display: flex;
-  flex-wrap: wrap;
-  padding: 24rpx 20rpx;
-  gap: 16rpx;
-}
-
-.mode-item {
-  width: calc((100% - 48rpx) / 4);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12rpx;
-  padding: 24rpx 8rpx;
-  border-radius: 20rpx;
-  transition: all 0.2s;
-}
-
-.mode-icon-wrap {
-  width: 88rpx;
-  height: 88rpx;
-  border-radius: 22rpx;
-  background-color: #eef2ff;
-  box-shadow: 0 4rpx 16rpx rgba(79, 127, 255, 0.15);
+.mode-badge-icon-core {
+  width: 100%;
+  height: 100%;
+  border-radius: 26rpx;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s;
+  box-shadow: 0 16rpx 32rpx rgba(15, 23, 42, 0.16);
 }
 
-.mode-name {
+.mode-badge-name {
   font-size: 24rpx;
-  color: #5f6f91;
   font-weight: 600;
+  color: #0f172a;
 }
 
-/* 操作行 */
-.action-row {
-  display: flex;
-  align-items: center;
-  padding: 28rpx 32rpx;
-  gap: 20rpx;
-}
-
-.action-row:active {
-  background-color: #f8f8f8;
-}
-
-.action-info {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
+.mode-pixel-icon {
+  width: 52rpx;
+  height: 52rpx;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
   gap: 4rpx;
 }
 
-.action-label {
-  font-size: 28rpx;
-  font-weight: 500;
-  color: #1a1a1a;
+.mode-pixel-cell {
+  border-radius: 6rpx;
+  background: rgba(255, 255, 255, 0.72);
 }
 
-.action-desc {
-  font-size: 22rpx;
-  color: #999;
+.mode-badge.pink {
+  background: linear-gradient(180deg, rgba(236, 72, 153, 0.12), rgba(236, 72, 153, 0.04));
+  border-color: rgba(236, 72, 153, 0.16);
+}
+
+.mode-badge.pink .mode-badge-icon-core {
+  background: linear-gradient(135deg, #ec4899 0%, #f472b6 100%);
+}
+
+.mode-badge.cyan {
+  background: linear-gradient(180deg, rgba(0, 217, 217, 0.12), rgba(0, 217, 217, 0.04));
+  border-color: rgba(0, 217, 217, 0.16);
+}
+
+.mode-badge.cyan .mode-badge-icon-core {
+  background: linear-gradient(135deg, #00d9d9 0%, #1ae4e4 100%);
+}
+
+.mode-badge.teal {
+  background: linear-gradient(180deg, rgba(6, 182, 212, 0.12), rgba(6, 182, 212, 0.04));
+  border-color: rgba(6, 182, 212, 0.16);
+}
+
+.mode-badge.teal .mode-badge-icon-core {
+  background: linear-gradient(135deg, #06b6d4 0%, #22d3ee 100%);
+}
+
+.mode-badge.purple {
+  background: linear-gradient(180deg, rgba(139, 92, 246, 0.12), rgba(139, 92, 246, 0.04));
+  border-color: rgba(139, 92, 246, 0.16);
+}
+
+.mode-badge.purple .mode-badge-icon-core {
+  background: linear-gradient(135deg, #8b5cf6 0%, #9b6ff7 100%);
+}
+
+.mode-badge.blue {
+  background: linear-gradient(180deg, rgba(79, 127, 255, 0.12), rgba(79, 127, 255, 0.04));
+  border-color: rgba(79, 127, 255, 0.16);
+}
+
+.mode-badge.blue .mode-badge-icon-core {
+  background: linear-gradient(135deg, #4f7fff 0%, #6b8fff 100%);
+}
+
+.mode-badge.indigo {
+  background: linear-gradient(180deg, rgba(124, 58, 237, 0.12), rgba(124, 58, 237, 0.04));
+  border-color: rgba(124, 58, 237, 0.16);
+}
+
+.mode-badge.indigo .mode-badge-icon-core {
+  background: linear-gradient(135deg, #7c3aed 0%, #8b5cf6 100%);
+}
+
+.mode-badge.green {
+  background: linear-gradient(180deg, rgba(16, 185, 129, 0.12), rgba(16, 185, 129, 0.04));
+  border-color: rgba(16, 185, 129, 0.16);
+}
+
+.mode-badge.green .mode-badge-icon-core {
+  background: linear-gradient(135deg, #10b981 0%, #20c997 100%);
+}
+
+.mode-badge.gold {
+  background: linear-gradient(180deg, rgba(245, 158, 11, 0.12), rgba(245, 158, 11, 0.04));
+  border-color: rgba(245, 158, 11, 0.16);
+}
+
+.mode-badge.gold .mode-badge-icon-core {
+  background: linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%);
+}
+
+.mode-badge.orange {
+  background: linear-gradient(180deg, rgba(255, 122, 69, 0.12), rgba(255, 122, 69, 0.04));
+  border-color: rgba(255, 122, 69, 0.16);
+}
+
+.mode-badge.orange .mode-badge-icon-core {
+  background: linear-gradient(135deg, #ff7a45 0%, #ff8b5c 100%);
+}
+
+.mode-badge.red {
+  background: linear-gradient(180deg, rgba(239, 68, 68, 0.12), rgba(239, 68, 68, 0.04));
+  border-color: rgba(239, 68, 68, 0.16);
+}
+
+.mode-badge.red .mode-badge-icon-core {
+  background: linear-gradient(135deg, #ef4444 0%, #f87171 100%);
+}
+
+.mode-badge.mint {
+  background: linear-gradient(180deg, rgba(20, 184, 166, 0.12), rgba(20, 184, 166, 0.04));
+  border-color: rgba(20, 184, 166, 0.16);
+}
+
+.mode-badge.mint .mode-badge-icon-core {
+  background: linear-gradient(135deg, #14b8a6 0%, #2dd4bf 100%);
+}
+
+.mode-badge.azure {
+  background: linear-gradient(180deg, rgba(59, 130, 246, 0.12), rgba(59, 130, 246, 0.04));
+  border-color: rgba(59, 130, 246, 0.16);
+}
+
+.mode-badge.azure .mode-badge-icon-core {
+  background: linear-gradient(135deg, #3b82f6 0%, #60a5fa 100%);
+}
+
+.panel-card {
+  background: rgba(255, 255, 255, 0.88);
+  border: 2rpx solid rgba(148, 163, 184, 0.14);
+  box-shadow: 0 16rpx 40rpx rgba(15, 23, 42, 0.04);
+  border-radius: 28rpx;
+  overflow: hidden;
+}
+
+.panel-action {
+  display: flex;
+  align-items: center;
+  gap: 18rpx;
+  padding: 24rpx;
+}
+
+.panel-action.danger {
+  background: linear-gradient(180deg, rgba(255, 122, 69, 0.05), rgba(255, 122, 69, 0.02));
 }
 
 .danger-text {
-  color: #ff3b30;
+  color: #ea580c;
 }
 
-/* 亮度调节 */
-.brightness-row {
+.panel-divider {
+  height: 2rpx;
+  background: rgba(148, 163, 184, 0.12);
+  margin: 0 24rpx;
+}
+
+.brightness-card {
+  padding: 24rpx;
+}
+
+.brightness-topline {
   display: flex;
   align-items: center;
-  gap: 16rpx;
-  padding: 28rpx 32rpx 8rpx;
-}
-
-.brightness-label {
-  flex: 1;
-  font-size: 28rpx;
-  font-weight: 500;
-  color: #1a1a1a;
+  gap: 18rpx;
+  margin-bottom: 18rpx;
 }
 
 .brightness-value {
-  font-size: 28rpx;
-  font-weight: 600;
-  color: #4f7fff;
-  font-family: monospace;
+  font-size: 34rpx;
+  font-weight: 700;
+  color: #0f172a;
+  margin-left: auto;
 }
 
 .brightness-slider {
-  margin: 0 32rpx 24rpx;
+  width: 100%;
+  margin: 0;
+}
+
+@media (max-width: 720px) {
+  .mode-badge-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 </style>

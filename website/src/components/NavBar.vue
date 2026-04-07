@@ -2,8 +2,8 @@
   <nav class="navbar">
     <div class="nav-container">
       <router-link to="/" class="logo">
-        <img :src="iconUrl" alt="RenLight" class="logo-icon" />
-        <img :src="logoUrl" alt="RenLight" class="logo-logo" />
+        <img :src="iconUrl" alt="光格像素工坊" class="logo-icon" />
+        <img :src="logoUrl" alt="光格像素工坊" class="logo-logo" />
       </router-link>
 
       <div class="nav-links" :class="{ active: mobileMenuOpen }">
@@ -86,8 +86,8 @@
 <script setup>
 import { computed, ref } from "vue";
 import { useRouter } from "vue-router";
-import iconUrl from "@/assets/images/RenLight-logo.png";
-import logoUrl from "@/assets/images/RenLight-logo.png";
+import iconUrl from "@/assets/images/glowxel-icon.png";
+import logoUrl from "@/assets/images/glowxel-logo.png";
 
 const router = useRouter();
 const mobileMenuOpen = ref(false);

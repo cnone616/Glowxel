@@ -1,7 +1,7 @@
 import jsPDF from 'jspdf'
 import html2canvas from 'html2canvas'
 import { getColorByCode } from '@/data/artkal-colors.js'
-import logoUrl from '@/assets/images/RenLight-logo.png'
+import logoUrl from '@/assets/images/glowxel-logo.png'
 
 /**
  * 导出拼豆图纸为 PDF
@@ -83,7 +83,7 @@ export async function exportToPDF(pixels, width, height, options = {}) {
   const pageHeight = pdf.internal.pageSize.getHeight()
   pdf.setFontSize(9)
   pdf.setTextColor(150, 150, 150)
-  pdf.text('RenLight', 20, pageHeight - 8)
+  pdf.text('光格像素工坊', 20, pageHeight - 8)
   pdf.text(new Date().toLocaleDateString('zh-CN'), 20, pageHeight - 4)
   try {
     const logoImg = await loadLogoBase64()
@@ -162,7 +162,7 @@ export async function exportToPNG(pixels, width, height, options = {}) {
   ctx.font = '13px Arial'
   ctx.textAlign = 'left'
   ctx.textBaseline = 'alphabetic'
-  ctx.fillText('RenLight', 20, canvas.height - 12)
+  ctx.fillText('光格像素工坊', 20, canvas.height - 12)
   ctx.fillText(new Date().toLocaleDateString('zh-CN'), 20, canvas.height - 28)
 
   // 转换为 blob 并下载

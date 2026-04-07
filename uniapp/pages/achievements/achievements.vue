@@ -1,160 +1,180 @@
 <template>
   <view class="achievements-page">
-    <!-- 状态栏占位 -->
     <!-- #ifdef MP-WEIXIN -->
     <view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
     <!-- #endif -->
 
-    <!-- 导航栏 -->
     <view class="navbar">
       <view class="nav-left" @click="handleBack">
-        <Icon
-          name="direction-left"
-          :size="32"
-          color="var(--color-text-primary)"
-        />
+        <Icon name="direction-left" :size="32" color="#0F172A" />
       </view>
       <text class="nav-title">成就</text>
       <view class="nav-right" @click="shareAchievements">
-        <Icon name="share" :size="32" />
+        <Icon name="share" :size="32" color="#0F172A" />
       </view>
     </view>
 
-    <!-- 成就统计 -->
-    <view class="stats-section">
-      <view class="stats-card">
-        <view class="stat-item">
-          <text class="stat-number">{{ unlockedCount }}</text>
-          <text class="stat-label">已解锁</text>
-        </view>
-        <view class="stat-divider"></view>
-        <view class="stat-item">
-          <text class="stat-number">{{ totalCount }}</text>
-          <text class="stat-label">总成就</text>
-        </view>
-        <view class="stat-divider"></view>
-        <view class="stat-item">
-          <text class="stat-number">{{ completionRate }}%</text>
-          <text class="stat-label">完成度</text>
-        </view>
-      </view>
-
-      <view class="progress-section">
-        <text class="progress-title">成就进度</text>
-        <view class="progress-bar">
-          <view
-            class="progress-fill"
-            :style="{ width: completionRate + '%' }"
-          ></view>
-        </view>
-      </view>
-    </view>
-
-    <!-- 分类标签 -->
-    <view class="category-tabs">
-      <view
-        v-for="category in categories"
-        :key="category.value"
-        class="category-tab"
-        :class="{ active: currentCategory === category.value }"
-        @click="currentCategory = category.value"
-      >
-        <Icon :name="category.icon" :size="32" />
-        <text class="category-text">{{ category.label }}</text>
-        <text v-if="category.count > 0" class="category-count">{{
-          category.count
-        }}</text>
-      </view>
-    </view>
-
-    <!-- 成就列表 -->
     <scroll-view scroll-y class="content">
-      <view class="achievements-grid">
-        <view
-          v-for="achievement in filteredAchievements"
-          :key="achievement.id"
-          class="achievement-card"
-          :class="{
-            unlocked: achievement.unlocked,
-            rare: achievement.rarity === 'rare',
-            epic: achievement.rarity === 'epic',
-            legendary: achievement.rarity === 'legendary',
-          }"
-          @click="showAchievementDetail(achievement)"
-        >
-          <!-- 成就图标 -->
-          <view class="achievement-icon">
-            <Icon
-              :name="achievement.icon"
-              :size="80"
-              :color="getIconColor(achievement)"
-            />
-
-            <!-- 稀有度光效 -->
-            <view
-              v-if="achievement.unlocked && achievement.rarity !== 'common'"
-              class="rarity-glow"
-            ></view>
-
-            <!-- 未解锁遮罩 -->
-            <view v-if="!achievement.unlocked" class="locked-overlay">
-              <Icon name="lock" :size="40" color="var(--color-text-disabled)" />
-            </view>
+      <view class="achievement-hero">
+        <view class="hero-copy">
+          <text class="hero-badge">荣誉系统</text>
+          <text class="hero-title">成就不只是图标，而是值得收藏的像素荣誉卡</text>
+          <text class="hero-subtitle"
+            >已解锁 {{ unlockedCount }} 项 · 当前完成度 {{ completionRate }}%</text
+          >
+        </view>
+        <view class="hero-stats-card">
+          <view class="hero-stat-item">
+            <text class="hero-stat-number">{{ unlockedCount }}</text>
+            <text class="hero-stat-label">已解锁</text>
           </view>
-
-          <!-- 成就信息 -->
-          <view class="achievement-info">
-            <text class="achievement-title">{{ achievement.title }}</text>
-            <text class="achievement-desc">{{ achievement.description }}</text>
-
-            <!-- 进度条 -->
+          <view class="hero-stat-divider"></view>
+          <view class="hero-stat-item">
+            <text class="hero-stat-number">{{ totalCount }}</text>
+            <text class="hero-stat-label">总成就</text>
+          </view>
+          <view class="hero-stat-divider"></view>
+          <view class="hero-stat-item">
+            <text class="hero-stat-number">{{ completionRate }}%</text>
+            <text class="hero-stat-label">完成度</text>
+          </view>
+          <view class="hero-progress-track">
             <view
-              v-if="achievement.progress !== undefined"
-              class="achievement-progress"
-            >
-              <view class="progress-info">
-                <text class="progress-text"
+              class="hero-progress-fill"
+              :style="{ width: completionRate + '%' }"
+            ></view>
+          </view>
+        </view>
+      </view>
+
+      <view class="section-block">
+        <view class="section-header">
+          <text class="section-title">稀有度层级</text>
+          <text class="section-meta">当前成就体系</text>
+        </view>
+        <view class="rarity-grid">
+          <view
+            v-for="rarity in rarityOverview"
+            :key="rarity.key"
+            class="rarity-card"
+            :class="rarity.key"
+          >
+            <view class="rarity-icon-shell">
+              <Icon name="trophy" :size="50" color="#FFFFFF" />
+            </view>
+            <text class="rarity-name">{{ rarity.label }}</text>
+            <text class="rarity-percent">{{ rarity.percent }}</text>
+          </view>
+        </view>
+      </view>
+
+      <view class="section-block">
+        <view class="section-header">
+          <text class="section-title">成就分类</text>
+          <text class="section-meta">按系列查看</text>
+        </view>
+        <view class="category-tabs">
+          <view
+            v-for="category in categories"
+            :key="category.value"
+            class="category-tab"
+            :class="[category.value, { active: currentCategory === category.value }]"
+            @click="currentCategory = category.value"
+          >
+            <Icon :name="category.icon" :size="28" />
+            <text class="category-text">{{ category.label }}</text>
+            <text v-if="category.count > 0" class="category-count">{{
+              category.count
+            }}</text>
+          </view>
+        </view>
+      </view>
+
+      <view class="section-block">
+        <view class="section-header">
+          <text class="section-title">成就卡片</text>
+          <text class="section-meta">点击查看详情</text>
+        </view>
+        <view class="achievements-grid">
+          <view
+            v-for="achievement in filteredAchievements"
+            :key="achievement.id"
+            class="achievement-card"
+            :class="{
+              unlocked: achievement.unlocked,
+              rare: achievement.rarity === 'rare',
+              epic: achievement.rarity === 'epic',
+              legendary: achievement.rarity === 'legendary',
+            }"
+            @click="showAchievementDetail(achievement)"
+          >
+            <view class="achievement-card-top">
+              <view class="achievement-icon-shell">
+                <Icon
+                  :name="achievement.icon"
+                  :size="64"
+                  :color="achievement.unlocked ? '#FFFFFF' : '#94A3B8'"
+                />
+                <view
+                  v-if="achievement.unlocked && achievement.rarity !== 'common'"
+                  class="rarity-glow"
+                ></view>
+                <view v-if="!achievement.unlocked" class="locked-overlay">
+                  <Icon name="lock" :size="34" color="#94A3B8" />
+                </view>
+              </view>
+              <view class="rarity-badge" :class="achievement.rarity">
+                <text class="rarity-text">{{
+                  getRarityText(achievement.rarity)
+                }}</text>
+              </view>
+            </view>
+
+            <view class="achievement-info">
+              <text class="achievement-title">{{ achievement.title }}</text>
+              <text class="achievement-desc">{{ achievement.description }}</text>
+
+              <view
+                v-if="achievement.progress !== undefined"
+                class="achievement-progress"
+              >
+                <view class="progress-info">
+                  <text class="progress-text">进度</text>
+                  <text class="progress-percent"
+                    >{{
+                      Math.round(
+                        (achievement.current / achievement.target) * 100,
+                      )
+                    }}%</text
+                  >
+                </view>
+                <view class="progress-bar-small">
+                  <view
+                    class="progress-fill-small"
+                    :style="{
+                      width:
+                        (achievement.current / achievement.target) * 100 + '%',
+                    }"
+                  ></view>
+                </view>
+                <text class="progress-detail"
                   >{{ achievement.current }}/{{ achievement.target }}</text
                 >
-                <text class="progress-percent"
-                  >{{
-                    Math.round(
-                      (achievement.current / achievement.target) * 100,
-                    )
-                  }}%</text
-                >
               </view>
-              <view class="progress-bar-small">
-                <view
-                  class="progress-fill-small"
-                  :style="{
-                    width:
-                      (achievement.current / achievement.target) * 100 + '%',
-                  }"
-                ></view>
-              </view>
-            </view>
 
-            <!-- 解锁时间 -->
-            <text
-              v-if="achievement.unlocked && achievement.unlockedAt"
-              class="unlock-time"
-            >
-              {{ formatUnlockTime(achievement.unlockedAt) }}
-            </text>
-
-            <!-- 稀有度标签 -->
-            <view class="rarity-badge" :class="achievement.rarity">
-              <text class="rarity-text">{{
-                getRarityText(achievement.rarity)
-              }}</text>
+              <text
+                v-if="achievement.unlocked && achievement.unlockedAt"
+                class="unlock-time"
+              >
+                {{ formatUnlockTime(achievement.unlockedAt) }}
+              </text>
             </view>
           </view>
         </view>
       </view>
+      <view style="height: 80rpx"></view>
     </scroll-view>
 
-    <!-- 成就详情弹窗 -->
     <view
       v-if="selectedAchievement"
       class="modal-overlay"
@@ -162,76 +182,74 @@
     >
       <view class="achievement-modal" @click.stop>
         <view class="modal-close" @click="selectedAchievement = null">
-          <Icon name="close" :size="32" />
+          <Icon name="close" :size="32" color="#0F172A" />
         </view>
 
-        <view class="modal-icon">
-          <Icon
-            :name="selectedAchievement.icon"
-            :size="120"
-            :color="getIconColor(selectedAchievement)"
-          />
-          <view
-            v-if="
-              selectedAchievement.unlocked &&
-              selectedAchievement.rarity !== 'common'
-            "
-            class="modal-glow"
-          ></view>
-        </view>
-
-        <text class="modal-title">{{ selectedAchievement.title }}</text>
-        <text class="modal-desc">{{ selectedAchievement.description }}</text>
-
-        <view v-if="selectedAchievement.unlocked" class="modal-unlocked">
-          <Icon name="check-circle" :size="40" color="var(--color-success)" />
-          <text class="unlocked-text">已解锁</text>
-          <text class="unlock-date">{{
-            formatUnlockTime(selectedAchievement.unlockedAt)
-          }}</text>
-        </view>
-
-        <view v-else class="modal-locked">
-          <view
-            v-if="selectedAchievement.progress !== undefined"
-            class="modal-progress"
-          >
-            <text class="progress-label">完成进度</text>
-            <view class="progress-bar-modal">
-              <view
-                class="progress-fill-modal"
-                :style="{
-                  width:
-                    (selectedAchievement.current / selectedAchievement.target) *
-                      100 +
-                    '%',
-                }"
-              ></view>
-            </view>
-            <text class="progress-detail"
-              >{{ selectedAchievement.current }}/{{
-                selectedAchievement.target
-              }}</text
-            >
-          </view>
-
-          <text class="hint-text">{{
-            selectedAchievement.hint || "继续努力，即将解锁！"
-          }}</text>
-        </view>
-
-        <view class="modal-rarity">
-          <text class="rarity-label">稀有度:</text>
-          <view class="rarity-badge" :class="selectedAchievement.rarity">
+        <view class="modal-icon" :class="selectedAchievement.rarity">
+          <Icon :name="selectedAchievement.icon" :size="88" color="#FFFFFF" />
+          <view v-if="selectedAchievement.rarity !== 'common'" class="modal-glow"></view>
+          <view class="modal-rarity-chip" :class="selectedAchievement.rarity">
             <text class="rarity-text">{{
               getRarityText(selectedAchievement.rarity)
             }}</text>
           </view>
         </view>
+
+        <text class="modal-title">{{ selectedAchievement.title }}</text>
+        <text class="modal-desc">{{ selectedAchievement.description }}</text>
+
+        <view class="modal-meta-grid">
+          <view class="modal-meta-card">
+            <text class="modal-meta-label">状态</text>
+            <text class="modal-meta-value">{{
+              selectedAchievement.unlocked ? "已解锁" : "进行中"
+            }}</text>
+          </view>
+          <view class="modal-meta-card">
+            <text class="modal-meta-label">稀有度</text>
+            <text class="modal-meta-value">{{ selectedAchievementRarityPercent }}</text>
+          </view>
+        </view>
+
+        <view class="modal-progress">
+          <view class="progress-info">
+            <text class="progress-text">完成进度</text>
+            <text class="progress-percent"
+              >{{ selectedAchievement.current }}/{{
+                selectedAchievement.target
+              }}</text
+            >
+          </view>
+          <view class="progress-bar-modal">
+            <view
+              class="progress-fill-modal"
+              :style="{
+                width:
+                  (selectedAchievement.current / selectedAchievement.target) *
+                    100 +
+                  '%',
+              }"
+            ></view>
+          </view>
+          <text class="hint-text">{{
+            selectedAchievement.unlocked
+              ? formatUnlockTime(selectedAchievement.unlockedAt)
+              : selectedAchievement.hint || "继续努力，即将解锁！"
+          }}</text>
+        </view>
+
+        <view class="modal-actions">
+          <view class="modal-action-button ghost" @click="selectedAchievement = null">
+            <text class="modal-action-text">关闭</text>
+          </view>
+          <view class="modal-action-button primary" @click="shareSelectedAchievement">
+            <Icon name="share" :size="28" color="#FFFFFF" />
+            <text class="modal-action-text white">分享成就</text>
+          </view>
+        </view>
       </view>
     </view>
 
-    <!-- Toast -->
     <Toast ref="toastRef" />
   </view>
 </template>
@@ -385,6 +403,14 @@ export default {
         (a) => a.category === this.currentCategory,
       );
     },
+    rarityOverview() {
+      return [
+        { key: "common", label: "普通", percent: "60%" },
+        { key: "rare", label: "稀有", percent: "25%" },
+        { key: "epic", label: "史诗", percent: "10%" },
+        { key: "legendary", label: "传说", percent: "5%" },
+      ];
+    },
     unlockedCount() {
       return this.achievements.filter((a) => a.unlocked).length;
     },
@@ -395,6 +421,13 @@ export default {
       return this.totalCount
         ? Math.round((this.unlockedCount / this.totalCount) * 100)
         : 0;
+    },
+    selectedAchievementRarityPercent() {
+      if (!this.selectedAchievement) return "";
+      if (this.selectedAchievement.rarity === "common") return "60%";
+      if (this.selectedAchievement.rarity === "rare") return "25%";
+      if (this.selectedAchievement.rarity === "epic") return "10%";
+      return "5%";
     },
   },
 
@@ -501,6 +534,20 @@ export default {
       });
     },
 
+    shareSelectedAchievement() {
+      if (!this.selectedAchievement) return;
+      const shareText = `我在 Glowxel 的${this.getRarityText(this.selectedAchievement.rarity)}成就「${this.selectedAchievement.title}」进度为 ${this.selectedAchievement.current}/${this.selectedAchievement.target}`;
+      uni.setClipboardData({
+        data: shareText,
+        success: () => {
+          this.toast.showSuccess("成就文案已复制");
+        },
+        fail: () => {
+          this.toast.showError("复制失败");
+        },
+      });
+    },
+
     getIconColor(achievement) {
       if (!achievement.unlocked) return "var(--color-text-disabled)";
       const map = { rare: "#4F7FFF", epic: "#9333EA", legendary: "#F59E0B" };
@@ -525,7 +572,9 @@ export default {
 <style scoped>
 .achievements-page {
   height: 100vh;
-  background-color: var(--color-app-background);
+  background:
+    radial-gradient(circle at top right, rgba(167, 139, 250, 0.12), transparent 34%),
+    linear-gradient(180deg, #f8f9fd 0%, #eef3fb 100%);
   display: flex;
   flex-direction: column;
 }
@@ -536,479 +585,592 @@ export default {
   align-items: center;
   justify-content: center;
   padding: 0 32rpx;
-  background-color: var(--color-card-background);
-  border-bottom: 2rpx solid var(--border-primary);
+  background: rgba(255, 255, 255, 0.86);
+  border-bottom: 2rpx solid rgba(148, 163, 184, 0.16);
+  backdrop-filter: blur(24rpx);
   position: relative;
 }
 
-.nav-left {
+.nav-left,
+.nav-right {
   position: absolute;
-  left: 32rpx;
   width: 80rpx;
   display: flex;
   align-items: center;
+}
+
+.nav-left {
+  left: 32rpx;
   justify-content: flex-start;
 }
 
 .nav-right {
-  position: absolute;
   right: 32rpx;
-  width: 80rpx;
-  display: flex;
-  align-items: center;
   justify-content: flex-end;
 }
 
 .nav-title {
   font-size: 32rpx;
-  font-weight: 600;
-  color: var(--color-text-primary);
-}
-
-.stats-section {
-  background-color: var(--color-card-background);
-  padding: 32rpx;
-  border-bottom: 2rpx solid var(--border-primary);
-}
-
-.stats-card {
-  display: flex;
-  align-items: center;
-  margin-bottom: 32rpx;
-}
-
-.stat-item {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8rpx;
-}
-
-.stat-number {
-  font-size: 36rpx;
   font-weight: 700;
-  color: var(--color-text-primary);
-}
-
-.stat-label {
-  font-size: 24rpx;
-  color: var(--color-text-secondary);
-}
-
-.stat-divider {
-  width: 2rpx;
-  height: 60rpx;
-  background-color: var(--border-primary);
-  margin: 0 32rpx;
-}
-
-.progress-section {
-  display: flex;
-  flex-direction: column;
-  gap: 16rpx;
-}
-
-.progress-title {
-  font-size: 24rpx;
-  color: var(--color-text-secondary);
-  font-weight: 500;
-}
-
-.progress-bar {
-  height: 16rpx;
-  background-color: var(--color-app-background);
-  border-radius: 8rpx;
-  overflow: hidden;
-}
-
-.progress-fill {
-  height: 100%;
-  background: linear-gradient(
-    90deg,
-    var(--color-brand-primary),
-    var(--color-brand-accent)
-  );
-  transition: width 0.3s ease;
-}
-
-.category-tabs {
-  display: flex;
-  background-color: var(--color-card-background);
-  padding: 24rpx 32rpx;
-  border-bottom: 2rpx solid var(--border-primary);
-  gap: 16rpx;
-  overflow-x: auto;
-}
-
-.category-tab {
-  display: flex;
-  align-items: center;
-  gap: 8rpx;
-  padding: 16rpx 24rpx;
-  background-color: var(--color-app-background);
-  border: 2rpx solid var(--border-primary);
-  border-radius: 32rpx;
-  transition: all 0.2s ease;
-  flex-shrink: 0;
-}
-
-.category-tab.active {
-  background-color: var(--color-brand-primary);
-  border-color: var(--color-brand-primary);
-  color: #ffffff;
-}
-
-.category-text {
-  font-size: 24rpx;
-  color: var(--color-text-secondary);
-}
-
-.category-tab.active .category-text {
-  color: #ffffff;
-}
-
-.category-count {
-  font-size: 20rpx;
-  background-color: rgba(255, 255, 255, 0.2);
-  padding: 4rpx 8rpx;
-  border-radius: 10rpx;
-  color: inherit;
+  color: #0f172a;
 }
 
 .content {
   flex: 1;
-  padding: 32rpx;
-  overflow-y: auto;
+  padding: 28rpx 28rpx 0;
   box-sizing: border-box;
 }
 
-.achievements-grid {
+.achievement-hero {
+  margin-bottom: 28rpx;
+}
+
+.hero-copy {
   display: flex;
+  flex-direction: column;
+  gap: 12rpx;
+  margin-bottom: 20rpx;
+}
+
+.hero-badge {
+  align-self: flex-start;
+  padding: 8rpx 18rpx;
+  border-radius: 999rpx;
+  background: rgba(79, 127, 255, 0.12);
+  color: #4f7fff;
+  font-size: 22rpx;
+  font-weight: 600;
+}
+
+.hero-title {
+  font-size: 42rpx;
+  line-height: 1.35;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.hero-subtitle {
+  font-size: 24rpx;
+  color: #64748b;
+}
+
+.hero-stats-card {
+  padding: 28rpx;
+  border-radius: 32rpx;
+  background: linear-gradient(145deg, #ffffff 0%, #f7faff 100%);
+  border: 2rpx solid rgba(148, 163, 184, 0.14);
+  box-shadow: 0 16rpx 44rpx rgba(15, 23, 42, 0.05);
+  display: flex;
+  align-items: center;
   flex-wrap: wrap;
-  gap: 24rpx;
-  justify-content: space-between;
 }
 
-.achievement-card {
-  width: calc(50% - 12rpx);
-  background-color: var(--color-card-background);
-  border-radius: 16rpx;
-  padding: 32rpx;
-  box-shadow: var(--shadow-card);
-  transition: all 0.2s ease;
-  position: relative;
+.hero-stat-item {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8rpx;
+}
+
+.hero-stat-number {
+  font-size: 38rpx;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.hero-stat-label {
+  font-size: 24rpx;
+  color: #64748b;
+}
+
+.hero-stat-divider {
+  width: 2rpx;
+  height: 60rpx;
+  background: rgba(148, 163, 184, 0.18);
+  margin: 0 32rpx;
+}
+
+.hero-progress-track {
+  width: 100%;
+  height: 16rpx;
+  border-radius: 999rpx;
+  background: #e2e8f0;
   overflow: hidden;
-  box-sizing: border-box;
+  margin-top: 24rpx;
 }
 
-.achievement-card:active {
-  transform: scale(0.98);
-  box-shadow: var(--shadow-floating);
+.hero-progress-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #4f7fff 0%, #8b5cf6 100%);
 }
 
-.achievement-card.unlocked {
-  border: 2rpx solid rgba(79, 127, 255, 0.3);
+.section-block {
+  margin-bottom: 28rpx;
 }
 
-.achievement-card.rare.unlocked {
-  border-color: rgba(79, 127, 255, 0.5);
-  box-shadow: 0 0 20rpx rgba(79, 127, 255, 0.2);
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16rpx;
+  padding: 4rpx 8rpx 16rpx;
 }
 
-.achievement-card.epic.unlocked {
-  border-color: rgba(147, 51, 234, 0.5);
-  box-shadow: 0 0 20rpx rgba(147, 51, 234, 0.2);
+.section-title {
+  font-size: 30rpx;
+  font-weight: 700;
+  color: #0f172a;
 }
 
-.achievement-card.legendary.unlocked {
-  border-color: rgba(245, 158, 11, 0.5);
-  box-shadow: 0 0 20rpx rgba(245, 158, 11, 0.2);
+.section-meta {
+  font-size: 22rpx;
+  color: #64748b;
 }
 
-.achievement-icon {
-  position: relative;
-  width: 120rpx;
-  height: 120rpx;
+.rarity-grid,
+.achievements-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18rpx;
+}
+
+.rarity-card {
+  border-radius: 28rpx;
+  padding: 24rpx 16rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12rpx;
+  border: 2rpx solid transparent;
+}
+
+.rarity-icon-shell {
+  width: 96rpx;
+  height: 96rpx;
+  border-radius: 26rpx;
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: var(--color-app-background);
-  border-radius: 60rpx;
-  margin: 0 auto 24rpx;
+  box-shadow: 0 14rpx 30rpx rgba(15, 23, 42, 0.12);
+}
+
+.rarity-name {
+  font-size: 28rpx;
+  font-weight: 700;
+}
+
+.rarity-percent {
+  font-size: 22rpx;
+  color: #64748b;
+}
+
+.rarity-card.common {
+  background: linear-gradient(180deg, rgba(156, 163, 175, 0.12), rgba(156, 163, 175, 0.04));
+  border-color: rgba(156, 163, 175, 0.18);
+}
+
+.rarity-card.common .rarity-icon-shell {
+  background: linear-gradient(135deg, #9ca3af 0%, #6b7280 100%);
+}
+
+.rarity-card.rare {
+  background: linear-gradient(180deg, rgba(96, 165, 250, 0.12), rgba(96, 165, 250, 0.04));
+  border-color: rgba(96, 165, 250, 0.18);
+}
+
+.rarity-card.rare .rarity-icon-shell {
+  background: linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%);
+}
+
+.rarity-card.epic {
+  background: linear-gradient(180deg, rgba(167, 139, 250, 0.12), rgba(167, 139, 250, 0.04));
+  border-color: rgba(167, 139, 250, 0.18);
+}
+
+.rarity-card.epic .rarity-icon-shell {
+  background: linear-gradient(135deg, #a78bfa 0%, #8b5cf6 100%);
+}
+
+.rarity-card.legendary {
+  background: linear-gradient(180deg, rgba(251, 191, 36, 0.12), rgba(251, 191, 36, 0.04));
+  border-color: rgba(251, 191, 36, 0.18);
+}
+
+.rarity-card.legendary .rarity-icon-shell {
+  background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+}
+
+.category-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16rpx;
+}
+
+.category-tab {
+  padding: 16rpx 22rpx;
+  border-radius: 999rpx;
+  border: 2rpx solid rgba(148, 163, 184, 0.18);
+  background: rgba(255, 255, 255, 0.86);
+  display: flex;
+  align-items: center;
+  gap: 10rpx;
+}
+
+.category-tab.active {
+  box-shadow: 0 10rpx 24rpx rgba(15, 23, 42, 0.08);
+}
+
+.category-tab.all.active {
+  color: #6b7280;
+  border-color: rgba(107, 114, 128, 0.24);
+}
+
+.category-tab.create.active {
+  color: #4f7fff;
+  border-color: rgba(79, 127, 255, 0.26);
+}
+
+.category-tab.social.active {
+  color: #00d9d9;
+  border-color: rgba(0, 217, 217, 0.26);
+}
+
+.category-tab.skill.active {
+  color: #8b5cf6;
+  border-color: rgba(139, 92, 246, 0.26);
+}
+
+.category-tab.special.active {
+  color: #f59e0b;
+  border-color: rgba(245, 158, 11, 0.26);
+}
+
+.category-text,
+.category-count {
+  font-size: 24rpx;
+  font-weight: 600;
+}
+
+.achievement-card {
+  position: relative;
+  padding: 24rpx;
+  border-radius: 32rpx;
+  border: 2rpx solid rgba(156, 163, 175, 0.18);
+  background: linear-gradient(180deg, rgba(156, 163, 175, 0.12), rgba(255, 255, 255, 0.92));
+  box-shadow: 0 16rpx 40rpx rgba(15, 23, 42, 0.05);
+}
+
+.achievement-card.rare {
+  border-color: rgba(79, 127, 255, 0.18);
+  background: linear-gradient(180deg, rgba(79, 127, 255, 0.12), rgba(255, 255, 255, 0.92));
+}
+
+.achievement-card.epic {
+  border-color: rgba(139, 92, 246, 0.18);
+  background: linear-gradient(180deg, rgba(139, 92, 246, 0.12), rgba(255, 255, 255, 0.92));
+}
+
+.achievement-card.legendary {
+  border-color: rgba(245, 158, 11, 0.18);
+  background: linear-gradient(180deg, rgba(245, 158, 11, 0.12), rgba(255, 255, 255, 0.92));
+}
+
+.achievement-card:not(.unlocked) {
+  opacity: 0.82;
+}
+
+.achievement-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16rpx;
+  margin-bottom: 20rpx;
+}
+
+.achievement-icon-shell {
+  width: 112rpx;
+  height: 112rpx;
+  border-radius: 30rpx;
+  background: linear-gradient(135deg, #9ca3af 0%, #6b7280 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  box-shadow: 0 16rpx 30rpx rgba(15, 23, 42, 0.14);
+}
+
+.achievement-card.rare .achievement-icon-shell {
+  background: linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%);
+}
+
+.achievement-card.epic .achievement-icon-shell {
+  background: linear-gradient(135deg, #a78bfa 0%, #8b5cf6 100%);
+}
+
+.achievement-card.legendary .achievement-icon-shell {
+  background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
 }
 
 .rarity-glow {
   position: absolute;
-  inset: -8rpx;
-  border-radius: 68rpx;
-  background: conic-gradient(
-    from 0deg,
-    transparent,
-    var(--color-brand-primary),
-    transparent
-  );
-  animation: rotate 3s linear infinite;
-  z-index: -1;
+  inset: -6rpx;
+  border-radius: inherit;
+  background: rgba(255, 255, 255, 0.24);
 }
 
 .locked-overlay {
   position: absolute;
   inset: 0;
-  background-color: rgba(0, 0, 0, 0.5);
-  border-radius: 60rpx;
+  background: rgba(248, 250, 252, 0.82);
+  border-radius: inherit;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
 .achievement-info {
-  text-align: center;
   display: flex;
   flex-direction: column;
-  align-items: center;
+  gap: 12rpx;
 }
 
 .achievement-title {
-  font-size: 28rpx;
-  font-weight: 600;
-  color: var(--color-text-primary);
-  margin-bottom: 8rpx;
-  display: block;
-  word-break: break-word;
-  width: 100%;
+  font-size: 30rpx;
+  font-weight: 700;
+  color: #0f172a;
 }
 
 .achievement-desc {
-  font-size: 22rpx;
-  color: var(--color-text-secondary);
-  margin-bottom: 16rpx;
-  display: block;
-  line-height: 1.4;
-  word-break: break-word;
-  width: 100%;
+  font-size: 24rpx;
+  line-height: 1.5;
+  color: #64748b;
+  min-height: 72rpx;
 }
 
-.achievement-progress {
-  margin-bottom: 16rpx;
-  width: 100%;
+.achievement-progress,
+.modal-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 10rpx;
 }
 
 .progress-info {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  margin-bottom: 8rpx;
-  width: 100%;
+  justify-content: space-between;
+  gap: 16rpx;
 }
 
 .progress-text,
-.progress-percent {
-  font-size: 20rpx;
-  color: var(--color-text-disabled);
+.progress-detail,
+.unlock-time,
+.hint-text,
+.modal-meta-label {
+  font-size: 22rpx;
+  color: #64748b;
 }
 
-.progress-bar-small {
-  height: 8rpx;
-  background-color: var(--color-app-background);
-  border-radius: 4rpx;
+.progress-percent,
+.modal-meta-value {
+  font-size: 24rpx;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.progress-bar-small,
+.progress-bar-modal {
+  height: 14rpx;
+  border-radius: 999rpx;
+  background: #e2e8f0;
   overflow: hidden;
-  width: 100%;
 }
 
-.progress-fill-small {
+.progress-fill-small,
+.progress-fill-modal {
   height: 100%;
-  background-color: var(--color-brand-primary);
-  transition: width 0.3s ease;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #4f7fff 0%, #8b5cf6 100%);
 }
 
-.unlock-time {
-  font-size: 20rpx;
-  color: var(--color-success);
-  margin-bottom: 12rpx;
-  display: block;
+.rarity-badge,
+.modal-rarity-chip {
+  align-self: flex-start;
+  padding: 8rpx 16rpx;
+  border-radius: 999rpx;
 }
 
-.rarity-badge {
-  display: inline-block;
-  padding: 4rpx 12rpx;
-  border-radius: 12rpx;
-  font-size: 18rpx;
-  font-weight: 500;
+.rarity-badge.common,
+.modal-rarity-chip.common {
+  background: rgba(156, 163, 175, 0.16);
+  color: #6b7280;
 }
 
-.rarity-badge.common {
-  background-color: rgba(156, 163, 175, 0.2);
-  color: var(--color-text-secondary);
+.rarity-badge.rare,
+.modal-rarity-chip.rare {
+  background: rgba(96, 165, 250, 0.16);
+  color: #3b82f6;
 }
 
-.rarity-badge.rare {
-  background-color: rgba(79, 127, 255, 0.2);
-  color: #4f7fff;
+.rarity-badge.epic,
+.modal-rarity-chip.epic {
+  background: rgba(167, 139, 250, 0.16);
+  color: #8b5cf6;
 }
 
-.rarity-badge.epic {
-  background-color: rgba(147, 51, 234, 0.2);
-  color: #9333ea;
+.rarity-badge.legendary,
+.modal-rarity-chip.legendary {
+  background: rgba(251, 191, 36, 0.18);
+  color: #d97706;
 }
 
-.rarity-badge.legendary {
-  background-color: rgba(245, 158, 11, 0.2);
-  color: #f59e0b;
+.rarity-text {
+  font-size: 22rpx;
+  font-weight: 700;
 }
 
-/* 弹窗样式 */
 .modal-overlay {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(0, 0, 0, 0.5);
+  inset: 0;
+  background: rgba(15, 23, 42, 0.46);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
+  padding: 32rpx;
+  z-index: 20;
 }
 
 .achievement-modal {
-  background-color: var(--color-card-background);
-  border-radius: 24rpx;
-  padding: 48rpx;
-  margin: 32rpx;
-  max-width: 600rpx;
   width: 100%;
-  box-shadow: var(--shadow-modal);
-  text-align: center;
+  max-width: 640rpx;
+  border-radius: 36rpx;
+  background: linear-gradient(180deg, #ffffff 0%, #f8faff 100%);
+  padding: 40rpx 32rpx 32rpx;
   position: relative;
+  box-shadow: 0 30rpx 80rpx rgba(15, 23, 42, 0.22);
 }
 
 .modal-close {
   position: absolute;
   top: 24rpx;
   right: 24rpx;
-  padding: 8rpx;
-}
-
-.modal-icon {
-  position: relative;
-  width: 160rpx;
-  height: 160rpx;
+  width: 64rpx;
+  height: 64rpx;
+  border-radius: 18rpx;
+  background: rgba(148, 163, 184, 0.12);
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: var(--color-app-background);
-  border-radius: 80rpx;
-  margin: 0 auto 32rpx;
+}
+
+.modal-icon {
+  width: 160rpx;
+  height: 160rpx;
+  margin: 0 auto 28rpx;
+  border-radius: 42rpx;
+  background: linear-gradient(135deg, #9ca3af 0%, #6b7280 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  box-shadow: 0 24rpx 48rpx rgba(15, 23, 42, 0.18);
+}
+
+.modal-icon.rare {
+  background: linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%);
+}
+
+.modal-icon.epic {
+  background: linear-gradient(135deg, #a78bfa 0%, #8b5cf6 100%);
+}
+
+.modal-icon.legendary {
+  background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
 }
 
 .modal-glow {
   position: absolute;
-  inset: -12rpx;
-  border-radius: 92rpx;
-  background: conic-gradient(
-    from 0deg,
-    transparent,
-    var(--color-brand-primary),
-    transparent
-  );
-  animation: rotate 3s linear infinite;
-  z-index: -1;
+  inset: -8rpx;
+  border-radius: inherit;
+  background: rgba(255, 255, 255, 0.24);
+}
+
+.modal-rarity-chip {
+  position: absolute;
+  top: -12rpx;
+  right: -12rpx;
 }
 
 .modal-title {
-  font-size: 36rpx;
+  display: block;
+  text-align: center;
+  font-size: 38rpx;
   font-weight: 700;
-  color: var(--color-text-primary);
-  margin-bottom: 16rpx;
-  display: block;
-}
-
-.modal-desc {
-  font-size: 28rpx;
-  color: var(--color-text-secondary);
-  margin-bottom: 32rpx;
-  display: block;
-  line-height: 1.5;
-}
-
-.modal-unlocked {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8rpx;
-  margin-bottom: 32rpx;
-}
-
-.unlocked-text {
-  font-size: 28rpx;
-  color: var(--color-success);
-  font-weight: 600;
-}
-
-.unlock-date {
-  font-size: 24rpx;
-  color: var(--color-text-disabled);
-}
-
-.modal-locked {
-  margin-bottom: 32rpx;
-}
-
-.modal-progress {
-  margin-bottom: 24rpx;
-}
-
-.progress-label {
-  font-size: 24rpx;
-  color: var(--color-text-secondary);
-  margin-bottom: 16rpx;
-  display: block;
-}
-
-.progress-bar-modal {
-  height: 16rpx;
-  background-color: var(--color-app-background);
-  border-radius: 8rpx;
-  overflow: hidden;
+  color: #0f172a;
   margin-bottom: 12rpx;
 }
 
-.progress-fill-modal {
-  height: 100%;
-  background-color: var(--color-brand-primary);
-  transition: width 0.3s ease;
-}
-
-.progress-detail {
+.modal-desc {
+  display: block;
+  text-align: center;
   font-size: 24rpx;
-  color: var(--color-text-disabled);
+  line-height: 1.55;
+  color: #64748b;
+  margin-bottom: 24rpx;
 }
 
-.hint-text {
-  font-size: 24rpx;
-  color: var(--color-text-secondary);
-  font-style: italic;
+.modal-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16rpx;
+  margin-bottom: 24rpx;
 }
 
-.modal-rarity {
+.modal-meta-card {
+  border-radius: 24rpx;
+  background: rgba(148, 163, 184, 0.08);
+  padding: 20rpx;
   display: flex;
-  align-items: center;
-  justify-content: center;
+  flex-direction: column;
+  gap: 10rpx;
+}
+
+.modal-progress {
+  margin-bottom: 28rpx;
+}
+
+.modal-actions {
+  display: flex;
   gap: 16rpx;
 }
 
-.rarity-label {
-  font-size: 24rpx;
-  color: var(--color-text-secondary);
+.modal-action-button {
+  flex: 1;
+  min-height: 88rpx;
+  border-radius: 24rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10rpx;
 }
 
-@keyframes rotate {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+.modal-action-button.ghost {
+  background: rgba(148, 163, 184, 0.1);
+}
+
+.modal-action-button.primary {
+  background: linear-gradient(90deg, #4f7fff 0%, #8b5cf6 100%);
+}
+
+.modal-action-text {
+  font-size: 26rpx;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.modal-action-text.white {
+  color: #ffffff;
 }
 </style>

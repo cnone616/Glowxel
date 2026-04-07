@@ -3,8 +3,8 @@
     <div class="container">
       <div class="footer-content">
         <div class="footer-brand">
-          <span class="brand-name">RenLight</span>
-          <p class="brand-desc">像素创作平台 · 光格科技</p>
+          <span class="brand-name">光格像素工坊</span>
+          <p class="brand-desc">像素内容创作与设备连接平台</p>
         </div>
         <div class="footer-links">
           <router-link to="/community">社区</router-link>
@@ -14,7 +14,7 @@
         </div>
       </div>
       <div class="footer-bottom">
-        <p>&copy; 2026 RenLight 仁光数字科技. All rights reserved.</p>
+        <p>&copy; 2026 光格像素工坊</p>
       </div>
     </div>
   </footer>

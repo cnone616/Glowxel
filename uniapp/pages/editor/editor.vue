@@ -260,6 +260,7 @@ import HelpModal from "../../components/HelpModal.vue";
 import Toast from "../../components/Toast.vue";
 import Icon from "../../components/Icon.vue";
 import editorPersistenceMixin from "./mixins/editorPersistenceMixin.js";
+import { PERLER_BOARD_SIZE } from "../../constants/perler.js";
 
 export default {
   mixins: [statusBarMixin, editorPersistenceMixin],
@@ -358,9 +359,9 @@ export default {
       if (!this.boardId || !this.project) {
         // 全画布模式：使用填充后的尺寸
         const paddedWidth =
-          this.project?.paddedWidth || this.project?.width || 64;
+          this.project?.paddedWidth || this.project?.width || PERLER_BOARD_SIZE;
         const paddedHeight =
-          this.project?.paddedHeight || this.project?.height || 64;
+          this.project?.paddedHeight || this.project?.height || PERLER_BOARD_SIZE;
         return {
           x: 0,
           y: 0,
@@ -368,14 +369,14 @@ export default {
           h: paddedHeight,
         };
       }
-      // 单板模式：使用64x64
+      // 单板模式：使用52x52
       const row = (this.boardId.charCodeAt(0) || 65) - 65;
       const col = parseInt(this.boardId.slice(1) || "1") - 1;
       return {
-        x: col * 64,
-        y: row * 64,
-        w: 64,
-        h: 64,
+        x: col * PERLER_BOARD_SIZE,
+        y: row * PERLER_BOARD_SIZE,
+        w: PERLER_BOARD_SIZE,
+        h: PERLER_BOARD_SIZE,
       };
     },
 

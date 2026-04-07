@@ -1,4 +1,5 @@
 import { ARTKAL_COLORS_FULL } from "../../../data/artkal-colors-full.js";
+import { PERLER_BOARD_SIZE } from "../../../constants/perler.js";
 
 export default {
   methods: {
@@ -673,10 +674,10 @@ export default {
 
             let multiplier = 1;
             // #ifdef H5
-            multiplier = maxDimension > 64 ? 3 : 2;
+            multiplier = maxDimension > PERLER_BOARD_SIZE ? 3 : 2;
             // #endif
             // #ifdef MP-WEIXIN
-            multiplier = maxDimension > 64 ? 1.5 : 1;
+            multiplier = maxDimension > PERLER_BOARD_SIZE ? 1.5 : 1;
             // #endif
 
             let scale = Math.min(

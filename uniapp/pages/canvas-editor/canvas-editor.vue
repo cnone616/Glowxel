@@ -42,11 +42,18 @@
 
       <view class="preview-caption">
         <view class="preview-caption-info">
-          <text class="preview-caption-title">64 x 64 模拟预览</text>
+          <view class="preview-status-chip" :class="previewStatusClass">
+            <text class="preview-status-chip-text">{{ previewStatusLabel }}</text>
+          </view>
+          <text class="preview-caption-title">{{ previewPanelTitle }}</text>
           <text class="preview-caption-text">{{ previewCaptionText }}</text>
         </view>
         <view class="preview-actions">
-          <view class="action-btn-sm" @click="saveLocal">
+          <view
+            class="action-btn-sm"
+            :class="{ disabled: isSending }"
+            @click="saveLocal"
+          >
             <Icon name="save" :size="36" color="var(--color-text-primary)" />
             <text>保存</text>
           </view>
@@ -164,6 +171,14 @@
       </view>
     </scroll-view>
 
+    <view v-if="isSending" class="sending-overlay" @touchmove.stop.prevent>
+      <view class="sending-modal">
+        <view class="sending-spinner"></view>
+        <text class="sending-title">正在发送画板...</text>
+        <text class="sending-tip">请保持连接稳定，完成后会自动恢复预览</text>
+      </view>
+    </view>
+
     <Toast ref="toastRef" @show="canvasHidden = true" @hide="onToastHide" />
   </view>
 </template>
@@ -207,13 +222,43 @@ export default {
     };
   },
   computed: {
+    previewPanelTitle() {
+      return "64 x 64 模拟预览";
+    },
     previewCaptionText() {
+      if (!this.canvasReady) {
+        return "预览网格加载中，完成后可直接拖动或绘制";
+      }
       if (this.currentTool === "move") {
         return "拖动画布查看细节，缩放后可继续调整位置";
       }
 
       const toolLabel = this.currentTool === "pencil" ? "绘画" : "擦除";
       return `${toolLabel}模式，当前笔触 ${this.brushSize} x ${this.brushSize}`;
+    },
+    previewStatusLabel() {
+      if (this.isSending) {
+        return "发送中";
+      }
+      if (!this.canvasReady) {
+        return "预览加载中";
+      }
+      if (this.livePreviewEnabled && this.deviceStore && this.deviceStore.connected) {
+        return "实时联动";
+      }
+      return "本地编辑";
+    },
+    previewStatusClass() {
+      if (this.isSending) {
+        return "is-sending";
+      }
+      if (!this.canvasReady) {
+        return "is-loading";
+      }
+      if (this.livePreviewEnabled && this.deviceStore && this.deviceStore.connected) {
+        return "is-live";
+      }
+      return "is-preview";
     },
   },
   onLoad() {
@@ -228,6 +273,11 @@ export default {
     }
     this.initCanvas();
   },
+  onShow() {
+    if (!this.isSending) {
+      this.canvasHidden = false;
+    }
+  },
   methods: {
     setTool(newTool) {
       if (this.currentTool !== newTool) {
@@ -236,11 +286,13 @@ export default {
     },
 
     handleBack() {
-      this.flushQueuedSync();
+      this.cleanupCanvasSync();
       uni.navigateBack();
     },
     onToastHide() {
-      this.canvasHidden = false;
+      if (!this.isSending) {
+        this.canvasHidden = false;
+      }
     },
 
     initCanvas() {
@@ -567,6 +619,13 @@ export default {
         console.error("实时预览同步失败:", err);
       }
     },
+    cleanupCanvasSync() {
+      this.flushQueuedSync();
+      if (this.syncTimer) {
+        clearTimeout(this.syncTimer);
+        this.syncTimer = null;
+      }
+    },
 
     async syncCurrentCanvasToDevice() {
       if (!this.livePreviewEnabled || !this.deviceStore.connected) {
@@ -629,11 +688,11 @@ export default {
   },
 
   onUnload() {
-    this.flushQueuedSync();
-    if (this.syncTimer) {
-      clearTimeout(this.syncTimer);
-      this.syncTimer = null;
-    }
+    this.cleanupCanvasSync();
+  },
+
+  onHide() {
+    this.cleanupCanvasSync();
   },
 };
 </script>
@@ -727,6 +786,36 @@ export default {
   gap: 4rpx;
 }
 
+.preview-status-chip {
+  display: inline-flex;
+  width: fit-content;
+  padding: 6rpx 12rpx;
+  border-radius: 999rpx;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.preview-status-chip.is-loading {
+  background: rgba(255, 214, 102, 0.14);
+}
+
+.preview-status-chip.is-preview {
+  background: rgba(79, 127, 255, 0.14);
+}
+
+.preview-status-chip.is-live {
+  background: rgba(52, 211, 153, 0.16);
+}
+
+.preview-status-chip.is-sending {
+  background: rgba(52, 211, 153, 0.22);
+}
+
+.preview-status-chip-text {
+  font-size: 20rpx;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
 .preview-caption-title {
   font-size: 24rpx;
   font-weight: 600;
@@ -757,6 +846,11 @@ export default {
   transition: var(--transition-base);
 }
 
+.action-btn-sm.disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
 .action-btn-sm.primary {
   background-color: var(--accent-primary);
   border-color: var(--accent-primary);
@@ -785,6 +879,53 @@ export default {
 
 .preview-actions .action-btn-sm.primary text {
   color: #ffffff;
+}
+
+.sending-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.sending-modal {
+  min-width: 420rpx;
+  padding: 60rpx 50rpx;
+  border-radius: 24rpx;
+  background: var(--bg-elevated);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24rpx;
+}
+
+.sending-spinner {
+  width: 60rpx;
+  height: 60rpx;
+  border-radius: 50%;
+  border: 6rpx solid rgba(79, 127, 255, 0.2);
+  border-top-color: var(--accent-primary);
+  animation: spin 0.8s linear infinite;
+}
+
+.sending-title {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.sending-tip {
+  font-size: 24rpx;
+  color: var(--text-secondary);
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .content {

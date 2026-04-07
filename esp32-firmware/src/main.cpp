@@ -10,6 +10,45 @@
 #include "tetris_effect.h"
 #include "ble_config.h"
 #include "eyes_effect.h"
+#include "theme_renderer.h"
+
+namespace {
+void renderStartupRestoredFrame() {
+  if (DisplayManager::currentMode == MODE_CLOCK) {
+    DisplayManager::displayClock(true);
+    return;
+  }
+
+  if (DisplayManager::currentMode == MODE_THEME) {
+    DisplayManager::displayTheme(true);
+    return;
+  }
+
+  if (DisplayManager::currentMode == MODE_CANVAS) {
+    DisplayManager::renderCanvas();
+    return;
+  }
+
+  if (DisplayManager::currentMode == MODE_ANIMATION &&
+      DisplayManager::currentBusinessModeTag == "eyes") {
+    DisplayManager::activateEyesEffect(ConfigManager::eyesConfig);
+    DisplayManager::renderNativeEffect();
+    return;
+  }
+
+  if (DisplayManager::currentMode == MODE_ANIMATION &&
+      DisplayManager::currentBusinessModeTag == "ambient_effect") {
+    DisplayManager::activateAmbientEffect(DisplayManager::ambientEffectConfig);
+    DisplayManager::renderNativeEffect();
+    return;
+  }
+
+  if (DisplayManager::currentMode == MODE_ANIMATION &&
+      AnimationManager::currentGIF == nullptr) {
+    DisplayManager::displayClock(true);
+  }
+}
+}
 
 void setup() {
   Serial.begin(115200);
@@ -31,30 +70,28 @@ void setup() {
   DisplayManager::init();
   ConfigManager::init();
   WiFiManager::init();
+
+  if (!WiFiManager::isConfigMode()) {
+    DisplayManager::enableDoubleBuffer();
+  }
+
   AnimationManager::init();
   EyesEffect::init();
 
   // 只有 WiFi 连接成功才启动 HTTP/WebSocket 服务
   if (!WiFiManager::isConfigMode()) {
+    Serial.printf("[BOOT] 准备渲染恢复模式首帧，模式=%d，业务模式=%s\n",
+                  DisplayManager::currentMode,
+                  DisplayManager::currentBusinessModeTag.c_str());
+    renderStartupRestoredFrame();
+    Serial.printf("[BOOT] 恢复模式首帧已完成，耗时=%lu ms\n", millis());
+
     WebSocketHandler::init();
     WebServer::init();
 
     // OTA 检查更新
     OTAManager::init();
     OTAManager::checkUpdate();
-
-    // 清除WiFi状态画面，进入正常显示
-    DisplayManager::clearScreen();
-
-    // 立即渲染首帧：动画模式由 AnimationManager::init() 已处理
-    if (DisplayManager::currentMode == MODE_CLOCK) {
-      DisplayManager::displayClock();
-    } else if (DisplayManager::currentMode == MODE_CANVAS) {
-      DisplayManager::renderCanvas();
-    } else if (DisplayManager::currentMode == MODE_ANIMATION &&
-               DisplayManager::currentBusinessModeTag == "eyes") {
-      DisplayManager::activateEyesEffect(ConfigManager::eyesConfig);
-    }
   }
   
   Serial.println("\n=================================");
@@ -80,6 +117,8 @@ void loop() {
     delay(100);
     return;
   }
+
+  WiFiManager::tick();
 
   // 检查是否有待保存的二进制像素数据
   if (WebSocketHandler::binaryDataPending && millis() - WebSocketHandler::lastBinaryReceiveTime > 500) {
@@ -119,6 +158,8 @@ void loop() {
       if (DisplayManager::currentMode == MODE_CLOCK) {
         DisplayManager::drawBackground();
         DisplayManager::drawClockOverlay();
+      } else if (DisplayManager::currentMode == MODE_THEME) {
+        DisplayManager::displayTheme(true);
       } else if (DisplayManager::currentMode == MODE_ANIMATION &&
                  AnimationManager::currentGIF == nullptr) {
         DisplayManager::displayClock(true);
@@ -128,7 +169,7 @@ void loop() {
 
   // 心跳超时检测：15秒没收到消息认为客户端已断开
   if (DisplayManager::clientConnected &&
-      millis() - WebSocketHandler::lastMessageTime > 15000) {
+      millis() - WebSocketHandler::lastMessageTime > 45000) {
     Serial.println("心跳超时，客户端已断开");
     DisplayManager::clientConnected = false;
   }
@@ -143,25 +184,26 @@ void loop() {
       // 静态时钟模式，无客户端：每分钟更新一次时钟
       static unsigned long lastClockUpdate = 0;
       static int lastMinute = -1;
-      static unsigned long lastNtpRetry = 0;
 
       struct tm timeinfo;
-      if (getLocalTime(&timeinfo)) {
+      if (getLocalTime(&timeinfo, 0)) {
         if (timeinfo.tm_min != lastMinute) {
           lastMinute = timeinfo.tm_min;
           DisplayManager::displayClock();
         }
       } else {
-        if (millis() - lastNtpRetry > 60000) {
-          lastNtpRetry = millis();
-          Serial.println("NTP 未同步，重试...");
-          configTime(8 * 3600, 0, "pool.ntp.org");
-        }
         if (millis() - lastClockUpdate > 10000) {
           lastClockUpdate = millis();
           DisplayManager::displayClock();
         }
       }
+    }
+  } else if (DisplayManager::currentMode == MODE_THEME) {
+    static unsigned long lastThemeUpdate = 0;
+    uint16_t refreshInterval = getThemeRefreshIntervalMs(ConfigManager::themeConfig.themeId);
+    if (millis() - lastThemeUpdate >= refreshInterval) {
+      lastThemeUpdate = millis();
+      DisplayManager::displayTheme();
     }
   } else if (DisplayManager::currentMode == MODE_ANIMATION) {
     // 动画模式

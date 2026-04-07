@@ -16,7 +16,8 @@ export default {
       visible: false,
       message: '',
       type: 'success',
-      timer: null
+      timer: null,
+      showTimer: null
     }
   },
   
@@ -38,22 +39,35 @@ export default {
       if (this.timer) {
         clearTimeout(this.timer)
       }
+      if (this.showTimer) {
+        clearTimeout(this.showTimer)
+        this.showTimer = null
+      }
       
       this.message = message
       this.type = type
-      this.visible = true
       
       // 通知父组件显示toast（用于隐藏canvas）
       this.$emit('show')
-      
-      if (duration > 0) {
-        this.timer = setTimeout(() => {
-          this.hide()
-        }, duration)
-      }
+
+      // 让页面先完成 canvas 隐藏/卸载，再显示 toast，避免被原生 canvas 遮挡
+      this.showTimer = setTimeout(() => {
+        this.visible = true
+        this.showTimer = null
+
+        if (duration > 0) {
+          this.timer = setTimeout(() => {
+            this.hide()
+          }, duration)
+        }
+      }, 32)
     },
     
     hide() {
+      if (this.showTimer) {
+        clearTimeout(this.showTimer)
+        this.showTimer = null
+      }
       this.visible = false
       // 通知父组件隐藏toast（用于显示canvas）
       this.$emit('hide')
@@ -68,6 +82,9 @@ export default {
   beforeDestroy() {
     if (this.timer) {
       clearTimeout(this.timer)
+    }
+    if (this.showTimer) {
+      clearTimeout(this.showTimer)
     }
   }
 }

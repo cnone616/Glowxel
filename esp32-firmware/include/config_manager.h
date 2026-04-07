@@ -58,6 +58,7 @@ struct EyesConfig {
     int eyeSpacing;
     int eyeWidth;
     int eyeHeight;
+    int timeX;
     int timeY;
   } layout;
 
@@ -86,6 +87,10 @@ struct EyesConfig {
   } style;
 };
 
+struct ThemeConfig {
+  char themeId[48];
+};
+
 // 像素数据结构
 struct PixelData {
   uint8_t x;
@@ -108,6 +113,13 @@ public:
   static void saveAnimImagePixels();
   static void loadEyesConfig();
   static void saveEyesConfig();
+  static void loadAmbientEffectConfig();
+  static void saveAmbientEffectConfig();
+  static void loadThemeConfig();
+  static void saveThemeConfig();
+  static void loadPacmanRoute();
+  static bool savePacmanRoute(const uint8_t* routeData, uint16_t routeLength);
+  static void clearPacmanRoute();
   static void loadCanvasPixels();
   static void saveCanvasPixels();
   static void clearCanvasPixels();
@@ -116,6 +128,7 @@ public:
   static ClockConfig clockConfig;
   static ClockConfig animClockConfig;
   static EyesConfig eyesConfig;
+  static ThemeConfig themeConfig;
 
   // 静态时钟的背景图片像素
   static PixelData* staticImagePixels;
@@ -124,6 +137,9 @@ public:
   // 动态时钟的背景图片像素（如果不用 GIF 动画，可以用静态图）
   static PixelData* animImagePixels;
   static int animImagePixelCount;
+
+  static uint8_t* pacmanRouteData;
+  static uint16_t pacmanRouteLength;
 
   static Preferences preferences;
 

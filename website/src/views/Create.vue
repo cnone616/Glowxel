@@ -1,126 +1,470 @@
 <template>
-  <div class="create">
-    <div class="container">
-      <div class="page-header">
-        <h1 class="page-title">开始创作</h1>
-        <p class="page-desc">选择一种方式开始你的像素创作</p>
-      </div>
+  <div class="create-page">
+    <div class="create-shell">
+      <header class="topbar">
+        <button class="back-btn" type="button" @click="handleBack" aria-label="返回">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1">
+            <path d="M15 18l-6-6 6-6"/>
+          </svg>
+        </button>
+        <div class="topbar-copy">
+          <h1 class="page-title">新建画布</h1>
+          <p class="page-desc">先选一种开始方式，再进入对应流程</p>
+        </div>
+      </header>
 
-      <div class="create-grid">
-        <router-link to="/editor" class="create-card">
-          <div class="card-icon">
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/></svg>
+      <section class="mode-panel">
+        <button
+          v-for="item in createModes"
+          :key="item.value"
+          class="mode-card"
+          :class="{ active: selectedMode === item.value }"
+          type="button"
+          @click="selectedMode = item.value"
+        >
+          <div class="mode-icon" :class="item.colorClass" v-html="item.icon"></div>
+          <div class="mode-copy">
+            <strong class="mode-title">{{ item.title }}</strong>
+            <span class="mode-subtitle">{{ item.subtitle }}</span>
           </div>
-          <h3>像素绘制</h3>
-          <p>在画布上自由绘制像素图案，支持多种工具</p>
-          <span class="card-arrow">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+          <span class="mode-check">
+            <svg v-if="selectedMode === item.value" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+              <path d="M20 6L9 17l-5-5"/>
+            </svg>
           </span>
-        </router-link>
+        </button>
+      </section>
 
-        <router-link to="/editor?mode=image" class="create-card">
-          <div class="card-icon">
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-          </div>
-          <h3>图片导入</h3>
-          <p>上传图片，智能转换为 Artkal 拼豆像素图案</p>
-          <span class="card-arrow">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
-          </span>
-        </router-link>
+      <section class="summary-card">
+        <div class="summary-head">
+          <span class="summary-tag">{{ currentMode.summaryTag }}</span>
+          <strong class="summary-title">{{ currentMode.summaryTitle }}</strong>
+        </div>
+        <p class="summary-text">{{ currentMode.summaryText }}</p>
+        <div class="summary-points">
+          <span v-for="point in currentMode.points" :key="point" class="summary-point">{{ point }}</span>
+        </div>
+      </section>
 
-        <router-link to="/clock-editor" class="create-card">
-          <div class="card-icon">
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-          </div>
-          <h3>时钟编辑器</h3>
-          <p>连接 RenLight 设备，配置字体、时间样式并一键下发</p>
-          <span class="card-arrow">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
-          </span>
-        </router-link>
-      </div>
+      <section class="advanced-card">
+        <div class="advanced-copy">
+          <strong>拼豆图纸生成</strong>
+          <span>如果你上传的是带编号的拼豆图纸，走这个入口会更合适。</span>
+        </div>
+        <button class="advanced-btn" type="button" @click="openPatternWorkbench">
+          进入图纸流程
+        </button>
+      </section>
 
-      <div class="section-divider">
-        <span>或者从模板开始</span>
-      </div>
-
-      <div class="quick-links">
-        <router-link to="/templates" class="quick-link">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
-          浏览模板库
-        </router-link>
-        <router-link to="/challenges" class="quick-link">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-          参与挑战
-        </router-link>
-      </div>
+      <footer class="action-bar">
+        <button class="secondary-btn" type="button" @click="handleBack">上一步</button>
+        <button class="primary-btn" type="button" @click="handleContinue">
+          {{ currentMode.actionText }}
+        </button>
+      </footer>
     </div>
   </div>
 </template>
 
 <script setup>
+import { computed, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+
+const router = useRouter()
+const route = useRoute()
+
+const createModes = [
+  {
+    value: 'blank',
+    title: '新建画布',
+    subtitle: '从空白开始创作',
+    summaryTag: '空白开始',
+    summaryTitle: '直接进入画布开始绘制',
+    summaryText: '适合从零开始画图，先进入编辑器，再按你的想法自由创作。',
+    points: ['直接进入画布', '适合手动绘制', '流程更轻'],
+    actionText: '开始新建',
+    target: '/editor',
+    colorClass: 'blue',
+    icon: `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>`,
+  },
+  {
+    value: 'image',
+    title: '导入图片',
+    subtitle: '转换为像素画',
+    summaryTag: '图片生成',
+    summaryTitle: '上传图片后按步骤生成',
+    summaryText: '适合把照片、插画或现成图片转换成像素图，再进入后续编辑。',
+    points: ['支持上传图片', '调整尺寸与预览', '完成后继续编辑'],
+    actionText: '选择图片',
+    target: '/pattern-workbench',
+    colorClass: 'green',
+    icon: `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>`,
+  },
+]
+
+const selectedMode = ref('blank')
+
+const currentMode = computed(() => {
+  const activeMode = createModes.find((item) => item.value === selectedMode.value)
+  return activeMode || createModes[0]
+})
+
+function syncModeFromQuery(modeValue) {
+  if (modeValue === 'blank' || modeValue === 'image') {
+    selectedMode.value = modeValue
+    return
+  }
+
+  selectedMode.value = 'blank'
+}
+
+function handleBack() {
+  router.push('/workspace')
+}
+
+function handleContinue() {
+  router.push(currentMode.value.target)
+}
+
+function openPatternWorkbench() {
+  router.push('/pattern-workbench')
+}
+
+watch(
+  () => route.query.mode,
+  (modeValue) => {
+    syncModeFromQuery(modeValue)
+  },
+  { immediate: true },
+)
 </script>
 
 <style scoped>
-.create { padding: 60px 0 80px; }
-.page-header { text-align: center; margin-bottom: 48px; }
-.page-title { font-size: 32px; font-weight: 700; color: var(--color-text-primary); }
-.page-desc { color: var(--color-text-muted); font-size: 15px; margin-top: 8px; }
-
-.create-grid {
-  display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 48px;
+.create-page {
+  min-height: calc(100vh - 60px);
+  padding: 20px 0 36px;
+  background:
+    radial-gradient(circle at top, rgba(79, 127, 255, 0.08), transparent 42%),
+    #f6f8fb;
 }
 
-.create-card {
-  position: relative;
-  background: #fff; border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg); padding: 32px 28px;
-  text-decoration: none; color: inherit;
-  transition: all 0.2s; display: block;
-}
-.create-card:hover { border-color: var(--color-primary); box-shadow: var(--shadow-md); transform: translateY(-2px); }
-
-.card-icon {
-  width: 52px; height: 52px; background: var(--color-bg-muted);
-  border-radius: var(--radius-md); display: flex; align-items: center;
-  justify-content: center; margin-bottom: 20px; color: var(--color-text-primary);
-}
-.create-card:hover .card-icon { background: var(--color-primary); color: #fff; }
-
-.create-card h3 { font-size: 17px; font-weight: 600; color: var(--color-text-primary); margin-bottom: 8px; }
-.create-card p { font-size: 13px; color: var(--color-text-muted); line-height: 1.6; }
-
-.card-arrow {
-  position: absolute; bottom: 28px; right: 28px;
-  color: var(--color-text-muted); opacity: 0; transition: opacity 0.2s;
-}
-.create-card:hover .card-arrow { opacity: 1; color: var(--color-primary); }
-
-.section-divider {
-  text-align: center; position: relative; margin: 0 0 32px;
-}
-.section-divider::before {
-  content: ''; position: absolute; top: 50%; left: 0; right: 0;
-  height: 1px; background: var(--color-border);
-}
-.section-divider span {
-  position: relative; background: #fff;
-  padding: 0 16px; color: var(--color-text-muted); font-size: 13px;
+.create-shell {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 0 20px;
 }
 
-.quick-links { display: flex; gap: 12px; justify-content: center; }
-.quick-link {
-  display: inline-flex; align-items: center; gap: 6px;
-  padding: 10px 20px; border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm); text-decoration: none;
-  color: var(--color-text-secondary); font-size: 14px; transition: all 0.15s;
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 20px;
+  padding: 18px 20px;
+  border-radius: 24px;
+  background: #ffffff;
+  box-shadow: 0 16px 28px rgba(18, 32, 51, 0.05);
 }
-.quick-link:hover { border-color: var(--color-primary); color: var(--color-primary); }
+
+.back-btn {
+  width: 44px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 16px;
+  background: #f3f6fb;
+  color: #23384d;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.topbar-copy {
+  display: grid;
+  gap: 6px;
+}
+
+.page-title {
+  margin: 0;
+  font-size: 30px;
+  font-weight: 700;
+  color: #1d2b3a;
+}
+
+.page-desc {
+  margin: 0;
+  font-size: 14px;
+  color: #748399;
+}
+
+.mode-panel {
+  display: grid;
+  gap: 14px;
+}
+
+.mode-card {
+  width: 100%;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid #dfe6f2;
+  border-radius: 22px;
+  background: #ffffff;
+  box-shadow: 0 16px 28px rgba(18, 32, 51, 0.04);
+  text-align: left;
+  cursor: pointer;
+  transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.mode-card:hover {
+  transform: translateY(-1px);
+  border-color: #bfd0ef;
+}
+
+.mode-card.active {
+  border-color: #4f7fff;
+  box-shadow: 0 18px 34px rgba(79, 127, 255, 0.15);
+}
+
+.mode-icon {
+  width: 56px;
+  height: 56px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 18px;
+}
+
+.mode-icon.blue {
+  color: #4f7fff;
+  background: rgba(79, 127, 255, 0.12);
+}
+
+.mode-icon.green {
+  color: #2ecc71;
+  background: rgba(46, 204, 113, 0.14);
+}
+
+.mode-copy {
+  display: grid;
+  gap: 6px;
+}
+
+.mode-title {
+  font-size: 18px;
+  color: #1d2b3a;
+}
+
+.mode-subtitle {
+  font-size: 14px;
+  color: #748399;
+}
+
+.mode-check {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  color: #4f7fff;
+}
+
+.summary-card,
+.advanced-card {
+  margin-top: 16px;
+  padding: 20px;
+  border-radius: 22px;
+  background: #ffffff;
+  box-shadow: 0 16px 28px rgba(18, 32, 51, 0.05);
+}
+
+.summary-head {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.summary-tag {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #eef4ff;
+  color: #4f7fff;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.summary-title {
+  font-size: 18px;
+  color: #1d2b3a;
+}
+
+.summary-text {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.7;
+  color: #5f7086;
+}
+
+.summary-points {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.summary-point {
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: #f4f7fb;
+  color: #41566d;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.advanced-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.advanced-copy {
+  display: grid;
+  gap: 6px;
+}
+
+.advanced-copy strong {
+  font-size: 16px;
+  color: #1d2b3a;
+}
+
+.advanced-copy span {
+  font-size: 13px;
+  line-height: 1.6;
+  color: #748399;
+}
+
+.advanced-btn,
+.secondary-btn,
+.primary-btn {
+  height: 46px;
+  padding: 0 18px;
+  border: none;
+  border-radius: 15px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.advanced-btn,
+.secondary-btn {
+  background: #eef3fb;
+  color: #38506c;
+}
+
+.primary-btn {
+  min-width: 132px;
+  background: #4f7fff;
+  color: #ffffff;
+  box-shadow: 0 12px 24px rgba(79, 127, 255, 0.22);
+}
+
+.action-bar {
+  position: sticky;
+  bottom: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 18px;
+  padding: 14px;
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 18px 36px rgba(18, 32, 51, 0.08);
+  backdrop-filter: blur(14px);
+}
 
 @media (max-width: 768px) {
-  .create-grid { grid-template-columns: 1fr; }
-  .page-title { font-size: 24px; }
-  .create { padding: 40px 0 60px; }
+  .create-page {
+    min-height: calc(100vh - 56px);
+    padding: 10px 0 24px;
+  }
+
+  .create-shell {
+    padding: 0 12px;
+  }
+
+  .topbar {
+    gap: 12px;
+    margin-bottom: 14px;
+    padding: 14px;
+    border-radius: 18px;
+  }
+
+  .back-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 14px;
+  }
+
+  .page-title {
+    font-size: 24px;
+  }
+
+  .page-desc {
+    font-size: 13px;
+  }
+
+  .mode-card {
+    gap: 12px;
+    padding: 14px;
+    border-radius: 18px;
+  }
+
+  .mode-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 16px;
+  }
+
+  .mode-title {
+    font-size: 16px;
+  }
+
+  .mode-subtitle {
+    font-size: 13px;
+  }
+
+  .summary-card,
+  .advanced-card {
+    margin-top: 12px;
+    padding: 16px;
+    border-radius: 18px;
+  }
+
+  .advanced-card {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .advanced-btn,
+  .secondary-btn,
+  .primary-btn {
+    width: 100%;
+  }
+
+  .action-bar {
+    bottom: 12px;
+    flex-direction: column;
+    align-items: stretch;
+    padding: 12px;
+    border-radius: 18px;
+  }
 }
 </style>

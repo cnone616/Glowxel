@@ -21,6 +21,24 @@ class WebSocket {
     this._heartbeatTimer = null;
   }
 
+  normalizeHostInput(host) {
+    if (typeof host !== "string") {
+      return "";
+    }
+
+    let normalized = host.trim();
+    normalized = normalized.replace(/^wss?:\/\//i, "");
+    normalized = normalized.replace(/^https?:\/\//i, "");
+    normalized = normalized.replace(/\/+$/, "");
+
+    const slashIndex = normalized.indexOf("/");
+    if (slashIndex >= 0) {
+      normalized = normalized.slice(0, slashIndex);
+    }
+
+    return normalized;
+  }
+
   /**
    * 连接到 ESP32
    * @param {string} host - IP 地址
@@ -28,6 +46,43 @@ class WebSocket {
    */
   connect(host, port = 80) {
     return new Promise((resolve, reject) => {
+      let settled = false;
+      let connectTimeoutTimer = null;
+
+      const finishResolve = () => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        if (connectTimeoutTimer) {
+          clearTimeout(connectTimeoutTimer);
+          connectTimeoutTimer = null;
+        }
+        resolve();
+      };
+
+      const finishReject = (err) => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        if (connectTimeoutTimer) {
+          clearTimeout(connectTimeoutTimer);
+          connectTimeoutTimer = null;
+        }
+        reject(err);
+      };
+
+      const normalizedHost = this.normalizeHostInput(host);
+      if (!normalizedHost) {
+        const err = new Error("设备 IP 地址无效");
+        if (this.onErrorCallback) {
+          this.onErrorCallback(err);
+        }
+        finishReject(err);
+        return;
+      }
+
       // 主动发起新连接时，清理残留重连定时器
       if (this._reconnectTimer) {
         clearTimeout(this._reconnectTimer);
@@ -48,11 +103,11 @@ class WebSocket {
         this.connected = false;
       }
 
-      this.host = host;
+      this.host = normalizedHost;
       this.port = port;
 
       // 使用 WebSocket 协议，连接到 /ws 路径
-      const url = `ws://${host}/ws`;
+      const url = `ws://${normalizedHost}/ws`;
       console.log("准备连接 WebSocket:", url);
 
       // 创建 WebSocket 连接
@@ -67,11 +122,24 @@ class WebSocket {
           if (this.onErrorCallback) {
             this.onErrorCallback(err);
           }
-          reject(err);
+          finishReject(err);
         },
       });
 
       this.socket = socketTask;
+      connectTimeoutTimer = setTimeout(() => {
+        const err = new Error("WebSocket 连接超时");
+        console.error(err.message);
+        this.connected = false;
+        if (this.onErrorCallback) {
+          this.onErrorCallback(err);
+        }
+        if (this.socket) {
+          this._suppressReconnectOnClose = true;
+          this.socket.close({});
+        }
+        finishReject(err);
+      }, 12000);
 
       // 连接成功
       socketTask.onOpen(() => {
@@ -83,7 +151,7 @@ class WebSocket {
         if (this.onConnectCallback) {
           this.onConnectCallback();
         }
-        resolve();
+        finishResolve();
       });
 
       // 接收消息
@@ -116,16 +184,19 @@ class WebSocket {
         if (!this._manualDisconnect && this.host) {
           this._scheduleReconnect();
         }
+        if (!settled) {
+          finishReject(new Error("WebSocket 连接已关闭"));
+        }
       });
 
       // 连接错误
       socketTask.onError((err) => {
         console.error("WebSocket 错误:", err);
-        this.connected = false;
         if (this.onErrorCallback) {
           this.onErrorCallback(err);
         }
-        reject(err);
+        // 某些平台在握手期间会先抛一次 onError，随后仍然能 onOpen，
+        // 这里不立刻 reject，交给 onOpen / onClose / timeout 最终定论。
       });
     });
   }
@@ -195,6 +266,16 @@ class WebSocket {
     }
   }
 
+  pauseHeartbeat() {
+    this._stopHeartbeat();
+  }
+
+  resumeHeartbeat() {
+    if (this.connected) {
+      this._startHeartbeat();
+    }
+  }
+
   /**
    * 指数退避重连（意外断线时自动调用）
    */
@@ -210,6 +291,7 @@ class WebSocket {
     this._reconnectAttempts++;
     console.log(`将在 ${delay}ms 后第 ${this._reconnectAttempts} 次重连...`);
     this._reconnectTimer = setTimeout(() => {
+      this._reconnectTimer = null;
       if (this._manualDisconnect) return;
       console.log("正在重连...");
       this.connect(this.host, this.port).catch((err) => {
@@ -306,7 +388,56 @@ class WebSocket {
    * 获取设备状态
    */
   async getStatus() {
-    return this.sendAndWait({ cmd: "status" });
+    if (!this.connected || !this.socket) {
+      return Promise.reject(new Error("未连接到设备"));
+    }
+
+    return new Promise((resolve, reject) => {
+      let timer = null;
+
+      const handler = (response) => {
+        if (!response || typeof response !== "object") {
+          return;
+        }
+
+        if (response.error || response.status === "error") {
+          clearTimeout(timer);
+          this.offMessage(handler);
+          reject(
+            new Error(response.error || response.message || "获取设备状态失败"),
+          );
+          return;
+        }
+
+        if (
+          response.status !== "ok" ||
+          typeof response.ip !== "string" ||
+          typeof response.width !== "number" ||
+          typeof response.height !== "number" ||
+          typeof response.brightness !== "number" ||
+          typeof response.mode !== "string"
+        ) {
+          return;
+        }
+
+        clearTimeout(timer);
+        this.offMessage(handler);
+        resolve(response);
+      };
+
+      this.onMessage(handler);
+
+      timer = setTimeout(() => {
+        this.offMessage(handler);
+        reject(new Error("等待回复超时"));
+      }, 3000);
+
+      this.send({ cmd: "status" }).catch((err) => {
+        clearTimeout(timer);
+        this.offMessage(handler);
+        reject(err);
+      });
+    });
   }
 
   /**
@@ -326,11 +457,33 @@ class WebSocket {
   }
 
   /**
+   * 设置主题配置
+   * @param {string} themeId - 主题 ID
+   */
+  async setThemeConfig(themeId) {
+    return this.send({ cmd: "set_theme_config", themeId });
+  }
+
+  /**
    * 设置眼睛模式配置
    * @param {object} config - 眼睛模式配置对象
    */
   async setEyesConfig(config) {
     return this.send({ cmd: "set_eyes_config", config });
+  }
+
+  /**
+   * 设置像素屏保配置
+   * @param {object} config - 屏保配置对象
+   */
+  async setAmbientEffect(config) {
+    return this.send({
+      cmd: "set_ambient_effect",
+      preset: config.preset,
+      speed: config.speed,
+      intensity: config.intensity,
+      loop: config.loop,
+    });
   }
 
   /**
