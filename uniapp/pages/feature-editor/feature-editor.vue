@@ -41,21 +41,9 @@
       ></view>
       <view class="preview-caption">
         <view class="preview-caption-info">
-          <view class="preview-status-chip" :class="previewStatusClass">
-            <text class="preview-status-chip-text">{{ previewStatusLabel }}</text>
-          </view>
-          <text class="preview-title">64 x 64 模拟预览</text>
-          <text class="preview-subtitle">{{ previewSubtitle }}</text>
+          <text class="preview-title">预览效果</text>
         </view>
         <view class="preview-actions">
-          <view
-            class="action-btn-sm"
-            :class="{ disabled: isSending }"
-            @click="saveDraft"
-          >
-            <Icon name="save" :size="36" color="var(--color-text-primary)" />
-            <text>保存</text>
-          </view>
           <view
             class="action-btn-sm primary"
             :class="{ disabled: isSending }"
@@ -70,18 +58,9 @@
 
     <scroll-view scroll-y class="content" :style="{ height: contentHeight }">
       <view class="content-wrapper" v-if="featureReady">
-        <view class="card info-card">
-          <view class="card-title-section">
-            <text class="card-title">{{ featureGuideTitle }}</text>
-            <text class="card-tag">{{ featureGuideTag }}</text>
-          </view>
-          <text class="info-text">{{ featureGuideText }}</text>
-        </view>
-
         <view v-if="featureType === 'weather'" class="card">
           <view class="card-title-section">
             <text class="card-title">天气快捷样式</text>
-            <text class="card-subtitle">先选结构，再细调颜色</text>
           </view>
           <view class="piece-grid">
             <view
@@ -223,33 +202,9 @@
           </view>
         </view>
 
-        <view v-if="featureType === 'countdown'" class="card summary-card">
-          <view class="card-title-section">
-            <text class="card-title">倒计时摘要</text>
-            <text class="card-subtitle">先看结构，再细调参数</text>
-          </view>
-          <view class="summary-grid">
-            <view class="summary-item">
-              <text class="summary-label">总时长</text>
-              <text class="summary-value">{{ countdownDurationLabel }}</text>
-            </view>
-            <view class="summary-item">
-              <text class="summary-label">当前剩余</text>
-              <text class="summary-value">{{ countdownRemainingLabel }}</text>
-            </view>
-            <view class="summary-item">
-              <text class="summary-label">当前进度</text>
-              <text class="summary-value">{{
-                Math.round(countdownConfig.progress * 100)
-              }}%</text>
-            </view>
-          </view>
-        </view>
-
         <view v-if="featureType === 'countdown'" class="card">
           <view class="card-title-section">
             <text class="card-title">倒计时快捷样式</text>
-            <text class="card-subtitle">含沙漏核心视觉</text>
           </view>
           <view class="piece-grid">
             <view
@@ -284,7 +239,6 @@
           <view class="section-group">
             <view class="section-heading">
               <text class="section-title">表现样式</text>
-              <text class="section-tip">沙漏、环形与冲刺氛围</text>
             </view>
 
             <view class="form-row">
@@ -308,7 +262,6 @@
           <view class="section-group">
             <view class="section-heading">
               <text class="section-title">时间设定</text>
-              <text class="section-tip">调整总时长与当前进度</text>
             </view>
 
             <view class="form-row">
@@ -367,7 +320,6 @@
           <view class="section-group">
             <view class="section-heading">
               <text class="section-title">颜色表现</text>
-              <text class="section-tip">自动变色或固定主色</text>
             </view>
 
             <view class="form-row">
@@ -400,7 +352,6 @@
         <view v-if="featureType === 'stopwatch'" class="card">
           <view class="card-title-section">
             <text class="card-title">秒表快捷样式</text>
-            <text class="card-subtitle">兼顾训练和竞速场景</text>
           </view>
           <view class="piece-grid">
             <view
@@ -499,31 +450,9 @@
           </view>
         </view>
 
-        <view v-if="featureType === 'notification'" class="card summary-card">
-          <view class="card-title-section">
-            <text class="card-title">提醒摘要</text>
-            <text class="card-subtitle">触发规则与展示主题</text>
-          </view>
-          <view class="summary-grid">
-            <view class="summary-item">
-              <text class="summary-label">触发时间</text>
-              <text class="summary-value">{{ notificationTimeLabel }}</text>
-            </view>
-            <view class="summary-item">
-              <text class="summary-label">重复方式</text>
-              <text class="summary-value">{{ notificationRepeatLabel }}</text>
-            </view>
-            <view class="summary-item">
-              <text class="summary-label">当前主题</text>
-              <text class="summary-value">{{ notificationThemeLabel }}</text>
-            </view>
-          </view>
-        </view>
-
         <view v-if="featureType === 'notification'" class="card">
           <view class="card-title-section">
             <text class="card-title">通知提醒快捷样式</text>
-            <text class="card-subtitle">日常提醒与节日主题</text>
           </view>
           <view class="piece-grid">
             <view
@@ -558,7 +487,6 @@
           <view class="section-group">
             <view class="section-heading">
               <text class="section-title">定时触发</text>
-              <text class="section-tip">决定什么时候点亮提醒画面</text>
             </view>
 
             <view class="form-row inline-row">
@@ -610,19 +538,11 @@
         <view v-if="featureType === 'notification'" class="card">
           <view class="card-title-section">
             <text class="card-title">到点展示内容</text>
-            <text class="card-subtitle">不是常驻显示时间</text>
-          </view>
-
-          <view class="helper-note">
-            <text class="helper-note-text"
-              >这里定义的是提醒触发后的整屏内容。当前先支持图标加文案主题，后续可以继续扩展更多画面来源。</text
-            >
           </view>
 
           <view class="section-group">
             <view class="section-heading">
               <text class="section-title">主题内容</text>
-              <text class="section-tip">先确定图标与文案主角</text>
             </view>
 
             <view class="form-row">
@@ -656,7 +576,6 @@
           <view class="section-group">
             <view class="section-heading">
               <text class="section-title">视觉主题</text>
-              <text class="section-tip">用强调色区分提醒类型</text>
             </view>
 
             <view class="form-row">
@@ -855,9 +774,9 @@ export default {
       weatherPresets: [
         {
           key: "sunny-standard",
-          label: "AWTRIX 晴天卡",
+          label: "晴天卡",
           tag: "信息卡",
-          hint: "主温度大字，天气图标和湿度分层",
+          hint: "温度、天气、湿度一屏看清",
           colors: ["#FFD24D", "#DFF7FF", "#64C8FF"],
           config: {
             weatherType: "sunny",
@@ -873,9 +792,9 @@ export default {
         },
         {
           key: "rain-detail",
-          label: "AWTRIX 雨天卡",
+          label: "雨天卡",
           tag: "播报",
-          hint: "适合显示湿度偏高和降温场景",
+          hint: "适合潮湿和降温场景",
           colors: ["#64C8FF", "#DFF7FF", "#7DD3FC"],
           config: {
             weatherType: "rainy",
@@ -893,7 +812,7 @@ export default {
           key: "night-cloud",
           label: "夜间天气卡",
           tag: "夜景",
-          hint: "月夜配色更柔和，适合床头氛围",
+          hint: "适合夜间和床头显示",
           colors: ["#9AABFF", "#F9F7D1", "#A0E9FF"],
           config: {
             weatherType: "cloudy",
@@ -913,7 +832,7 @@ export default {
           key: "quick-break",
           label: "沙漏倒数",
           tag: "沙漏",
-          hint: "适合五分钟休息和短时提醒",
+          hint: "适合短时倒数",
           colors: ["#64C8FF", "#C7EEFF"],
           config: {
             hours: 0,
@@ -929,7 +848,7 @@ export default {
           key: "focus-ring",
           label: "环形倒数",
           tag: "环形",
-          hint: "长时专注时更容易一眼看出进度",
+          hint: "适合专注计时",
           colors: ["#7DDF8A", "#D5FFD8"],
           config: {
             hours: 0,
@@ -945,7 +864,7 @@ export default {
           key: "event-sprint",
           label: "冲刺倒数",
           tag: "冲刺",
-          hint: "末段压迫感更强，适合比赛或整点",
+          hint: "适合最后冲刺",
           colors: ["#FF6464", "#FFD2D2"],
           config: {
             hours: 0,
@@ -963,7 +882,7 @@ export default {
           key: "training",
           label: "训练计时板",
           tag: "训练",
-          hint: "主读数最大，圈次和节奏做辅助",
+          hint: "主时间最醒目",
           colors: ["#FFB020", "#FFE3A4"],
           config: {
             displayStyle: "training",
@@ -977,7 +896,7 @@ export default {
           key: "racing",
           label: "竞速计时板",
           tag: "竞速",
-          hint: "高对比布局，更突出冲线速度感",
+          hint: "适合竞速场景",
           colors: ["#FF6464", "#FFD2D2"],
           config: {
             displayStyle: "racing",
@@ -991,7 +910,7 @@ export default {
           key: "lap-focus",
           label: "圈速计时板",
           tag: "圈次",
-          hint: "圈次更醒目，适合分段和间歇训练",
+          hint: "适合看圈次变化",
           colors: ["#64C8FF", "#C7EEFF"],
           config: {
             displayStyle: "lap_focus",
@@ -1007,7 +926,7 @@ export default {
           key: "drink",
           label: "喝水提醒卡",
           tag: "日常",
-          hint: "杯子图标配短文案，远看也容易识别",
+          hint: "适合日常提醒",
           colors: ["#64C8FF", "#C7EEFF"],
           config: {
             icon: "drink",
@@ -1022,7 +941,7 @@ export default {
           key: "break",
           label: "休息提醒卡",
           tag: "办公",
-          hint: "适合久坐场景，语义更直接",
+          hint: "适合久坐休息",
           colors: ["#7DDF8A", "#D5FFD8"],
           config: {
             icon: "break",
@@ -1035,9 +954,9 @@ export default {
         },
         {
           key: "fireworks",
-          label: "烟花庆祝卡",
+          label: "烟花卡",
           tag: "节日",
-          hint: "烟花主图更适合整屏庆祝卡片",
+          hint: "适合庆祝场景",
           colors: ["#FFB020", "#FFE3A4"],
           config: {
             icon: "fireworks",
@@ -1052,7 +971,7 @@ export default {
           key: "birthday",
           label: "生日祝福卡",
           tag: "庆祝",
-          hint: "蛋糕主题更适合一次性的庆祝提醒",
+          hint: "适合生日提醒",
           colors: ["#FF6FAE", "#FFD0E4"],
           config: {
             icon: "birthday",
@@ -1067,7 +986,7 @@ export default {
           key: "christmas",
           label: "圣诞祝福卡",
           tag: "节日",
-          hint: "节日树形更适合暖色氛围和祝福卡",
+          hint: "适合节日祝福",
           colors: ["#7DDF8A", "#FFD24D"],
           config: {
             icon: "christmas",
@@ -1093,131 +1012,23 @@ export default {
     },
     pageTitle() {
       if (this.featureType === "weather") {
-        return "天气看板";
+        return "天气设置";
       }
       if (this.featureType === "countdown") {
-        return "倒数看板";
+        return "倒计时";
       }
       if (this.featureType === "stopwatch") {
-        return "计时看板";
+        return "秒表设置";
       }
       if (this.featureType === "notification") {
-        return "提醒看板";
+        return "提醒设置";
       }
       return "扩展功能";
-    },
-    featureGuideTitle() {
-      if (this.featureType === "weather") {
-        return "天气信息卡";
-      }
-      if (this.featureType === "countdown") {
-        return "倒数整屏卡";
-      }
-      if (this.featureType === "stopwatch") {
-        return "训练计时板";
-      }
-      if (this.featureType === "notification") {
-        return "提醒信息卡";
-      }
-      return "功能说明";
-    },
-    featureGuideTag() {
-      if (this.featureType === "weather") {
-        return "AWTRIX";
-      }
-      if (this.featureType === "countdown") {
-        return "倒数屏";
-      }
-      if (this.featureType === "stopwatch") {
-        return "计时板";
-      }
-      if (this.featureType === "notification") {
-        return "提醒卡";
-      }
-      return "说明";
-    },
-    featureGuideText() {
-      if (this.featureType === "weather") {
-        return "这里直接按 AWTRIX 一类成熟信息卡的层级来做，先保证天气状态和温度一眼能读，再把城市和湿度放到辅助层。";
-      }
-      if (this.featureType === "countdown") {
-        return "这里按成熟倒数屏的做法，把剩余时间、进度结构和整屏张力一起成立，不再只是放一串数字。";
-      }
-      if (this.featureType === "stopwatch") {
-        return "这里直接对标训练和竞速计时板，主时间最大最醒目，圈次和节奏只做辅助，不再走杂乱堆叠。";
-      }
-      if (this.featureType === "notification") {
-        return "这里按成熟提醒卡的结构来做，重点是图标、文案和主题氛围一起成立，而不是普通弹字提示。";
-      }
-      return "";
-    },
-    previewSubtitle() {
-      if (!this.previewCanvasReady) {
-        return "预览网格加载中，完成后可直接查看当前功能布局";
-      }
-      if (this.featureType === "weather") {
-        return "预览 AWTRIX 风格天气卡的主信息层级和整屏观感";
-      }
-      if (this.featureType === "countdown") {
-        return "预览倒数屏的大字读数、进度结构和整体氛围";
-      }
-      if (this.featureType === "stopwatch") {
-        return "预览训练计时板的主读数、圈次信息和竞速感";
-      }
-      if (this.featureType === "notification") {
-        return "预览提醒卡触发后的整屏图标、文案和主题";
-      }
-      return "";
-    },
-    previewStatusLabel() {
-      if (this.isSending) {
-        return "发送中";
-      }
-      if (!this.previewCanvasReady) {
-        return "预览加载中";
-      }
-      return "模拟预览";
-    },
-    previewStatusClass() {
-      if (this.isSending) {
-        return "is-sending";
-      }
-      if (!this.previewCanvasReady) {
-        return "is-loading";
-      }
-      return "is-preview";
-    },
-    countdownDurationLabel() {
-      const totalSeconds =
-        this.countdownConfig.hours * 3600 +
-        this.countdownConfig.minutes * 60 +
-        this.countdownConfig.seconds;
-      return this.formatDuration(totalSeconds);
-    },
-    countdownRemainingLabel() {
-      const totalSeconds =
-        this.countdownConfig.hours * 3600 +
-        this.countdownConfig.minutes * 60 +
-        this.countdownConfig.seconds;
-      const remaining = Math.round(totalSeconds * (1 - this.countdownConfig.progress));
-      return this.formatDuration(remaining);
     },
     notificationTimeLabel() {
       return `${String(this.notificationConfig.hour).padStart(2, "0")}:${String(
         this.notificationConfig.minute,
       ).padStart(2, "0")}`;
-    },
-    notificationRepeatLabel() {
-      return this.findOptionLabel(
-        this.notificationRepeatOptions,
-        this.notificationConfig.repeatMode,
-      );
-    },
-    notificationThemeLabel() {
-      return this.findOptionLabel(
-        this.notificationIconOptions,
-        this.notificationConfig.icon,
-      );
     },
   },
   watch: {
@@ -1485,11 +1296,6 @@ export default {
       if (this.featureType === "notification") {
         uni.setStorageSync(draftKey, this.notificationConfig);
       }
-    },
-    saveDraft() {
-      this.persistDraft();
-
-      this.toast.showSuccess("草稿已保存");
     },
     buildFeaturePreviewFrames() {
       if (this.featureType === "weather") {
@@ -1869,19 +1675,10 @@ export default {
   padding-top: 20rpx;
 }
 
-.summary-card {
-  background: transparent;
-}
-
-.info-card {
-  background: transparent;
-  border-color: transparent;
-}
-
 .card-title-section {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 8rpx;
   margin-bottom: 16rpx;
 }
@@ -1890,26 +1687,6 @@ export default {
   font-size: 22rpx;
   font-weight: 500;
   color: var(--text-primary);
-}
-
-.card-subtitle {
-  font-size: 20rpx;
-  color: var(--text-secondary);
-}
-
-.card-tag {
-  padding: 8rpx 16rpx;
-  border-radius: 999rpx;
-  background: rgba(79, 127, 255, 0.14);
-  color: var(--accent-primary);
-  font-size: 22rpx;
-  font-weight: 600;
-}
-
-.info-text {
-  font-size: 22rpx;
-  line-height: 1.7;
-  color: var(--text-secondary);
 }
 
 .inline-value {
@@ -2097,36 +1874,6 @@ export default {
   line-height: 1.4;
 }
 
-.summary-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 16rpx;
-}
-
-.summary-item {
-  min-height: 112rpx;
-  padding: 18rpx 16rpx;
-  border-radius: 18rpx;
-  background: rgba(0, 0, 0, 0.16);
-  border: 2rpx solid rgba(255, 255, 255, 0.06);
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  gap: 8rpx;
-}
-
-.summary-label {
-  font-size: 22rpx;
-  color: var(--text-secondary);
-}
-
-.summary-value {
-  font-size: 28rpx;
-  font-weight: 600;
-  color: var(--text-primary);
-  line-height: 1.2;
-}
-
 .section-group {
   display: flex;
   flex-direction: column;
@@ -2135,8 +1882,8 @@ export default {
 
 .section-heading {
   display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
+  align-items: center;
+  justify-content: flex-start;
   gap: 16rpx;
 }
 
@@ -2146,30 +1893,10 @@ export default {
   color: var(--text-primary);
 }
 
-.section-tip {
-  font-size: 22rpx;
-  color: var(--text-secondary);
-  text-align: right;
-}
-
 .section-divider {
   height: 2rpx;
   background: var(--border-primary);
   margin: 8rpx 0 18rpx;
-}
-
-.helper-note {
-  margin-bottom: 20rpx;
-  padding: 18rpx 20rpx;
-  border-radius: 18rpx;
-  background: rgba(79, 127, 255, 0.08);
-  border: 2rpx solid rgba(79, 127, 255, 0.16);
-}
-
-.helper-note-text {
-  font-size: 22rpx;
-  color: var(--text-secondary);
-  line-height: 1.6;
 }
 
 </style>

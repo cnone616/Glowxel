@@ -25,6 +25,9 @@ uint8_t (*TetrisEffect::targetMap)[TETRIS_MAX / 8] = nullptr;
 int TetrisEffect::lastClockMinute = -1;
 int TetrisEffect::lastClockHour = -1;
 bool TetrisEffect::holdClockFrame = false;
+bool TetrisEffect::spawnBiasLeft = true;
+unsigned long TetrisEffect::holdPulseAt = 0;
+bool TetrisEffect::holdPulseBright = false;
 
 namespace {
 constexpr size_t kTetrisBoardBytes = TETRIS_MAX * TETRIS_MAX * sizeof(uint8_t);
@@ -110,6 +113,9 @@ void TetrisEffect::init(bool clearMode, int cellSz, int speed, bool clock, uint8
   lastClockMinute = -1;
   lastClockHour = -1;
   holdClockFrame = false;
+  spawnBiasLeft = true;
+  holdPulseAt = 0;
+  holdPulseBright = false;
   if (showClock) {
     rebuildClockTarget();
   }
@@ -184,7 +190,9 @@ int TetrisEffect::computeSpawnX(int type, int rot, int finalX) {
   const int maxOffset = pieceMaxX(type, rot);
   const int minSpawnX = -minOffset;
   const int maxSpawnX = cols - 1 - maxOffset;
-  int startX = finalX + random(-6, 7);
+  int drift = 4 + random(0, 5);
+  int startX = finalX + (spawnBiasLeft ? -drift : drift);
+  spawnBiasLeft = !spawnBiasLeft;
   if (startX < minSpawnX) {
     startX = minSpawnX;
   }
@@ -561,6 +569,7 @@ int TetrisEffect::clearLines() {
 void TetrisEffect::update() {
   if (!isActive) return;
   if (board == nullptr || prevDisplay == nullptr || targetMap == nullptr) return;
+  unsigned long now = millis();
 
   if (showClock) {
     struct tm timeinfo;
@@ -575,11 +584,14 @@ void TetrisEffect::update() {
       }
     }
     if (holdClockFrame) {
+      if (now - holdPulseAt >= 220) {
+        holdPulseAt = now;
+        holdPulseBright = !holdPulseBright;
+        needsRender = true;
+      }
       return;
     }
   }
-
-  unsigned long now = millis();
   if (now - lastDropTime < (unsigned long)dropSpeed) return;
   lastDropTime = now;
 
@@ -642,25 +654,40 @@ void TetrisEffect::render(MatrixPanel_I2S_DMA* display) {
     }
   }
 
+  if (showClock) {
+    for (int y = 0; y < rows; y++) {
+      for (int x = 0; x < cols; x++) {
+        if (curDisplay[y][x] == 0 && getTargetCell(x, y)) {
+          curDisplay[y][x] = 8;
+        }
+      }
+    }
+  }
+
   // 增量渲染：只重绘变化的格子
   for (int y = 0; y < rows; y++) {
     for (int x = 0; x < cols; x++) {
       if (curDisplay[y][x] == prevDisplay[y][x]) continue;
 
       uint8_t c = curDisplay[y][x];
-      if (c > 0) {
+      if (c > 0 && c <= 7) {
         const uint8_t* rgb = colors[c - 1];
-        uint8_t highlightR = min(255, rgb[0] + 40);
-        uint8_t highlightG = min(255, rgb[1] + 40);
-        uint8_t highlightB = min(255, rgb[2] + 40);
+        uint8_t baseBoost = (showClock && holdClockFrame && holdPulseBright) ? 20 : 0;
+        uint8_t highlightBoost = (showClock && holdClockFrame && holdPulseBright) ? 60 : 40;
+        uint8_t baseR = min(255, rgb[0] + baseBoost);
+        uint8_t baseG = min(255, rgb[1] + baseBoost);
+        uint8_t baseB = min(255, rgb[2] + baseBoost);
+        uint8_t highlightR = min(255, rgb[0] + highlightBoost);
+        uint8_t highlightG = min(255, rgb[1] + highlightBoost);
+        uint8_t highlightB = min(255, rgb[2] + highlightBoost);
         uint8_t shadowR = rgb[0] / 2;
         uint8_t shadowG = rgb[1] / 2;
         uint8_t shadowB = rgb[2] / 2;
         for (int dy = 0; dy < cellSize; dy++) {
           for (int dx = 0; dx < cellSize; dx++) {
-            uint8_t drawR = rgb[0];
-            uint8_t drawG = rgb[1];
-            uint8_t drawB = rgb[2];
+            uint8_t drawR = baseR;
+            uint8_t drawG = baseG;
+            uint8_t drawB = baseB;
 
             if (cellSize >= 2) {
               if (dy == 0 || dx == 0) {
@@ -674,6 +701,20 @@ void TetrisEffect::render(MatrixPanel_I2S_DMA* display) {
               }
             }
 
+            display->drawPixelRGB888(x * cellSize + dx, y * cellSize + dy, drawR, drawG, drawB);
+          }
+        }
+      } else if (c == 8) {
+        for (int dy = 0; dy < cellSize; dy++) {
+          for (int dx = 0; dx < cellSize; dx++) {
+            uint8_t drawR = 16;
+            uint8_t drawG = 32;
+            uint8_t drawB = 56;
+            if (cellSize >= 2 && (dy == 0 || dx == 0)) {
+              drawR = 28;
+              drawG = 58;
+              drawB = 92;
+            }
             display->drawPixelRGB888(x * cellSize + dx, y * cellSize + dy, drawR, drawG, drawB);
           }
         }

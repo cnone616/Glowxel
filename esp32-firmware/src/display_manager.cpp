@@ -1434,6 +1434,329 @@ static float fireflySeedf(int index, float shift) {
   return fractf32(sinf((float)(index + 1) * 17.371f + shift * 3.147f) * 24634.6345f);
 }
 
+static void fillAmbientRect(int x, int y, int w, int h, const NativeRgb& color) {
+  if (DisplayManager::dma_display == nullptr) {
+    return;
+  }
+  DisplayManager::dma_display->fillRect(x, y, w, h, DisplayManager::dma_display->color565(color.r, color.g, color.b));
+}
+
+static void drawAmbientGlowDot(int centerX, int centerY, const NativeRgb& color, float intensity, int radius) {
+  if (DisplayManager::dma_display == nullptr) {
+    return;
+  }
+
+  for (int offsetY = -radius; offsetY <= radius; offsetY++) {
+    for (int offsetX = -radius; offsetX <= radius; offsetX++) {
+      int distance = abs(offsetX) + abs(offsetY);
+      float fade = clampUnit(1.0f - (float)distance / (float)(radius + 1));
+      if (fade <= 0.0f) {
+        continue;
+      }
+      float alpha = intensity * fade;
+      DisplayManager::dma_display->drawPixelRGB888(
+        centerX + offsetX,
+        centerY + offsetY,
+        clampByte((int)roundf((float)color.r * alpha)),
+        clampByte((int)roundf((float)color.g * alpha)),
+        clampByte((int)roundf((float)color.b * alpha))
+      );
+    }
+  }
+}
+
+static void renderAmbientBoids(unsigned long elapsed, float speedUnit, float intensityUnit) {
+  DisplayManager::dma_display->fillScreenRGB888(4, 10, 18);
+
+  for (int y = 8; y < 64; y += 9) {
+    for (int x = 0; x < 64; x++) {
+      DisplayManager::dma_display->drawPixelRGB888(x, y, 10, 18, 28);
+    }
+  }
+
+  float timeBase = (float)elapsed * (0.0012f + speedUnit * 0.0016f);
+  for (int index = 0; index < 11; index++) {
+    float seedA = fireflySeedf(index, 0.8f);
+    float seedB = fireflySeedf(index, 2.4f);
+    float px =
+      32.0f +
+      sinf(timeBase * (0.9f + seedA * 0.8f) + seedB * 6.2831852f) * (10.0f + seedA * 18.0f) +
+      cosf(timeBase * (0.5f + seedB * 0.7f) + (float)index) * 6.0f;
+    float py =
+      32.0f +
+      cosf(timeBase * (0.7f + seedB * 0.9f) + seedA * 6.2831852f) * (8.0f + seedB * 16.0f) +
+      sinf(timeBase * (0.8f + seedA * 0.4f) + (float)index * 0.6f) * 5.0f;
+    float tailX = px - cosf(timeBase + (float)index) * 4.0f;
+    float tailY = py - sinf(timeBase * 1.1f + (float)index) * 4.0f;
+    NativeRgb body = addHighlightColor(
+      blendRgbColor(makeRgb(44, 164, 255), makeRgb(80, 255, 196), seedA),
+      0.12f + intensityUnit * 0.16f
+    );
+    drawAmbientGlowDot((int)roundf(px), (int)roundf(py), body, 0.9f, 1);
+    drawAmbientGlowDot((int)roundf((px + tailX) * 0.5f), (int)roundf((py + tailY) * 0.5f), scaleRgbColor(body, 0.45f), 0.7f, 1);
+  }
+}
+
+static void renderAmbientBouncingLogo(unsigned long elapsed, float speedUnit) {
+  DisplayManager::dma_display->fillScreenRGB888(8, 11, 18);
+  int travelX = 8 + abs((int)fmodf((float)elapsed * (0.02f + speedUnit * 0.02f), 96.0f) - 48);
+  int travelY = 8 + abs((int)fmodf((float)elapsed * (0.016f + speedUnit * 0.018f) + 12.0f, 84.0f) - 42);
+  int x = min(46, travelX);
+  int y = min(46, travelY);
+  DisplayManager::drawLogo(x, y);
+  drawAmbientGlowDot(x + 16, y + 16, makeRgb(110, 180, 255), 0.32f, 5);
+}
+
+static void renderAmbientSortingVisualizer(unsigned long elapsed, float intensityUnit) {
+  DisplayManager::dma_display->fillScreenRGB888(6, 9, 16);
+  int heights[16] = {13, 9, 5, 15, 7, 12, 3, 10, 16, 8, 14, 6, 11, 4, 2, 1};
+  int compareCount = (int)(elapsed / 120UL) * 3;
+  int activeLeft = 0;
+  int activeRight = 1;
+
+  for (int step = 0; step < compareCount; step++) {
+    int index = step % 15;
+    activeLeft = index;
+    activeRight = index + 1;
+    if (heights[index] > heights[index + 1]) {
+      int temp = heights[index];
+      heights[index] = heights[index + 1];
+      heights[index + 1] = temp;
+    }
+  }
+
+  for (int index = 0; index < 16; index++) {
+    int barHeight = heights[index];
+    int x = index * 4;
+    NativeRgb base =
+      index == activeLeft || index == activeRight
+        ? makeRgb(255, 180, 68)
+        : blendRgbColor(makeRgb(78, 162, 255), makeRgb(96, 255, 188), (float)index / 15.0f);
+    NativeRgb color = addHighlightColor(base, intensityUnit * 0.14f);
+    for (int row = 0; row < barHeight; row++) {
+      fillAmbientRect(x + 1, 63 - row * 3, 3, 2, color);
+    }
+  }
+}
+
+static void renderAmbientClockScene(unsigned long elapsed, float intensityUnit) {
+  float timeBase = (float)elapsed * 0.0012f;
+  for (int y = 0; y < 64; y++) {
+    for (int x = 0; x < 64; x++) {
+      float nx = ((float)x - 31.5f) / 31.5f;
+      float ny = ((float)y - 31.5f) / 31.5f;
+      float nebulaA = 0.5f + 0.5f * sinf(nx * 5.0f + timeBase * 0.45f + ny * 4.0f);
+      float nebulaB = 0.5f + 0.5f * sinf((nx - ny) * 7.2f - timeBase * 0.62f);
+      float backdrop = clampUnit(0.03f + nebulaA * 0.08f + nebulaB * 0.06f);
+      uint8_t r = clampByte((int)roundf(4.0f + 16.0f * nebulaB * backdrop));
+      uint8_t g = clampByte((int)roundf(6.0f + 22.0f * nebulaA * backdrop));
+      uint8_t b = clampByte((int)roundf(12.0f + 46.0f * (nebulaA * 0.55f + nebulaB * 0.45f) * backdrop));
+      int starIndex = (x * 31 + y * 17) % 97;
+      if (starIndex < 3) {
+        float twinkle = glowPulsef(timeBase * (1.1f + (float)starIndex * 0.35f), (float)(x + y) * 0.21f);
+        float shine = 0.28f + twinkle * (0.42f + intensityUnit * 0.18f);
+        r = clampByte((int)roundf((float)r + 140.0f * shine));
+        g = clampByte((int)roundf((float)g + 150.0f * shine));
+        b = clampByte((int)roundf((float)b + 185.0f * shine));
+      }
+      DisplayManager::dma_display->drawPixelRGB888(x, y, r, g, b);
+    }
+  }
+
+  fillAmbientRect(8, 18, 48, 28, makeRgb(6, 12, 20));
+  fillAmbientRect(8, 47, 48, 1, makeRgb(24, 60, 88));
+  struct tm timeinfo;
+  char buffer[8];
+  if (getLocalTime(&timeinfo, 0)) {
+    snprintf(buffer, sizeof(buffer), "%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min);
+  } else {
+    snprintf(buffer, sizeof(buffer), "12:34");
+  }
+  DisplayManager::drawTinyText(buffer, 11, 28, DisplayManager::dma_display->color565(142, 214, 255), 3);
+}
+
+static void renderAmbientCountdownScene(unsigned long elapsed, float speedUnit) {
+  DisplayManager::dma_display->fillScreenRGB888(8, 10, 18);
+  int totalSeconds = 300;
+  int spent = ((int)floorf(((float)elapsed / 1000.0f) * (0.4f + speedUnit * 1.2f))) % totalSeconds;
+  int remaining = totalSeconds - spent;
+  int minutes = remaining / 60;
+  int seconds = remaining % 60;
+  char buffer[8];
+  snprintf(buffer, sizeof(buffer), "%02d:%02d", minutes, seconds);
+  float progress = (float)remaining / (float)totalSeconds;
+  fillAmbientRect(7, 16, 50, 34, makeRgb(10, 16, 28));
+  fillAmbientRect(8, 50, max(1, (int)roundf(progress * 48.0f)), 2, makeRgb(255, 112, 64));
+  DisplayManager::drawTinyText(buffer, 11, 29, DisplayManager::dma_display->color565(255, 212, 82), 3);
+}
+
+static void renderAmbientWeatherScene(unsigned long elapsed, float speedUnit) {
+  DisplayManager::dma_display->fillScreenRGB888(6, 10, 18);
+  int phase = ((int)floorf(((float)elapsed / 1000.0f) * (0.28f + speedUnit * 0.2f))) % 3;
+  int temp = phase == 0 ? 26 : (phase == 1 ? 18 : 8);
+  char buffer[4];
+  snprintf(buffer, sizeof(buffer), "%02d", temp);
+  fillAmbientRect(6, 10, 52, 40, makeRgb(10, 16, 28));
+
+  if (phase == 0) {
+    drawAmbientGlowDot(18, 24, makeRgb(255, 206, 84), 0.95f, 4);
+  } else if (phase == 1) {
+    drawAmbientGlowDot(16, 22, makeRgb(188, 212, 255), 0.8f, 4);
+    for (int row = 0; row < 5; row++) {
+      fillAmbientRect(14 + row * 3, 30 + row, 1, 4, makeRgb(88, 176, 255));
+    }
+  } else {
+    drawAmbientGlowDot(18, 24, makeRgb(208, 232, 255), 0.72f, 4);
+    for (int index = 0; index < 6; index++) {
+      DisplayManager::dma_display->drawPixelRGB888(12 + index * 3, 32 + (index % 2), 240, 248, 255);
+      DisplayManager::dma_display->drawPixelRGB888(13 + index * 3, 33 + (index % 2), 240, 248, 255);
+    }
+  }
+
+  DisplayManager::drawTinyText(buffer, 35, 29, DisplayManager::dma_display->color565(224, 244, 255), 3);
+  fillAmbientRect(48, 22, 2, 2, makeRgb(120, 196, 255));
+}
+
+static void renderAmbientGameOfLife(unsigned long elapsed, float intensityUnit) {
+  DisplayManager::dma_display->fillScreenRGB888(4, 9, 13);
+  uint8_t grid[16][16];
+  uint8_t next[16][16];
+  for (int y = 0; y < 16; y++) {
+    for (int x = 0; x < 16; x++) {
+      float seed = fireflySeedf(y * 16 + x, 0.42f);
+      grid[y][x] = seed > 0.58f ? 1 : 0;
+    }
+  }
+
+  int steps = (int)(elapsed / 120UL) + 2;
+  for (int step = 0; step < steps; step++) {
+    for (int y = 0; y < 16; y++) {
+      for (int x = 0; x < 16; x++) {
+        int neighbors = 0;
+        for (int oy = -1; oy <= 1; oy++) {
+          for (int ox = -1; ox <= 1; ox++) {
+            if (ox == 0 && oy == 0) {
+              continue;
+            }
+            int px = (x + ox + 16) % 16;
+            int py = (y + oy + 16) % 16;
+            neighbors += grid[py][px];
+          }
+        }
+        bool alive = grid[y][x] == 1;
+        next[y][x] = alive ? ((neighbors == 2 || neighbors == 3) ? 1 : 0) : (neighbors == 3 ? 1 : 0);
+      }
+    }
+    memcpy(grid, next, sizeof(grid));
+  }
+
+  for (int y = 0; y < 16; y++) {
+    for (int x = 0; x < 16; x++) {
+      if (grid[y][x] != 1) {
+        continue;
+      }
+      NativeRgb color = addHighlightColor(
+        blendRgbColor(makeRgb(68, 255, 144), makeRgb(82, 178, 255), (float)(x + y) / 30.0f),
+        intensityUnit * 0.16f
+      );
+      fillAmbientRect(x * 4, y * 4, 3, 3, color);
+    }
+  }
+}
+
+static void renderAmbientJuliaSet(unsigned long elapsed, float intensityUnit) {
+  float timeBase = (float)elapsed * 0.0012f;
+  float cx = -0.7f + sinf(timeBase * 0.6f) * 0.12f;
+  float cy = 0.27015f + cosf(timeBase * 0.8f) * 0.08f;
+
+  for (int y = 0; y < 64; y++) {
+    for (int x = 0; x < 64; x++) {
+      float zx = ((float)x - 32.0f) / 22.0f;
+      float zy = ((float)y - 32.0f) / 22.0f;
+      int iteration = 0;
+      while (zx * zx + zy * zy < 4.0f && iteration < 18) {
+        float nextX = zx * zx - zy * zy + cx;
+        zy = 2.0f * zx * zy + cy;
+        zx = nextX;
+        iteration++;
+      }
+      float ratio = (float)iteration / 18.0f;
+      NativeRgb color = addHighlightColor(
+        blendRgbColor(makeRgb(34, 18, 92), makeRgb(82, 212, 255), ratio),
+        intensityUnit * 0.12f
+      );
+      DisplayManager::dma_display->drawPixelRGB888(
+        x,
+        y,
+        clampByte((int)roundf((float)color.r * ratio)),
+        clampByte((int)roundf((float)color.g * ratio)),
+        clampByte((int)roundf((float)color.b * ratio))
+      );
+    }
+  }
+}
+
+static void renderAmbientReactionDiffusion(unsigned long elapsed, float speedUnit, float intensityUnit) {
+  float timeBase = (float)elapsed * (0.0011f + speedUnit * 0.0011f);
+  for (int y = 0; y < 64; y++) {
+    for (int x = 0; x < 64; x++) {
+      float nx = ((float)x - 31.5f) / 31.5f;
+      float ny = ((float)y - 31.5f) / 31.5f;
+      float fieldA = 0.5f + 0.5f * sinf(nx * 8.2f + timeBase * 1.6f + sinf(ny * 6.4f));
+      float fieldB = 0.5f + 0.5f * cosf(ny * 8.8f - timeBase * 1.2f + sinf(nx * 5.6f));
+      float contour = smoothstepf(0.46f, 0.62f + intensityUnit * 0.08f, fieldA * 0.58f + fieldB * 0.42f);
+      NativeRgb color = blendRgbColor(makeRgb(22, 38, 88), makeRgb(96, 255, 204), contour);
+      DisplayManager::dma_display->drawPixelRGB888(
+        x,
+        y,
+        clampByte((int)roundf((float)color.r * contour)),
+        clampByte((int)roundf((float)color.g * contour)),
+        clampByte((int)roundf((float)color.b * contour))
+      );
+    }
+  }
+}
+
+static bool renderAmbientExtendedScene(uint8_t preset, unsigned long elapsed, float speedUnit, float intensityUnit) {
+  if (preset == AMBIENT_PRESET_BOIDS) {
+    renderAmbientBoids(elapsed, speedUnit, intensityUnit);
+    return true;
+  }
+  if (preset == AMBIENT_PRESET_BOUNCING_LOGO) {
+    renderAmbientBouncingLogo(elapsed, speedUnit);
+    return true;
+  }
+  if (preset == AMBIENT_PRESET_SORTING_VISUALIZER) {
+    renderAmbientSortingVisualizer(elapsed, intensityUnit);
+    return true;
+  }
+  if (preset == AMBIENT_PRESET_CLOCK_SCENE) {
+    renderAmbientClockScene(elapsed, intensityUnit);
+    return true;
+  }
+  if (preset == AMBIENT_PRESET_COUNTDOWN_SCENE) {
+    renderAmbientCountdownScene(elapsed, speedUnit);
+    return true;
+  }
+  if (preset == AMBIENT_PRESET_WEATHER_SCENE) {
+    renderAmbientWeatherScene(elapsed, speedUnit);
+    return true;
+  }
+  if (preset == AMBIENT_PRESET_GAME_OF_LIFE) {
+    renderAmbientGameOfLife(elapsed, intensityUnit);
+    return true;
+  }
+  if (preset == AMBIENT_PRESET_JULIA_SET) {
+    renderAmbientJuliaSet(elapsed, intensityUnit);
+    return true;
+  }
+  if (preset == AMBIENT_PRESET_REACTION_DIFFUSION) {
+    renderAmbientReactionDiffusion(elapsed, speedUnit, intensityUnit);
+    return true;
+  }
+  return false;
+}
+
 void DisplayManager::renderNativeEffect() {
   if (nativeEffectType == NATIVE_EFFECT_NONE) {
     return;
@@ -1989,6 +2312,10 @@ void DisplayManager::renderNativeEffect() {
     float intensityUnit = (float)intensity / 100.0f;
     float timeBase = (float)elapsed * (0.00045f + speedUnit * 0.00135f);
 
+    if (renderAmbientExtendedScene(ambientEffectConfig.preset, elapsed, speedUnit, intensityUnit)) {
+      return;
+    }
+
     for (int y = 0; y < PANEL_RES_Y; y++) {
       for (int x = 0; x < PANEL_RES_X; x++) {
         float nx = ((float)x - 31.5f) / 31.5f;
@@ -2000,34 +2327,6 @@ void DisplayManager::renderNativeEffect() {
         uint8_t b = 0;
 
         if (ambientEffectConfig.preset == AMBIENT_PRESET_AURORA) {
-          float curtainA = 0.5f + 0.5f * sinf(nx * 5.2f + timeBase * 1.9f + sinf(ny * 3.6f - timeBase * 1.1f));
-          float curtainB = 0.5f + 0.5f * sinf(nx * 7.4f - timeBase * 1.5f + ny * 5.0f);
-          float horizon = clampUnit(1.0f - ((float)y / 63.0f) * 1.18f);
-          float veil = clampUnit(curtainA * 0.55f + curtainB * 0.45f);
-          float glow = clampUnit(horizon * (0.35f + veil * (0.5f + intensityUnit * 0.35f)));
-          float accent = clampUnit(0.24f + 0.76f * glowPulsef(timeBase * 1.1f, nx * 2.5f + ny * 1.7f));
-
-          r = clampByte((int)roundf((10.0f + 70.0f * veil + 24.0f * accent) * glow));
-          g = clampByte((int)roundf((30.0f + 180.0f * veil + 28.0f * accent) * glow));
-          b = clampByte((int)roundf((50.0f + 210.0f * accent + 18.0f * veil) * glow));
-
-          if (((x + y + (int)(elapsed / 180UL)) % 29) == 0) {
-            addHighlight(r, g, b, 0.18f + intensityUnit * 0.16f);
-          }
-        } else if (ambientEffectConfig.preset == AMBIENT_PRESET_PLASMA) {
-          float plasmaA = sinf((nx * 5.8f + timeBase * 1.4f) + sinf(ny * 4.0f - timeBase * 0.9f));
-          float plasmaB = sinf((nx + ny) * 6.4f - timeBase * 1.8f);
-          float plasmaC = sinf(dist * 12.0f - timeBase * 3.0f);
-          float field = clampUnit((plasmaA + plasmaB + plasmaC + 3.0f) / 6.0f);
-          float heat = clampUnit(0.5f + 0.5f * sinf(field * 8.0f + timeBase * 2.2f));
-          float cool = clampUnit(0.5f + 0.5f * cosf(field * 7.0f - timeBase * 1.3f));
-          float glow = 0.18f + field * (0.56f + intensityUnit * 0.22f);
-
-          r = clampByte((int)roundf((40.0f + 205.0f * heat) * glow));
-          g = clampByte((int)roundf((20.0f + 150.0f * field + 45.0f * cool) * glow));
-          b = clampByte((int)roundf((60.0f + 185.0f * cool) * glow));
-          addHighlight(r, g, b, field * 0.12f);
-        } else if (ambientEffectConfig.preset == AMBIENT_PRESET_MATRIX_RAIN) {
           float seed = columnSeedf(x);
           float companionSeed = columnSeedf(x + 19);
           float travel = fractf32(timeBase * (0.34f + speedUnit * 0.32f) + seed);
@@ -2059,83 +2358,12 @@ void DisplayManager::renderNativeEffect() {
           );
 
           r = clampByte((int)roundf(8.0f + 38.0f * headGlow + 16.0f * secondaryHeadGlow));
-          g = clampByte((int)roundf((26.0f + 220.0f * brightness)));
-          b = clampByte((int)roundf((8.0f + 92.0f * (tail * 0.55f + headGlow * 0.35f + tailSecondary * 0.22f))));
+          g = clampByte((int)roundf(26.0f + 220.0f * brightness));
+          b = clampByte((int)roundf(8.0f + 92.0f * (tail * 0.55f + headGlow * 0.35f + tailSecondary * 0.22f)));
           if (((x + (int)(elapsed / 42UL)) % 9) == 0 && tail > 0.16f) {
             addHighlight(r, g, b, 0.1f + intensityUnit * 0.12f);
           }
-        } else if (ambientEffectConfig.preset == AMBIENT_PRESET_FIREFLY_SWARM) {
-          float dusk = clampUnit(1.0f - ((float)y / 63.0f) * 0.78f);
-          float backgroundWave = 0.5f + 0.5f * sinf(ny * 6.0f - timeBase * 0.85f);
-          r = clampByte((int)roundf(2.0f + 6.0f * backgroundWave));
-          g = clampByte((int)roundf(10.0f + 18.0f * dusk));
-          b = clampByte((int)roundf(16.0f + 42.0f * dusk));
-
-          const int kFireflyCount = 9;
-          for (int i = 0; i < kFireflyCount; i++) {
-            float seedX = fireflySeedf(i, 0.0f);
-            float seedY = fireflySeedf(i, 1.3f);
-            float orbit = fireflySeedf(i, 2.7f);
-            float fx = 6.0f + seedX * 52.0f + sinf(timeBase * (0.7f + orbit * 0.8f) + seedY * 6.2831852f) * (5.0f + orbit * 10.0f);
-            float fy = 8.0f + seedY * 44.0f + cosf(timeBase * (0.9f + seedX * 0.7f) + orbit * 4.1f) * (4.0f + seedX * 9.0f);
-            float dx = (float)x - fx;
-            float dy = (float)y - fy;
-            float glow = clampUnit(1.0f - sqrtf(dx * dx + dy * dy) / (4.5f + intensityUnit * 4.0f));
-            if (glow > 0.0f) {
-              float twinkle = glowPulsef(timeBase * (1.5f + seedX), seedY * 8.0f);
-              int addR = (int)roundf(50.0f * glow * twinkle);
-              int addG = (int)roundf((140.0f + 70.0f * intensityUnit) * glow * twinkle);
-              int addB = (int)roundf(30.0f * glow * twinkle);
-              r = clampByte((int)r + addR);
-              g = clampByte((int)g + addG);
-              b = clampByte((int)b + addB);
-            }
-          }
-        } else if (ambientEffectConfig.preset == AMBIENT_PRESET_OCEAN_CURRENT) {
-          float tideA = 0.5f + 0.5f * sinf(nx * 4.6f - timeBase * 1.1f + sinf(ny * 5.0f + timeBase * 0.7f));
-          float tideB = 0.5f + 0.5f * sinf((nx - ny) * 6.2f + timeBase * 1.6f);
-          float ripple = 0.5f + 0.5f * sinf(dist * 14.0f - timeBase * 2.4f);
-          float depth = clampUnit(0.18f + ((float)y / 63.0f) * 0.52f);
-          float foam = clampUnit(1.0f - fabsf(ripple - 0.82f) * 5.5f);
-          float glow = clampUnit(0.16f + depth * 0.34f + tideA * 0.24f + tideB * 0.2f);
-
-          r = clampByte((int)roundf((6.0f + 28.0f * tideB + 42.0f * foam) * glow));
-          g = clampByte((int)roundf((36.0f + 110.0f * tideA + 40.0f * foam) * glow));
-          b = clampByte((int)roundf((70.0f + 150.0f * tideA + 36.0f * ripple) * glow));
-          addHighlight(r, g, b, foam * (0.1f + intensityUnit * 0.12f));
-        } else if (ambientEffectConfig.preset == AMBIENT_PRESET_NEON_GRID) {
-          float scanX = clampUnit(1.0f - fabsf(fractf32((float)x / 64.0f + timeBase * (0.28f + speedUnit * 0.18f)) - 0.5f) * 5.6f);
-          float scanY = clampUnit(1.0f - fabsf(fractf32((float)y / 64.0f - timeBase * (0.22f + speedUnit * 0.14f)) - 0.5f) * 5.6f);
-          float gridLine = (x % 8 == 0 || y % 8 == 0) ? 1.0f : 0.0f;
-          float junction = (x % 8 == 0 && y % 8 == 0) ? 1.0f : 0.0f;
-          float cellPulse = 0.5f + 0.5f * sinf((float)(x + y) * 0.25f + timeBase * 3.2f);
-          float brightness = clampUnit(
-            0.06f +
-            gridLine * 0.24f +
-            junction * 0.12f +
-            scanX * 0.32f +
-            scanY * 0.26f +
-            cellPulse * 0.14f
-          );
-
-          r = clampByte((int)roundf((18.0f + 120.0f * scanX + 40.0f * gridLine + 40.0f * junction) * brightness));
-          g = clampByte((int)roundf((10.0f + 70.0f * cellPulse + 30.0f * gridLine + 12.0f * junction) * brightness));
-          b = clampByte((int)roundf((30.0f + 180.0f * scanY + 100.0f * gridLine + 60.0f * junction) * brightness));
-          if (gridLine > 0.5f) {
-            addHighlight(r, g, b, 0.08f + intensityUnit * 0.1f);
-          }
-        } else if (ambientEffectConfig.preset == AMBIENT_PRESET_SUNSET_BLUSH) {
-          float sky = 1.0f - ((float)y / 63.0f);
-          float warmBand = 0.5f + 0.5f * sinf(nx * 4.2f + timeBase * 0.9f + ny * 2.0f);
-          float cloud = 0.5f + 0.5f * sinf(nx * 8.0f - timeBase * 0.6f + sinf(ny * 6.0f + timeBase * 0.5f));
-          float sunGlow = clampUnit(1.0f - sqrtf((nx * 0.92f) * (nx * 0.92f) + ((ny + 0.18f) * 1.25f) * ((ny + 0.18f) * 1.25f)) * 1.55f);
-          float haze = clampUnit(0.1f + sky * 0.35f + warmBand * 0.22f + cloud * 0.12f);
-
-          r = clampByte((int)roundf((40.0f + 185.0f * sky + 55.0f * sunGlow) * haze));
-          g = clampByte((int)roundf((16.0f + 88.0f * warmBand + 76.0f * sunGlow) * haze));
-          b = clampByte((int)roundf((20.0f + 105.0f * cloud + 70.0f * (1.0f - sky)) * haze));
-          addHighlight(r, g, b, sunGlow * (0.16f + intensityUnit * 0.14f));
-        } else if (ambientEffectConfig.preset == AMBIENT_PRESET_STARFIELD_DRIFT) {
+        } else if (ambientEffectConfig.preset == AMBIENT_PRESET_PLASMA) {
           float nebulaA = 0.5f + 0.5f * sinf(nx * 5.0f + timeBase * 0.45f + ny * 4.0f);
           float nebulaB = 0.5f + 0.5f * sinf((nx - ny) * 7.2f - timeBase * 0.62f);
           float backdrop = clampUnit(0.03f + nebulaA * 0.08f + nebulaB * 0.06f);
@@ -2156,22 +2384,155 @@ void DisplayManager::renderNativeEffect() {
               b = clampByte((int)b + 40);
             }
           }
-        } else {
-          float diag = fractf32(((float)(x + y) / 96.0f) - timeBase * (0.7f + speedUnit * 0.9f));
-          float diagB =
-            fractf32(((float)x * 0.84f + (float)y * 1.18f) / 88.0f - timeBase * (0.48f + speedUnit * 0.66f) + 0.37f);
-          float streak = clampUnit(1.0f - fabsf(diag - 0.5f) * 7.6f);
-          float streakB = clampUnit(1.0f - fabsf(diagB - 0.5f) * 8.4f);
-          float sparkle = (((x * 13 + y * 7 + (int)(elapsed / 60UL)) % 43) == 0) ? 1.0f : 0.0f;
-          float haze = clampUnit(0.08f + (1.0f - dist) * 0.14f);
-          float brightness = clampUnit(haze + streak * (0.42f + intensityUnit * 0.2f) + streakB * 0.28f + sparkle * 0.32f);
+        } else if (ambientEffectConfig.preset == AMBIENT_PRESET_MATRIX_RAIN) {
+          float angle = atan2f(ny, nx) / (3.1415926f * 2.0f);
+          float tunnelDepth = fractf32(dist * 4.4f - timeBase * (1.8f + speedUnit * 1.1f));
+          float ringGlow = clampUnit(1.0f - fabsf(tunnelDepth - 0.5f) * 6.5f);
+          float laneGlow = clampUnit(1.0f - fabsf(fractf32(angle * 6.0f + timeBase * 0.22f) - 0.5f) * 4.6f);
+          float rimGlow = clampUnit(1.0f - fabsf(dist - 0.88f) * 8.5f);
+          float centerFade = clampUnit(1.0f - dist * 0.92f);
+          float pulse = 0.5f + 0.5f * sinf(timeBase * 3.2f + angle * 8.0f);
+          float glow = clampUnit(
+            0.04f +
+            ringGlow * (0.46f + intensityUnit * 0.2f) +
+            laneGlow * 0.24f +
+            rimGlow * 0.18f +
+            centerFade * 0.08f
+          );
 
-          r = clampByte((int)roundf((10.0f + 80.0f * streak + 52.0f * streakB + 45.0f * sparkle + 20.0f * haze) * brightness));
-          g = clampByte((int)roundf((18.0f + 120.0f * streak + 78.0f * streakB + 60.0f * sparkle + 35.0f * haze) * brightness));
-          b = clampByte((int)roundf((28.0f + 180.0f * streak + 110.0f * streakB + 90.0f * sparkle + 60.0f * haze) * brightness));
-          if (sparkle > 0.0f) {
-            addHighlight(r, g, b, 0.2f + intensityUnit * 0.15f);
+          r = clampByte((int)roundf((20.0f + 180.0f * laneGlow + 45.0f * pulse) * glow));
+          g = clampByte((int)roundf((10.0f + 70.0f * pulse + 30.0f * rimGlow) * glow));
+          b = clampByte((int)roundf((40.0f + 210.0f * ringGlow + 80.0f * laneGlow) * glow));
+        } else if (ambientEffectConfig.preset == AMBIENT_PRESET_FIREFLY_SWARM) {
+          float field = 0.0f;
+          for (int index = 0; index < 4; index++) {
+            float seedA = fireflySeedf(index, 0.3f);
+            float seedB = fireflySeedf(index, 1.6f);
+            float blobX = sinf(timeBase * (0.72f + seedA * 0.65f) + seedB * 6.2831852f) * (0.24f + seedA * 0.38f);
+            float blobY = cosf(timeBase * (0.94f + seedB * 0.52f) + seedA * 6.2831852f) * (0.22f + seedB * 0.36f);
+            float dx = nx - blobX;
+            float dy = ny - blobY;
+            field += (0.065f + intensityUnit * 0.032f) / (dx * dx + dy * dy + 0.026f);
           }
+          float iso = clampUnit((field - 0.82f) / (1.9f + intensityUnit * 0.4f));
+          float edge = smoothstepf(1.8f, 2.45f + intensityUnit * 0.3f, field);
+          float shimmer = 0.5f + 0.5f * sinf(field * 4.2f - timeBase * 2.1f);
+          float glow = clampUnit(iso * 0.78f + edge * 0.22f);
+
+          r = clampByte((int)roundf((8.0f + 46.0f * shimmer + 22.0f * edge) * glow));
+          g = clampByte((int)roundf((24.0f + 150.0f * iso + 55.0f * shimmer) * glow));
+          b = clampByte((int)roundf((42.0f + 150.0f * edge + 48.0f * (1.0f - shimmer)) * glow));
+        } else if (ambientEffectConfig.preset == AMBIENT_PRESET_METEOR_SHOWER) {
+          float depth = (float)y / 63.0f;
+          float duneBase =
+            0.74f +
+            sinf(nx * 5.4f + timeBase * 0.22f) * 0.045f +
+            sinf(nx * 10.8f - timeBase * 0.14f) * 0.018f;
+          float duneGlow = clampUnit((depth - duneBase) / 0.18f);
+          float driftA = fractf32(timeBase * (0.62f + speedUnit * 0.68f) + (float)x * 0.071f);
+          float driftB = fractf32(timeBase * (0.48f + speedUnit * 0.44f) + (float)x * 0.127f + 0.31f);
+          float grainA =
+            smoothstepf(0.018f, 0.0f, fabsf(depth - driftA * 0.76f)) *
+            smoothstepf(0.08f, 0.01f, fabsf(fractf32((float)x * 0.19f) - 0.5f));
+          float grainB =
+            smoothstepf(0.016f, 0.0f, fabsf(depth - driftB * 0.7f)) *
+            smoothstepf(0.12f, 0.02f, fabsf(fractf32((float)x * 0.11f + 0.4f) - 0.5f));
+          float sparkle = clampUnit((grainA + grainB) * (0.8f + intensityUnit * 0.4f));
+          float haze = clampUnit(0.04f + duneGlow * 0.36f + sparkle * 0.32f);
+
+          r = clampByte((int)roundf((18.0f + 170.0f * duneGlow + 120.0f * sparkle) * haze));
+          g = clampByte((int)roundf((10.0f + 104.0f * duneGlow + 76.0f * sparkle) * haze));
+          b = clampByte((int)roundf((4.0f + 34.0f * duneGlow + 16.0f * sparkle) * haze));
+          if (sparkle > 0.48f) {
+            addHighlight(r, g, b, 0.08f + intensityUnit * 0.12f);
+          }
+        } else if (ambientEffectConfig.preset == AMBIENT_PRESET_OCEAN_CURRENT) {
+          float ember = clampUnit(1.0f - dist * 1.1f) * 0.08f;
+          r = clampByte((int)roundf(2.0f + 24.0f * ember));
+          g = clampByte((int)roundf(1.0f + 12.0f * ember));
+          b = clampByte((int)roundf(1.0f + 6.0f * ember));
+
+          const float launchX = 0.0f;
+          const float launchY = 0.55f;
+          for (int index = 0; index < 8; index++) {
+            float seedA = fireflySeedf(index, 0.4f);
+            float seedB = fireflySeedf(index, 2.1f);
+            float angle = -1.9f + seedA * 0.95f;
+            float progress = fractf32(timeBase * (0.34f + speedUnit * 0.64f) + seedB);
+            float radius = progress * (0.65f + seedA * 0.35f);
+            float sx = launchX + cosf(angle) * radius;
+            float sy = launchY + sinf(angle) * radius * 1.2f;
+            float dx = nx - sx;
+            float dy = ny - sy;
+            float tip = clampUnit(1.0f - sqrtf(dx * dx + dy * dy) / 0.085f);
+            float tail = clampUnit(
+              1.0f - sqrtf((nx - (sx * 0.78f)) * (nx - (sx * 0.78f)) + (ny - (sy * 0.78f + 0.12f)) * (ny - (sy * 0.78f + 0.12f))) / 0.15f
+            );
+            r = clampByte((int)r + (int)roundf(180.0f * tip + 96.0f * tail));
+            g = clampByte((int)g + (int)roundf(110.0f * tip + 54.0f * tail));
+            b = clampByte((int)b + (int)roundf(26.0f * tip + 10.0f * tail));
+          }
+
+          if (ny > 0.55f) {
+            float floorGlow = clampUnit((ny - 0.55f) / 0.45f) * 0.12f;
+            r = clampByte((int)r + (int)roundf(38.0f * floorGlow));
+            g = clampByte((int)g + (int)roundf(12.0f * floorGlow));
+          }
+          if (intensityUnit > 0.4f && fabsf(nx) < 0.04f && ny > 0.18f) {
+            r = clampByte((int)r + 30);
+            g = clampByte((int)g + 10);
+          }
+        } else if (ambientEffectConfig.preset == AMBIENT_PRESET_NEON_GRID) {
+          float waveA = 0.5f + 0.5f * sinf(nx * 7.2f - timeBase * 1.6f + sinf(ny * 4.6f));
+          float waveB = 0.5f + 0.5f * sinf(ny * 11.4f + timeBase * 1.1f + nx * 3.6f);
+          float stripe = clampUnit(1.0f - fabsf(fractf32(waveA * 1.8f + waveB * 1.2f) - 0.5f) * 5.8f);
+          float glow = clampUnit(0.06f + stripe * (0.58f + intensityUnit * 0.14f) + waveB * 0.16f);
+
+          r = clampByte((int)roundf((8.0f + 44.0f * waveB + 16.0f * stripe) * glow));
+          g = clampByte((int)roundf((18.0f + 110.0f * stripe + 40.0f * waveA) * glow));
+          b = clampByte((int)roundf((40.0f + 170.0f * waveA + 72.0f * stripe) * glow));
+        } else if (ambientEffectConfig.preset == AMBIENT_PRESET_SUNSET_BLUSH) {
+          float cloud = 0.5f + 0.5f * sinf(nx * 4.6f + timeBase * 0.24f + sinf(ny * 6.2f));
+          r = clampByte((int)roundf(3.0f + 8.0f * cloud));
+          g = clampByte((int)roundf(8.0f + 12.0f * cloud));
+          b = clampByte((int)roundf(14.0f + 26.0f * cloud));
+
+          int band = x % 5;
+          float trail = fractf32(timeBase * (0.72f + speedUnit * 0.66f) + (float)x * 0.041f);
+          float headY = trail * 1.22f - 0.12f;
+          float distance = headY - (float)y / 63.0f;
+          if (band < 2 && distance >= 0.0f && distance <= 0.24f + intensityUnit * 0.2f) {
+            float drop = 1.0f - distance / (0.24f + intensityUnit * 0.2f);
+            r = clampByte((int)r + (int)roundf(34.0f * drop));
+            g = clampByte((int)g + (int)roundf(88.0f * drop));
+            b = clampByte((int)b + (int)roundf(150.0f * drop));
+          }
+
+          if (y > 47) {
+            float puddle = 0.5f + 0.5f * sinf(nx * 10.2f - timeBase * 1.4f);
+            float floor = clampUnit((float)(y - 47) / 16.0f);
+            r = clampByte((int)r + (int)roundf(6.0f * puddle * floor));
+            g = clampByte((int)g + (int)roundf(20.0f * puddle * floor));
+            b = clampByte((int)b + (int)roundf(52.0f * puddle * floor));
+          }
+        } else {
+          float plasmaA = 0.5f + 0.5f * sinf(nx * 5.8f + timeBase * 1.2f + sinf(ny * 4.2f));
+          float plasmaB = 0.5f + 0.5f * sinf((nx + ny) * 6.6f - timeBase * 1.9f);
+          float rind = 0.5f + 0.5f * sinf(dist * 10.4f - timeBase * 1.5f);
+          float field = clampUnit(plasmaA * 0.48f + plasmaB * 0.34f + rind * 0.18f);
+          float flesh = clampUnit(0.3f + plasmaA * 0.7f);
+          float glow = clampUnit(0.16f + field * (0.52f + intensityUnit * 0.2f));
+
+          r = clampByte((int)roundf((22.0f + 215.0f * flesh) * glow));
+          g = clampByte((int)roundf((14.0f + 145.0f * (1.0f - flesh) + 42.0f * rind) * glow));
+          b = clampByte((int)roundf((12.0f + 54.0f * (1.0f - field)) * glow));
+
+          if (((int)floorf((nx + 1.0f) * 18.0f) + (int)floorf((ny + 1.0f) * 18.0f)) % 19 == 0) {
+            r = clampByte((int)roundf((float)r * 0.62f));
+            g = clampByte((int)roundf((float)g * 0.42f));
+            b = clampByte((int)roundf((float)b * 0.38f));
+          }
+          addHighlight(r, g, b, field * 0.08f);
         }
 
         dma_display->drawPixelRGB888(x, y, r, g, b);

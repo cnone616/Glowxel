@@ -29,46 +29,82 @@ const ThemePageItem kThemePageItems[] = {
 };
 
 const AmbientPageItem kAmbientPageItems[] = {
-  {"aurora_flow", "Aurora Flow", "极光流动感，适合常亮氛围展示"},
-  {"plasma_wave", "Plasma Wave", "全屏等离子波纹，颜色层次更丰富"},
-  {"matrix_rain", "Matrix Rain", "数字雨风格，适合偏科技感展示"},
-  {"firefly_swarm", "Firefly Swarm", "萤火虫群飞，暗环境下更耐看"},
-  {"meteor_shower", "Meteor Shower", "斜向流星雨，动态感更明显"},
-  {"ocean_current", "Ocean Current", "海流涌动风格，颜色更柔和"},
-  {"neon_grid", "Neon Grid", "霓虹网格扫描，适合展示科技氛围"},
-  {"sunset_blush", "Sunset Blush", "暖色夕照氛围，适合桌面常亮"},
-  {"starfield_drift", "Starfield Drift", "低亮星空漂移，适合夜间展示"}
+  {"digital_rain", "Digital Rain", "字符雨风格，适合做科技感屏保"},
+  {"starfield", "Starfield", "低亮星空缓慢漂移，适合夜间待机"},
+  {"neon_tunnel", "Neon Tunnel", "霓虹隧道纵深感更强，动态更集中"},
+  {"metablob", "Metablob", "流体团块不断聚合分离，层次更自然"},
+  {"falling_sand", "Falling Sand", "细颗粒往下流动，画面更安静"},
+  {"sparks", "Sparks", "火花从底部向外迸发，暖色氛围更明显"},
+  {"wave_pattern", "Wave Pattern", "图案化波纹持续流动，适合简洁桌搭"},
+  {"rain_scene", "Rain Scene", "偏真实雨幕感，整体更克制"},
+  {"watermelon_plasma", "Watermelon Plasma", "高彩红绿等离子流动，画面更活"},
+  {"boids", "Boids", "粒子群游，像小生物一样在屏里穿梭"},
+  {"bouncing_logo", "Bouncing Logo", "九宫格徽标在屏里反弹移动"},
+  {"sorting_visualizer", "Sorting Visualizer", "排序柱条不断交换重排"},
+  {"clock_scene", "Clock Scene", "场景化时钟读数，适合桌面待机"},
+  {"countdown_scene", "Countdown Scene", "大字倒计时搭配底部进度条"},
+  {"weather_scene", "Weather Scene", "天气图标与温度同屏展示"},
+  {"game_of_life", "Game Of Life", "经典细胞自动机不断演化"},
+  {"julia_set", "Julia Set", "分形纹理持续变化"},
+  {"reaction_diffusion", "Reaction Diffusion", "类似细胞生长的纹理扩散"}
 };
 
 const char* ambientPresetToString(uint8_t preset) {
   if (preset == AMBIENT_PRESET_AURORA) {
-    return "aurora_flow";
+    return "digital_rain";
   }
   if (preset == AMBIENT_PRESET_PLASMA) {
-    return "plasma_wave";
+    return "starfield";
   }
   if (preset == AMBIENT_PRESET_MATRIX_RAIN) {
-    return "matrix_rain";
+    return "neon_tunnel";
   }
   if (preset == AMBIENT_PRESET_FIREFLY_SWARM) {
-    return "firefly_swarm";
+    return "metablob";
   }
   if (preset == AMBIENT_PRESET_METEOR_SHOWER) {
-    return "meteor_shower";
+    return "falling_sand";
   }
   if (preset == AMBIENT_PRESET_OCEAN_CURRENT) {
-    return "ocean_current";
+    return "sparks";
   }
   if (preset == AMBIENT_PRESET_NEON_GRID) {
-    return "neon_grid";
+    return "wave_pattern";
   }
   if (preset == AMBIENT_PRESET_SUNSET_BLUSH) {
-    return "sunset_blush";
+    return "rain_scene";
   }
   if (preset == AMBIENT_PRESET_STARFIELD_DRIFT) {
-    return "starfield_drift";
+    return "watermelon_plasma";
   }
-  return "aurora_flow";
+  if (preset == AMBIENT_PRESET_BOIDS) {
+    return "boids";
+  }
+  if (preset == AMBIENT_PRESET_BOUNCING_LOGO) {
+    return "bouncing_logo";
+  }
+  if (preset == AMBIENT_PRESET_SORTING_VISUALIZER) {
+    return "sorting_visualizer";
+  }
+  if (preset == AMBIENT_PRESET_CLOCK_SCENE) {
+    return "clock_scene";
+  }
+  if (preset == AMBIENT_PRESET_COUNTDOWN_SCENE) {
+    return "countdown_scene";
+  }
+  if (preset == AMBIENT_PRESET_WEATHER_SCENE) {
+    return "weather_scene";
+  }
+  if (preset == AMBIENT_PRESET_GAME_OF_LIFE) {
+    return "game_of_life";
+  }
+  if (preset == AMBIENT_PRESET_JULIA_SET) {
+    return "julia_set";
+  }
+  if (preset == AMBIENT_PRESET_REACTION_DIFFUSION) {
+    return "reaction_diffusion";
+  }
+  return "digital_rain";
 }
 
 String buildThemeBrowserPage() {
@@ -1170,12 +1206,21 @@ String buildControlHubPage() {
       { id: "clockwise_canvas", name: "画布主题" }
     ];
     const QUICK_EFFECTS = [
-      { id: "aurora_flow", name: "Aurora" },
-      { id: "matrix_rain", name: "Matrix" },
-      { id: "sunset_blush", name: "Sunset" },
-      { id: "starfield_drift", name: "Starfield" },
-      { id: "ocean_current", name: "Ocean" },
-      { id: "neon_grid", name: "Neon Grid" }
+      { id: "digital_rain", name: "数字雨" },
+      { id: "starfield", name: "星空" },
+      { id: "neon_tunnel", name: "霓虹隧道" },
+      { id: "metablob", name: "流体团块" },
+      { id: "falling_sand", name: "流沙" },
+      { id: "watermelon_plasma", name: "西瓜等离子" },
+      { id: "boids", name: "群游粒子" },
+      { id: "bouncing_logo", name: "弹跳徽标" },
+      { id: "sorting_visualizer", name: "排序柱阵" },
+      { id: "clock_scene", name: "场景时钟" },
+      { id: "countdown_scene", name: "倒计时" },
+      { id: "weather_scene", name: "天气场景" },
+      { id: "game_of_life", name: "生命游戏" },
+      { id: "julia_set", name: "朱莉亚集" },
+      { id: "reaction_diffusion", name: "反应扩散" }
     ];
     const statusEl = document.getElementById("status");
     const statusTextEl = document.getElementById("status-text");

@@ -42,6 +42,9 @@ private:
   static int lastClockMinute;
   static int lastClockHour;
   static bool holdClockFrame;
+  static bool spawnBiasLeft;
+  static unsigned long holdPulseAt;
+  static bool holdPulseBright;
   
   // 方块定义：7种标准俄罗斯方块，4种旋转
   static const uint16_t pieces[7][4]; // 每个旋转状态用 16bit 编码 4x4 格子

@@ -41,27 +41,15 @@
       ></view>
       <view class="preview-caption">
         <view class="preview-caption-info">
-          <view class="preview-status-chip" :class="previewStatusClass">
-            <text class="preview-status-chip-text">{{ previewStatusLabel }}</text>
-          </view>
-          <text class="preview-caption-title">64 x 64 模拟预览</text>
-          <text class="preview-caption-text">{{ previewCaptionText }}</text>
+          <text class="preview-caption-title">预览效果</text>
         </view>
         <view class="preview-actions">
           <view
             class="action-btn-sm primary"
             :class="{ disabled: isSending }"
-            @click="saveReminder"
-          >
-            <Icon name="save" :size="36" color="#fff" />
-            <text>保存</text>
-          </view>
-          <view
-            class="action-btn-sm primary"
-            :class="{ disabled: isSending }"
             @click="saveAndApply"
           >
-            <Icon name="top" :size="36" color="#fff" />
+            <Icon name="link" :size="36" color="#fff" />
             <text>{{ isSending ? "发送中" : "发送" }}</text>
           </view>
         </view>
@@ -297,19 +285,19 @@ export default {
         { label: "动图提示", value: "animation" },
       ],
       textTemplateOptions: [
-        { label: "大标题", value: "headline", hint: "大字居中，适合日常提醒" },
-        { label: "卡片标签", value: "badge", hint: "卡片化更稳重" },
-        { label: "滚动横幅", value: "ticker", hint: "适合较长文案" },
+        { label: "大标题", value: "headline", hint: "适合短文案" },
+        { label: "标签卡", value: "badge", hint: "显示更稳" },
+        { label: "滚动条", value: "ticker", hint: "适合长文案" },
       ],
       staticTemplateOptions: [
-        { label: "图标徽章", value: "badge", hint: "图标居中，文案简洁" },
-        { label: "海报卡片", value: "poster", hint: "适合节日或祝福" },
-        { label: "角标提示", value: "corner", hint: "更像系统通知牌" },
+        { label: "图标卡", value: "badge", hint: "图标居中" },
+        { label: "海报卡", value: "poster", hint: "适合祝福" },
+        { label: "角标卡", value: "corner", hint: "更像通知牌" },
       ],
       animationTemplateOptions: [
-        { label: "脉冲扩散", value: "pulse", hint: "适合一般提醒" },
-        { label: "烟花庆祝", value: "fireworks", hint: "适合节日、生日" },
-        { label: "环绕动效", value: "orbit", hint: "适合仪式感提醒" },
+        { label: "脉冲", value: "pulse", hint: "适合普通提醒" },
+        { label: "烟花", value: "fireworks", hint: "适合庆祝" },
+        { label: "环绕", value: "orbit", hint: "适合强调提醒" },
       ],
       iconOptions: [
         { label: "喝水", value: "drink" },
@@ -355,24 +343,24 @@ export default {
     },
     previewCaptionText() {
       if (!this.reminderReady || !this.reminder) {
-        return "预览加载中，完成后会展示提醒触发效果";
+        return "加载完成后会展示提醒触发效果";
       }
       if (this.reminder.contentType === "text") {
-        return "先设置提醒时间，再设计文字出现方式与节奏";
+        return "先定时间，再看标题、信息条和文字节奏";
       }
       if (this.reminder.contentType === "static") {
-        return "适合固定节日、祝福和简洁型通知画面";
+        return "适合节日、祝福和简洁整屏提醒";
       }
-      return "预览触发后的动效节奏，适合庆祝或强调型提醒";
+      return "适合庆祝、强调和提醒感更强的场景";
     },
     previewStatusLabel() {
       if (this.isSending) {
         return "发送中";
       }
       if (!this.previewCanvasReady || !this.reminderReady) {
-        return "预览加载中";
+        return "加载中";
       }
-      return "模拟预览";
+      return "就绪";
     },
     previewStatusClass() {
       if (this.isSending) {
@@ -561,10 +549,6 @@ export default {
     },
     handleAccentColorChange(color) {
       this.reminder.accentColor = color;
-    },
-    saveReminder() {
-      upsertNotificationReminder(this.reminder);
-      this.toast.showSuccess("提醒已保存");
     },
     async saveAndApply() {
       if (this.isSending) {

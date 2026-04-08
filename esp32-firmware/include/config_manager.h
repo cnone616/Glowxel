@@ -78,6 +78,8 @@ struct EyesConfig {
   struct {
     bool show;
     bool showSeconds;
+    uint8_t font;
+    uint8_t fontSize;
   } time;
 
   struct {

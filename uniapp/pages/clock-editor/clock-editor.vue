@@ -68,10 +68,6 @@
           </view>
         </view>
         <view class="preview-actions">
-          <view class="action-btn-sm" @click="saveConfig">
-            <Icon name="save" :size="36" color="var(--color-text-primary)" />
-            <text>保存</text>
-          </view>
           <view
             class="action-btn-sm primary"
             :class="{ disabled: isSending }"
