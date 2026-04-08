@@ -409,6 +409,111 @@ function paintFireScreen(frameMap, phase, speed, colorA, colorB, energy) {
   }
 }
 
+function paintWaveScreen(frameMap, phase, speed, colorA, colorB, energy) {
+  const waveCount = 4;
+  const crestColor = addColorHighlight(blendColor(colorA, colorB, 0.3), 0.24);
+  const troughColor = blendColor(colorA, colorB, 0.72);
+
+  for (let band = 0; band < waveCount; band += 1) {
+    const baseY = 12 + band * 12;
+    const amplitude = 3 + band + energy * 5;
+    const phaseShift = band * 0.65;
+
+    for (let x = 0; x < 64; x += 1) {
+      const y =
+        baseY +
+        Math.sin(x * 0.18 + phase * Math.PI * (1.5 + speed * 0.08) + phaseShift) *
+          amplitude +
+        Math.cos(x * 0.08 - phase * Math.PI * (2.2 + speed * 0.06) - phaseShift) *
+          (1.5 + band * 0.6);
+      const py = Math.round(y);
+      const mix = clampUnit((band + x / 64) / waveCount);
+      const waveColor = blendColor(crestColor, troughColor, mix);
+      paintGlowDot(frameMap, x, py, waveColor, 0.28 + energy * 0.22, 1);
+      blendFramePixel(frameMap, x, py + 1, troughColor, 0.18 + band * 0.04);
+    }
+  }
+
+  for (let y = 10; y < 64; y += 12) {
+    for (let x = 0; x < 64; x += 1) {
+      blendFramePixel(frameMap, x, y, colorA, 0.03);
+    }
+  }
+}
+
+function paintRadarScreen(frameMap, phase, speed, colorA, colorB, energy) {
+  const centerX = 32;
+  const centerY = 32;
+  const sweepAngle = phase * Math.PI * (2.2 + speed * 0.1) - Math.PI / 2;
+  const ringColor = blendColor(colorA, colorB, 0.4);
+  const headColor = addColorHighlight(colorA, 0.3);
+
+  for (let radius = 8; radius <= 26; radius += 8) {
+    for (let degree = 0; degree < 360; degree += 4) {
+      const rad = (degree * Math.PI) / 180;
+      const px = Math.round(centerX + Math.cos(rad) * radius);
+      const py = Math.round(centerY + Math.sin(rad) * radius);
+      blendFramePixel(frameMap, px, py, ringColor, 0.12 + radius / 120);
+    }
+  }
+
+  for (let step = 0; step <= 28; step += 1) {
+    const distance = step / 28;
+    const px = Math.round(centerX + Math.cos(sweepAngle) * distance * 28);
+    const py = Math.round(centerY + Math.sin(sweepAngle) * distance * 28);
+    const alpha = clampUnit(0.18 + (1 - distance) * 0.62 + energy * 0.18);
+    const sweepColor = blendColor(colorA, colorB, distance * 0.55);
+    paintGlowDot(frameMap, px, py, sweepColor, alpha, step > 22 ? 1 : 0);
+  }
+
+  const blipSeed = wrapUnit(phase * (1.6 + speed * 0.05));
+  const blipAngle = blipSeed * Math.PI * 2;
+  const blipRadius = 10 + Math.round(14 * wrapUnit(phase * 1.1 + 0.23));
+  const blipX = Math.round(centerX + Math.cos(blipAngle) * blipRadius);
+  const blipY = Math.round(centerY + Math.sin(blipAngle) * blipRadius);
+  paintGlowDot(frameMap, blipX, blipY, headColor, 0.65, 1);
+  paintGlowDot(frameMap, centerX, centerY, headColor, 0.18 + energy * 0.16, 1);
+}
+
+function paintRectOutline(frameMap, left, top, size, color, alpha) {
+  if (size <= 0) {
+    return;
+  }
+  const right = left + size - 1;
+  const bottom = top + size - 1;
+
+  for (let x = left; x <= right; x += 1) {
+    blendFramePixel(frameMap, x, top, color, alpha);
+    blendFramePixel(frameMap, x, bottom, color, alpha);
+  }
+  for (let y = top; y <= bottom; y += 1) {
+    blendFramePixel(frameMap, left, y, color, alpha);
+    blendFramePixel(frameMap, right, y, color, alpha);
+  }
+}
+
+function paintTunnelScreen(frameMap, phase, speed, colorA, colorB, energy) {
+  const layerCount = 7;
+
+  for (let layer = 0; layer < layerCount; layer += 1) {
+    const loopPhase = wrapUnit(phase * (1 + speed * 0.04) + layer / layerCount);
+    const size = Math.max(8, Math.round(10 + loopPhase * 50));
+    const left = Math.round((64 - size) / 2);
+    const top = Math.round((64 - size) / 2);
+    const mix = clampUnit(layer / Math.max(layerCount - 1, 1));
+    const layerColor = blendColor(colorA, colorB, mix);
+    const alpha = clampUnit((1 - loopPhase) * 0.5 + energy * 0.18);
+
+    paintRectOutline(frameMap, left, top, size, layerColor, alpha);
+    if (size > 14) {
+      paintRectOutline(frameMap, left + 1, top + 1, size - 2, addColorHighlight(layerColor, 0.18), alpha * 0.55);
+    }
+  }
+
+  const glowColor = addColorHighlight(blendColor(colorA, colorB, 0.5), 0.22);
+  paintGlowDot(frameMap, 32, 32, glowColor, 0.2 + energy * 0.18, 2);
+}
+
 export function buildBreathFrames(config) {
   if (!config) {
     throw new Error("矩阵流光配置缺失");
@@ -476,6 +581,36 @@ export function buildBreathFrames(config) {
       continue;
     }
 
+    if (
+      config.scope === "full_screen" &&
+      config.motion === "counterclockwise" &&
+      config.colorMode === "gradient"
+    ) {
+      paintWaveScreen(frameMap, phase, speed, colorA, colorB, breath);
+      frames.push(frameMapToFrame(frameMap, delay));
+      continue;
+    }
+
+    if (
+      config.scope === "full_screen" &&
+      config.motion === "inward" &&
+      config.colorMode === "solid"
+    ) {
+      paintRadarScreen(frameMap, phase, speed, colorA, colorB, breath);
+      frames.push(frameMapToFrame(frameMap, delay));
+      continue;
+    }
+
+    if (
+      config.scope === "full_screen" &&
+      config.motion === "outward" &&
+      config.colorMode === "gradient"
+    ) {
+      paintTunnelScreen(frameMap, phase, speed, colorA, colorB, breath);
+      frames.push(frameMapToFrame(frameMap, delay));
+      continue;
+    }
+
     if (config.motion === "clockwise" || config.motion === "counterclockwise") {
       const direction = config.motion === "clockwise" ? 1 : -1;
       for (let layerIndex = 0; layerIndex < displayLayers.length; layerIndex++) {
@@ -524,6 +659,10 @@ export function buildBreathFrames(config) {
       paintGlowDot(frameMap, 59, 4, accentColor, cornerPulse, 1);
       paintGlowDot(frameMap, 4, 59, accentColor, cornerPulse, 1);
       paintGlowDot(frameMap, 59, 59, accentColor, cornerPulse, 1);
+      if (config.scope === "single_ring" && config.colorMode === "gradient") {
+        addOrbitDots(frameMap, i, colorA, colorB);
+        paintGlowDot(frameMap, 32, 32, accentColor, 0.12 + breath * 0.12, 1);
+      }
     } else {
       const travel = phase * (displayLayers.length + 4);
       for (let layerIndex = 0; layerIndex < displayLayers.length; layerIndex++) {

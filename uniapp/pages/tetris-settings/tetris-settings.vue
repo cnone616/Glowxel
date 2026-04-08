@@ -3,6 +3,7 @@
     <!-- #ifdef MP-WEIXIN -->
     <view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
     <!-- #endif -->
+
     <view class="header">
       <view class="nav-left" @click="handleBack">
         <Icon
@@ -35,170 +36,191 @@
         />
       </view>
       <view class="preview-caption">
-        <view class="preview-status-chip" :class="{ sending: isSending }">
-          <text class="preview-status-chip-text">{{
-            isSending ? "发送中" : config.showClock ? "下落拼时" : "堆叠待机"
-          }}</text>
+        <text class="preview-title">预览效果</text>
+        <view
+          class="action-btn-sm primary"
+          :class="{ disabled: isSending }"
+          @click="saveAndApply"
+        >
+          <Icon name="link" :size="32" color="#ffffff" />
+          <text>{{ isSending ? "发送中" : "发送" }}</text>
         </view>
-        <text class="preview-title">64 x 64 方块预览</text>
-          <text class="preview-subtitle">{{
-          config.showClock
-            ? "预览俄罗斯方块成组下落并逐步拼出当前时间"
-            : "预览空闲状态下的堆叠、掉落和持续重组效果"
-        }}</text>
       </view>
     </view>
 
     <scroll-view scroll-y class="content" :style="{ height: contentHeight }">
       <view class="content-wrapper">
-        <view class="action-strip">
-          <view class="action-strip-info">
-            <text class="action-strip-title">调整完成后发送到设备</text>
-            <text class="action-strip-text">按经典俄罗斯方块时钟的方式逐块下落并拼出时间</text>
-          </view>
-          <view class="preview-actions">
-            <view
-              class="action-btn-sm primary"
-              :class="{ disabled: isSending }"
-              @click="saveAndApply"
-            >
-              <Icon name="link" :size="32" color="#fff" />
-              <text>{{ isSending ? "发送中" : "发送" }}</text>
+        <view v-show="currentTab === 0" class="tab-panel">
+          <view class="card">
+            <view class="card-title-section">
+              <text class="card-title">效果风格</text>
+              <text class="card-subtitle">{{ currentSceneLabel }}</text>
             </view>
-          </view>
-        </view>
-
-        <view v-if="config.showClock" class="card">
-          <view class="card-title-section">
-            <text class="card-title">当前状态</text>
-          </view>
-          <text class="card-tip-text"
-            >当前会朝时间目标自动拼装，分钟变化后会重新开始下落并重组。</text
-          >
-        </view>
-
-        <!-- 模式 -->
-        <view v-if="!config.showClock" class="card">
-          <view class="card-title-section">
-            <text class="card-title">待机方式</text>
-          </view>
-          <view class="option-row">
-            <view
-              class="option-btn"
-              :class="{ active: config.clearMode }"
-              @click="config.clearMode = true"
-            >
-              <text>消除模式</text>
-            </view>
-            <view
-              class="option-btn"
-              :class="{ active: !config.clearMode }"
-              @click="config.clearMode = false"
-            >
-              <text>满屏模式</text>
-            </view>
-          </view>
-        </view>
-
-        <!-- 方块大小 -->
-        <view class="card">
-          <view class="card-title-section">
-            <text class="card-title">方块大小</text>
-          </view>
-          <view class="option-row">
-            <view
-              class="option-btn"
-              :class="{ active: config.cellSize === 1 }"
-              @click="config.cellSize = 1"
-            >
-              <text>小 (1px)</text>
-            </view>
-            <view
-              class="option-btn"
-              :class="{ active: config.cellSize === 2 }"
-              @click="config.cellSize = 2"
-            >
-              <text>中 (2px)</text>
-            </view>
-            <view
-              class="option-btn"
-              :class="{ active: config.cellSize === 3 }"
-              @click="config.cellSize = 3"
-            >
-              <text>大 (3px)</text>
-            </view>
-          </view>
-        </view>
-
-        <!-- 下落速度 -->
-        <view class="card">
-          <view class="card-title-section">
-            <text class="card-title">下落速度</text>
-          </view>
-          <view class="option-row">
-            <view
-              class="option-btn"
-              :class="{ active: config.speed === 'slow' }"
-              @click="config.speed = 'slow'"
-            >
-              <text>慢</text>
-            </view>
-            <view
-              class="option-btn"
-              :class="{ active: config.speed === 'normal' }"
-              @click="config.speed = 'normal'"
-            >
-              <text>中</text>
-            </view>
-            <view
-              class="option-btn"
-              :class="{ active: config.speed === 'fast' }"
-              @click="config.speed = 'fast'"
-            >
-              <text>快</text>
-            </view>
-          </view>
-        </view>
-
-        <!-- 显示时间 -->
-        <view class="card">
-          <view class="card-title-section">
-            <text class="card-title">方块拼时间</text>
-            <view
-              class="toggle-switch"
-              @click="config.showClock = !config.showClock"
-            >
-              <view class="switch-track" :class="{ active: config.showClock }">
-                <view class="switch-thumb"></view>
+            <view class="scene-grid">
+              <view
+                v-for="preset in scenePresets"
+                :key="preset.key"
+                class="scene-card"
+                :class="{ active: config.sceneKey === preset.key }"
+                @click="applyScenePreset(preset)"
+              >
+                <text class="scene-card-title">{{ preset.label }}</text>
+                <text class="scene-card-desc">{{ preset.desc }}</text>
               </view>
             </view>
           </view>
         </view>
 
-        <!-- 方块类型 -->
-        <view class="card">
-          <view class="card-title-section">
-            <text class="card-title">方块类型</text>
-            <text class="card-subtitle">至少选择一种</text>
-          </view>
-          <view class="piece-grid">
-            <view
-              v-for="(piece, idx) in pieceTypes"
-              :key="idx"
-              class="piece-item"
-              :class="{ active: config.pieces.includes(idx) }"
-              @click="togglePiece(idx)"
-            >
+        <view v-show="currentTab === 1" class="tab-panel">
+          <view class="card">
+            <view class="card-title-section">
+              <text class="card-title">画面内容</text>
+            </view>
+            <view class="option-row">
               <view
-                class="piece-preview"
-                :style="{ backgroundColor: piece.color }"
-              ></view>
-              <text class="piece-name">{{ piece.name }}</text>
+                class="option-btn"
+                :class="{ active: config.showClock }"
+                @click="setDisplayMode(true)"
+              >
+                <text>拼时间</text>
+              </view>
+              <view
+                class="option-btn"
+                :class="{ active: !config.showClock }"
+                @click="setDisplayMode(false)"
+              >
+                <text>只下落</text>
+              </view>
+            </view>
+          </view>
+
+          <view class="card">
+            <view class="card-title-section">
+              <text class="card-title">下落速度</text>
+            </view>
+            <view class="option-row">
+              <view
+                v-for="item in dropSpeedOptions"
+                :key="item.value"
+                class="option-btn"
+                :class="{ active: config.speed === item.value }"
+                @click="setSpeed(item.value)"
+              >
+                <text>{{ item.label }}</text>
+              </view>
+            </view>
+          </view>
+
+          <view class="card">
+            <view class="card-title-section">
+              <text class="card-title">格子大小</text>
+            </view>
+            <view class="option-row">
+              <view
+                v-for="item in sizeOptions"
+                :key="item.value"
+                class="option-btn"
+                :class="{ active: config.cellSize === item.value }"
+                @click="setCellSize(item.value)"
+              >
+                <text>{{ item.label }}</text>
+              </view>
+            </view>
+          </view>
+
+          <view v-if="!config.showClock" class="card">
+            <view class="card-title-section">
+              <text class="card-title">堆叠方式</text>
+            </view>
+            <view class="option-row">
+              <view
+                class="option-btn"
+                :class="{ active: config.clearMode }"
+                @click="setClearMode(true)"
+              >
+                <text>自动消行</text>
+              </view>
+              <view
+                class="option-btn"
+                :class="{ active: !config.clearMode }"
+                @click="setClearMode(false)"
+              >
+                <text>堆满重来</text>
+              </view>
+            </view>
+          </view>
+
+          <view class="summary-card">
+            <text class="summary-text">{{ motionSummary }}</text>
+          </view>
+        </view>
+
+        <view v-show="currentTab === 2" class="tab-panel">
+          <view class="card">
+            <view class="card-title-section">
+              <text class="card-title">常用组合</text>
+              <text class="card-subtitle">{{ currentPieceGroupLabel }}</text>
+            </view>
+            <view class="scene-grid">
+              <view
+                v-for="group in pieceGroups"
+                :key="group.key"
+                class="scene-card group-card"
+                :class="{ active: config.pieceGroupKey === group.key }"
+                @click="applyPieceGroup(group)"
+              >
+                <text class="scene-card-title">{{ group.label }}</text>
+                <text class="scene-card-desc">{{ group.desc }}</text>
+              </view>
+            </view>
+          </view>
+
+          <view class="card">
+            <view class="card-title-section">
+              <text class="card-title">单独开关</text>
+              <text class="card-subtitle">至少保留一种</text>
+            </view>
+            <view class="piece-grid">
+              <view
+                v-for="(piece, idx) in pieceTypes"
+                :key="idx"
+                class="piece-item"
+                :class="{ active: config.pieces.includes(idx) }"
+                @click="togglePiece(idx)"
+              >
+                <view class="piece-preview-grid">
+                  <view
+                    v-for="(block, blockIndex) in piece.blocks"
+                    :key="blockIndex"
+                    class="piece-block"
+                    :style="getPieceBlockStyle(block, piece.color)"
+                  ></view>
+                </view>
+                <text class="piece-name">{{ piece.name }}</text>
+              </view>
             </view>
           </view>
         </view>
       </view>
     </scroll-view>
+
+    <view class="bottom-tabs">
+      <view
+        v-for="(tab, index) in tabs"
+        :key="tab"
+        class="bottom-tab-item"
+        :class="{ active: currentTab === index }"
+        @click="currentTab = index"
+      >
+        <Icon
+          :name="tabIconNames[index]"
+          :size="36"
+          :color="currentTab === index ? '#4F7FFF' : 'var(--text-secondary)'"
+        />
+        <text class="bottom-tab-text">{{ tab }}</text>
+      </view>
+    </view>
+
     <Toast ref="toastRef" />
   </view>
 </template>
@@ -212,50 +234,180 @@ import Toast from "../../components/Toast.vue";
 import PixelCanvas from "../../components/PixelCanvas.vue";
 import { buildTetrisPreviewFrames } from "../../utils/tetrisClockPreview.js";
 
-const TETRIS_SHAPES = {
-  0: [
-    [1, 0],
-    [1, 1],
-    [1, 2],
-    [1, 3],
-  ],
-  1: [
-    [0, 0],
-    [1, 0],
-    [0, 1],
-    [1, 1],
-  ],
-  2: [
-    [1, 0],
-    [0, 1],
-    [1, 1],
-    [2, 1],
-  ],
-  3: [
-    [1, 0],
-    [2, 0],
-    [0, 1],
-    [1, 1],
-  ],
-  4: [
-    [0, 0],
-    [1, 0],
-    [1, 1],
-    [2, 1],
-  ],
-  5: [
-    [0, 0],
-    [0, 1],
-    [1, 1],
-    [2, 1],
-  ],
-  6: [
-    [2, 0],
-    [0, 1],
-    [1, 1],
-    [2, 1],
-  ],
-};
+const DEFAULT_PIECES = [0, 1, 2, 3, 4, 5, 6];
+
+const SCENE_PRESETS = [
+  {
+    key: "clock_classic",
+    label: "标准拼时",
+    desc: "完整轮廓慢慢拼合，适合做主展示。",
+    clearMode: true,
+    cellSize: 2,
+    speed: "normal",
+    showClock: true,
+    pieces: [0, 1, 2, 3, 4, 5, 6],
+  },
+  {
+    key: "clock_compact",
+    label: "快速拼时",
+    desc: "格子更细，拼得更快，数字轮廓更完整。",
+    clearMode: true,
+    cellSize: 1,
+    speed: "fast",
+    showClock: true,
+    pieces: [0, 1, 2, 5, 6],
+  },
+  {
+    key: "clock_bold",
+    label: "大块拼时",
+    desc: "块更大，远看更醒目，适合桌面远距显示。",
+    clearMode: true,
+    cellSize: 3,
+    speed: "slow",
+    showClock: true,
+    pieces: [0, 1, 2, 3, 4, 5, 6],
+  },
+  {
+    key: "clock_clean",
+    label: "规整拼时",
+    desc: "只保留更利落的块型，画面更干净。",
+    clearMode: true,
+    cellSize: 2,
+    speed: "slow",
+    showClock: true,
+    pieces: [0, 1, 5, 6],
+  },
+  {
+    key: "free_fall",
+    label: "自由掉落",
+    desc: "不拼时间，只保留俄罗斯方块持续下落。",
+    clearMode: true,
+    cellSize: 2,
+    speed: "normal",
+    showClock: false,
+    pieces: [0, 1, 2, 3, 4, 5, 6],
+  },
+];
+
+const PIECE_GROUPS = [
+  {
+    key: "full_set",
+    label: "全部方块",
+    desc: "完整七种，更接近经典俄罗斯方块。",
+    pieces: [0, 1, 2, 3, 4, 5, 6],
+  },
+  {
+    key: "clean_set",
+    label: "规整组合",
+    desc: "形状更利落，拼出来的数字更干净。",
+    pieces: [0, 1, 5, 6],
+  },
+  {
+    key: "motion_set",
+    label: "变化组合",
+    desc: "拐角和折线更多，重组过程更活。",
+    pieces: [0, 2, 3, 4],
+  },
+  {
+    key: "corner_set",
+    label: "直角组合",
+    desc: "更偏边角块，轮廓变化更明显。",
+    pieces: [1, 5, 6],
+  },
+];
+
+function clonePieces(source) {
+  return source.slice();
+}
+
+function createDefaultConfig() {
+  return {
+    sceneKey: "clock_classic",
+    pieceGroupKey: "full_set",
+    clearMode: true,
+    cellSize: 2,
+    speed: "normal",
+    showClock: true,
+    pieces: clonePieces(DEFAULT_PIECES),
+  };
+}
+
+function samePieces(left, right) {
+  if (!Array.isArray(left) || !Array.isArray(right)) {
+    return false;
+  }
+  if (left.length !== right.length) {
+    return false;
+  }
+  for (let index = 0; index < left.length; index += 1) {
+    if (left[index] !== right[index]) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function findSceneKey(config) {
+  for (let index = 0; index < SCENE_PRESETS.length; index += 1) {
+    const preset = SCENE_PRESETS[index];
+    if (
+      preset.clearMode === config.clearMode &&
+      preset.cellSize === config.cellSize &&
+      preset.speed === config.speed &&
+      preset.showClock === config.showClock &&
+      samePieces(preset.pieces, config.pieces)
+    ) {
+      return preset.key;
+    }
+  }
+  return "";
+}
+
+function findPieceGroupKey(pieces) {
+  for (let index = 0; index < PIECE_GROUPS.length; index += 1) {
+    const group = PIECE_GROUPS[index];
+    if (samePieces(group.pieces, pieces)) {
+      return group.key;
+    }
+  }
+  return "";
+}
+
+function normalizeSavedConfig(saved) {
+  const config = createDefaultConfig();
+  if (!saved || typeof saved !== "object") {
+    return config;
+  }
+
+  if (typeof saved.clearMode === "boolean") {
+    config.clearMode = saved.clearMode;
+  }
+  if (saved.cellSize === 1 || saved.cellSize === 2 || saved.cellSize === 3) {
+    config.cellSize = saved.cellSize;
+  }
+  if (
+    saved.speed === "slow" ||
+    saved.speed === "normal" ||
+    saved.speed === "fast"
+  ) {
+    config.speed = saved.speed;
+  }
+  if (typeof saved.showClock === "boolean") {
+    config.showClock = saved.showClock;
+  }
+  if (Array.isArray(saved.pieces) && saved.pieces.length > 0) {
+    const nextPieces = saved.pieces
+      .filter((item) => Number.isInteger(item) && item >= 0 && item <= 6)
+      .sort((left, right) => left - right);
+    if (nextPieces.length > 0) {
+      config.pieces = nextPieces;
+    }
+  }
+
+  config.sceneKey = findSceneKey(config);
+  config.pieceGroupKey = findPieceGroupKey(config.pieces);
+  return config;
+}
 
 export default {
   mixins: [statusBarMixin],
@@ -268,8 +420,8 @@ export default {
     return {
       deviceStore: null,
       toast: null,
-      contentHeight: "calc(100vh - 88rpx - 520rpx)",
       isSending: false,
+      contentHeight: "calc(100vh - 88rpx - 520rpx - 112rpx)",
       previewCanvasReady: false,
       previewZoom: 4,
       previewOffset: { x: 0, y: 0 },
@@ -277,22 +429,94 @@ export default {
       previewFrameMaps: [],
       previewFrameIndex: 0,
       previewTimer: null,
-      config: {
-        clearMode: true,
-        cellSize: 2,
-        speed: "normal",
-        showClock: true,
-        pieces: [0, 1, 2, 3, 4, 5, 6],
-      },
-      pieceTypes: [
-        { name: "I", color: "#00F0F0" },
-        { name: "O", color: "#F0F000" },
-        { name: "T", color: "#A000F0" },
-        { name: "S", color: "#00F000" },
-        { name: "Z", color: "#F00000" },
-        { name: "J", color: "#0000F0" },
-        { name: "L", color: "#F0A000" },
+      currentTab: 0,
+      tabs: ["场景", "动画", "方块"],
+      tabIconNames: ["browse", "time", "setting"],
+      scenePresets: SCENE_PRESETS,
+      pieceGroups: PIECE_GROUPS,
+      sizeOptions: [
+        { label: "细", value: 1 },
+        { label: "中", value: 2 },
+        { label: "粗", value: 3 },
       ],
+      dropSpeedOptions: [
+        { label: "慢", value: "slow" },
+        { label: "中", value: "normal" },
+        { label: "快", value: "fast" },
+      ],
+      pieceTypes: [
+        {
+          name: "I",
+          color: "#00F0F0",
+          blocks: [
+            [0, 1],
+            [1, 1],
+            [2, 1],
+            [3, 1],
+          ],
+        },
+        {
+          name: "O",
+          color: "#F0F000",
+          blocks: [
+            [1, 0],
+            [2, 0],
+            [1, 1],
+            [2, 1],
+          ],
+        },
+        {
+          name: "T",
+          color: "#A000F0",
+          blocks: [
+            [1, 0],
+            [0, 1],
+            [1, 1],
+            [2, 1],
+          ],
+        },
+        {
+          name: "S",
+          color: "#00F000",
+          blocks: [
+            [1, 0],
+            [2, 0],
+            [0, 1],
+            [1, 1],
+          ],
+        },
+        {
+          name: "Z",
+          color: "#F00000",
+          blocks: [
+            [0, 0],
+            [1, 0],
+            [1, 1],
+            [2, 1],
+          ],
+        },
+        {
+          name: "J",
+          color: "#0000F0",
+          blocks: [
+            [0, 0],
+            [0, 1],
+            [1, 1],
+            [2, 1],
+          ],
+        },
+        {
+          name: "L",
+          color: "#F0A000",
+          blocks: [
+            [2, 0],
+            [0, 1],
+            [1, 1],
+            [2, 1],
+          ],
+        },
+      ],
+      config: createDefaultConfig(),
     };
   },
   computed: {
@@ -314,6 +538,48 @@ export default {
       }
       return 116;
     },
+    currentScene() {
+      const current = this.scenePresets.find((item) => item.key === this.config.sceneKey);
+      if (current) {
+        return current;
+      }
+      return null;
+    },
+    currentSceneLabel() {
+      if (this.currentScene) {
+        return this.currentScene.label;
+      }
+      return "自定义";
+    },
+    currentPieceGroupLabel() {
+      const current = this.pieceGroups.find(
+        (item) => item.key === this.config.pieceGroupKey,
+      );
+      if (current) {
+        return current.label;
+      }
+      return "自定义";
+    },
+    motionSummary() {
+      const modeText = this.config.showClock ? "当前会持续拼出时间" : "当前只展示方块下落";
+      const sizeText =
+        this.config.cellSize === 1
+          ? "格子更细"
+          : this.config.cellSize === 3
+            ? "格子更粗"
+            : "格子大小适中";
+      const speedText =
+        this.config.speed === "slow"
+          ? "节奏更从容"
+          : this.config.speed === "fast"
+            ? "节奏更利落"
+            : "节奏比较均衡";
+      if (!this.config.showClock) {
+        const stackText = this.config.clearMode ? "并且会自动消行" : "堆满后重新开始";
+        return `${modeText}，${sizeText}，${speedText}，${stackText}。`;
+      }
+      return `${modeText}，${sizeText}，${speedText}。`;
+    },
   },
   watch: {
     config: {
@@ -328,9 +594,7 @@ export default {
     this.deviceStore.init();
     this.toast = useToast();
     const saved = uni.getStorageSync("tetris_config");
-    if (saved) {
-      this.config = { ...this.config, ...saved };
-    }
+    this.config = normalizeSavedConfig(saved);
   },
   onReady() {
     if (this.$refs.toastRef) {
@@ -358,7 +622,7 @@ export default {
               height: rect.height,
             };
             const nextHeight =
-              systemInfo.windowHeight - statusBarHeight - 88 - rect.height - 90;
+              systemInfo.windowHeight - statusBarHeight - 88 - rect.height - 112;
             this.contentHeight = `${Math.max(120, nextHeight)}px`;
           }
           this.previewCanvasReady = true;
@@ -390,18 +654,59 @@ export default {
         this.previewTimer = null;
       }
     },
+    syncDerivedKeys() {
+      this.config.sceneKey = findSceneKey(this.config);
+      this.config.pieceGroupKey = findPieceGroupKey(this.config.pieces);
+    },
+    applyScenePreset(preset) {
+      this.config.sceneKey = preset.key;
+      this.config.clearMode = preset.clearMode;
+      this.config.cellSize = preset.cellSize;
+      this.config.speed = preset.speed;
+      this.config.showClock = preset.showClock;
+      this.config.pieces = clonePieces(preset.pieces);
+      this.config.pieceGroupKey = findPieceGroupKey(this.config.pieces);
+    },
+    applyPieceGroup(group) {
+      this.config.pieces = clonePieces(group.pieces);
+      this.syncDerivedKeys();
+    },
+    setDisplayMode(showClock) {
+      this.config.showClock = showClock;
+      this.syncDerivedKeys();
+    },
+    setSpeed(value) {
+      this.config.speed = value;
+      this.syncDerivedKeys();
+    },
+    setCellSize(value) {
+      this.config.cellSize = value;
+      this.syncDerivedKeys();
+    },
+    setClearMode(value) {
+      this.config.clearMode = value;
+      this.syncDerivedKeys();
+    },
     togglePiece(idx) {
-      const i = this.config.pieces.indexOf(idx);
-      if (i >= 0) {
+      const currentIndex = this.config.pieces.indexOf(idx);
+      if (currentIndex >= 0) {
         if (this.config.pieces.length <= 1) {
           this.toast.showError("至少保留一种方块");
           return;
         }
-        this.config.pieces.splice(i, 1);
+        this.config.pieces.splice(currentIndex, 1);
       } else {
         this.config.pieces.push(idx);
-        this.config.pieces.sort();
+        this.config.pieces.sort((left, right) => left - right);
       }
+      this.syncDerivedKeys();
+    },
+    getPieceBlockStyle(block, color) {
+      return {
+        left: `${block[0] * 15 + 6}rpx`,
+        top: `${block[1] * 15 + 6}rpx`,
+        backgroundColor: color,
+      };
     },
     async saveAndApply() {
       if (this.isSending) {
@@ -418,12 +723,17 @@ export default {
       this.isSending = true;
       try {
         const ws = this.deviceStore.getWebSocket();
-        const speedMap = { slow: 300, normal: 150, fast: 80 };
+        const speedMap = {
+          slow: 300,
+          normal: 150,
+          fast: 80,
+        };
         const speed = speedMap[this.config.speed];
         if (speed === undefined) {
           this.toast.showError("速度参数无效");
           return;
         }
+
         await ws.send({
           cmd: "set_mode",
           mode: "tetris",
@@ -433,7 +743,8 @@ export default {
           showClock: this.config.showClock,
           pieces: this.config.pieces,
         });
-        this.toast.showSuccess("已应用");
+
+        this.toast.showSuccess("俄罗斯方块时钟已发送到设备");
         const pages = getCurrentPages();
         if (pages.length >= 2) {
           const prev = pages[pages.length - 2];
@@ -442,8 +753,8 @@ export default {
           }
         }
         this.deviceStore.setDeviceMode("tetris", { businessMode: true });
-      } catch (err) {
-        console.error("发送失败:", err);
+      } catch (error) {
+        console.error("发送俄罗斯方块时钟失败:", error);
         this.toast.showError("发送失败");
       } finally {
         this.isSending = false;
@@ -475,6 +786,7 @@ export default {
   background-color: var(--bg-elevated);
   border-bottom: 2rpx solid var(--border-primary);
   position: relative;
+  flex-shrink: 0;
 }
 
 .nav-left {
@@ -487,12 +799,6 @@ export default {
   justify-content: flex-start;
 }
 
-.nav-title {
-  font-size: 32rpx;
-  font-weight: 600;
-  color: var(--color-text-primary);
-}
-
 .project-name {
   font-size: 36rpx;
   font-weight: 700;
@@ -502,14 +808,11 @@ export default {
   white-space: nowrap;
 }
 
-.content {
-  flex: 1;
-}
-
 .canvas-section {
   padding: 24rpx 24rpx 16rpx;
   background: linear-gradient(180deg, rgba(17, 24, 39, 0.98), rgba(10, 14, 24, 0.98));
   border-bottom: 2rpx solid rgba(148, 163, 184, 0.14);
+  flex-shrink: 0;
 }
 
 .preview-canvas-container {
@@ -517,32 +820,16 @@ export default {
   height: 420rpx;
   border-radius: 28rpx;
   overflow: hidden;
-  background: radial-gradient(circle at 50% 30%, rgba(59, 130, 246, 0.18), rgba(15, 23, 42, 0.98));
-  border: 2rpx solid rgba(148, 163, 184, 0.2);
+  background: radial-gradient(circle at 50% 30%, rgba(59, 130, 246, 0.16), rgba(10, 16, 26, 0.98));
+  border: 2rpx solid rgba(148, 163, 184, 0.18);
 }
 
 .preview-caption {
   margin-top: 18rpx;
   display: flex;
-  flex-direction: column;
-  gap: 8rpx;
-}
-
-.preview-status-chip {
-  display: inline-flex;
-  align-self: flex-start;
-  padding: 8rpx 16rpx;
-  border-radius: 999rpx;
-  background: rgba(59, 130, 246, 0.16);
-}
-
-.preview-status-chip.sending {
-  background: rgba(245, 158, 11, 0.18);
-}
-
-.preview-status-chip-text {
-  font-size: 20rpx;
-  color: #dbeafe;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16rpx;
 }
 
 .preview-title {
@@ -551,63 +838,17 @@ export default {
   color: #f8fafc;
 }
 
-.preview-subtitle {
-  font-size: 22rpx;
-  color: #94a3b8;
-}
-
-.content-wrapper {
-  padding: 24rpx;
-}
-
-.action-strip {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16rpx;
-  padding: 14rpx 20rpx 18rpx;
-  margin-bottom: 20rpx;
-  border-radius: 24rpx;
-  background: var(--bg-tertiary);
-  border: 2rpx solid var(--border-primary);
-}
-
-.action-strip-info {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 4rpx;
-}
-
-.action-strip-title {
-  font-size: 24rpx;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-.action-strip-text {
-  font-size: 22rpx;
-  color: var(--text-secondary);
-}
-
-.preview-actions {
-  display: flex;
-  align-items: center;
-  gap: 12rpx;
-  flex-shrink: 0;
-}
-
 .action-btn-sm {
-  width: 56rpx;
-  height: 56rpx;
+  min-width: 118rpx;
+  height: 64rpx;
+  padding: 0 18rpx;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 14rpx;
+  gap: 10rpx;
+  border-radius: 18rpx;
   border: 2rpx solid var(--border-primary);
   background-color: var(--bg-tertiary);
-  transition: var(--transition-base);
 }
 
 .action-btn-sm.primary {
@@ -619,50 +860,101 @@ export default {
   opacity: 0.6;
 }
 
-.preview-actions .action-btn-sm {
-  width: auto;
-  min-width: 118rpx;
-  height: 64rpx;
-  padding: 0 18rpx;
-  gap: 10rpx;
-  border-radius: 18rpx;
-}
-
-.preview-actions .action-btn-sm text {
+.action-btn-sm text {
   font-size: 24rpx;
   font-weight: 600;
   color: #ffffff;
-  line-height: 1;
+}
+
+.content {
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+}
+
+.content-wrapper {
+  padding: 24rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 24rpx;
+}
+
+.tab-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 24rpx;
 }
 
 .card {
   background: var(--bg-elevated);
   border: 2rpx solid var(--border-primary);
-  border-radius: 24rpx;
-  padding: 28rpx;
-  margin-bottom: 24rpx;
+  border-radius: 28rpx;
+  padding: 24rpx;
 }
+
 .card-title-section {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  flex-direction: column;
+  gap: 8rpx;
   margin-bottom: 20rpx;
 }
+
 .card-title {
-  font-size: 30rpx;
+  font-size: 28rpx;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.card-subtitle {
+  font-size: 22rpx;
+  color: var(--color-text-secondary);
+}
+
+.scene-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16rpx;
+}
+
+.scene-card {
+  width: calc(50% - 8rpx);
+  min-height: 164rpx;
+  padding: 18rpx;
+  border-radius: 22rpx;
+  background: var(--bg-tertiary);
+  border: 2rpx solid var(--border-primary);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 14rpx;
+  box-sizing: border-box;
+}
+
+.scene-card.active {
+  background: rgba(79, 127, 255, 0.12);
+  border-color: var(--accent-primary);
+  box-shadow: 0 10rpx 24rpx rgba(79, 127, 255, 0.12);
+}
+
+.scene-card-title {
+  font-size: 28rpx;
   font-weight: 600;
   color: var(--text-primary);
 }
 
-.card-subtitle {
-  font-size: 24rpx;
+.scene-card-desc {
+  font-size: 22rpx;
+  line-height: 1.6;
   color: var(--text-secondary);
 }
 
-.card-tip-text {
-  font-size: 24rpx;
-  line-height: 1.6;
-  color: var(--text-secondary);
+.scene-card.active .scene-card-title,
+.scene-card.active .scene-card-desc {
+  color: var(--accent-primary);
+}
+
+.group-card {
+  min-height: 148rpx;
 }
 
 .option-row {
@@ -672,14 +964,15 @@ export default {
 
 .option-btn {
   flex: 1;
-  height: 72rpx;
+  min-height: 76rpx;
+  padding: 0 12rpx;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 16rpx;
+  border-radius: 18rpx;
   background: var(--bg-tertiary);
   border: 2rpx solid var(--border-primary);
-  transition: all 0.2s;
+  box-sizing: border-box;
 }
 
 .option-btn text {
@@ -688,9 +981,8 @@ export default {
 }
 
 .option-btn.active {
-  background: rgba(79, 127, 255, 0.14);
+  background: rgba(79, 127, 255, 0.12);
   border-color: var(--accent-primary);
-  box-shadow: 0 8rpx 18rpx rgba(79, 127, 255, 0.12);
 }
 
 .option-btn.active text {
@@ -698,36 +990,17 @@ export default {
   font-weight: 600;
 }
 
-.toggle-switch {
-  cursor: pointer;
-}
-
-.switch-track {
-  width: 88rpx;
-  height: 48rpx;
+.summary-card {
+  padding: 24rpx 28rpx;
   border-radius: 24rpx;
-  background: var(--border-primary);
-  display: flex;
-  align-items: center;
-  padding: 4rpx;
-  transition: all 0.3s;
+  background: rgba(79, 127, 255, 0.08);
+  border: 2rpx solid rgba(79, 127, 255, 0.16);
 }
 
-.switch-track.active {
-  background: var(--accent-primary);
-}
-
-.switch-thumb {
-  width: 40rpx;
-  height: 40rpx;
-  border-radius: 20rpx;
-  background: #fff;
-  transition: all 0.3s;
-  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.15);
-}
-
-.switch-track.active .switch-thumb {
-  margin-left: 40rpx;
+.summary-text {
+  font-size: 24rpx;
+  line-height: 1.7;
+  color: var(--text-secondary);
 }
 
 .piece-grid {
@@ -737,38 +1010,74 @@ export default {
 }
 
 .piece-item {
-  width: calc(25% - 12rpx);
+  width: calc(33.333% - 11rpx);
+  padding: 18rpx 0 14rpx;
+  border-radius: 20rpx;
+  background: var(--bg-tertiary);
+  border: 2rpx solid var(--border-primary);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8rpx;
-  padding: 16rpx 0;
-  border-radius: 16rpx;
-  background: var(--bg-tertiary);
-  border: 2rpx solid var(--border-primary);
-  transition: all 0.2s;
+  gap: 12rpx;
+  box-sizing: border-box;
 }
 
 .piece-item.active {
-  background: rgba(79, 127, 255, 0.14);
+  background: rgba(79, 127, 255, 0.12);
   border-color: var(--accent-primary);
-  box-shadow: 0 8rpx 18rpx rgba(79, 127, 255, 0.12);
+  box-shadow: 0 10rpx 24rpx rgba(79, 127, 255, 0.12);
 }
 
-.piece-preview {
-  width: 48rpx;
-  height: 48rpx;
-  border-radius: 10rpx;
+.piece-preview-grid {
+  width: 72rpx;
+  height: 72rpx;
+  position: relative;
+}
+
+.piece-block {
+  position: absolute;
+  width: 12rpx;
+  height: 12rpx;
+  border-radius: 4rpx;
+  box-shadow: inset 0 2rpx 0 rgba(255, 255, 255, 0.28);
 }
 
 .piece-name {
   font-size: 24rpx;
-  color: var(--text-secondary);
   font-weight: 600;
+  color: var(--text-secondary);
 }
 
 .piece-item.active .piece-name {
   color: var(--accent-primary);
 }
 
+.bottom-tabs {
+  display: flex;
+  flex-shrink: 0;
+  padding: 12rpx 16rpx;
+  padding-bottom: calc(12rpx + env(safe-area-inset-bottom));
+  background-color: var(--bg-elevated);
+  border-top: 2rpx solid var(--border-primary);
+  gap: 8rpx;
+}
+
+.bottom-tab-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4rpx;
+}
+
+.bottom-tab-text {
+  font-size: 20rpx;
+  color: var(--text-secondary);
+}
+
+.bottom-tab-item.active .bottom-tab-text {
+  color: var(--accent-primary);
+  font-weight: 500;
+}
 </style>

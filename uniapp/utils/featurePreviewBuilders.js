@@ -209,6 +209,45 @@ function drawTickerDots(pixels, x, y, count, color, mutedColor) {
   }
 }
 
+function drawInfoDivider(pixels, x, y, width, color) {
+  fillRect(pixels, x, y, width, 1, color);
+  fillRect(pixels, x + 2, y + 1, Math.max(2, width - 4), 1, color);
+}
+
+function drawStatusCapsule(pixels, x, y, width, text, textColor, backgroundColor) {
+  fillRect(pixels, x, y, width, 7, backgroundColor);
+  drawTinyTextToPixels(text, x + Math.floor(width / 2), y + 1, textColor, pixels, 1, "center");
+}
+
+function drawHudDots(pixels, x, y, values, activeColor, mutedColor) {
+  values.forEach((active, index) => {
+    fillRect(pixels, x + index * 4, y, 2, 2, active ? activeColor : mutedColor);
+  });
+}
+
+function drawTelemetryBars(pixels, x, y, width, values, color, mutedColor) {
+  values.forEach((value, index) => {
+    const barHeight = Math.max(1, Math.min(6, Math.round(value)));
+    fillRect(pixels, x + index * 3, y - barHeight, 2, barHeight, color);
+    fillRect(pixels, x + index * 3, y, 2, 1, mutedColor);
+  });
+  fillRect(pixels, x, y + 1, width, 1, mutedColor);
+}
+
+function drawScanLine(pixels, x, y, width, color) {
+  fillRect(pixels, x, y, width, 1, color);
+  fillRect(pixels, x + 3, y + 1, Math.max(1, width - 6), 1, color);
+}
+
+function drawSplitRows(pixels, rows, x, y, width, height, color, mutedColor) {
+  const safeRows = Math.max(1, rows);
+  const rowHeight = Math.max(2, Math.floor(height / safeRows));
+  for (let index = 0; index < safeRows; index += 1) {
+    const rowY = y + index * rowHeight;
+    fillRect(pixels, x, rowY, width, 1, index % 2 === 0 ? color : mutedColor);
+  }
+}
+
 function clonePixels(pixels) {
   return new Map(pixels);
 }
@@ -459,8 +498,58 @@ export function buildWeatherPreview(config) {
     weatherPattern = WEATHER_PATTERNS[weatherType];
   }
 
-  if (layout === "night") {
-    fillRect(pixels, 0, 0, 64, 64, "#060d18");
+  const weatherLabelMap = {
+    sunny: "SUN",
+    cloudy: "CLOUD",
+    rainy: "RAIN",
+    snow: "SNOW",
+    thunder: "STORM",
+  };
+  const weatherLabel = weatherLabelMap[weatherType] || "SUN";
+  const tempText = formatTemp(config && config.temperature, unit);
+
+  if (layout === "standard") {
+    fillRect(pixels, 0, 0, 64, 64, "#050a12");
+    fillRect(pixels, 0, 0, 64, 1, "#122133");
+    drawTinyTextToPixels(cityLabel, 6, 6, "#8ea7c3", pixels, 1, "left");
+    drawTinyTextToPixels(`${humidity}%`, 58, 6, humidityColor, pixels, 1, "right");
+    drawPattern(pixels, weatherPattern, 6, 16, accentColor, 2);
+    drawClockTextToPixels(
+      tempText,
+      45,
+      18,
+      tempColor,
+      pixels,
+      "rounded_4x6",
+      2,
+      "center",
+    );
+    drawTinyTextToPixels(weatherLabel, 45, 33, "#7d94ad", pixels, 1, "center");
+    fillRect(pixels, 6, 48, 52, 1, "#132438");
+    fillRect(pixels, 6, 56, 52, 2, "#0d1724");
+    fillRect(pixels, 6, 56, Math.max(1, Math.round(52 * (humidity / 100))), 2, humidityColor);
+  } else if (layout === "detail") {
+    fillRect(pixels, 0, 0, 64, 64, "#050a12");
+    fillRect(pixels, 0, 0, 64, 1, "#122133");
+    drawTinyTextToPixels(cityLabel, 6, 6, "#8ea7c3", pixels, 1, "left");
+    drawTinyTextToPixels(weatherLabel, 58, 6, accentColor, pixels, 1, "right");
+    drawClockTextToPixels(
+      tempText,
+      22,
+      17,
+      tempColor,
+      pixels,
+      "rounded_4x6",
+      2,
+      "center",
+    );
+    drawTinyTextToPixels(unit === "fahrenheit" ? "FAH" : "CEL", 22, 33, "#7d94ad", pixels, 1, "center");
+    drawPattern(pixels, weatherPattern, 38, 16, accentColor, 2);
+    fillRect(pixels, 6, 46, 52, 1, "#132438");
+    drawTinyTextToPixels("HUMIDITY", 6, 52, "#7d94ad", pixels, 1, "left");
+    drawTinyTextToPixels(`${humidity}%`, 58, 52, humidityColor, pixels, 1, "right");
+  } else if (layout === "night") {
+    fillRect(pixels, 0, 0, 64, 64, "#040811");
     drawDotCluster(
       pixels,
       [
@@ -473,89 +562,22 @@ export function buildWeatherPreview(config) {
       ],
       "#d8d3a4",
     );
-    drawPattern(pixels, NOTIFICATION_PATTERNS.moon, 42, 4, "#f7f0aa", 2);
-    addSparkles(
-      pixels,
-      [
-        [24, 10],
-        [34, 16],
-        [40, 26],
-      ],
-      "#ffe7a6",
-    );
-  }
-
-  if (layout === "standard") {
-    fillRect(pixels, 0, 0, 64, 64, "#08111c");
-    drawInsetFrame(pixels, 4, 4, 56, 56, "#142438", "#0f1d2d");
-    drawCornerMarks(pixels, 4, 4, 56, 56, accentColor);
-    fillRect(pixels, 8, 14, 24, 26, "#122336");
-    fillRect(pixels, 34, 14, 24, 18, "#101b2b");
-    fillRect(pixels, 34, 36, 24, 10, "#0e1826");
-    drawBadge(pixels, 6, 6, cityLabel, "#d8e4f6", "#1a2536");
-    drawPattern(pixels, weatherPattern, 6, 16, accentColor, 2);
+    drawPattern(pixels, weatherPattern, 8, 18, accentColor, 2);
     drawClockTextToPixels(
-      formatTemp(config && config.temperature, unit),
-      46,
-      17,
-      tempColor,
-      pixels,
-      "rounded_4x6",
-      2,
-      "center",
-    );
-    drawTinyTextToPixels("TEMP", 46, 31, "#879eb8", pixels, 1, "center");
-    drawTinyTextToPixels(unit === "fahrenheit" ? "FAH" : "CEL", 46, 39, "#9db0c7", pixels, 1, "center");
-    drawTinyTextToPixels(`${humidity}%`, 18, 46, humidityColor, pixels, 2, "center");
-    drawVerticalMeter(pixels, 53, 38, 3, 14, humidity / 100, humidityColor, "#1a2538");
-    drawStripedBar(pixels, 8, 55, 44, 4, humidity / 100, humidityColor, "#1a2538");
-    addSparkles(
-      pixels,
-      [
-        [38, 12],
-        [52, 12],
-      ],
-      "#d9ecff",
-    );
-  } else if (layout === "detail") {
-    fillRect(pixels, 0, 0, 64, 64, "#07111c");
-    strokeRect(pixels, 4, 4, 56, 56, "#142438");
-    fillRect(pixels, 6, 14, 52, 18, "#0d1b2b");
-    fillRect(pixels, 6, 36, 52, 20, "#0f1826");
-    drawBadge(pixels, 4, 4, cityLabel, "#d8e4f6", "#1a2536");
-    drawClockTextToPixels(
-      formatTemp(config && config.temperature, unit),
-      18,
-      16,
-      tempColor,
-      pixels,
-      "rounded_4x6",
-      2,
-      "center",
-    );
-    drawTinyTextToPixels("NOW", 18, 30, "#8ea5c0", pixels, 1, "center");
-    drawPattern(pixels, weatherPattern, 34, 14, accentColor, 2);
-    drawTinyTextToPixels("HUM", 14, 41, "#8ea5c0", pixels, 1, "center");
-    drawTinyTextToPixels(`${humidity}%`, 46, 40, humidityColor, pixels, 2, "center");
-    drawStripedBar(pixels, 10, 50, 44, 4, humidity / 100, humidityColor, "#1a2538");
-    drawTinyTextToPixels("AIR", 12, 57, "#7188a5", pixels, 1, "left");
-    drawSignalBars(pixels, 42, 56, [4, 8, 12], accentColor);
-  } else if (layout === "night") {
-    fillRect(pixels, 8, 18, 22, 20, "#0b1523");
-    drawPattern(pixels, weatherPattern, 8, 20, accentColor, 2);
-    drawClockTextToPixels(
-      formatTemp(config && config.temperature, unit),
+      tempText,
       43,
-      24,
+      22,
       tempColor,
       pixels,
       "rounded_4x6",
       2,
       "center",
     );
-    drawTinyTextToPixels(cityLabel, 30, 8, "#9db0c7", pixels, 1, "center");
-    drawTinyTextToPixels(`${humidity}%`, 42, 40, humidityColor, pixels, 2, "center");
-    drawStripedBar(pixels, 12, 54, 40, 3, humidity / 100, humidityColor, "#162236");
+    drawTinyTextToPixels(cityLabel, 43, 8, "#9db0c7", pixels, 1, "center");
+    drawTinyTextToPixels(weatherLabel, 43, 34, "#7d94ad", pixels, 1, "center");
+    fillRect(pixels, 8, 48, 48, 1, "#132031");
+    drawTinyTextToPixels("HUM", 8, 54, "#7d94ad", pixels, 1, "left");
+    drawTinyTextToPixels(`${humidity}%`, 56, 54, humidityColor, pixels, 1, "right");
     addSparkles(
       pixels,
       [
@@ -607,6 +629,7 @@ export function buildCountdownPreview(config) {
     fillRect(pixels, 0, 0, 64, 64, "#07101a");
     drawInsetFrame(pixels, 4, 4, 56, 56, "#18293d", "#102033");
     drawCornerMarks(pixels, 4, 4, 56, 56, "#2b4060");
+    drawStatusCapsule(pixels, 42, 6, 14, "FOC", mainColor, "#132133");
     drawClockTextToPixels(
       timeText,
       32,
@@ -624,6 +647,8 @@ export function buildCountdownPreview(config) {
     fillRect(pixels, 30, 35, 4, 2, "#dcecff");
     drawStripedBar(pixels, 10, 55, 44, 4, progress, mainColor, "#152131");
     drawTinyTextToPixels("LEFT", 32, 48, "#8ca4be", pixels, 1, "center");
+    drawTelemetryBars(pixels, 10, 50, 18, [3, 5, 7, 5, 3], mainColor, "#21364d");
+    drawTelemetryBars(pixels, 38, 50, 18, [2, 4, 6, 4, 2], "#dcecff", "#21364d");
     addSparkles(
       pixels,
       [
@@ -636,6 +661,7 @@ export function buildCountdownPreview(config) {
     fillRect(pixels, 0, 0, 64, 64, "#110d13");
     drawInsetFrame(pixels, 4, 4, 56, 56, "#311b2d", "#20111d");
     drawCornerMarks(pixels, 4, 4, 56, 56, "#553046");
+    drawStatusCapsule(pixels, 40, 6, 16, "RUN", "#ffdbe6", "#2c1826");
     drawClockTextToPixels(
       timeText,
       32,
@@ -654,6 +680,8 @@ export function buildCountdownPreview(config) {
     drawStripedBar(pixels, 14, 48, 36, 6, progress, mainColor, "#2b1a28");
     drawBarProgress(pixels, 54, 18, 3, 28, progress, mainColor, "#2b1a28");
     drawTinyTextToPixels("GO", 16, 40, "#ffdbe6", pixels, 2, "center");
+    drawSplitRows(pixels, 4, 16, 20, 32, 18, "#4d2739", "#2c1826");
+    drawTelemetryBars(pixels, 18, 58, 24, [3, 5, 7, 9, 7, 5], "#ffdbe6", "#422534");
     addSparkles(
       pixels,
       [
@@ -666,6 +694,7 @@ export function buildCountdownPreview(config) {
     fillRect(pixels, 0, 0, 64, 64, "#07111c");
     drawInsetFrame(pixels, 4, 4, 56, 56, "#18293d", "#112132");
     drawCornerMarks(pixels, 4, 4, 56, 56, "#2b4060");
+    drawStatusCapsule(pixels, 40, 6, 16, "SYNC", mainColor, "#152232");
     drawRingProgress(pixels, 8, 8, 48, progress, mainColor, "#152232");
     drawClockTextToPixels(
       timeText,
@@ -679,11 +708,13 @@ export function buildCountdownPreview(config) {
     );
     drawTinyTextToPixels("SYNC", 32, 47, "#8ca4be", pixels, 1, "center");
     drawStripedBar(pixels, 14, 55, 36, 3, progress, mainColor, "#152232");
+    drawHudDots(pixels, 18, 51, [true, progress > 0.66, progress > 0.33, progress > 0.1], mainColor, "#2b405b");
     addSparkles(pixels, [[32, 49]], mainColor);
   } else if (style === "bar") {
     fillRect(pixels, 0, 0, 64, 64, "#08111c");
     drawInsetFrame(pixels, 4, 4, 56, 56, "#162236", "#0e1a28");
     drawCornerMarks(pixels, 4, 4, 56, 56, "#28405f");
+    drawStatusCapsule(pixels, 40, 6, 16, "TASK", mainColor, "#162236");
     drawClockTextToPixels(
       timeText,
       32,
@@ -699,6 +730,8 @@ export function buildCountdownPreview(config) {
     drawProgressTicks(pixels, 12, 44, 40, "#50647e");
     drawTinyTextToPixels(`${Math.round(progress * 100)}%`, 32, 50, mainColor, pixels, 2, "center");
     drawTickerDots(pixels, 16, 18, 8, "#8ca4be", "#33475f");
+    drawInfoDivider(pixels, 12, 41, 40, "#22374d");
+    drawTelemetryBars(pixels, 14, 58, 18, [3, 4, 6, 8, 6, 4], mainColor, "#22374d");
   }
 
   return pixels;
@@ -723,6 +756,7 @@ export function buildStopwatchPreview(config) {
     fillRect(pixels, 0, 0, 64, 64, "#08111c");
     drawInsetFrame(pixels, 4, 4, 56, 56, "#162236", "#0f1a28");
     drawCornerMarks(pixels, 4, 4, 56, 56, "#28405f");
+    drawStatusCapsule(pixels, 40, 6, 16, "GYM", accentColor, "#162236");
     drawPattern(pixels, STOPWATCH_PATTERN, 8, 18, accentColor, 2);
     drawClockTextToPixels(
       timeText,
@@ -747,10 +781,12 @@ export function buildStopwatchPreview(config) {
     drawSignalBars(pixels, 28, 56, [4, 8, 12, 16], accentColor);
     drawStripedBar(pixels, 10, 44, 44, 4, 0.76, accentColor, "#162236");
     drawTickerDots(pixels, 10, 14, 7, accentColor, "#33475f");
+    drawSplitRows(pixels, 3, 38, 18, 16, 18, "#2a425e", "#18283c");
   } else if (style === "racing") {
     fillRect(pixels, 0, 0, 64, 64, "#140d0d");
     drawInsetFrame(pixels, 4, 4, 56, 56, "#2b1212", "#1c0e0e");
     drawCornerMarks(pixels, 4, 4, 56, 56, "#663737");
+    drawStatusCapsule(pixels, 40, 6, 16, "RACE", accentColor, "#2a1212");
     drawCheckeredBar(pixels, 10, 16, 4, 34, "#ffffff", "#140d0d");
     drawCheckeredBar(pixels, 50, 16, 4, 34, "#ffffff", "#140d0d");
     drawClockTextToPixels(
@@ -765,6 +801,7 @@ export function buildStopwatchPreview(config) {
     );
     drawTinyTextToPixels("RACE", 32, 18, accentColor, pixels, 1, "center");
     drawStripedBar(pixels, 12, 48, 40, 5, 0.72, accentColor, "#302010");
+    drawHudDots(pixels, 18, 56, [true, true, false, true], "#ffffff", "#4d2929");
     addSparkles(
       pixels,
       [
@@ -777,6 +814,7 @@ export function buildStopwatchPreview(config) {
     fillRect(pixels, 0, 0, 64, 64, "#08111c");
     drawInsetFrame(pixels, 4, 4, 56, 56, "#162236", "#0f1a28");
     drawCornerMarks(pixels, 4, 4, 56, 56, "#28405f");
+    drawStatusCapsule(pixels, 40, 6, 16, "LAP", accentColor, "#162236");
     drawTinyTextToPixels("LAP", 10, 8, "#7ddf8a", pixels, 2, "left");
     drawTinyTextToPixels(
       String(config && config.lapCount ? config.lapCount : 3),
@@ -800,6 +838,7 @@ export function buildStopwatchPreview(config) {
     drawSignalBars(pixels, 10, 54, [6, 10, 14, 9], accentColor);
     drawStripedBar(pixels, 28, 46, 24, 6, 0.58, accentColor, "#162236");
     drawVerticalMeter(pixels, 52, 18, 3, 20, 0.58, accentColor, "#162236");
+    drawSplitRows(pixels, 3, 28, 18, 22, 20, "#23374d", "#172538");
     addSparkles(
       pixels,
       [
@@ -839,47 +878,34 @@ export function buildNotificationPreview(config) {
     repeatLabel = "WKDY";
   }
 
-  fillRect(pixels, 0, 0, 64, 64, "#08111c");
-  drawInsetFrame(pixels, 4, 4, 56, 56, "#162236", "#0f1a28");
-  drawCornerMarks(pixels, 4, 4, 56, 56, accentColor);
-  fillRect(pixels, 8, 14, 48, 6, "#101a28");
-  fillRect(pixels, 10, 22, 44, 22, "#0f1724");
-  fillRect(pixels, 8, 48, 48, 8, "#101a28");
-  fillRect(pixels, 8, 22, 2, 22, accentColor);
-  fillRect(pixels, 54, 22, 2, 22, accentColor);
-  fillRect(pixels, 12, 24, 40, 18, "#111c2b");
+  fillRect(pixels, 0, 0, 64, 64, "#050a12");
+  fillRect(pixels, 0, 0, 64, 1, "#132438");
   drawClockTextToPixels(
     timeText,
-    32,
-    9,
+    48,
+    6,
     "#ffffff",
     pixels,
     "minimal_3x5",
-    2,
+    1,
     "center",
   );
-  drawTinyTextToPixels(repeatLabel, 32, 16, accentColor, pixels, 1, "center");
-  drawPattern(pixels, notificationPattern, 24, 25, accentColor, 2);
+  drawTinyTextToPixels(repeatLabel, 6, 6, accentColor, pixels, 1, "left");
+  drawPattern(pixels, notificationPattern, 6, 20, accentColor, 2);
   drawClockTextToPixels(
     message,
-    32,
-    48,
+    40,
+    22,
     "#ffffff",
     pixels,
     "minimal_3x5",
     2,
     "center",
   );
-  drawStripedBar(pixels, 12, 57, 40, 2, 1, accentColor, "#1a2538");
-  drawTickerDots(pixels, 12, 52, 8, accentColor, "#33475f");
-  addSparkles(
-    pixels,
-    [
-      [14, 10],
-      [50, 10],
-    ],
-    "#dbe9ff",
-  );
+  drawTinyTextToPixels("READY", 40, 38, "#7d94ad", pixels, 1, "center");
+  fillRect(pixels, 6, 48, 52, 1, "#132438");
+  fillRect(pixels, 6, 56, 52, 2, "#0d1724");
+  fillRect(pixels, 6, 56, 28, 2, accentColor);
 
   if (icon === "fireworks") {
     addSparkles(
@@ -928,28 +954,17 @@ export function buildWeatherPreviewFrames(config) {
     : "#6ed0ff";
   let iconCenterX = 14;
   let iconCenterY = 24;
-  let tickerX = 8;
-  let tickerY = 54;
-  let tickerWidth = 44;
-
   if (layout === "detail") {
     iconCenterX = 42;
     iconCenterY = 22;
-    tickerX = 10;
-    tickerY = 49;
-    tickerWidth = 44;
   } else if (layout === "night") {
     iconCenterX = 16;
     iconCenterY = 28;
-    tickerX = 12;
-    tickerY = 53;
-    tickerWidth = 40;
   }
 
   for (let frameIndex = 0; frameIndex < 18; frameIndex += 1) {
     const pixels = clonePixels(buildWeatherPreview(config));
     const pulse = 0.5 + 0.5 * Math.sin((frameIndex / 16) * Math.PI * 2);
-    drawSweepDots(pixels, tickerX, tickerY, tickerWidth, frameIndex, humidityColor, "#203245");
 
     if (weatherType === "sunny") {
       if (pulse > 0.55) {
@@ -1047,6 +1062,14 @@ export function buildCountdownPreviewFrames(config) {
       const streamY = 34 + (frameIndex % 6);
       fillRect(pixels, 31, streamY, 2, 2, "#ffffff");
       fillRect(pixels, 28, 43, 8 + (frameIndex % 3), 1, currentAccentColor);
+      drawHudDots(
+        pixels,
+        20,
+        52,
+        [true, frameIndex % 2 === 0, frameIndex % 3 === 0, currentProgress < 0.35],
+        currentAccentColor,
+        "#244059",
+      );
       if (frameIndex % 3 === 0) {
         addSparkles(pixels, [[32, 18], [20, 28], [44, 28]], "#eaf4ff");
       }
@@ -1073,6 +1096,7 @@ export function buildCountdownPreviewFrames(config) {
       fillRect(pixels, 12 + (frameIndex % 8) * 5, 46, 3, 1, "#ffe5ec");
       fillRect(pixels, 15 + (frameIndex % 7) * 5, 44, 2, 1, currentAccentColor);
       fillRect(pixels, 8 + (frameIndex % 10) * 5, 20, 2, 1, "#fff4f7");
+      drawScanLine(pixels, 16, 54, 32, "#fff4f7");
     } else if (style === "bar") {
       fillRect(pixels, 14 + (frameIndex % 10) * 3, 22, 2, 2, "#dbeafe");
       drawSweepDots(pixels, 13, 43, 38, frameIndex, currentAccentColor, "#3b4d62");
@@ -1114,14 +1138,31 @@ export function buildStopwatchPreviewFrames(config) {
     if (style === "training") {
       fillRect(pixels, 28 + (frameIndex % 6) * 4, 44, 2, 1, "#dff6ff");
       fillRect(pixels, 8 + (frameIndex % 4) * 4, 52 - (frameIndex % 3), 2, 2, accentColor);
+      drawHudDots(
+        pixels,
+        38,
+        38,
+        [true, frameIndex % 2 === 0, true, frameIndex % 3 !== 0],
+        accentColor,
+        "#31485f",
+      );
     } else if (style === "racing") {
       const sideY = 18 + (frameIndex * 2 % 24);
       fillRect(pixels, 10, sideY, 4, 1, "#ffffff");
       fillRect(pixels, 50, 40 - (frameIndex * 2 % 24), 4, 1, "#ffffff");
       addSparkles(pixels, [[18 + (frameIndex % 5), 20], [46 - (frameIndex % 5), 20]], "#ffe8d7");
+      drawHudDots(
+        pixels,
+        22,
+        54,
+        [frameIndex % 4 !== 0, true, frameIndex % 3 === 0, true],
+        "#ffffff",
+        "#4d2929",
+      );
     } else if (style === "lap_focus") {
       fillRect(pixels, 52, 18 + (frameIndex % 12), 3, 3, accentColor);
       fillRect(pixels, 28 + (frameIndex % 5) * 4, 46, 3, 2, "#dff6ff");
+      drawScanLine(pixels, 28, 54, 22, accentColor);
     }
 
     frames.push({
@@ -1142,15 +1183,7 @@ export function buildNotificationPreviewFrames(config) {
 
   for (let frameIndex = 0; frameIndex < 16; frameIndex += 1) {
     const pixels = clonePixels(buildNotificationPreview(config));
-    const pulse = frameIndex % 4 < 2;
-
-    fillRect(pixels, 8, 22, 2, 22, pulse ? accentColor : "#2b3a50");
-    fillRect(pixels, 54, 22, 2, 22, pulse ? accentColor : "#2b3a50");
-    fillRect(pixels, 12 + (frameIndex % 8) * 5, 52, 2, 1, accentColor);
-    drawSweepDots(pixels, 12, 57, 40, frameIndex, accentColor, "#314257");
-    if (frameIndex % 5 < 2) {
-      fillRect(pixels, 12 + (frameIndex % 6) * 6, 14, 4, 1, "#ffffff");
-    }
+    fillRect(pixels, 6 + (frameIndex % 8) * 6, 56, 10, 2, accentColor);
 
     if (icon === "fireworks") {
       addSparkles(

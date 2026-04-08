@@ -1502,12 +1502,19 @@ bool buildPacmanVariedRoute(PacmanThemeState* state) {
   int currentX = (state->x - 2) / 5;
   int currentY = (state->y - 2) / 5;
   PacmanDirection tempDirections[144];
-  uint8_t quadrantOrder[4] = {0, 1, 2, 3};
-  shufflePacmanQuadrants(quadrantOrder, 4);
+  int planChoice = random((int)(sizeof(kPacmanRoutePlans) / sizeof(kPacmanRoutePlans[0])) + 1);
+
+  if (planChoice == 0) {
+    state->routeLength = sizeof(kPacmanRecordedRoute);
+    memcpy(state->routeDirections, kPacmanRecordedRoute, state->routeLength);
+    return true;
+  }
+
+  const PacmanRoutePlan& routePlan = kPacmanRoutePlans[planChoice - 1];
 
   for (int quadrantIndex = 0; quadrantIndex < 4; quadrantIndex++) {
-    uint8_t quadrant = quadrantOrder[quadrantIndex];
-    uint8_t variant = random(4);
+    uint8_t quadrant = routePlan.quadrantOrder[quadrantIndex];
+    uint8_t variant = routePlan.variants[quadrantIndex];
     int targetCount = quadrantCounts[quadrant];
 
     if (targetCount <= 0) {

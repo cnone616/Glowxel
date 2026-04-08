@@ -57,6 +57,48 @@
         </view>
       </view>
 
+      <view class="preview-entry-grid">
+        <view
+          class="preview-entry-card"
+          @click="openDesignPreview('/pages/design-preview/index')"
+        >
+          <view class="preview-entry-icon">
+            <Icon name="layout-filling" :size="34" color="#111827" />
+          </view>
+          <view class="preview-entry-text">
+            <text class="preview-entry-title">设计总览</text>
+            <text class="preview-entry-desc">看整体风格规范</text>
+          </view>
+          <Icon name="direction-right" :size="28" color="#94A3B8" />
+        </view>
+        <view
+          class="preview-entry-card"
+          @click="openDesignPreview('/pages/design-preview/control')"
+        >
+          <view class="preview-entry-icon warm">
+            <Icon name="setting-filling" :size="34" color="#111827" />
+          </view>
+          <view class="preview-entry-text">
+            <text class="preview-entry-title">控制预览</text>
+            <text class="preview-entry-desc">看设备控制页效果</text>
+          </view>
+          <Icon name="direction-right" :size="28" color="#94A3B8" />
+        </view>
+        <view
+          class="preview-entry-card"
+          @click="openDesignPreview('/pages/design-preview/ecosystem')"
+        >
+          <view class="preview-entry-icon mint">
+            <Icon name="picture-filling" :size="34" color="#111827" />
+          </view>
+          <view class="preview-entry-text">
+            <text class="preview-entry-title">生态预览</text>
+            <text class="preview-entry-desc">看主题成就素材效果</text>
+          </view>
+          <Icon name="direction-right" :size="28" color="#94A3B8" />
+        </view>
+      </view>
+
       <template v-if="isDeviceConnected">
         <view class="section-block">
         <view class="section-header">
@@ -350,28 +392,28 @@ export default {
         },
         {
           key: "weather",
-          name: "天气看板",
+          name: "天气设置",
           icon: "picture",
           variant: "azure",
           type: "feature",
         },
         {
           key: "countdown",
-          name: "倒数看板",
+          name: "倒计时",
           icon: "time",
           variant: "red",
           type: "feature",
         },
         {
           key: "stopwatch",
-          name: "计时看板",
+          name: "秒表设置",
           icon: "task",
           variant: "mint",
           type: "feature",
         },
         {
           key: "notification",
-          name: "提醒看板",
+          name: "提醒设置",
           icon: "prompt",
           variant: "azure",
           type: "feature",
@@ -883,6 +925,10 @@ export default {
     goToBleConfig() {
       uni.navigateTo({ url: "/pages/ble-config/ble-config" });
     },
+
+    openDesignPreview(url) {
+      uni.navigateTo({ url });
+    },
   },
 };
 </script>
@@ -929,6 +975,63 @@ export default {
   background: #ffffff;
   border: 2rpx solid #e9edf3;
   box-shadow: 0 12rpx 32rpx rgba(15, 23, 42, 0.05);
+}
+
+.preview-entry-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 20rpx;
+  margin-bottom: 24rpx;
+}
+
+.preview-entry-card {
+  padding: 24rpx 28rpx;
+  border-radius: 24rpx;
+  background: #ffffff;
+  border: 2rpx solid #e9edf3;
+  box-shadow: 0 12rpx 32rpx rgba(15, 23, 42, 0.05);
+  display: flex;
+  align-items: center;
+  gap: 18rpx;
+}
+
+.preview-entry-icon {
+  width: 80rpx;
+  height: 80rpx;
+  border-radius: 20rpx;
+  background: #f4f6fb;
+  border: 2rpx solid #e9edf3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.preview-entry-icon.warm {
+  background: #fff5df;
+}
+
+.preview-entry-icon.mint {
+  background: #eafcf8;
+}
+
+.preview-entry-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+}
+
+.preview-entry-title {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #111827;
+}
+
+.preview-entry-desc {
+  font-size: 24rpx;
+  color: #64748b;
 }
 
 .console-card-header {

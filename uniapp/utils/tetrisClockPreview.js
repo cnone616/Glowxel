@@ -66,6 +66,53 @@ const DIGIT_PATTERNS = [
   ["111", "101", "111", "001", "111"],
 ];
 
+function clampUnit(value) {
+  if (value < 0) {
+    return 0;
+  }
+  if (value > 1) {
+    return 1;
+  }
+  return value;
+}
+
+function parseHexColor(hex) {
+  return {
+    r: parseInt(hex.slice(1, 3), 16),
+    g: parseInt(hex.slice(3, 5), 16),
+    b: parseInt(hex.slice(5, 7), 16),
+  };
+}
+
+function toHexColor({ r, g, b }) {
+  const toHex = (value) => {
+    const safe = Math.max(0, Math.min(255, Math.round(value)));
+    return safe.toString(16).padStart(2, "0");
+  };
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+}
+
+function mixHexColor(base, target, ratio) {
+  const safeRatio = clampUnit(ratio);
+  const left = parseHexColor(base);
+  const right = parseHexColor(target);
+  return toHexColor({
+    r: left.r * (1 - safeRatio) + right.r * safeRatio,
+    g: left.g * (1 - safeRatio) + right.g * safeRatio,
+    b: left.b * (1 - safeRatio) + right.b * safeRatio,
+  });
+}
+
+function scaleHexColor(base, scale) {
+  const safeScale = Math.max(0, scale);
+  const rgb = parseHexColor(base);
+  return toHexColor({
+    r: rgb.r * safeScale,
+    g: rgb.g * safeScale,
+    b: rgb.b * safeScale,
+  });
+}
+
 function setPixel(pixels, x, y, color) {
   if (x < 0 || x >= 64 || y < 0 || y >= 64) {
     return;
@@ -140,15 +187,17 @@ function choosePieceTypes(selectedPieces) {
 }
 
 function drawGridBackground(pixels, cellSize) {
-  fillRect(pixels, 0, 0, 64, 64, "#070b12");
+  fillRect(pixels, 0, 0, 64, 64, "#060910");
   for (let pos = 0; pos < 64; pos += cellSize) {
     for (let cursor = 0; cursor < 64; cursor += 1) {
-      setPixel(pixels, pos, cursor, "#101824");
-      setPixel(pixels, cursor, pos, "#101824");
+      setPixel(pixels, pos, cursor, "#0d1520");
+      setPixel(pixels, cursor, pos, "#0d1520");
     }
   }
-  fillRect(pixels, 4, 4, 56, 1, "#182233");
-  fillRect(pixels, 4, 59, 56, 1, "#182233");
+  fillRect(pixels, 0, 0, 64, 1, "#182433");
+  fillRect(pixels, 0, 63, 64, 1, "#182433");
+  fillRect(pixels, 0, 0, 1, 64, "#182433");
+  fillRect(pixels, 63, 0, 1, 64, "#182433");
 }
 
 function buildTimeCells(showClock, cellSize) {
@@ -404,9 +453,20 @@ function buildAnimatedPlacements(config) {
   return placements.map((placement, index) => {
     const minX = Math.min(...placement.cells.map((cell) => cell.x));
     const minY = Math.min(...placement.cells.map((cell) => cell.y));
+    const maxX = Math.max(...placement.cells.map((cell) => cell.x));
+    const width = maxX - minX + 1;
+    const cols = Math.floor(64 / cellSize);
+    const shift = index % 2 === 0 ? -(4 + (index % 3)) : 4 + (index % 3);
+    let spawnX = minX + shift;
+    if (spawnX < 0) {
+      spawnX = 0;
+    }
+    if (spawnX > cols - width) {
+      spawnX = cols - width;
+    }
     return {
       ...placement,
-      spawnX: Math.max(0, minX + ((index % 5) - 2) * 2),
+      spawnX,
       spawnY: -6 - (index % 4) * 3,
       minX,
       minY,
@@ -420,29 +480,35 @@ function drawPieceCell(pixels, cellX, cellY, cellSize, color, landed) {
   fillRect(pixels, px, py, cellSize, cellSize, color);
 
   if (cellSize >= 2) {
-    fillRect(pixels, px, py, cellSize, 1, "#f8fbff");
-    fillRect(pixels, px, py, 1, cellSize, "#f8fbff");
+    const highlight = mixHexColor(color, "#ffffff", 0.32);
+    const shadow = scaleHexColor(color, 0.42);
+    fillRect(pixels, px, py, cellSize, 1, highlight);
+    fillRect(pixels, px, py, 1, cellSize, highlight);
     if (landed) {
-      fillRect(pixels, px, py + cellSize - 1, cellSize, 1, "#1b2433");
-      fillRect(pixels, px + cellSize - 1, py, 1, cellSize, "#1b2433");
+      fillRect(pixels, px, py + cellSize - 1, cellSize, 1, shadow);
+      fillRect(pixels, px + cellSize - 1, py, 1, cellSize, shadow);
     }
   }
 }
 
-function drawSideDecor(pixels, frameIndex, showClock) {
-  fillRect(pixels, 6, 6, 10, 3, "#152030");
-  fillRect(pixels, 48, 6, 10, 3, "#152030");
-  fillRect(pixels, 8 + (frameIndex % 4) * 2, 7, 2, 1, "#dbe8ff");
-  fillRect(pixels, 50, 7, 2, 1, showClock ? "#7dd3fc" : "#fbbf24");
-  fillRect(pixels, 54, 7, 2, 1, "#64748b");
+function drawGhostCell(pixels, cellX, cellY, cellSize) {
+  const px = cellX * cellSize;
+  const py = cellY * cellSize;
+  fillRect(pixels, px, py, cellSize, cellSize, "#102038");
+  if (cellSize >= 2) {
+    fillRect(pixels, px, py, cellSize, 1, "#214166");
+    fillRect(pixels, px, py, 1, cellSize, "#214166");
+  }
 }
 
 export function buildTetrisPreviewFrames(config) {
   const safeConfig = config || {};
   const cellSize = Math.max(1, Math.min(3, Number(safeConfig.cellSize) || 2));
   const colors = chooseColors(safeConfig.pieces);
+  const showClock = safeConfig.showClock !== false;
+  const targetCells = buildTimeCells(showClock, cellSize);
   const animatedPlacements = buildAnimatedPlacements(safeConfig);
-  const frameCount = 24;
+  const frameCount = 36;
   const frames = [];
   const speedLabel =
     typeof safeConfig.speed === "string" ? safeConfig.speed : "normal";
@@ -451,13 +517,19 @@ export function buildTetrisPreviewFrames(config) {
   for (let frameIndex = 0; frameIndex < frameCount; frameIndex += 1) {
     const pixels = new Map();
     drawGridBackground(pixels, cellSize);
-    drawSideDecor(pixels, frameIndex, safeConfig.showClock !== false);
+
+    if (showClock) {
+      for (let index = 0; index < targetCells.length; index += 1) {
+        const cell = targetCells[index];
+        drawGhostCell(pixels, cell.x, cell.y, cellSize);
+      }
+    }
 
     for (let placementIndex = 0; placementIndex < animatedPlacements.length; placementIndex += 1) {
       const placement = animatedPlacements[placementIndex];
-      const color = colors[placement.pieceType % colors.length];
-      const startFrame = placementIndex * 0.7;
-      const duration = 5.4 / speedFactor;
+      let color = colors[placement.pieceType % colors.length];
+      const startFrame = placementIndex * 0.72;
+      const duration = 5.8 / speedFactor;
       const progress = (frameIndex - startFrame) / duration;
 
       if (progress <= 0) {
@@ -472,7 +544,12 @@ export function buildTetrisPreviewFrames(config) {
         placement.spawnY + (placement.minY - placement.spawnY) * eased,
       );
       const landed = progress >= 1;
-      const glow = landed && frameIndex >= frameCount - 3;
+      const holdPulseFrame = Math.max(0, frameIndex - (frameCount - 8));
+      const holdPulse = landed && holdPulseFrame > 0;
+      if (holdPulse) {
+        const pulse = 0.18 + 0.18 * Math.sin((holdPulseFrame / 8) * Math.PI * 2);
+        color = mixHexColor(color, "#dbeafe", pulse);
+      }
 
       for (let cellIndex = 0; cellIndex < placement.cells.length; cellIndex += 1) {
         const cell = placement.cells[cellIndex];
@@ -482,7 +559,7 @@ export function buildTetrisPreviewFrames(config) {
         const drawY = currentOffsetY + localY;
         drawPieceCell(pixels, drawX, drawY, cellSize, color, landed);
 
-        if (glow && cellSize >= 2) {
+        if (holdPulse && cellSize >= 2) {
           const baseX = drawX * cellSize;
           const baseY = drawY * cellSize;
           setPixel(pixels, baseX - 1, baseY, "#dbeafe");

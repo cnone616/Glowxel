@@ -75,7 +75,7 @@ EyesConfig ConfigManager::eyesConfig = {
   .layout = {24, 14, 16, 10, 22, 4},
   .behavior = {true, 3200, 4200, 2, 45000},
   .interaction = {1200, 1800},
-  .time = {true, false},
+  .time = {true, false, CLOCK_FONT_MINIMAL_3X5, 1},
   .style = {"#9bdcff", "#1b6dff", "#d8f3ff"}
 };
 ThemeConfig ConfigManager::themeConfig = {};
@@ -579,6 +579,8 @@ void ConfigManager::resetToDefault() {
   defaultEyesConfig.interaction.moodHoldMs = 1800;
   defaultEyesConfig.time.show = true;
   defaultEyesConfig.time.showSeconds = false;
+  defaultEyesConfig.time.font = CLOCK_FONT_MINIMAL_3X5;
+  defaultEyesConfig.time.fontSize = 1;
   memcpy(defaultEyesConfig.style.eyeColor, "#9bdcff", sizeof(defaultEyesConfig.style.eyeColor));
   memcpy(defaultEyesConfig.style.pupilColor, "#1b6dff", sizeof(defaultEyesConfig.style.pupilColor));
   memcpy(defaultEyesConfig.style.timeColor, "#d8f3ff", sizeof(defaultEyesConfig.style.timeColor));

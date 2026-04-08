@@ -37,22 +37,9 @@ function drawPattern(pixels, pattern, x, y, color, scale) {
       if (line[col] !== "1") {
         continue;
       }
-      fillRect(
-        pixels,
-        x + col * scale,
-        y + row * scale,
-        scale,
-        scale,
-        color,
-      );
+      fillRect(pixels, x + col * scale, y + row * scale, scale, scale, color);
     }
   }
-}
-
-function drawBadge(pixels, x, y, text, color, backgroundColor) {
-  const width = Math.min(56, Math.max(14, text.length * 8 + 4));
-  fillRect(pixels, x, y, width, 8, backgroundColor);
-  drawTinyTextToPixels(text, x + Math.floor(width / 2), y + 1, color, pixels, 1, "center");
 }
 
 function hasWideGlyph(text) {
@@ -61,37 +48,12 @@ function hasWideGlyph(text) {
 
 function drawWideGlyph(pixels, x, y, seed, color) {
   const patterns = [
-    [
-      "11111",
-      "10001",
-      "10101",
-      "10001",
-      "11111",
-    ],
-    [
-      "11111",
-      "10101",
-      "11111",
-      "10101",
-      "11111",
-    ],
-    [
-      "11111",
-      "11011",
-      "10101",
-      "11011",
-      "11111",
-    ],
-    [
-      "11111",
-      "10001",
-      "11111",
-      "10001",
-      "11111",
-    ],
+    ["11111", "10001", "10101", "10001", "11111"],
+    ["11111", "10101", "11111", "10101", "11111"],
+    ["11111", "11011", "10101", "11011", "11111"],
+    ["11111", "10001", "11111", "10001", "11111"],
   ];
-  const pattern = patterns[seed % patterns.length];
-  drawPattern(pixels, pattern, x, y, color, 1);
+  drawPattern(pixels, patterns[seed % patterns.length], x, y, color, 1);
 }
 
 function drawMixedLabel(pixels, text, x, y, color, align) {
@@ -132,9 +94,6 @@ function drawMixedLabel(pixels, text, x, y, color, align) {
 }
 
 function getRepeatLabel(repeatMode) {
-  if (repeatMode === "once") {
-    return "单次";
-  }
   if (repeatMode === "daily") {
     return "每天";
   }
@@ -150,12 +109,9 @@ function getRepeatLabel(repeatMode) {
   return "单次";
 }
 
-function getAsciiRepeatLabel(repeatMode) {
-  if (repeatMode === "once") {
-    return "ONCE";
-  }
+function getRepeatCapsuleLabel(repeatMode) {
   if (repeatMode === "daily") {
-    return "DAILY";
+    return "DAY";
   }
   if (repeatMode === "weekday") {
     return "WKDY";
@@ -163,7 +119,10 @@ function getAsciiRepeatLabel(repeatMode) {
   if (repeatMode === "weekend") {
     return "WKND";
   }
-  return "YEAR";
+  if (repeatMode === "yearly") {
+    return "YEAR";
+  }
+  return "ONCE";
 }
 
 function getTimeLabel(reminder) {
@@ -171,96 +130,15 @@ function getTimeLabel(reminder) {
 }
 
 const ICON_PATTERNS = {
-  drink: [
-    "00111100",
-    "00100100",
-    "00100100",
-    "00111100",
-    "00111100",
-    "00100110",
-    "00011100",
-    "00000000",
-  ],
-  break: [
-    "00110000",
-    "00110000",
-    "01111100",
-    "11111110",
-    "01111100",
-    "00110000",
-    "00110000",
-    "00000000",
-  ],
-  medicine: [
-    "01111000",
-    "11111100",
-    "11111100",
-    "01111110",
-    "00111111",
-    "00111111",
-    "00011110",
-    "00001100",
-  ],
-  birthday: [
-    "00011000",
-    "00011000",
-    "00111100",
-    "01111110",
-    "11111111",
-    "11111111",
-    "01111110",
-    "00000000",
-  ],
-  fireworks: [
-    "10011001",
-    "01011010",
-    "00111100",
-    "11111111",
-    "00111100",
-    "01011010",
-    "10011001",
-    "00000000",
-  ],
-  christmas: [
-    "00011000",
-    "00111100",
-    "01111110",
-    "00111100",
-    "01111110",
-    "11111111",
-    "00011000",
-    "00011000",
-  ],
-  heart: [
-    "01100110",
-    "11111111",
-    "11111111",
-    "11111111",
-    "01111110",
-    "00111100",
-    "00011000",
-    "00000000",
-  ],
-  moon: [
-    "00011110",
-    "00111111",
-    "01111110",
-    "01111100",
-    "01111100",
-    "01111110",
-    "00111111",
-    "00011110",
-  ],
-  star: [
-    "00011000",
-    "10011001",
-    "01011010",
-    "00111100",
-    "11111111",
-    "00111100",
-    "01011010",
-    "10011001",
-  ],
+  drink: ["00111100", "00100100", "00100100", "00111100", "00111100", "00100110", "00011100", "00000000"],
+  break: ["00110000", "00110000", "01111100", "11111110", "01111100", "00110000", "00110000", "00000000"],
+  medicine: ["01111000", "11111100", "11111100", "01111110", "00111111", "00111111", "00011110", "00001100"],
+  birthday: ["00011000", "00011000", "00111100", "01111110", "11111111", "11111111", "01111110", "00000000"],
+  fireworks: ["10011001", "01011010", "00111100", "11111111", "00111100", "01011010", "10011001", "00000000"],
+  christmas: ["00011000", "00111100", "01111110", "00111100", "01111110", "11111111", "00011000", "00011000"],
+  heart: ["01100110", "11111111", "11111111", "11111111", "01111110", "00111100", "00011000", "00000000"],
+  moon: ["00011110", "00111111", "01111110", "01111100", "01111100", "01111110", "00111111", "00011110"],
+  star: ["00011000", "10011001", "01011010", "00111100", "11111111", "00111100", "01011010", "10011001"],
 };
 
 function createFrame() {
@@ -268,33 +146,15 @@ function createFrame() {
 }
 
 function decorateReminderFrame(pixels, reminder) {
-  drawBadge(pixels, 4, 4, getTimeLabel(reminder), "#ffffff", "#1a2536");
-  drawBadge(
-    pixels,
-    40,
-    4,
-    getAsciiRepeatLabel(reminder.repeatMode),
-    reminder.accentColor,
-    "#1a2536",
-  );
-  strokeRect(pixels, 4, 14, 56, 46, "#162236");
+  fillRect(pixels, 0, 0, 64, 64, "#050a12");
+  fillRect(pixels, 0, 0, 64, 1, "#122133");
+  drawTinyTextToPixels(getRepeatCapsuleLabel(reminder.repeatMode), 6, 6, reminder.accentColor, pixels, 1, "left");
+  drawClockTextToPixels(getTimeLabel(reminder), 48, 4, "#ffffff", pixels, "minimal_3x5", 1, "center");
 }
 
-function buildTextHeadlineFrame(reminder) {
-  const pixels = createFrame();
-  decorateReminderFrame(pixels, reminder);
-  fillRect(pixels, 8, 18, 48, 18, "#132032");
-  strokeRect(pixels, 8, 18, 48, 18, reminder.accentColor);
-  drawMixedLabel(pixels, reminder.text.slice(0, 8), 32, 24, "#ffffff", "center");
-  drawTinyTextToPixels(getRepeatLabel(reminder.repeatMode), 32, 46, reminder.accentColor, pixels, 2, "center");
-  drawBarGlow(pixels, 10, 54, 44, reminder.accentColor);
-  addSparkleSet(pixels, [[14, 20], [50, 20]], "#ffffff");
-  return pixels;
-}
-
-function drawBarGlow(pixels, x, y, width, color) {
-  fillRect(pixels, x, y, width, 2, color);
-  fillRect(pixels, x + 4, y - 2, width - 8, 1, color);
+function drawAccentBar(pixels, width, color) {
+  fillRect(pixels, 6, 56, 52, 2, "#0d1724");
+  fillRect(pixels, 6, 56, width, 2, color);
 }
 
 function addSparkle(pixels, x, y, color) {
@@ -305,73 +165,70 @@ function addSparkle(pixels, x, y, color) {
   setPixel(pixels, x, y + 1, color);
 }
 
-function addSparkleSet(pixels, points, color) {
-  points.forEach(([x, y]) => addSparkle(pixels, x, y, color));
+function buildTextHeadlineFrame(reminder) {
+  const pixels = createFrame();
+  decorateReminderFrame(pixels, reminder);
+  drawMixedLabel(pixels, reminder.reminderName.slice(0, 8), 8, 18, reminder.accentColor, "left");
+  drawMixedLabel(pixels, reminder.text.slice(0, 8), 8, 30, "#ffffff", "left");
+  drawTinyTextToPixels(getRepeatLabel(reminder.repeatMode), 8, 43, "#7d94ad", pixels, 1, "left");
+  drawAccentBar(pixels, 28, reminder.accentColor);
+  return pixels;
 }
 
 function buildTextBadgeFrame(reminder) {
   const pixels = createFrame();
   decorateReminderFrame(pixels, reminder);
-  fillRect(pixels, 10, 20, 44, 24, "#182842");
-  strokeRect(pixels, 10, 20, 44, 24, reminder.accentColor);
-  drawMixedLabel(pixels, reminder.text.slice(0, 8), 32, 28, "#ffffff", "center");
-  drawMixedLabel(pixels, reminder.reminderName.slice(0, 8), 32, 48, reminder.accentColor, "center");
-  addSparkleSet(pixels, [[16, 24], [48, 24]], reminder.accentColor);
+  fillRect(pixels, 8, 18, 48, 9, "#111d2b");
+  drawMixedLabel(pixels, reminder.reminderName.slice(0, 8), 32, 20, reminder.accentColor, "center");
+  drawMixedLabel(pixels, reminder.text.slice(0, 8), 32, 34, "#ffffff", "center");
+  drawAccentBar(pixels, 36, reminder.accentColor);
   return pixels;
 }
 
 function buildTickerFrames(reminder) {
   const frames = [];
-  const maxOffset = reminder.text.length * 6 + 64;
+  const iconPattern = ICON_PATTERNS[reminder.icon];
+  const travel = reminder.text.length * 6 + 54;
+
   for (let step = 0; step < 14; step += 1) {
     const pixels = createFrame();
     decorateReminderFrame(pixels, reminder);
-    fillRect(pixels, 6, 24, 52, 14, "#111d2d");
-    strokeRect(pixels, 6, 24, 52, 14, reminder.accentColor);
-    const offsetX = 64 - Math.floor((maxOffset / 14) * step);
-    drawMixedLabel(pixels, reminder.text, offsetX, 28, "#ffffff", "left");
-    drawTinyTextToPixels("TICKER", 32, 46, reminder.accentColor, pixels, 1, "center");
-    fillRect(pixels, 8 + (step * 3) % 44, 39, 8, 1, reminder.accentColor);
+    drawPattern(pixels, iconPattern, 6, 20, reminder.accentColor, 2);
+    const offsetX = 58 - Math.floor((travel / 14) * step);
+    drawMixedLabel(pixels, reminder.text, offsetX, 27, "#ffffff", "left");
+    drawAccentBar(pixels, 10 + (step * 3) % 34, reminder.accentColor);
     frames.push({ pixels, delay: 90 });
   }
+
   return frames;
 }
 
 function buildStaticBadgeFrame(reminder) {
   const pixels = createFrame();
   decorateReminderFrame(pixels, reminder);
-  drawPattern(pixels, ICON_PATTERNS[reminder.icon], 24, 18, reminder.accentColor, 2);
-  drawMixedLabel(pixels, reminder.text.slice(0, 8), 32, 46, "#ffffff", "center");
-  drawBarGlow(pixels, 12, 54, 40, reminder.accentColor);
+  drawPattern(pixels, ICON_PATTERNS[reminder.icon], 8, 18, reminder.accentColor, 2);
+  drawMixedLabel(pixels, reminder.text.slice(0, 8), 32, 24, "#ffffff", "left");
+  drawTinyTextToPixels(reminder.reminderName.slice(0, 8), 32, 38, "#7d94ad", pixels, 1, "left");
+  drawAccentBar(pixels, 30, reminder.accentColor);
   return pixels;
 }
 
 function buildStaticPosterFrame(reminder) {
   const pixels = createFrame();
-  fillRect(pixels, 0, 0, 64, 64, "#09111d");
-  fillRect(pixels, 6, 6, 52, 52, "#101a2b");
-  strokeRect(pixels, 6, 6, 52, 52, reminder.accentColor);
-  drawBadge(pixels, 10, 10, getTimeLabel(reminder), "#ffffff", "#162236");
-  drawPattern(pixels, ICON_PATTERNS[reminder.icon], 18, 18, reminder.accentColor, 2);
-  drawMixedLabel(pixels, reminder.text.slice(0, 8), 32, 48, "#ffffff", "center");
-  drawTinyTextToPixels(getRepeatLabel(reminder.repeatMode), 32, 55, "#8aa0c0", pixels, 1, "center");
-  addSparkleSet(pixels, [[14, 14], [50, 14]], "#ffffff");
+  decorateReminderFrame(pixels, reminder);
+  drawPattern(pixels, ICON_PATTERNS[reminder.icon], 24, 16, reminder.accentColor, 2);
+  drawMixedLabel(pixels, reminder.text.slice(0, 8), 32, 40, "#ffffff", "center");
+  drawTinyTextToPixels(reminder.reminderName.slice(0, 8), 32, 50, "#7d94ad", pixels, 1, "center");
   return pixels;
 }
 
 function buildStaticCornerFrame(reminder) {
   const pixels = createFrame();
   decorateReminderFrame(pixels, reminder);
-  drawPattern(pixels, ICON_PATTERNS[reminder.icon], 22, 18, reminder.accentColor, 2);
-  fillRect(pixels, 8, 50, 48, 6, "#162236");
-  drawMixedLabel(pixels, reminder.text.slice(0, 8), 32, 51, "#ffffff", "center");
-  setPixel(pixels, 8, 18, reminder.accentColor);
-  setPixel(pixels, 9, 18, reminder.accentColor);
-  setPixel(pixels, 8, 19, reminder.accentColor);
-  setPixel(pixels, 56, 18, reminder.accentColor);
-  setPixel(pixels, 55, 18, reminder.accentColor);
-  setPixel(pixels, 56, 19, reminder.accentColor);
-  addSparkleSet(pixels, [[14, 24], [50, 24]], "#ffffff");
+  drawPattern(pixels, ICON_PATTERNS[reminder.icon], 6, 18, reminder.accentColor, 2);
+  drawMixedLabel(pixels, reminder.reminderName.slice(0, 8), 28, 20, reminder.accentColor, "left");
+  drawMixedLabel(pixels, reminder.text.slice(0, 8), 28, 32, "#ffffff", "left");
+  drawAccentBar(pixels, 24, reminder.accentColor);
   return pixels;
 }
 
@@ -386,10 +243,8 @@ function buildPulseFrames(reminder) {
     if (radius > 0) {
       strokeRect(pixels, 24 - radius * 2, 18 - radius * 2, 16 + radius * 4, 16 + radius * 4, reminder.accentColor);
     }
-    if (radius > 1) {
-      addSparkleSet(pixels, [[16, 18], [48, 18], [16, 46], [48, 46]], "#ffffff");
-    }
     drawMixedLabel(pixels, reminder.text.slice(0, 8), 32, 48, "#ffffff", "center");
+    drawAccentBar(pixels, 14 + radius * 7, reminder.accentColor);
     frames.push({ pixels, delay: 110 });
   });
 
@@ -399,23 +254,22 @@ function buildPulseFrames(reminder) {
 function buildFireworksFrames(reminder) {
   const frames = [];
   const sparkSets = [
-    [[8, 18], [54, 18], [14, 48], [50, 48]],
-    [[10, 14], [52, 14], [10, 52], [52, 52], [32, 16]],
-    [[6, 22], [58, 22], [18, 54], [46, 54], [32, 12], [32, 56]],
-    [[12, 18], [52, 18], [14, 46], [50, 46], [22, 12], [42, 12]],
-    [[16, 16], [48, 16], [16, 48], [48, 48]],
+    [[10, 18], [54, 18], [18, 50], [46, 50]],
+    [[14, 14], [50, 14], [10, 46], [54, 46], [32, 12]],
+    [[8, 22], [56, 22], [18, 54], [46, 54], [32, 16], [32, 52]],
+    [[14, 18], [50, 18], [18, 46], [46, 46], [22, 12], [42, 12]],
   ];
 
-  sparkSets.forEach((sparkSet, index) => {
+  sparkSets.forEach((points, index) => {
     const pixels = createFrame();
     decorateReminderFrame(pixels, reminder);
     drawPattern(pixels, ICON_PATTERNS[reminder.icon], 24, 18, reminder.accentColor, 2);
-    sparkSet.forEach((point, pointIndex) => {
-      const color = pointIndex % 2 === 0 ? "#ffffff" : reminder.accentColor;
-      addSparkle(pixels, point[0], point[1], color);
+    points.forEach((point, pointIndex) => {
+      addSparkle(pixels, point[0], point[1], pointIndex % 2 === 0 ? "#ffffff" : reminder.accentColor);
     });
     drawMixedLabel(pixels, reminder.text.slice(0, 8), 32, 48, "#ffffff", "center");
-    frames.push({ pixels, delay: index === 0 ? 140 : 90 });
+    drawAccentBar(pixels, 18 + index * 8, reminder.accentColor);
+    frames.push({ pixels, delay: 100 });
   });
 
   return frames;
@@ -424,23 +278,21 @@ function buildFireworksFrames(reminder) {
 function buildOrbitFrames(reminder) {
   const frames = [];
   const orbitPoints = [
-    [[32, 16], [48, 32], [32, 48], [16, 32]],
-    [[40, 18], [46, 40], [24, 46], [18, 24]],
-    [[48, 24], [40, 48], [16, 40], [24, 16]],
-    [[46, 32], [32, 46], [18, 32], [32, 18]],
+    [[32, 14], [50, 32], [32, 50], [14, 32]],
+    [[40, 16], [48, 40], [24, 48], [16, 24]],
+    [[50, 24], [40, 50], [14, 40], [24, 14]],
+    [[48, 32], [32, 48], [16, 32], [32, 16]],
   ];
 
-  orbitPoints.forEach((pointSet) => {
+  orbitPoints.forEach((points, index) => {
     const pixels = createFrame();
     decorateReminderFrame(pixels, reminder);
     drawPattern(pixels, ICON_PATTERNS[reminder.icon], 24, 18, reminder.accentColor, 2);
-    pointSet.forEach((point, index) => {
-      const color = index % 2 === 0 ? reminder.accentColor : "#ffffff";
-      setPixel(pixels, point[0], point[1], color);
-      setPixel(pixels, point[0] + 1, point[1], color);
+    points.forEach((point, pointIndex) => {
+      fillRect(pixels, point[0], point[1], 2, 2, pointIndex % 2 === 0 ? reminder.accentColor : "#ffffff");
     });
-    strokeRect(pixels, 20, 14, 24, 24, "#1e2d45");
     drawMixedLabel(pixels, reminder.text.slice(0, 8), 32, 48, "#ffffff", "center");
+    drawAccentBar(pixels, 20 + index * 6, reminder.accentColor);
     frames.push({ pixels, delay: 100 });
   });
 

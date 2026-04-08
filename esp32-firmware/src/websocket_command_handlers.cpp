@@ -44,70 +44,133 @@ namespace {
 
   const char* ambientPresetToString(uint8_t preset) {
     if (preset == AMBIENT_PRESET_AURORA) {
-      return "aurora_flow";
+      return "digital_rain";
     }
     if (preset == AMBIENT_PRESET_PLASMA) {
-      return "plasma_wave";
+      return "starfield";
     }
     if (preset == AMBIENT_PRESET_MATRIX_RAIN) {
-      return "matrix_rain";
+      return "neon_tunnel";
     }
     if (preset == AMBIENT_PRESET_FIREFLY_SWARM) {
-      return "firefly_swarm";
+      return "metablob";
     }
     if (preset == AMBIENT_PRESET_METEOR_SHOWER) {
-      return "meteor_shower";
+      return "falling_sand";
     }
     if (preset == AMBIENT_PRESET_OCEAN_CURRENT) {
-      return "ocean_current";
+      return "sparks";
     }
     if (preset == AMBIENT_PRESET_NEON_GRID) {
-      return "neon_grid";
+      return "wave_pattern";
     }
     if (preset == AMBIENT_PRESET_SUNSET_BLUSH) {
-      return "sunset_blush";
+      return "rain_scene";
     }
     if (preset == AMBIENT_PRESET_STARFIELD_DRIFT) {
-      return "starfield_drift";
+      return "watermelon_plasma";
+    }
+    if (preset == AMBIENT_PRESET_BOIDS) {
+      return "boids";
+    }
+    if (preset == AMBIENT_PRESET_BOUNCING_LOGO) {
+      return "bouncing_logo";
+    }
+    if (preset == AMBIENT_PRESET_SORTING_VISUALIZER) {
+      return "sorting_visualizer";
+    }
+    if (preset == AMBIENT_PRESET_CLOCK_SCENE) {
+      return "clock_scene";
+    }
+    if (preset == AMBIENT_PRESET_COUNTDOWN_SCENE) {
+      return "countdown_scene";
+    }
+    if (preset == AMBIENT_PRESET_WEATHER_SCENE) {
+      return "weather_scene";
+    }
+    if (preset == AMBIENT_PRESET_GAME_OF_LIFE) {
+      return "game_of_life";
+    }
+    if (preset == AMBIENT_PRESET_JULIA_SET) {
+      return "julia_set";
+    }
+    if (preset == AMBIENT_PRESET_REACTION_DIFFUSION) {
+      return "reaction_diffusion";
     }
     return "";
   }
 
   bool ambientPresetFromString(const String& value, uint8_t& preset) {
-    if (value == "aurora_flow") {
+    if (value == "digital_rain") {
       preset = AMBIENT_PRESET_AURORA;
       return true;
     }
-    if (value == "plasma_wave") {
+    if (value == "starfield") {
       preset = AMBIENT_PRESET_PLASMA;
       return true;
     }
-    if (value == "matrix_rain") {
+    if (value == "neon_tunnel") {
       preset = AMBIENT_PRESET_MATRIX_RAIN;
       return true;
     }
-    if (value == "firefly_swarm") {
+    if (value == "metablob") {
       preset = AMBIENT_PRESET_FIREFLY_SWARM;
       return true;
     }
-    if (value == "meteor_shower") {
+    if (value == "falling_sand") {
       preset = AMBIENT_PRESET_METEOR_SHOWER;
       return true;
     }
-    if (value == "ocean_current") {
+    if (value == "sparks") {
       preset = AMBIENT_PRESET_OCEAN_CURRENT;
       return true;
     }
-    if (value == "neon_grid") {
+    if (value == "wave_pattern") {
       preset = AMBIENT_PRESET_NEON_GRID;
       return true;
     }
-    if (value == "sunset_blush") {
+    if (value == "rain_scene") {
       preset = AMBIENT_PRESET_SUNSET_BLUSH;
       return true;
     }
-    if (value == "starfield_drift") {
+    if (value == "watermelon_plasma") {
       preset = AMBIENT_PRESET_STARFIELD_DRIFT;
+      return true;
+    }
+    if (value == "boids") {
+      preset = AMBIENT_PRESET_BOIDS;
+      return true;
+    }
+    if (value == "bouncing_logo") {
+      preset = AMBIENT_PRESET_BOUNCING_LOGO;
+      return true;
+    }
+    if (value == "sorting_visualizer") {
+      preset = AMBIENT_PRESET_SORTING_VISUALIZER;
+      return true;
+    }
+    if (value == "clock_scene") {
+      preset = AMBIENT_PRESET_CLOCK_SCENE;
+      return true;
+    }
+    if (value == "countdown_scene") {
+      preset = AMBIENT_PRESET_COUNTDOWN_SCENE;
+      return true;
+    }
+    if (value == "weather_scene") {
+      preset = AMBIENT_PRESET_WEATHER_SCENE;
+      return true;
+    }
+    if (value == "game_of_life") {
+      preset = AMBIENT_PRESET_GAME_OF_LIFE;
+      return true;
+    }
+    if (value == "julia_set") {
+      preset = AMBIENT_PRESET_JULIA_SET;
+      return true;
+    }
+    if (value == "reaction_diffusion") {
+      preset = AMBIENT_PRESET_REACTION_DIFFUSION;
       return true;
     }
     return false;
@@ -505,7 +568,9 @@ namespace {
 
   bool ensureEyesTimeObject(JsonObject time) {
     return time.containsKey("show") &&
-           time.containsKey("showSeconds");
+           time.containsKey("showSeconds") &&
+           time.containsKey("font") &&
+           time.containsKey("fontSize");
   }
 
   bool ensureEyesStyleObject(JsonObject style) {
@@ -761,10 +826,21 @@ bool WebSocketCommandHandlers::handleEyesCommand(
     const char* eyeColor = style["eyeColor"];
     const char* pupilColor = style["pupilColor"];
     const char* timeColor = style["timeColor"];
+    const char* timeFont = time["font"];
+    uint8_t timeFontId = 0;
+    int timeFontSize = time["fontSize"].as<int>();
     if (!isHexColorText(eyeColor) ||
         !isHexColorText(pupilColor) ||
         !isHexColorText(timeColor)) {
       setErrorResponse(response, "invalid eyes color");
+      return true;
+    }
+    if (timeFont == nullptr || !clockFontIdFromString(timeFont, timeFontId)) {
+      setErrorResponse(response, "invalid eyes time font");
+      return true;
+    }
+    if (timeFontSize < 1 || timeFontSize > 3) {
+      setErrorResponse(response, "invalid eyes time font size");
       return true;
     }
 
@@ -787,6 +863,8 @@ bool WebSocketCommandHandlers::handleEyesCommand(
 
     nextConfig.time.show = time["show"].as<bool>();
     nextConfig.time.showSeconds = time["showSeconds"].as<bool>();
+    nextConfig.time.font = timeFontId;
+    nextConfig.time.fontSize = static_cast<uint8_t>(timeFontSize);
 
     memcpy(nextConfig.style.eyeColor, eyeColor, sizeof(nextConfig.style.eyeColor));
     memcpy(nextConfig.style.pupilColor, pupilColor, sizeof(nextConfig.style.pupilColor));

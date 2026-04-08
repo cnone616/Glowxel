@@ -50,14 +50,6 @@
         </view>
         <view class="preview-actions">
           <view
-            class="action-btn-sm"
-            :class="{ disabled: isSending }"
-            @click="saveLocal"
-          >
-            <Icon name="save" :size="36" color="var(--color-text-primary)" />
-            <text>保存</text>
-          </view>
-          <view
             class="action-btn-sm primary"
             :class="{ disabled: isSending }"
             @click="publishCanvas"
@@ -482,11 +474,6 @@ export default {
       this.persistPixels();
       this.queueClearSync();
       this.toast.showInfo("画板已清空");
-    },
-
-    saveLocal() {
-      this.persistPixels();
-      this.toast.showSuccess("已保存到本地");
     },
 
     async publishCanvas() {

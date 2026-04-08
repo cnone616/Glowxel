@@ -649,82 +649,105 @@ static bool parseExpressionAction(const char* action, EyeExpressionId& expressio
 static unsigned long minExpressionInterval(TimeOfDay timeOfDay) {
   switch (timeOfDay) {
     case TIME_DEEP_NIGHT:
-      return 8000;
+      return 5800;
     case TIME_EARLY_MORNING:
-      return 6000;
+      return 4200;
     case TIME_NOON:
-      return 6000;
+      return 3600;
     case TIME_EVENING:
-      return 5000;
+      return 3200;
     case TIME_NIGHT:
-      return 6000;
+      return 4000;
     case TIME_MORNING:
     case TIME_AFTERNOON:
     default:
-      return 4000;
+      return 2800;
   }
 }
 
 static void fillTimeWeights(TimeOfDay timeOfDay, float weights[EYE_EXPRESSION_COUNT]) {
   for (int i = 0; i < EYE_EXPRESSION_COUNT; i++) {
-    weights[i] = 0.0f;
+    weights[i] = 0.45f;
   }
+
+  weights[EYE_EXPRESSION_SLEEPY] = 0.18f;
+  weights[EYE_EXPRESSION_SCARED] = 0.20f;
+  weights[EYE_EXPRESSION_FURIOUS] = 0.20f;
+  weights[EYE_EXPRESSION_ANGRY] = 0.24f;
 
   switch (timeOfDay) {
     case TIME_DEEP_NIGHT:
-      weights[EYE_EXPRESSION_SLEEPY] = 50.0f;
-      weights[EYE_EXPRESSION_WORRIED] = 20.0f;
-      weights[EYE_EXPRESSION_SAD] = 15.0f;
-      weights[EYE_EXPRESSION_NORMAL] = 10.0f;
-      weights[EYE_EXPRESSION_SQUINT] = 5.0f;
+      weights[EYE_EXPRESSION_SLEEPY] += 18.0f;
+      weights[EYE_EXPRESSION_SQUINT] += 11.0f;
+      weights[EYE_EXPRESSION_NORMAL] += 8.0f;
+      weights[EYE_EXPRESSION_WORRIED] += 7.0f;
+      weights[EYE_EXPRESSION_SAD] += 6.0f;
+      weights[EYE_EXPRESSION_UNIMPRESSED] += 4.0f;
       break;
     case TIME_EARLY_MORNING:
-      weights[EYE_EXPRESSION_SLEEPY] = 40.0f;
-      weights[EYE_EXPRESSION_NORMAL] = 30.0f;
-      weights[EYE_EXPRESSION_WORRIED] = 15.0f;
-      weights[EYE_EXPRESSION_SQUINT] = 10.0f;
-      weights[EYE_EXPRESSION_UNIMPRESSED] = 5.0f;
+      weights[EYE_EXPRESSION_SLEEPY] += 12.0f;
+      weights[EYE_EXPRESSION_NORMAL] += 8.0f;
+      weights[EYE_EXPRESSION_FOCUSED] += 5.0f;
+      weights[EYE_EXPRESSION_WORRIED] += 5.0f;
+      weights[EYE_EXPRESSION_SQUINT] += 5.0f;
+      weights[EYE_EXPRESSION_UNIMPRESSED] += 4.0f;
+      weights[EYE_EXPRESSION_HAPPY] += 3.0f;
+      weights[EYE_EXPRESSION_DETERMINED] += 2.0f;
       break;
     case TIME_MORNING:
-      weights[EYE_EXPRESSION_NORMAL] = 30.0f;
-      weights[EYE_EXPRESSION_FOCUSED] = 25.0f;
-      weights[EYE_EXPRESSION_HAPPY] = 15.0f;
-      weights[EYE_EXPRESSION_DETERMINED] = 15.0f;
-      weights[EYE_EXPRESSION_EXCITED] = 10.0f;
-      weights[EYE_EXPRESSION_GLEE] = 5.0f;
+      weights[EYE_EXPRESSION_NORMAL] += 7.0f;
+      weights[EYE_EXPRESSION_FOCUSED] += 9.0f;
+      weights[EYE_EXPRESSION_HAPPY] += 8.0f;
+      weights[EYE_EXPRESSION_DETERMINED] += 8.0f;
+      weights[EYE_EXPRESSION_EXCITED] += 5.0f;
+      weights[EYE_EXPRESSION_GLEE] += 4.0f;
+      weights[EYE_EXPRESSION_SURPRISED] += 3.0f;
+      weights[EYE_EXPRESSION_AWE] += 2.0f;
+      weights[EYE_EXPRESSION_SUSPICIOUS] += 2.0f;
       break;
     case TIME_NOON:
-      weights[EYE_EXPRESSION_SLEEPY] = 30.0f;
-      weights[EYE_EXPRESSION_NORMAL] = 25.0f;
-      weights[EYE_EXPRESSION_UNIMPRESSED] = 20.0f;
-      weights[EYE_EXPRESSION_SQUINT] = 15.0f;
-      weights[EYE_EXPRESSION_FRUSTRATED] = 10.0f;
-      weights[EYE_EXPRESSION_CONFUSED] = 8.0f;
+      weights[EYE_EXPRESSION_FOCUSED] += 7.0f;
+      weights[EYE_EXPRESSION_NORMAL] += 6.0f;
+      weights[EYE_EXPRESSION_HAPPY] += 5.0f;
+      weights[EYE_EXPRESSION_DETERMINED] += 4.0f;
+      weights[EYE_EXPRESSION_SLEEPY] += 4.0f;
+      weights[EYE_EXPRESSION_UNIMPRESSED] += 4.0f;
+      weights[EYE_EXPRESSION_SQUINT] += 4.0f;
+      weights[EYE_EXPRESSION_FRUSTRATED] += 3.0f;
+      weights[EYE_EXPRESSION_ANNOYED] += 2.0f;
       break;
     case TIME_AFTERNOON:
-      weights[EYE_EXPRESSION_FOCUSED] = 30.0f;
-      weights[EYE_EXPRESSION_NORMAL] = 25.0f;
-      weights[EYE_EXPRESSION_DETERMINED] = 20.0f;
-      weights[EYE_EXPRESSION_ANNOYED] = 10.0f;
-      weights[EYE_EXPRESSION_SKEPTIC] = 10.0f;
-      weights[EYE_EXPRESSION_HAPPY] = 5.0f;
-      weights[EYE_EXPRESSION_CONFUSED] = 6.0f;
+      weights[EYE_EXPRESSION_FOCUSED] += 8.0f;
+      weights[EYE_EXPRESSION_DETERMINED] += 7.0f;
+      weights[EYE_EXPRESSION_HAPPY] += 6.0f;
+      weights[EYE_EXPRESSION_NORMAL] += 5.0f;
+      weights[EYE_EXPRESSION_EXCITED] += 5.0f;
+      weights[EYE_EXPRESSION_SKEPTIC] += 4.0f;
+      weights[EYE_EXPRESSION_SUSPICIOUS] += 4.0f;
+      weights[EYE_EXPRESSION_SURPRISED] += 3.0f;
+      weights[EYE_EXPRESSION_ANNOYED] += 3.0f;
+      weights[EYE_EXPRESSION_GLEE] += 3.0f;
       break;
     case TIME_EVENING:
-      weights[EYE_EXPRESSION_HAPPY] = 25.0f;
-      weights[EYE_EXPRESSION_NORMAL] = 25.0f;
-      weights[EYE_EXPRESSION_GLEE] = 20.0f;
-      weights[EYE_EXPRESSION_EXCITED] = 15.0f;
-      weights[EYE_EXPRESSION_SURPRISED] = 10.0f;
-      weights[EYE_EXPRESSION_AWE] = 5.0f;
+      weights[EYE_EXPRESSION_HAPPY] += 8.0f;
+      weights[EYE_EXPRESSION_GLEE] += 7.0f;
+      weights[EYE_EXPRESSION_EXCITED] += 7.0f;
+      weights[EYE_EXPRESSION_SURPRISED] += 5.0f;
+      weights[EYE_EXPRESSION_AWE] += 5.0f;
+      weights[EYE_EXPRESSION_NORMAL] += 4.0f;
+      weights[EYE_EXPRESSION_DETERMINED] += 3.0f;
+      weights[EYE_EXPRESSION_SUSPICIOUS] += 3.0f;
+      weights[EYE_EXPRESSION_FOCUSED] += 2.0f;
       break;
     case TIME_NIGHT:
-      weights[EYE_EXPRESSION_SLEEPY] = 35.0f;
-      weights[EYE_EXPRESSION_NORMAL] = 20.0f;
-      weights[EYE_EXPRESSION_UNIMPRESSED] = 20.0f;
-      weights[EYE_EXPRESSION_WORRIED] = 15.0f;
-      weights[EYE_EXPRESSION_SAD] = 10.0f;
-      weights[EYE_EXPRESSION_CONFUSED] = 7.0f;
+      weights[EYE_EXPRESSION_SLEEPY] += 8.0f;
+      weights[EYE_EXPRESSION_NORMAL] += 6.0f;
+      weights[EYE_EXPRESSION_SQUINT] += 5.0f;
+      weights[EYE_EXPRESSION_UNIMPRESSED] += 5.0f;
+      weights[EYE_EXPRESSION_WORRIED] += 4.0f;
+      weights[EYE_EXPRESSION_SAD] += 4.0f;
+      weights[EYE_EXPRESSION_HAPPY] += 2.0f;
+      weights[EYE_EXPRESSION_AWE] += 2.0f;
       break;
   }
 }
@@ -791,15 +814,6 @@ static void applyTransitionWeights(EyeExpressionId currentExpression, float weig
     {EYE_EXPRESSION_NORMAL, 15.0f},
     {EYE_EXPRESSION_HAPPY, 10.0f}
   };
-  static const WeightedExpression kConfused[] = {
-    {EYE_EXPRESSION_CONFUSED, 20.0f},
-    {EYE_EXPRESSION_SKEPTIC, 22.0f},
-    {EYE_EXPRESSION_WORRIED, 18.0f},
-    {EYE_EXPRESSION_NORMAL, 15.0f},
-    {EYE_EXPRESSION_FOCUSED, 12.0f},
-    {EYE_EXPRESSION_SURPRISED, 13.0f}
-  };
-
   switch (currentExpression) {
     case EYE_EXPRESSION_NORMAL:
       transitions = kNormal;
@@ -832,10 +846,6 @@ static void applyTransitionWeights(EyeExpressionId currentExpression, float weig
     case EYE_EXPRESSION_SURPRISED:
       transitions = kSurprised;
       transitionCount = sizeof(kSurprised) / sizeof(kSurprised[0]);
-      break;
-    case EYE_EXPRESSION_CONFUSED:
-      transitions = kConfused;
-      transitionCount = sizeof(kConfused) / sizeof(kConfused[0]);
       break;
     default:
       break;
@@ -890,11 +900,12 @@ static EyeExpressionId chooseNextExpression() {
   fillTimeWeights(timeOfDay, weights);
   applyTransitionWeights(s_state.expression, weights);
 
-  weights[(int)s_state.expression] *= 0.3f;
+  weights[(int)s_state.expression] *= 0.12f;
 
-  int recentStart = s_state.historyCount > 3 ? (s_state.historyCount - 3) : 0;
+  int recentStart = s_state.historyCount > 4 ? (s_state.historyCount - 4) : 0;
   for (int i = recentStart; i < s_state.historyCount; i++) {
-    weights[(int)s_state.history[i]] *= 0.2f;
+    float penalty = 0.05f + (float)(i - recentStart) * 0.03f;
+    weights[(int)s_state.history[i]] *= penalty;
   }
 
   return weightedRandomChoice(weights, s_state.expression);
@@ -905,7 +916,7 @@ static void scheduleNextBlink(const EyesConfig& config) {
 }
 
 static void scheduleNextLook(const EyesConfig& config) {
-  s_state.nextLookAfterMs = jitteredInterval(config.behavior.lookIntervalMs, 68, 150);
+  s_state.nextLookAfterMs = jitteredInterval(config.behavior.lookIntervalMs, 45, 100);
 }
 
 static void startBlink(unsigned long now) {
@@ -1333,11 +1344,29 @@ static void drawTimeOverlay(MatrixPanel_I2S_DMA* display, const EyesConfig& conf
     return;
   }
 
+  uint8_t fontId = config.time.font;
+  if (fontId > CLOCK_FONT_RETRO_5X7) {
+    fontId = CLOCK_FONT_MINIMAL_3X5;
+  }
+
+  int fontSize = config.time.fontSize;
+  if (fontSize < 1) {
+    fontSize = 1;
+  }
+  if (fontSize > 3) {
+    fontSize = 3;
+  }
+
   uint16_t color = display->color565(r, g, b);
-  int width = getClockTextWidth(buffer, CLOCK_FONT_MINIMAL_3X5, 1);
+  int width = getClockTextWidth(buffer, fontId, fontSize);
+  int height = getClockTextHeight(fontId, fontSize);
   int maxX = DisplayManager::PANEL_RES_X - width;
   if (maxX < 0) {
     maxX = 0;
+  }
+  int maxY = DisplayManager::PANEL_RES_Y - height;
+  if (maxY < 0) {
+    maxY = 0;
   }
   int x = config.layout.timeX;
   if (x < 0) {
@@ -1346,14 +1375,21 @@ static void drawTimeOverlay(MatrixPanel_I2S_DMA* display, const EyesConfig& conf
   if (x > maxX) {
     x = maxX;
   }
+  int y = config.layout.timeY;
+  if (y < 0) {
+    y = 0;
+  }
+  if (y > maxY) {
+    y = maxY;
+  }
   drawClockText(
     display,
     buffer,
     x,
-    config.layout.timeY,
+    y,
     color,
-    CLOCK_FONT_MINIMAL_3X5,
-    1
+    fontId,
+    fontSize
   );
 }
 
@@ -1368,20 +1404,20 @@ static void chooseIdleLook() {
   long roll = random(0, 100);
   float baseX = 0.0f;
   float baseY = 0.0f;
-  if (roll < 28) {
+  if (roll < 10) {
     baseX = randomFloat(-0.18f, 0.18f);
     baseY = randomFloat(-0.10f, 0.10f);
-  } else if (roll < 54) {
+  } else if (roll < 42) {
     float side = random(0, 100) < 50 ? -1.0f : 1.0f;
     baseX = side * randomFloat(0.42f, 0.80f);
     baseY = randomFloat(-0.18f, 0.20f);
-  } else if (roll < 72) {
+  } else if (roll < 66) {
     baseX = randomFloat(-0.36f, 0.36f);
     baseY = randomFloat(-0.62f, -0.22f);
-  } else if (roll < 84) {
+  } else if (roll < 78) {
     baseX = randomFloat(-0.28f, 0.28f);
     baseY = randomFloat(0.12f, 0.34f);
-  } else if (roll < 94) {
+  } else if (roll < 92) {
     float side = random(0, 100) < 50 ? -1.0f : 1.0f;
     baseX = side * randomFloat(0.32f, 0.64f);
     baseY = random(0, 100) < 50 ? randomFloat(-0.42f, -0.14f) : randomFloat(0.08f, 0.24f);
@@ -1399,11 +1435,10 @@ static void chooseIdleLook() {
   s_state.targetRightLookOffsetX = 0.0f;
   s_state.targetRightLookOffsetY = 0.0f;
 
-  int asymmetryChance = 22;
-  if (s_state.expression == EYE_EXPRESSION_CONFUSED ||
-      s_state.expression == EYE_EXPRESSION_SKEPTIC ||
+  int asymmetryChance = 30;
+  if (s_state.expression == EYE_EXPRESSION_SKEPTIC ||
       s_state.expression == EYE_EXPRESSION_WORRIED) {
-    asymmetryChance = 34;
+    asymmetryChance = 42;
   }
 
   if (random(0, 100) >= asymmetryChance) {

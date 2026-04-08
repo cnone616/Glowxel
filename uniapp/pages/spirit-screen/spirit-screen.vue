@@ -41,14 +41,9 @@
       ></view>
       <view class="preview-caption">
         <view class="preview-caption-info">
-          <text class="preview-title">64 x 64 动态预览</text>
-          <text class="preview-subtitle">{{ previewSubtitle }}</text>
+          <text class="preview-title">预览效果</text>
         </view>
         <view class="preview-actions">
-          <view class="action-btn-sm" @click="saveDraft">
-            <Icon name="save" :size="36" color="var(--color-text-primary)" />
-            <text>保存</text>
-          </view>
           <view
             class="action-btn-sm primary"
             :class="{ disabled: isSending }"
@@ -96,9 +91,7 @@
               </view>
             </view>
           </view>
-        </view>
 
-        <view v-show="currentTab === 1" class="tab-panel">
           <view class="card">
             <text class="card-title">眼睛颜色</text>
             <ColorPanelPicker
@@ -110,59 +103,15 @@
           </view>
 
           <view class="card">
-            <text class="card-title">时间显示</text>
-            <view class="form-row inline-row">
-              <text class="form-label">显示时间</text>
-              <switch
-                :checked="eyesConfig.time.show"
-                color="#4F7FFF"
-                @change="handleTimeShowChange"
-              />
-            </view>
-            <view class="form-row inline-row">
-              <text class="form-label">显示秒</text>
-              <switch
-                :checked="eyesConfig.time.showSeconds"
-                color="#4F7FFF"
-                @change="handleTimeSecondsChange"
-              />
-            </view>
-            <view class="form-row">
-              <text class="form-label">
-                时间横向位置 {{ eyesConfig.layout.timeX }}
-              </text>
-              <slider
-                :value="eyesConfig.layout.timeX"
-                min="0"
-                :max="timeXMax"
-                step="1"
-                activeColor="#4F7FFF"
-                @change="handleTimeXChange"
-              />
-            </view>
-            <view class="form-row">
-              <text class="form-label">
-                时间纵向位置 {{ eyesConfig.layout.timeY }}
-              </text>
-              <slider
-                :value="eyesConfig.layout.timeY"
-                min="0"
-                max="12"
-                step="1"
-                activeColor="#4F7FFF"
-                @change="handleTimeYChange"
-              />
-            </view>
+            <text class="card-title">瞳孔颜色</text>
             <ColorPanelPicker
-              :value="eyesConfig.style.timeColor"
-              label="时间颜色"
-              :preset-colors="timeColorOptions"
-              @input="handleTimeColorChange"
+              :value="eyesConfig.style.pupilColor"
+              label="瞳孔颜色"
+              :preset-colors="pupilColorOptions"
+              @input="handlePupilColorChange"
             />
           </view>
-        </view>
 
-        <view v-show="currentTab === 2" class="tab-panel">
           <view class="card">
             <text class="card-title">参数调整</text>
 
@@ -212,7 +161,6 @@
           <view class="card">
             <view class="card-title-section">
               <text class="card-title">互动预览</text>
-              <text class="card-subtitle">仅预览</text>
             </view>
             <view class="option-row option-row-wrap">
               <view class="option-btn" @click="triggerPreviewOnlyAction('blink')">
@@ -228,6 +176,92 @@
                 <text>看右</text>
               </view>
             </view>
+          </view>
+        </view>
+
+        <view v-show="currentTab === 1" class="tab-panel">
+          <view class="card">
+            <view class="card-title-section">
+              <text class="card-title">时间显示</text>
+              <text class="card-subtitle">仅作用于桌面宠物</text>
+            </view>
+            <view class="form-row inline-row">
+              <text class="form-label">显示时间</text>
+              <switch
+                :checked="eyesConfig.time.show"
+                color="#4F7FFF"
+                @change="handleTimeShowChange"
+              />
+            </view>
+            <view class="form-row inline-row">
+              <text class="form-label">显示秒</text>
+              <switch
+                :checked="eyesConfig.time.showSeconds"
+                color="#4F7FFF"
+                @change="handleTimeSecondsChange"
+              />
+            </view>
+            <view class="form-row">
+              <text class="form-label">
+                时间字体 {{ selectedTimeFontLabel }}
+              </text>
+              <view class="font-grid">
+                <view
+                  v-for="item in timeFontOptions"
+                  :key="item.value"
+                  class="option-btn font-option-btn"
+                  :class="{ active: eyesConfig.time.font === item.value }"
+                  @click="handleTimeFontChange(item.value)"
+                >
+                  <text class="font-option-name">{{ item.label }}</text>
+                </view>
+              </view>
+            </view>
+            <view class="form-row">
+              <text class="form-label">
+                时间字号 {{ eyesConfig.time.fontSize }}
+              </text>
+              <slider
+                :value="eyesConfig.time.fontSize"
+                min="1"
+                max="3"
+                step="1"
+                activeColor="#4F7FFF"
+                @change="handleTimeFontSizeChange"
+              />
+            </view>
+            <view class="form-row">
+              <text class="form-label">
+                时间横向位置 {{ eyesConfig.layout.timeX }}
+              </text>
+              <slider
+                :value="eyesConfig.layout.timeX"
+                min="0"
+                :max="timeXMax"
+                step="1"
+                activeColor="#4F7FFF"
+                @change="handleTimeXChange"
+              />
+            </view>
+            <view class="form-row">
+              <text class="form-label">
+                时间纵向位置 {{ eyesConfig.layout.timeY }}
+              </text>
+              <slider
+                :value="eyesConfig.layout.timeY"
+                min="0"
+                :max="timeYMax"
+                step="1"
+                activeColor="#4F7FFF"
+                @change="handleTimeYChange"
+              />
+            </view>
+            <ColorPanelPicker
+              :value="eyesConfig.style.timeColor"
+              label="时间颜色"
+              :preset-colors="timeColorOptions"
+              @input="handleTimeColorChange"
+            />
           </view>
         </view>
       </view>
@@ -262,9 +296,22 @@ import Icon from "../../components/Icon.vue";
 import Toast from "../../components/Toast.vue";
 import PixelCanvas from "../../components/PixelCanvas.vue";
 import ColorPanelPicker from "../../components/ColorPanelPicker.vue";
+import {
+  drawClockTextToPixels,
+  getClockFontOptions,
+  getClockTextHeight,
+  getClockTextWidth,
+} from "../../utils/clockCanvas.js";
 
 const EYES_CONFIG_STORAGE_KEY = "eyes_config";
 const EYES_EXPRESSION_STORAGE_KEY = "eyes_expression";
+const EYES_TIME_FONT_OPTIONS = getClockFontOptions().map((item) => ({
+  value: item.id,
+  label: item.name,
+}));
+const EYES_TIME_FONT_IDS = new Set(
+  EYES_TIME_FONT_OPTIONS.map((item) => item.value),
+);
 const BLINK_DURATION_MS = 150;
 const REFERENCE_EYE_SIZE = 20;
 
@@ -291,6 +338,68 @@ const EXPRESSION_OPTIONS = [
   { label: "坚定", value: "Determined" },
 ];
 
+const ALL_EXPRESSION_VALUES = EXPRESSION_OPTIONS.map((item) => item.value);
+const PREVIEW_TRANSITION_WEIGHTS = {
+  Normal: [
+    ["Normal", 20],
+    ["Happy", 20],
+    ["Focused", 20],
+    ["Surprised", 15],
+    ["Skeptic", 15],
+    ["Determined", 10],
+  ],
+  Happy: [
+    ["Happy", 20],
+    ["Glee", 25],
+    ["Excited", 20],
+    ["Normal", 15],
+    ["Surprised", 10],
+  ],
+  Angry: [
+    ["Angry", 20],
+    ["Furious", 25],
+    ["Annoyed", 20],
+    ["Frustrated", 20],
+    ["Normal", 10],
+  ],
+  Sleepy: [
+    ["Sleepy", 30],
+    ["Squint", 25],
+    ["Unimpressed", 20],
+    ["Worried", 15],
+    ["Normal", 10],
+  ],
+  Focused: [
+    ["Focused", 25],
+    ["Determined", 25],
+    ["Normal", 20],
+    ["Skeptic", 15],
+    ["Annoyed", 10],
+  ],
+  Sad: [
+    ["Sad", 25],
+    ["Worried", 25],
+    ["Frustrated", 20],
+    ["Normal", 15],
+    ["Unimpressed", 10],
+  ],
+  Excited: [
+    ["Excited", 20],
+    ["Happy", 25],
+    ["Surprised", 20],
+    ["Glee", 20],
+    ["Normal", 10],
+  ],
+  Surprised: [
+    ["Surprised", 15],
+    ["Awe", 25],
+    ["Scared", 20],
+    ["Excited", 15],
+    ["Normal", 15],
+    ["Happy", 10],
+  ],
+};
+
 const PRESETS = {
   Normal: { offsetX: 0, offsetY: 0, height: 20, width: 20, slopeTop: 0, slopeBottom: 0, radiusTop: 4, radiusBottom: 4 },
   Angry: { offsetX: -2, offsetY: 0, height: 10, width: 20, slopeTop: 0.3, slopeBottom: 0, radiusTop: 1, radiusBottom: 6 },
@@ -312,20 +421,6 @@ const PRESETS = {
   Awe: { offsetX: 1, offsetY: 0, height: 18, width: 23, slopeTop: -0.1, slopeBottom: 0.1, radiusTop: 6, radiusBottom: 6 },
   Excited: { offsetX: 0, offsetY: -2, height: 24, width: 22, slopeTop: 0.05, slopeBottom: -0.05, radiusTop: 7, radiusBottom: 7 },
   Determined: { offsetX: 0, offsetY: 0, height: 15, width: 20, slopeTop: 0.3, slopeBottom: 0, radiusTop: 2, radiusBottom: 2 },
-};
-
-const FONT_3X5 = {
-  "0": ["111", "101", "101", "101", "111"],
-  "1": ["010", "110", "010", "010", "111"],
-  "2": ["111", "001", "111", "100", "111"],
-  "3": ["111", "001", "111", "001", "111"],
-  "4": ["101", "101", "111", "001", "001"],
-  "5": ["111", "100", "111", "001", "111"],
-  "6": ["111", "100", "111", "101", "111"],
-  "7": ["111", "001", "001", "001", "001"],
-  "8": ["111", "101", "111", "101", "111"],
-  "9": ["111", "101", "111", "001", "111"],
-  ":": ["000", "010", "000", "010", "000"],
 };
 
 function createDefaultEyesConfig() {
@@ -352,6 +447,8 @@ function createDefaultEyesConfig() {
     time: {
       show: true,
       showSeconds: false,
+      font: "minimal_3x5",
+      fontSize: 1,
     },
     style: {
       eyeColor: "#9bdcff",
@@ -377,6 +474,7 @@ function isValidEyesConfig(config) {
     config.layout.eyeSpacing === undefined ||
     config.layout.eyeWidth === undefined ||
     config.layout.eyeHeight === undefined ||
+    config.layout.timeX === undefined ||
     config.layout.timeY === undefined
   ) {
     return false;
@@ -398,8 +496,13 @@ function isValidEyesConfig(config) {
   }
   if (
     config.time.show === undefined ||
-    config.time.showSeconds === undefined
+    config.time.showSeconds === undefined ||
+    config.time.font === undefined ||
+    config.time.fontSize === undefined
   ) {
+    return false;
+  }
+  if (!EYES_TIME_FONT_IDS.has(config.time.font)) {
     return false;
   }
   if (
@@ -428,6 +531,7 @@ function createPreviewRuntime(expression) {
   const now = Date.now();
   return {
     expression,
+    history: [expression],
     lookX: 0,
     lookY: 0,
     targetLookX: 0,
@@ -454,6 +558,174 @@ function createPreviewRuntime(expression) {
     nextExpressionAfterMs: 0,
     actionExpireAt: 0,
   };
+}
+
+function getPreviewTimeOfDay() {
+  const hour = new Date().getHours();
+  if (hour < 5) {
+    return "deepNight";
+  }
+  if (hour < 8) {
+    return "earlyMorning";
+  }
+  if (hour < 12) {
+    return "morning";
+  }
+  if (hour < 14) {
+    return "noon";
+  }
+  if (hour < 18) {
+    return "afternoon";
+  }
+  if (hour < 22) {
+    return "evening";
+  }
+  return "night";
+}
+
+function minPreviewExpressionInterval(timeOfDay) {
+  switch (timeOfDay) {
+    case "deepNight":
+      return 5800;
+    case "earlyMorning":
+      return 4200;
+    case "noon":
+      return 3600;
+    case "evening":
+      return 3200;
+    case "night":
+      return 4000;
+    case "morning":
+    case "afternoon":
+    default:
+      return 2800;
+  }
+}
+
+function createPreviewWeights() {
+  const weights = {};
+  ALL_EXPRESSION_VALUES.forEach((value) => {
+    weights[value] = 0.45;
+  });
+  weights.Sleepy = 0.18;
+  weights.Scared = 0.2;
+  weights.Furious = 0.2;
+  weights.Angry = 0.24;
+  return weights;
+}
+
+function fillPreviewTimeWeights(timeOfDay, weights) {
+  switch (timeOfDay) {
+    case "deepNight":
+      weights.Sleepy += 18;
+      weights.Squint += 11;
+      weights.Normal += 8;
+      weights.Worried += 7;
+      weights.Sad += 6;
+      weights.Unimpressed += 4;
+      break;
+    case "earlyMorning":
+      weights.Sleepy += 12;
+      weights.Normal += 8;
+      weights.Focused += 5;
+      weights.Worried += 5;
+      weights.Squint += 5;
+      weights.Unimpressed += 4;
+      weights.Happy += 3;
+      weights.Determined += 2;
+      break;
+    case "morning":
+      weights.Normal += 7;
+      weights.Focused += 9;
+      weights.Happy += 8;
+      weights.Determined += 8;
+      weights.Excited += 5;
+      weights.Glee += 4;
+      weights.Surprised += 3;
+      weights.Awe += 2;
+      weights.Suspicious += 2;
+      break;
+    case "noon":
+      weights.Focused += 7;
+      weights.Normal += 6;
+      weights.Happy += 5;
+      weights.Determined += 4;
+      weights.Sleepy += 4;
+      weights.Unimpressed += 4;
+      weights.Squint += 4;
+      weights.Frustrated += 3;
+      weights.Annoyed += 2;
+      break;
+    case "afternoon":
+      weights.Focused += 8;
+      weights.Determined += 7;
+      weights.Happy += 6;
+      weights.Normal += 5;
+      weights.Excited += 5;
+      weights.Skeptic += 4;
+      weights.Suspicious += 4;
+      weights.Surprised += 3;
+      weights.Annoyed += 3;
+      weights.Glee += 3;
+      break;
+    case "evening":
+      weights.Happy += 8;
+      weights.Glee += 7;
+      weights.Excited += 7;
+      weights.Surprised += 5;
+      weights.Awe += 5;
+      weights.Normal += 4;
+      weights.Determined += 3;
+      weights.Suspicious += 3;
+      weights.Focused += 2;
+      break;
+    case "night":
+      weights.Sleepy += 8;
+      weights.Normal += 6;
+      weights.Squint += 5;
+      weights.Unimpressed += 5;
+      weights.Worried += 4;
+      weights.Sad += 4;
+      weights.Happy += 2;
+      weights.Awe += 2;
+      break;
+    default:
+      break;
+  }
+}
+
+function applyPreviewTransitionWeights(currentExpression, weights) {
+  const transitions = PREVIEW_TRANSITION_WEIGHTS[currentExpression];
+  if (!transitions) {
+    return;
+  }
+  transitions.forEach(([expression, transitionWeight]) => {
+    weights[expression] = weights[expression] * 0.6 + transitionWeight * 0.4;
+  });
+}
+
+function pushPreviewHistory(runtime, expression) {
+  runtime.history.push(expression);
+  if (runtime.history.length > 5) {
+    runtime.history.shift();
+  }
+}
+
+function weightedPreviewChoice(weights, fallbackExpression) {
+  const entries = Object.entries(weights);
+  const totalWeight = entries.reduce((sum, [, value]) => sum + value, 0);
+  if (totalWeight <= 0) {
+    return fallbackExpression;
+  }
+
+  let target = Math.random() * totalWeight;
+  for (const [expression, value] of entries) {
+    target -= value;
+    if (target <= 0) {
+      return expression;
+    }
+  }
+  return fallbackExpression;
 }
 
 function normalizedLoopPhase(now, periodMs, phaseOffset) {
@@ -535,8 +807,8 @@ export default {
       previewPixels: new Map(),
       previewTimer: null,
       currentTab: 0,
-      tabs: ["表情", "时钟", "参数"],
-      tabIconNames: ["browse", "time", "task"],
+      tabs: ["表情", "时间"],
+      tabIconNames: ["browse", "time"],
       expressionModeOptions: [
         { label: "自动切换", value: "auto" },
         { label: "指定表情", value: "manual" },
@@ -545,6 +817,7 @@ export default {
       selectedEyesExpression: "Normal",
       previewRuntime: createPreviewRuntime("Normal"),
       expressionOptions: EXPRESSION_OPTIONS,
+      timeFontOptions: EYES_TIME_FONT_OPTIONS,
       eyeColorOptions: [
         { name: "浅蓝", hex: "#9bdcff" },
         { name: "冰蓝", hex: "#7fd8ff" },
@@ -552,6 +825,14 @@ export default {
         { name: "天青", hex: "#68c9ff" },
         { name: "雾蓝", hex: "#8ebcff" },
         { name: "霓虹蓝", hex: "#52b7ff" },
+      ],
+      pupilColorOptions: [
+        { name: "深蓝", hex: "#1b6dff" },
+        { name: "电蓝", hex: "#245dff" },
+        { name: "靛蓝", hex: "#3758ff" },
+        { name: "青蓝", hex: "#187bff" },
+        { name: "亮青", hex: "#00a6ff" },
+        { name: "冰青", hex: "#36cfff" },
       ],
       timeColorOptions: [
         { name: "冰白", hex: "#f4fbff" },
@@ -614,13 +895,33 @@ export default {
     timePreviewText() {
       return this.eyesConfig.time.showSeconds ? "12:34:56" : "12:34";
     },
+    selectedTimeFontLabel() {
+      const matched = this.timeFontOptions.find(
+        (item) => item.value === this.eyesConfig.time.font,
+      );
+      if (!matched) {
+        return "";
+      }
+      return matched.label;
+    },
+    timeTextWidth() {
+      return getClockTextWidth(
+        this.timePreviewText,
+        this.eyesConfig.time.font,
+        this.eyesConfig.time.fontSize,
+      );
+    },
+    timeTextHeight() {
+      return getClockTextHeight(
+        this.eyesConfig.time.font,
+        this.eyesConfig.time.fontSize,
+      );
+    },
     timeXMax() {
-      const glyphWidth = 3;
-      const spacing = 1;
-      const textLength = this.timePreviewText.length;
-      const totalWidth =
-        textLength * glyphWidth + Math.max(0, textLength - 1) * spacing;
-      return Math.max(0, 64 - totalWidth);
+      return Math.max(0, 64 - this.timeTextWidth);
+    },
+    timeYMax() {
+      return Math.max(0, 64 - this.timeTextHeight);
     },
   },
   onLoad() {
@@ -724,8 +1025,8 @@ export default {
           ...nextConfig.style,
           ...parsedConfig.style,
         };
-        nextConfig.layout.timeX = clamp(nextConfig.layout.timeX, 0, this.timeXMax);
         this.eyesConfig = nextConfig;
+        this.normalizeTimeLayout();
       } catch (error) {
         console.error("读取桌面宠物配置失败:", error);
         this.eyesConfig = createDefaultEyesConfig();
@@ -743,12 +1044,6 @@ export default {
         return;
       }
       this.selectedEyesExpression = matched.value;
-    },
-
-    saveDraft() {
-      this.saveEyesConfig();
-      this.saveSelectedExpression();
-      this.toast.showSuccess("桌面宠物草稿已保存");
     },
 
     saveEyesConfig() {
@@ -798,6 +1093,7 @@ export default {
       this.selectedEyesExpression = value;
       this.saveSelectedExpression();
       this.previewRuntime.expression = value;
+      this.previewRuntime.history = [value];
       this.previewRuntime.lastExpressionAt = Date.now();
       this.renderPreviewFrame();
     },
@@ -806,11 +1102,13 @@ export default {
       this.eyesConfig.behavior.autoSwitch = value === "auto";
       if (this.eyesConfig.behavior.autoSwitch) {
         this.previewRuntime.expression = this.chooseNextPreviewExpression();
+        this.previewRuntime.history = [this.previewRuntime.expression];
         this.previewRuntime.lastExpressionAt = Date.now();
         this.scheduleNextExpression();
         this.previewRuntime.actionExpireAt = 0;
       } else {
         this.previewRuntime.expression = this.selectedEyesExpression;
+        this.previewRuntime.history = [this.selectedEyesExpression];
         this.previewRuntime.actionExpireAt = 0;
       }
       this.saveEyesConfig();
@@ -823,6 +1121,12 @@ export default {
       this.renderPreviewFrame();
     },
 
+    handlePupilColorChange(value) {
+      this.eyesConfig.style.pupilColor = value;
+      this.saveEyesConfig();
+      this.renderPreviewFrame();
+    },
+
     handleTimeShowChange(event) {
       this.eyesConfig.time.show = event.detail.value;
       this.saveEyesConfig();
@@ -831,11 +1135,25 @@ export default {
 
     handleTimeSecondsChange(event) {
       this.eyesConfig.time.showSeconds = event.detail.value;
-      this.eyesConfig.layout.timeX = clamp(
-        this.eyesConfig.layout.timeX,
-        0,
-        this.timeXMax,
+      this.normalizeTimeLayout();
+      this.saveEyesConfig();
+      this.renderPreviewFrame();
+    },
+
+    handleTimeFontChange(value) {
+      this.eyesConfig.time.font = value;
+      this.normalizeTimeLayout();
+      this.saveEyesConfig();
+      this.renderPreviewFrame();
+    },
+
+    handleTimeFontSizeChange(event) {
+      this.eyesConfig.time.fontSize = clamp(
+        Number(event.detail.value),
+        1,
+        3,
       );
+      this.normalizeTimeLayout();
       this.saveEyesConfig();
       this.renderPreviewFrame();
     },
@@ -851,7 +1169,11 @@ export default {
     },
 
     handleTimeYChange(event) {
-      this.eyesConfig.layout.timeY = Number(event.detail.value);
+      this.eyesConfig.layout.timeY = clamp(
+        Number(event.detail.value),
+        0,
+        this.timeYMax,
+      );
       this.saveEyesConfig();
       this.renderPreviewFrame();
     },
@@ -860,6 +1182,24 @@ export default {
       this.eyesConfig.style.timeColor = value;
       this.saveEyesConfig();
       this.renderPreviewFrame();
+    },
+
+    normalizeTimeLayout() {
+      this.eyesConfig.time.fontSize = clamp(
+        Number(this.eyesConfig.time.fontSize),
+        1,
+        3,
+      );
+      this.eyesConfig.layout.timeX = clamp(
+        Number(this.eyesConfig.layout.timeX),
+        0,
+        this.timeXMax,
+      );
+      this.eyesConfig.layout.timeY = clamp(
+        Number(this.eyesConfig.layout.timeY),
+        0,
+        this.timeYMax,
+      );
     },
 
     handleBlinkIntervalChange(event) {
@@ -918,6 +1258,7 @@ export default {
     resetPreviewRuntime() {
       this.previewRuntime = createPreviewRuntime(this.selectedEyesExpression);
       this.previewRuntime.expression = this.selectedEyesExpression;
+      this.previewRuntime.history = [this.selectedEyesExpression];
     },
 
     intervalToRhythmLevel(value, minInterval, maxInterval) {
@@ -971,24 +1312,34 @@ export default {
     scheduleNextLook() {
       this.previewRuntime.nextLookAfterMs = jitteredInterval(
         this.eyesConfig.behavior.lookIntervalMs,
-        68,
-        150,
+        45,
+        100,
       );
     },
 
     scheduleNextExpression() {
-      this.previewRuntime.nextExpressionAfterMs = jitteredInterval(4200, 70, 160);
+      this.previewRuntime.nextExpressionAfterMs = jitteredInterval(
+        minPreviewExpressionInterval(getPreviewTimeOfDay()),
+        72,
+        130,
+      );
     },
 
     chooseNextPreviewExpression() {
-      const availableExpressions = this.expressionOptions.filter(
-        (item) => item.value !== this.previewRuntime.expression,
+      const weights = createPreviewWeights();
+      fillPreviewTimeWeights(getPreviewTimeOfDay(), weights);
+      applyPreviewTransitionWeights(
+        this.previewRuntime.expression,
+        weights,
       );
-      if (availableExpressions.length === 0) {
-        return this.previewRuntime.expression;
-      }
-      const randomIndex = Math.floor(Math.random() * availableExpressions.length);
-      return availableExpressions[randomIndex].value;
+      weights[this.previewRuntime.expression] *= 0.12;
+
+      this.previewRuntime.history.slice(-4).forEach((expression, index) => {
+        const penalty = 0.05 + index * 0.03;
+        weights[expression] *= penalty;
+      });
+
+      return weightedPreviewChoice(weights, this.previewRuntime.expression);
     },
 
     startPreviewBlink(now) {
@@ -1060,19 +1411,25 @@ export default {
       let baseX = 0;
       let baseY = 0;
 
-      if (roll < 28) {
+      if (roll < 10) {
         baseX = randomFloat(-0.18, 0.18);
         baseY = randomFloat(-0.10, 0.10);
-      } else if (roll < 54) {
+      } else if (roll < 42) {
         const side = Math.random() < 0.5 ? -1 : 1;
         baseX = side * randomFloat(0.42, 0.80);
         baseY = randomFloat(-0.18, 0.20);
-      } else if (roll < 72) {
+      } else if (roll < 66) {
         baseX = randomFloat(-0.36, 0.36);
         baseY = randomFloat(-0.62, -0.22);
-      } else if (roll < 84) {
+      } else if (roll < 78) {
         baseX = randomFloat(-0.28, 0.28);
         baseY = randomFloat(0.12, 0.34);
+      } else if (roll < 92) {
+        const side = Math.random() < 0.5 ? -1 : 1;
+        baseX = side * randomFloat(0.32, 0.64);
+        baseY = Math.random() < 0.5
+          ? randomFloat(-0.42, -0.14)
+          : randomFloat(0.08, 0.24);
       } else {
         const side = Math.random() < 0.5 ? -1 : 1;
         baseX = side * randomFloat(0.18, 0.30);
@@ -1087,9 +1444,12 @@ export default {
       this.previewRuntime.targetRightLookOffsetX = 0;
       this.previewRuntime.targetRightLookOffsetY = 0;
 
-      let asymmetryChance = 22;
-      if (activeExpression === "Skeptic" || activeExpression === "Worried") {
-        asymmetryChance = 34;
+      let asymmetryChance = 30;
+      if (
+        activeExpression === "Skeptic" ||
+        activeExpression === "Worried"
+      ) {
+        asymmetryChance = 42;
       }
 
       if (Math.random() * 100 >= asymmetryChance) {
@@ -1167,6 +1527,7 @@ export default {
           this.previewRuntime.nextExpressionAfterMs
       ) {
         this.previewRuntime.expression = this.chooseNextPreviewExpression();
+        pushPreviewHistory(this.previewRuntime, this.previewRuntime.expression);
         this.previewRuntime.lastExpressionAt = now;
         this.scheduleNextExpression();
       }
@@ -1443,28 +1804,6 @@ export default {
       }
     },
 
-    drawTinyText(pixelMap, text, x, y, color) {
-      const glyphWidth = 3;
-      const spacing = 1;
-      let cursorX = clamp(x, 0, 63);
-
-      for (const char of text) {
-        const glyph = FONT_3X5[char];
-        if (!glyph) {
-          cursorX += glyphWidth + spacing;
-          continue;
-        }
-        for (let row = 0; row < glyph.length; row++) {
-          for (let col = 0; col < glyph[row].length; col++) {
-            if (glyph[row][col] === "1") {
-              pixelMap.set(`${cursorX + col},${y + row}`, color);
-            }
-          }
-        }
-        cursorX += glyphWidth + spacing;
-      }
-    },
-
     drawTime(pixelMap) {
       if (!this.eyesConfig.time.show) {
         return;
@@ -1474,12 +1813,14 @@ export default {
       if (this.eyesConfig.time.showSeconds) {
         text = now.toTimeString().slice(0, 8);
       }
-      this.drawTinyText(
-        pixelMap,
+      drawClockTextToPixels(
         text,
         clamp(this.eyesConfig.layout.timeX, 0, this.timeXMax),
-        this.eyesConfig.layout.timeY,
+        clamp(this.eyesConfig.layout.timeY, 0, this.timeYMax),
         this.eyesConfig.style.timeColor,
+        pixelMap,
+        this.eyesConfig.time.font,
+        this.eyesConfig.time.fontSize,
       );
     },
 
@@ -1756,6 +2097,13 @@ export default {
   flex-wrap: wrap;
 }
 
+.font-grid {
+  margin-top: 10rpx;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14rpx;
+}
+
 .option-btn {
   min-width: calc(25% - 12rpx);
   height: 72rpx;
@@ -1767,6 +2115,16 @@ export default {
   align-items: center;
   justify-content: center;
   box-sizing: border-box;
+}
+
+.font-option-btn {
+  min-width: 0;
+  height: 80rpx;
+}
+
+.font-option-name {
+  font-size: 22rpx;
+  color: var(--text-secondary);
 }
 
 .option-btn text {
@@ -1781,6 +2139,11 @@ export default {
 }
 
 .option-btn.active text {
+  color: var(--accent-primary);
+  font-weight: 600;
+}
+
+.option-btn.active .font-option-name {
   color: var(--accent-primary);
   font-weight: 600;
 }

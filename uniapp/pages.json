@@ -302,6 +302,33 @@
         "backgroundColor": "#FFFFFF",
         "enablePullDownRefresh": false
       }
+    },
+    {
+      "path": "pages/design-preview/index",
+      "style": {
+        "navigationStyle": "custom",
+        "navigationBarTextStyle": "black",
+        "backgroundColor": "#FFFDF5",
+        "enablePullDownRefresh": false
+      }
+    },
+    {
+      "path": "pages/design-preview/control",
+      "style": {
+        "navigationStyle": "custom",
+        "navigationBarTextStyle": "black",
+        "backgroundColor": "#FFFDF5",
+        "enablePullDownRefresh": false
+      }
+    },
+    {
+      "path": "pages/design-preview/ecosystem",
+      "style": {
+        "navigationStyle": "custom",
+        "navigationBarTextStyle": "black",
+        "backgroundColor": "#FFFDF5",
+        "enablePullDownRefresh": false
+      }
     }
   ],
   "globalStyle": {

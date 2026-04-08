@@ -177,7 +177,6 @@
           <div class="buttons">
             <button id="replay">重新播放</button>
             <button id="jumpWin" class="secondary">直接跳到 GAME WIN</button>
-            <button id="refreshSamples" class="secondary">刷新路线样本</button>
           </div>
         </div>
       </div>
@@ -198,7 +197,6 @@
     const routeSamplesEl = document.getElementById("routeSamples");
     const replayButton = document.getElementById("replay");
     const jumpWinButton = document.getElementById("jumpWin");
-    const refreshSamplesButton = document.getElementById("refreshSamples");
 
     const PACMAN_DIRECTION_RIGHT = 0;
     const PACMAN_DIRECTION_DOWN = 1;
@@ -223,6 +221,16 @@
       [255, 255, 255]
     ];
     const winDurationMs = 3000;
+    const routePlans = [
+      { name: "经典录制路线", legacy: true },
+      { name: "短路线 1", quadrantOrder: [1, 0, 2, 3], variants: [0, 1, 1, 0] },
+      { name: "短路线 2", quadrantOrder: [0, 2, 1, 3], variants: [1, 1, 1, 0] },
+      { name: "短路线 3", quadrantOrder: [0, 1, 3, 2], variants: [1, 0, 0, 1] },
+      { name: "短路线 4", quadrantOrder: [1, 3, 0, 2], variants: [0, 1, 1, 1] },
+      { name: "短路线 5", quadrantOrder: [1, 3, 0, 2], variants: [0, 0, 0, 1] },
+      { name: "短路线 6", quadrantOrder: [1, 3, 0, 2], variants: [0, 0, 0, 0] },
+      { name: "短路线 7", quadrantOrder: [0, 2, 1, 3], variants: [1, 0, 0, 0] }
+    ];
 
     const fallbackRouteDirections = "LLLLLLDDRRRRLUURRRRRRRRDDLLLLRUDRRDDDRDLDDDRDDLLLUULRRLDDLLLLLLLLUURRRRLDULLUUULURUU"
       .split("")
@@ -432,7 +440,22 @@
       return reversed.reverse();
     }
 
-    function buildVariedRoute(map) {
+    function buildVariedRoute(map, forcedPlanIndex = null) {
+      const planIndex = forcedPlanIndex == null
+        ? Math.floor(Math.random() * routePlans.length)
+        : forcedPlanIndex;
+      const plan = routePlans[planIndex];
+
+      if (plan.legacy) {
+        const legacy = fallbackRouteDirections.slice();
+        legacy.meta = {
+          name: plan.name,
+          legacy: true,
+          fallback: false
+        };
+        return legacy;
+      }
+
       const quadrantTargets = [[], [], [], []];
       for (let row = 0; row < 12; row += 1) {
         for (let col = 0; col < 12; col += 1) {
@@ -443,15 +466,13 @@
         }
       }
 
-      const quadrantOrder = shuffleQuadrants([0, 1, 2, 3]);
       const routeDirections = [];
-      const variants = [];
       let currentX = 6;
       let currentY = 0;
 
-      for (const quadrant of quadrantOrder) {
-        const variant = Math.floor(Math.random() * 4);
-        variants.push(variant);
+      for (let index = 0; index < plan.quadrantOrder.length; index += 1) {
+        const quadrant = plan.quadrantOrder[index];
+        const variant = plan.variants[index];
         const targets = quadrantTargets[quadrant].slice();
         sortTargets(targets, quadrant, variant);
 
@@ -460,8 +481,8 @@
           if (!path) {
             const fallback = fallbackRouteDirections.slice();
             fallback.meta = {
-              quadrantOrder: [0, 1, 2, 3],
-              variants: [0, 0, 0, 0],
+              name: "经典录制路线",
+              legacy: true,
               fallback: true
             };
             return fallback;
@@ -473,8 +494,9 @@
       }
 
       routeDirections.meta = {
-        quadrantOrder,
-        variants,
+        name: plan.name,
+        quadrantOrder: plan.quadrantOrder.slice(),
+        variants: plan.variants.slice(),
         fallback: false
       };
       return routeDirections;
@@ -484,13 +506,17 @@
       if (!meta) {
         return "";
       }
+      if (meta.legacy) {
+        return meta.name || "经典录制路线";
+      }
       if (meta.fallback) {
         return "回退到固定路线";
       }
       const names = ["左上", "右上", "左下", "右下"];
-      return meta.quadrantOrder.map((quadrant, index) =>
+      const detail = meta.quadrantOrder.map((quadrant, index) =>
         `${names[quadrant]}-${meta.variants[index] + 1}`
       ).join(" / ");
+      return `${meta.name} | ${detail}`;
     }
 
     function routeToText(route) {
@@ -503,16 +529,15 @@
     }
 
     function renderRouteSamples() {
-      const samples = [];
-      for (let index = 0; index < 6; index += 1) {
-        const route = buildVariedRoute(mapTemplate.map((row) => row.slice()));
-        samples.push({
+      const samples = routePlans.map((_, index) => {
+        const route = buildVariedRoute(mapTemplate.map((row) => row.slice()), index);
+        return {
           index: index + 1,
           steps: route.length,
           profile: describeRouteProfile(route.meta),
           text: routeToText(route)
-        });
-      }
+        };
+      });
 
       routeSamplesEl.innerHTML = samples.map((sample) => `
         <div style="padding:10px 12px; border:1px solid rgba(255,255,255,0.08); border-radius:12px; background:rgba(255,255,255,0.02);">
@@ -798,10 +823,6 @@
           }
         }
       }
-    });
-
-    refreshSamplesButton.addEventListener("click", () => {
-      renderRouteSamples();
     });
 
     resetState();
