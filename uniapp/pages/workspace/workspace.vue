@@ -1,23 +1,25 @@
 <template>
-  <view class="workspace-page">
+  <view class="workspace-page glx-page-shell">
     <!-- 状态栏占位 -->
     <!-- #ifdef MP-WEIXIN -->
     <view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
     <!-- #endif -->
 
     <!-- 顶部栏 -->
-    <view class="header">
+    <view class="header glx-topbar glx-page-shell__fixed">
       <view class="header-content">
-        <text class="header-title">创作中心</text>
+        <view class="header-placeholder"></view>
+        <text class="header-title glx-topbar__title">创作中心</text>
+        <view class="header-placeholder"></view>
       </view>
     </view>
 
     <!-- 主要内容 -->
-    <scroll-view scroll-y class="main-content">
+    <scroll-view scroll-y class="main-content glx-scroll-region glx-page-shell__content">
       <!-- 快速开始 -->
       <view class="quick-actions">
         <view class="action-grid">
-          <view class="action-card" @click="startBlankCanvas">
+          <view class="action-card glx-panel-card" @click="startBlankCanvas">
             <view class="action-icon">
               <Icon name="add" :size="48" color="#4F7FFF" />
             </view>
@@ -25,7 +27,7 @@
             <text class="action-subtitle">从空白开始创作</text>
           </view>
 
-          <view class="action-card" @click="startImageImport">
+          <view class="action-card glx-panel-card" @click="startImageImport">
             <view class="action-icon">
               <Icon name="upload" :size="48" color="#2ECC71" />
             </view>
@@ -37,18 +39,18 @@
 
       <!-- 我的画布 -->
       <view class="my-projects">
-        <view class="section-header">
-          <text class="section-title">我的画布</text>
+        <view class="section-header glx-section-head">
+          <text class="section-title glx-section-title">我的画布</text>
           <text class="project-count">{{ filteredProjects.length }} 个</text>
         </view>
 
-        <view v-if="filteredProjects.length === 0" class="empty-state">
+        <view v-if="filteredProjects.length === 0" class="empty-state glx-panel-card">
           <view class="empty-icon">
             <Icon name="picture" :size="80" color="#AAAAAA" />
           </view>
           <text class="empty-title">还没有画布</text>
           <text class="empty-subtitle">开始您的第一个创作吧！</text>
-          <view class="empty-btn" @click="startBlankCanvas">
+          <view class="empty-btn glx-cta-button" @click="startBlankCanvas">
             <text class="empty-btn-text">立即创建</text>
           </view>
         </view>
@@ -138,13 +140,13 @@ export default {
   height: 100vh;
   display: flex;
   flex-direction: column;
-  background-color: var(--color-app-background);
+  background-color: var(--nb-paper);
   overflow: hidden;
 }
 
 .header {
-  background-color: var(--color-card-background);
-  border-bottom: 2rpx solid var(--border-primary);
+  background-color: var(--nb-surface);
+  border-bottom: 2rpx solid var(--nb-ink);
   padding: 0 32rpx;
 }
 
@@ -158,7 +160,7 @@ export default {
 .header-title {
   font-size: 36rpx;
   font-weight: 700;
-  color: var(--color-text-primary);
+  color: var(--nb-ink);
 }
 
 .header-actions {
@@ -174,7 +176,7 @@ export default {
 .section-title {
   font-size: 36rpx;
   font-weight: 700;
-  color: var(--color-text-primary);
+  color: var(--nb-ink);
   margin-bottom: 24rpx;
 }
 
@@ -187,7 +189,7 @@ export default {
 
 .project-count {
   font-size: 24rpx;
-  color: var(--color-text-secondary);
+  color: #4a4a4a;
   font-weight: 500;
 }
 
@@ -208,15 +210,15 @@ export default {
   flex-direction: column;
   align-items: center;
   padding: 32rpx 16rpx;
-  background-color: var(--color-card-background);
-  border-radius: var(--radius-medium);
-  box-shadow: var(--shadow-card);
+  background-color: var(--nb-surface);
+  border-radius: 0;
+  box-shadow: var(--nb-shadow-strong);
   transition: all 0.2s ease;
 }
 
 .action-card:active {
-  transform: scale(0.95);
-  box-shadow: var(--shadow-floating);
+  transform: none;
+  box-shadow: var(--nb-shadow-strong);
 }
 
 .action-icon {
@@ -225,22 +227,22 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: var(--color-app-background);
-  border-radius: var(--radius-medium);
+  background-color: var(--nb-paper);
+  border-radius: 0;
   margin-bottom: 16rpx;
 }
 
 .action-title {
   font-size: 26rpx;
   font-weight: 600;
-  color: var(--color-text-primary);
+  color: var(--nb-ink);
   margin-bottom: 8rpx;
   text-align: center;
 }
 
 .action-subtitle {
   font-size: 22rpx;
-  color: var(--color-text-secondary);
+  color: #4a4a4a;
   text-align: center;
   line-height: 1.4;
 }
@@ -271,7 +273,7 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: var(--color-app-background);
+  background-color: var(--nb-paper);
   border-radius: 50%;
   margin-bottom: 32rpx;
 }
@@ -279,31 +281,32 @@ export default {
 .empty-title {
   font-size: 32rpx;
   font-weight: 600;
-  color: var(--color-text-primary);
+  color: var(--nb-ink);
   margin-bottom: 12rpx;
 }
 
 .empty-subtitle {
   font-size: 26rpx;
-  color: var(--color-text-secondary);
+  color: #4a4a4a;
   line-height: 1.5;
   margin-bottom: 32rpx;
 }
 
 .empty-btn {
   padding: 20rpx 40rpx;
-  background-color: var(--color-brand-primary);
-  border-radius: var(--radius-small);
+  background-color: var(--nb-yellow);
+  border-radius: 0;
+  border: 3rpx solid #000000;
   transition: all 0.2s ease;
 }
 
 .empty-btn:active {
-  transform: scale(0.95);
+  transform: translate(2rpx, 2rpx);
 }
 
 .empty-btn-text {
   font-size: 28rpx;
   font-weight: 600;
-  color: #ffffff;
+  color: #000000;
 }
 </style>

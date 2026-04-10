@@ -26,6 +26,8 @@ export default {
 
 <style>
 @import './styles/theme.css';
+@import './styles/neubrutalism-global.css';
+@import './styles/glx-style-system.css';
 @import './static/iconfont/iconfont.css';
 
 /* 非小程序平台全局重置 */
@@ -59,7 +61,7 @@ page {
   /* #endif */
 
   /* #ifdef MP-WEIXIN */
-  background-color: #F5F5F7;
+  background-color: var(--bg-primary);
   /* #endif */
 }
 

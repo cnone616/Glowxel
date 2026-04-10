@@ -1,34 +1,31 @@
 <template>
-  <view class="clock-editor-page">
+  <view class="clock-editor-page glx-page-shell">
     <!-- 状态栏占位 -->
     <view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
 
     <!-- 头部 -->
-    <view class="header">
+    <view class="navbar glx-topbar glx-page-shell__fixed">
       <view class="nav-left" @click="handleBack">
-        <Icon
-          name="direction-left"
-          :size="32"
-          color="var(--color-text-primary)"
-        />
+        <Icon name="direction-left" :size="32" color="var(--nb-ink)" />
       </view>
-      <view class="nav-title">
-        <text class="project-name">{{ pageHeaderTitle }}</text>
-      </view>
+      <text class="nav-title glx-topbar__title">{{ pageHeaderTitle }}</text>
+      <view class="nav-right"></view>
     </view>
 
     <!-- Canvas 预览区域 -->
     <view class="canvas-section">
       <view v-if="!canvasHidden" class="canvas-container" ref="canvasContainer">
         <template v-if="useThemeImagePreview">
-          <image
-            :src="themeCanvasPreviewImage"
-            class="theme-canvas-preview"
-            mode="aspectFill"
-          />
-          <view class="theme-canvas-grid"></view>
-          <view class="theme-preview-badge">
-            <text class="theme-preview-badge-text">官方参考图</text>
+          <view class="theme-canvas-stage">
+            <image
+              :src="themeCanvasPreviewImage"
+              class="theme-canvas-preview"
+              mode="aspectFit"
+            />
+            <view class="theme-canvas-grid"></view>
+            <view class="theme-preview-badge">
+              <view class="theme-preview-badge-text">官方参考图</view>
+            </view>
           </view>
         </template>
         <PixelCanvas
@@ -48,15 +45,9 @@
         />
       </view>
       <view v-else class="canvas-placeholder"></view>
-      <view class="preview-caption">
-        <view class="preview-caption-info">
-          <view class="preview-status-chip" :class="previewStatusClass">
-            <text class="preview-status-chip-text">{{ previewStatusLabel }}</text>
-          </view>
+      <view class="preview-caption glx-preview-panel">
+        <view class="preview-caption-info glx-preview-panel__info">
           <text class="preview-caption-title">{{ previewPanelTitle }}</text>
-          <text v-if="previewCaptionText" class="preview-caption-text">{{
-            previewCaptionText
-          }}</text>
           <view
             v-if="clockMode === 'theme' && displayClockThemePreset"
             class="preview-theme-chip"
@@ -69,11 +60,11 @@
         </view>
         <view class="preview-actions">
           <view
-            class="action-btn-sm primary"
+            class="action-btn-sm primary glx-primary-action"
             :class="{ disabled: isSending }"
             @click="sendToDevice"
           >
-            <Icon name="link" :size="36" color="#fff" />
+            <Icon name="link" :size="36" color="#000000" />
             <text>发送</text>
           </view>
         </view>
@@ -81,12 +72,17 @@
     </view>
 
     <!-- 主内容：当前 Tab 的表单 -->
-    <scroll-view scroll-y class="content" :style="{ height: contentHeight }">
-      <view class="content-wrapper">
+    <scroll-view
+      scroll-y
+      class="content glx-scroll-region glx-page-shell__content"
+      :style="{ height: contentHeight }"
+    >
+      <view class="content-wrapper glx-scroll-stack">
         <ClockThemePanel
           v-if="clockMode === 'theme'"
           :presets="clockThemePresets"
-          :active-theme-id="displayClockThemeId"
+          :selected-theme-id="displayClockThemeId"
+          :current-theme-id="currentDeviceThemeId"
           :active-preset="displayClockThemePreset"
           :has-image="!!config.image.data || !!imagePixels"
           :is-modified="isClockThemeModified"
@@ -198,11 +194,11 @@
               </view>
               <view class="image-actions">
                 <view class="image-action-btn" @click="chooseImage">
-                  <Icon name="refresh" :size="28" />
+                  <Icon name="refresh" :size="28" color="#FFFFFF" />
                   <text>更换</text>
                 </view>
                 <view class="image-action-btn danger" @click="removeImage">
-                  <Icon name="ashbin" :size="28" />
+                  <Icon name="ashbin" :size="28" color="#FFFFFF" />
                   <text>删除</text>
                 </view>
               </view>
@@ -356,9 +352,7 @@
         <Icon
           :name="tab.icon"
           :size="36"
-          :color="
-            currentTab === tab.index ? accentColor : 'var(--text-secondary)'
-          "
+          :color="currentTab === tab.index ? '#000000' : '#666666'"
         />
         <text class="bottom-tab-text">{{ tab.label }}</text>
       </view>
@@ -411,6 +405,8 @@ import {
   getMatchingClockThemeId,
 } from "../../utils/clockThemePresets.js";
 
+const CLOCK_DEVICE_THEME_ID_KEY = "clock_device_theme_id";
+
 export default {
   mixins: [statusBarMixin, clockPreviewMixin, imageGifMixin, deviceSyncMixin],
   components: {
@@ -434,6 +430,7 @@ export default {
       gifIsPlaying: false, // 是否正在播放
       gifPlaySpeed: 1.0, // 播放速度倍率
       lastAppliedClockThemeId: "",
+      deviceThemeId: "",
       isSending: false, // 传输锁，防止传输过程中操作
       _gifParser: null, // GIF 解析器实例，改宽高时重新生成数据
       _imageConvertToken: 0,
@@ -578,6 +575,15 @@ export default {
       }
       return findClockThemePreset(this.displayClockThemeId);
     },
+    currentDeviceThemeId() {
+      if (!this.deviceStore || !this.deviceStore.connected) {
+        return "";
+      }
+      if (this.deviceStore.deviceMode !== "theme") {
+        return "";
+      }
+      return this.deviceThemeId;
+    },
     isClockThemeModified() {
       if (this.clockMode === "theme") {
         return false;
@@ -609,41 +615,8 @@ export default {
       }
       return this.displayClockThemePreset.previewImage;
     },
-    previewCaptionText() {
-      if (this.clockMode === "theme") {
-        return "当前展示官方主题参考图，实际效果以板载程序切换后为准";
-      }
-      return "直接查看当前时钟与背景效果";
-    },
     previewPanelTitle() {
-      if (this.clockMode === "theme") {
-        return "64 x 64 主题参考预览";
-      }
-      return "64 x 64 模拟预览";
-    },
-    previewStatusLabel() {
-      if (this.isSending) {
-        return "发送中";
-      }
-      if (!this.canvasReady) {
-        return "预览加载中";
-      }
-      if (this.clockMode === "theme") {
-        return "官方参考图";
-      }
       return "模拟预览";
-    },
-    previewStatusClass() {
-      if (this.isSending) {
-        return "is-sending";
-      }
-      if (!this.canvasReady) {
-        return "is-loading";
-      }
-      if (this.clockMode === "theme") {
-        return "is-reference";
-      }
-      return "is-preview";
     },
     allPixelsForPreview() {
       const pixels = new Map();
@@ -679,14 +652,16 @@ export default {
   onLoad(options) {
     const savedMode = uni.getStorageSync("device_mode");
     const defaultMode =
-      savedMode === "animation" || savedMode === "theme"
-        ? savedMode
-        : "clock";
+      savedMode === "animation" || savedMode === "theme" ? savedMode : "clock";
     this.clockMode = options.mode || defaultMode;
     this._clockModeFromOptions = !!options.mode;
     this.ensureValidCurrentTab();
 
     this.loadConfig();
+    const savedDeviceThemeId = uni.getStorageSync(CLOCK_DEVICE_THEME_ID_KEY);
+    if (typeof savedDeviceThemeId === "string") {
+      this.deviceThemeId = savedDeviceThemeId;
+    }
     if (!this.lastAppliedClockThemeId && this.clockMode !== "theme") {
       this.lastAppliedClockThemeId = getMatchingClockThemeId(this.config);
     }
@@ -721,7 +696,7 @@ export default {
           .boundingClientRect((data) => {
             if (data && data.width > 0) {
               this.containerSize = { width: data.width, height: data.width };
-              const fitZoom = Math.floor((data.width * 0.9) / 64);
+              const fitZoom = Math.floor((data.width * 0.96) / 64);
               this.zoom = Math.max(2, fitZoom);
               this.pan = {
                 x: (data.width - 64 * this.zoom) / 2,
@@ -851,66 +826,9 @@ export default {
   overflow: hidden;
 }
 
-.header {
-  height: 88rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0 32rpx;
-  border-bottom: 2rpx solid var(--border-primary);
-  background-color: var(--bg-elevated);
-  position: relative;
-}
-
-.nav-left {
-  position: absolute;
-  left: 32rpx;
-  width: 80rpx;
-  height: 80rpx;
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-}
-
-.back-btn {
-  width: 64rpx;
-  height: 64rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 16rpx;
-  transition: var(--transition-base);
-}
-
-.back-btn:active {
-  background-color: var(--bg-tertiary);
-  transform: scale(0.95);
-}
-
 .icon {
   font-size: 56rpx;
   color: var(--text-primary);
-}
-
-.nav-title {
-  font-size: 32rpx;
-  font-weight: 600;
-  color: var(--color-text-primary);
-}
-
-.project-name {
-  font-size: 36rpx;
-  font-weight: 700;
-  color: var(--text-primary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.header-actions-inline {
-  display: flex;
-  gap: 12rpx;
-  margin-right: 16rpx;
 }
 
 .action-btn-sm {
@@ -919,53 +837,21 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 14rpx;
-  border: 2rpx solid var(--border-primary);
+  border-radius: 0;
+  border: 2rpx solid var(--nb-ink);
   background-color: var(--bg-tertiary);
   transition: var(--transition-base);
-}
-
-.action-btn-sm:active {
-  transform: scale(0.95);
 }
 
 .action-btn-sm.primary {
-  background-color: var(--accent-primary);
-  border-color: var(--accent-primary);
-}
-
-.header-actions {
-  display: flex;
-  gap: 16rpx;
-}
-
-.action-btn {
-  width: 64rpx;
-  height: 64rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 16rpx;
-  border: 2rpx solid var(--border-primary);
-  background-color: var(--bg-tertiary);
-  transition: var(--transition-base);
-}
-
-.action-btn:active {
-  transform: scale(0.95);
-  border-color: var(--accent-primary);
-  box-shadow: var(--shadow-glow);
-}
-
-.action-btn.primary {
-  background-color: var(--accent-primary);
-  border-color: var(--accent-primary);
+  background-color: var(--nb-yellow);
+  border-color: var(--nb-ink);
 }
 
 .preview-hint {
   padding: 20rpx 32rpx;
   background-color: var(--bg-tertiary);
-  border-bottom: 2rpx solid var(--border-primary);
+  border-bottom: 2rpx solid var(--nb-ink);
 }
 
 .preview-hint-text {
@@ -984,6 +870,9 @@ export default {
   width: 100%;
   aspect-ratio: 1;
   position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   overflow: hidden;
   background: #000000;
 }
@@ -994,11 +883,20 @@ export default {
   background: #000000;
 }
 
+.theme-canvas-stage {
+  position: relative;
+  width: calc(100% - 32rpx);
+  height: calc(100% - 32rpx);
+  margin: 16rpx;
+  background: #000000;
+}
+
 .theme-canvas-preview {
   width: 100%;
   height: 100%;
   display: block;
   background: #000000;
+  image-rendering: pixelated;
 }
 
 .theme-canvas-grid {
@@ -1009,34 +907,41 @@ export default {
     linear-gradient(rgba(255, 255, 255, 0.24) 1px, transparent 1px),
     linear-gradient(90deg, rgba(255, 255, 255, 0.24) 1px, transparent 1px);
   background-size: calc(100% / 64) calc(100% / 64);
-  box-shadow: inset 0 0 0 2rpx rgba(255, 255, 255, 0.58);
+  box-shadow: inset 0 0 0 2rpx rgba(255, 255, 255, 0.32);
 }
 
 .theme-preview-badge {
   position: absolute;
   top: 14rpx;
   right: 14rpx;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42rpx;
   padding: 8rpx 14rpx;
-  border-radius: 999rpx;
-  background: rgba(12, 18, 28, 0.78);
-  border: 1rpx solid rgba(102, 206, 255, 0.45);
-  backdrop-filter: blur(8rpx);
+  border-radius: 0;
+  background: var(--nb-yellow);
+  border: 2rpx solid #000000;
+  backdrop-filter: none;
 }
 
 .theme-preview-badge-text {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   font-size: 18rpx;
   font-weight: 600;
-  color: #dff5ff;
+  line-height: 1;
+  color: #000000;
 }
 
 .preview-caption {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16rpx;
-  padding: 14rpx 20rpx 18rpx;
+  gap: 12rpx;
+  padding: 10rpx 16rpx 12rpx;
   background: var(--bg-tertiary);
-  border-bottom: 1rpx solid var(--border-color);
 }
 
 .preview-caption-info {
@@ -1044,48 +949,13 @@ export default {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 4rpx;
-}
-
-.preview-status-chip {
-  display: inline-flex;
-  width: fit-content;
-  padding: 6rpx 12rpx;
-  border-radius: 999rpx;
-  background: rgba(255, 255, 255, 0.08);
-}
-
-.preview-status-chip.is-loading {
-  background: rgba(255, 214, 102, 0.14);
-}
-
-.preview-status-chip.is-preview {
-  background: rgba(79, 127, 255, 0.14);
-}
-
-.preview-status-chip.is-reference {
-  background: rgba(102, 206, 255, 0.14);
-}
-
-.preview-status-chip.is-sending {
-  background: rgba(52, 211, 153, 0.16);
-}
-
-.preview-status-chip-text {
-  font-size: 20rpx;
-  font-weight: 600;
-  color: var(--text-secondary);
+  gap: 0;
 }
 
 .preview-caption-title {
   font-size: 24rpx;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--text-primary);
-}
-
-.preview-caption-text {
-  font-size: 22rpx;
-  color: var(--text-secondary);
 }
 
 .preview-theme-chip {
@@ -1093,14 +963,15 @@ export default {
   width: fit-content;
   margin-top: 4rpx;
   padding: 6rpx 12rpx;
-  border-radius: 999rpx;
-  background: rgba(79, 127, 255, 0.12);
+  border-radius: 0;
+  background: #ffffff;
+  border: 2rpx solid #000000;
 }
 
 .preview-theme-chip-text {
   font-size: 20rpx;
   font-weight: 600;
-  color: var(--accent-primary);
+  color: #000000;
 }
 
 .preview-actions {
@@ -1116,7 +987,7 @@ export default {
   height: 64rpx;
   padding: 0 18rpx;
   gap: 10rpx;
-  border-radius: 18rpx;
+  border-radius: 0;
 }
 
 .preview-actions .action-btn-sm text {
@@ -1127,7 +998,7 @@ export default {
 }
 
 .preview-actions .action-btn-sm.primary text {
-  color: #ffffff;
+  color: #000000;
 }
 
 .canvas-wrapper {
@@ -1140,9 +1011,9 @@ export default {
   width: 320px;
   height: 320px;
   background-color: #000;
-  border: 2rpx solid var(--accent-primary);
-  border-radius: 12rpx;
-  box-shadow: 0 0 20rpx rgba(0, 243, 255, 0.3);
+  border: 2rpx solid var(--nb-yellow);
+  border-radius: 0;
+  box-shadow: none;
 }
 
 .tool-selection {
@@ -1159,19 +1030,15 @@ export default {
   gap: 12rpx;
   padding: 32rpx 24rpx;
   background-color: var(--bg-secondary);
-  border: 2rpx solid var(--border-primary);
-  border-radius: 16rpx;
+  border: 2rpx solid var(--nb-ink);
+  border-radius: 0;
   transition: var(--transition-base);
 }
 
-.tool-option:active {
-  transform: scale(0.98);
-}
-
 .tool-option.active {
-  background-color: rgba(0, 243, 255, 0.1);
-  border-color: var(--accent-primary);
-  box-shadow: 0 0 16rpx rgba(0, 243, 255, 0.3);
+  background-color: var(--nb-yellow);
+  border-color: var(--nb-ink);
+  box-shadow: none;
 }
 
 .tool-name {
@@ -1180,8 +1047,8 @@ export default {
 }
 
 .tool-option.active .tool-name {
-  color: var(--accent-primary);
-  font-weight: 500;
+  color: #000000;
+  font-weight: 700;
 }
 
 .action-buttons {
@@ -1198,25 +1065,21 @@ export default {
   gap: 12rpx;
   padding: 24rpx 16rpx;
   background-color: var(--bg-secondary);
-  border: 2rpx solid var(--border-primary);
-  border-radius: 12rpx;
+  border: 2rpx solid var(--nb-ink);
+  border-radius: 0;
   font-size: 22rpx;
   color: var(--text-primary);
   transition: var(--transition-base);
 }
 
-.action-button:active {
-  transform: scale(0.98);
-  border-color: var(--accent-primary);
-}
-
 .action-button.danger {
-  border-color: rgba(239, 68, 68, 0.3);
-  color: var(--error-color);
+  background-color: #d92d20;
+  border-color: #000000;
+  color: #ffffff;
 }
 
 .action-button.danger:active {
-  background-color: rgba(239, 68, 68, 0.1);
+  background-color: #d92d20;
 }
 
 .current-color-section {
@@ -1229,16 +1092,17 @@ export default {
   gap: 16rpx;
   padding: 16rpx;
   background-color: var(--bg-secondary);
-  border-radius: 12rpx;
+  border-radius: 0;
   margin-top: 12rpx;
+  border: 2rpx solid var(--nb-ink);
 }
 
 .current-color-box {
   width: 80rpx;
   height: 80rpx;
-  border-radius: 12rpx;
-  border: 2rpx solid var(--border-primary);
-  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.2);
+  border-radius: 0;
+  border: 2rpx solid var(--nb-ink);
+  box-shadow: none;
 }
 
 .current-color-hex {
@@ -1254,15 +1118,15 @@ export default {
   justify-content: space-between;
   padding: 20rpx 24rpx;
   background-color: var(--bg-secondary);
-  border: 2rpx solid var(--border-primary);
-  border-radius: 12rpx;
+  border: 2rpx solid var(--nb-ink);
+  border-radius: 0;
   margin: 24rpx 0;
   transition: var(--transition-base);
 }
 
 .palette-toggle:active {
-  background-color: var(--bg-tertiary);
-  border-color: var(--accent-primary);
+  background-color: var(--nb-yellow);
+  border-color: var(--nb-ink);
 }
 
 .palette-toggle-text {
@@ -1273,7 +1137,7 @@ export default {
 
 .palette-toggle-icon {
   font-size: 24rpx;
-  color: var(--accent-primary);
+  color: var(--nb-ink);
 }
 
 .full-color-palette {
@@ -1282,64 +1146,26 @@ export default {
   gap: 8rpx;
   padding: 16rpx;
   background-color: var(--bg-secondary);
-  border-radius: 12rpx;
+  border-radius: 0;
   margin-bottom: 24rpx;
   max-height: 600rpx;
   overflow-y: auto;
+  border: 2rpx solid var(--nb-ink);
 }
 
 .palette-color-item {
   aspect-ratio: 1;
-  border-radius: 8rpx;
-  border: 2rpx solid transparent;
+  border-radius: 0;
+  border: 2rpx solid #000000;
   transition: var(--transition-base);
-}
-
-.palette-color-item:active {
-  transform: scale(0.9);
 }
 
 .palette-color-item.active {
-  border-color: var(--accent-primary);
-  border-width: 3rpx;
-  box-shadow: 0 0 12rpx var(--accent-primary);
-  transform: scale(1.1);
-  z-index: 1;
-}
-
-.align-buttons {
-  display: flex;
-  gap: 12rpx;
-  margin-top: 12rpx;
-}
-
-.align-btn {
-  flex: 1;
-  padding: 20rpx 16rpx;
-  background-color: var(--bg-secondary);
-  border: 2rpx solid var(--border-primary);
-  border-radius: 12rpx;
-  text-align: center;
-  transition: var(--transition-base);
-}
-
-.align-btn:active {
-  transform: scale(0.98);
-}
-
-.align-btn.active {
-  background-color: rgba(0, 243, 255, 0.1);
-  border-color: var(--accent-primary);
-}
-
-.align-text {
-  font-size: 22rpx;
-  color: var(--text-secondary);
-}
-
-.align-btn.active .align-text {
-  color: var(--accent-primary);
-  font-weight: 500;
+  border-color: var(--nb-yellow);
+  border-width: 4rpx;
+  box-shadow: none;
+  transform: none;
+  z-index: auto;
 }
 
 .setting-header-row {
@@ -1350,22 +1176,22 @@ export default {
 }
 
 .quick-size-btn {
+  min-height: 60rpx;
   padding: 12rpx 24rpx;
-  background-color: var(--bg-secondary);
-  border: 2rpx solid var(--accent-primary);
-  border-radius: 12rpx;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #ffffff;
+  border: 2rpx solid #000000;
+  border-radius: 0;
+  box-shadow: none;
   transition: var(--transition-base);
-}
-
-.quick-size-btn:active {
-  transform: scale(0.95);
-  background-color: rgba(0, 243, 255, 0.1);
 }
 
 .quick-size-btn .btn-text {
   font-size: 22rpx;
-  color: var(--accent-primary);
-  font-weight: 500;
+  color: #000000;
+  font-weight: 700;
 }
 
 .warning-color {
@@ -1398,22 +1224,23 @@ export default {
   width: 100%;
   min-height: 0;
   box-sizing: border-box;
+  background: var(--bg-tertiary);
+  padding: 16rpx 20rpx 0;
 }
 
 .content-wrapper {
-  /* padding: 24rpx; */
-  padding-bottom: 48rpx;
+  padding: 0 0 56rpx;
 }
 
 /* 底部 Tab 栏：与拼豆辅助页底部控制区风格一致 */
 .bottom-tabs {
   display: flex;
   flex-shrink: 0;
-  padding: 12rpx 16rpx;
-  padding-bottom: calc(12rpx + env(safe-area-inset-bottom));
+  padding: 2rpx 10rpx 0;
+  padding-bottom: var(--layout-bottom-offset);
   background-color: var(--bg-elevated);
-  border-top: 2rpx solid var(--border-primary);
-  gap: 8rpx;
+  border-top: 2rpx solid var(--nb-ink);
+  gap: 2rpx;
 }
 
 .bottom-tab-item {
@@ -1422,15 +1249,18 @@ export default {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 4rpx;
+  gap: 2rpx;
+  min-height: 68rpx;
+  padding: 2rpx 0;
+  background-color: transparent;
 }
 
 .bottom-tab-item:active {
-  background-color: var(--bg-tertiary);
+  background-color: transparent;
 }
 
 .bottom-tab-item.active {
-  background-color: var(--bg-tertiary);
+  background-color: transparent;
 }
 
 .bottom-tab-text {
@@ -1439,17 +1269,16 @@ export default {
 }
 
 .bottom-tab-item.active .bottom-tab-text {
-  color: var(--accent-primary);
-  font-weight: 500;
+  color: #000000;
+  font-weight: 900;
+  font-size: 22rpx;
 }
 
 .settings-card {
-  background-color: var(--bg-tertiary);
-  border: 2rpx solid var(--border-primary);
-  /* border-radius: 16rpx; */
-  padding: 20rpx;
+  background-color: transparent;
+  border: 0;
+  padding: 0;
   margin-bottom: 16rpx;
-  /* box-shadow: var(--shadow-md); */
 }
 
 .card-title-section {
@@ -1494,19 +1323,14 @@ export default {
 .quick-size-btn {
   padding: 12rpx 24rpx;
   background-color: var(--bg-secondary);
-  border: 2rpx solid var(--accent-primary);
+  border: 2rpx solid var(--nb-yellow);
   border-radius: 12rpx;
   transition: var(--transition-base);
 }
 
-.quick-size-btn:active {
-  transform: scale(0.95);
-  background-color: rgba(0, 243, 255, 0.1);
-}
-
 .quick-size-btn .btn-text {
   font-size: 22rpx;
-  color: var(--accent-primary);
+  color: var(--nb-yellow);
   font-weight: 500;
 }
 
@@ -1515,7 +1339,7 @@ export default {
   height: 56rpx;
   padding: 0 16rpx;
   background-color: var(--bg-secondary);
-  border: 2rpx solid var(--border-secondary);
+  border: 2rpx solid var(--nb-ink);
   border-radius: 12rpx;
   font-size: 28rpx;
   color: var(--text-primary);
@@ -1525,7 +1349,7 @@ export default {
 }
 
 .size-input:focus {
-  border-color: var(--accent-primary);
+  border-color: var(--nb-yellow);
 }
 
 .size-input.warning {
@@ -1563,15 +1387,9 @@ export default {
   align-items: center;
   justify-content: center;
   background-color: var(--bg-secondary);
-  border: 2rpx solid var(--border-primary);
-  border-radius: 12rpx;
+  border: 2rpx solid var(--nb-ink);
+  border-radius: 0;
   transition: var(--transition-base);
-}
-
-.control-btn:active {
-  transform: scale(0.9);
-  background-color: rgba(0, 243, 255, 0.1);
-  border-color: var(--accent-primary);
 }
 
 .control-icon {
@@ -1584,7 +1402,7 @@ export default {
   font-size: 32rpx;
   font-family: monospace;
   font-weight: bold;
-  color: var(--accent-primary);
+  color: var(--nb-yellow);
   min-width: 64rpx;
   text-align: center;
 }
@@ -1592,7 +1410,7 @@ export default {
 .setting-value {
   font-size: 20rpx;
   font-family: monospace;
-  color: var(--accent-primary);
+  color: var(--nb-yellow);
   min-width: 40rpx;
   text-align: right;
 }
@@ -1609,22 +1427,22 @@ export default {
   width: 80rpx;
   height: 44rpx;
   background-color: var(--bg-secondary);
-  border: 2rpx solid var(--border-primary);
-  border-radius: 22rpx;
+  border: 2rpx solid var(--nb-ink);
+  border-radius: 0;
   position: relative;
   transition: var(--transition-base);
 }
 
 .switch-track.active {
-  background-color: var(--accent-primary);
-  border-color: var(--accent-primary);
+  background-color: var(--nb-yellow);
+  border-color: var(--nb-ink);
 }
 
 .switch-thumb {
   width: 36rpx;
   height: 36rpx;
   background-color: var(--text-primary);
-  border-radius: 18rpx;
+  border-radius: 0;
   position: absolute;
   top: 2rpx;
   left: 2rpx;
@@ -1633,7 +1451,7 @@ export default {
 
 .switch-track.active .switch-thumb {
   left: 38rpx;
-  background-color: #ffffff;
+  background-color: #000000;
 }
 
 .image-upload {
@@ -1647,13 +1465,13 @@ export default {
   justify-content: center;
   padding: 64rpx 32rpx;
   background-color: var(--bg-secondary);
-  border: 4rpx dashed var(--border-secondary);
-  border-radius: 16rpx;
+  border: 4rpx dashed var(--nb-ink);
+  border-radius: 0;
   transition: var(--transition-base);
 }
 
 .upload-placeholder:active {
-  border-color: var(--accent-primary);
+  border-color: var(--nb-yellow);
   background-color: var(--bg-tertiary);
 }
 
@@ -1682,7 +1500,7 @@ export default {
   top: 12rpx;
   right: 12rpx;
   background: rgba(139, 92, 246, 0.9);
-  border-radius: 8rpx;
+  border-radius: 0;
   padding: 4rpx 12rpx;
 }
 
@@ -1696,8 +1514,8 @@ export default {
   width: 100%;
   height: 400rpx;
   background-color: var(--bg-secondary);
-  border-radius: 16rpx;
-  border: 2rpx solid var(--border-secondary);
+  border-radius: 0;
+  /* border: 2rpx solid var(--nb-ink); */
 }
 
 .image-actions {
@@ -1712,26 +1530,22 @@ export default {
   justify-content: center;
   gap: 8rpx;
   padding: 20rpx;
-  background-color: var(--bg-secondary);
-  border: 2rpx solid var(--border-primary);
+  background-color: #2563eb;
+  border: 2rpx solid #000000;
   border-radius: 12rpx;
   font-size: 24rpx;
-  color: var(--text-primary);
+  color: #ffffff;
   transition: var(--transition-base);
 }
 
-.image-action-btn:active {
-  transform: scale(0.98);
-  border-color: var(--accent-primary);
-}
-
 .image-action-btn.danger {
-  border-color: rgba(239, 68, 68, 0.3);
-  color: var(--error-color);
+  background-color: #d92d20;
+  border-color: #000000;
+  color: #ffffff;
 }
 
 .image-action-btn.danger:active {
-  background-color: rgba(239, 68, 68, 0.1);
+  background-color: #d92d20;
 }
 
 /* 传输遮罩弹窗 */
@@ -1749,8 +1563,10 @@ export default {
 }
 
 .sending-modal {
-  background: var(--color-bg-secondary, #fff);
-  border-radius: 24rpx;
+  background: var(--nb-surface);
+  border-radius: 0;
+  border: var(--nb-border-width-panel) solid var(--nb-ink);
+  box-shadow: var(--nb-shadow-strong);
   padding: 60rpx 50rpx;
   display: flex;
   flex-direction: column;
@@ -1762,8 +1578,8 @@ export default {
 .sending-spinner {
   width: 60rpx;
   height: 60rpx;
-  border: 6rpx solid rgba(99, 102, 241, 0.2);
-  border-top-color: #6366f1;
+  border: 6rpx solid rgba(0, 0, 0, 0.16);
+  border-top-color: var(--nb-ink);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
@@ -1776,13 +1592,13 @@ export default {
 
 .sending-title {
   font-size: 32rpx;
-  font-weight: 600;
-  color: var(--color-text-primary, #333);
+  font-weight: 900;
+  color: var(--nb-ink);
 }
 
 .sending-tip {
   font-size: 24rpx;
-  color: var(--color-text-secondary, #999);
+  color: #4a4a4a;
 }
 
 .sending-text {

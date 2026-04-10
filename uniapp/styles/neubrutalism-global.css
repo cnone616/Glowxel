@@ -1,0 +1,472 @@
+page {
+  --nb-ink: #000000;
+  --nb-paper: #ffffff;
+  --nb-surface: #ffffff;
+  --nb-yellow: #ffd23f;
+  --nb-blue: #74b9ff;
+  --nb-green: #88d498;
+  --nb-coral: #ff6b6b;
+  --nb-orange: #ffa552;
+  --nb-lavender: #b8a9fa;
+  --nb-border-width: 4rpx;
+  --nb-border-width-panel: 4rpx;
+  --nb-border-width-control: 3rpx;
+  --nb-shadow-soft: 2rpx 2rpx 0 #000000;
+  --nb-shadow-strong: 5rpx 5rpx 0 #000000;
+  --layout-bottom-offset: 32rpx;
+}
+
+page,
+body {
+  background: var(--nb-paper);
+  color: var(--nb-ink);
+}
+
+.home-page,
+.workspace-page,
+.create-page,
+.community-page,
+.ble-page,
+.control-page,
+.profile-page,
+.editor-page,
+.overview-page,
+.assist-page,
+.clock-editor-page,
+.effect-page,
+.spirit-page,
+.feature-page,
+.ambient-page,
+.canvas-page,
+.tetris-page,
+.notification-list-page,
+.notification-editor-page,
+.artwork-detail-page,
+.user-detail-page,
+.user-list-page,
+.edit-profile-page,
+.my-works-page,
+.my-favorites-page,
+.settings-page,
+.followers-page,
+.following-page,
+.achievements-page,
+.cloud-sync-page,
+.challenge-detail-page,
+.gallery-page,
+.publish-page,
+.nb-page {
+  background: var(--nb-paper) !important;
+  color: var(--nb-ink) !important;
+}
+
+.content,
+.main-content,
+.content-area,
+.content-wrapper {
+  background: transparent !important;
+}
+
+.header,
+.navbar {
+  background: var(--nb-paper) !important;
+  border-bottom: var(--nb-border-width) solid var(--nb-ink) !important;
+  box-shadow: none !important;
+}
+
+.header-title,
+.project-name,
+.nav-title text,
+.section-title,
+.card-title,
+.preview-title,
+.preview-caption-title,
+.setting-label,
+.setting-value-large,
+.scene-card-title,
+.tool-card-label {
+  color: var(--nb-ink) !important;
+  font-weight: 900 !important;
+}
+
+.section-meta,
+.card-subtitle,
+.preview-caption-text,
+.setting-desc,
+.piece-hint,
+.empty-subtitle,
+.preview-theme-chip-text,
+.preview-status-chip-text {
+  color: #4a4a4a !important;
+}
+
+.console-card,
+.card,
+.panel-card,
+.settings-section,
+.connect-entry-card,
+.empty-state,
+.preview-entry-card,
+.preview-status-chip,
+.preview-theme-chip,
+.artwork-card,
+.template-card,
+.challenge-card,
+.project-card,
+.device-card,
+.connect-modal,
+.help-modal,
+.json-import-modal {
+  background: var(--nb-surface) !important;
+  border: var(--nb-border-width-panel) solid var(--nb-ink) !important;
+  border-radius: 0 !important;
+  box-shadow: var(--nb-shadow-strong) !important;
+}
+
+.preview-caption,
+.preview-canvas-container,
+.canvas-container,
+.canvas-section,
+.theme-canvas-preview,
+.upload-placeholder,
+.image-preview,
+.hero-stats-card,
+.achievement-card,
+.rarity-card,
+.modal-meta-card,
+.template-item,
+.banner-item {
+  border-radius: 0 !important;
+}
+
+.preview-canvas-container,
+.canvas-container,
+.preview-caption,
+.hero-stats-card,
+.achievement-card,
+.rarity-card,
+.modal-meta-card,
+.upload-placeholder,
+.image-preview,
+.banner-item {
+  border: var(--nb-border-width-panel) solid var(--nb-ink) !important;
+  box-shadow: var(--nb-shadow-strong) !important;
+}
+
+.nav-left,
+.nav-right,
+.back-btn,
+.more-btn,
+.menu-icon,
+.setting-icon,
+.action-icon,
+.action-item,
+.preview-entry-icon,
+.panel-action-icon,
+.mode-badge-icon-shell,
+.mode-badge-icon-core,
+.tool-btn {
+  border-radius: 0 !important;
+}
+
+.nav-left,
+.back-btn,
+.more-btn {
+  border: var(--nb-border-width-control) solid var(--nb-ink) !important;
+  box-shadow: var(--nb-shadow-soft) !important;
+  background: var(--nb-surface) !important;
+}
+
+.menu-icon,
+.setting-icon,
+.action-icon,
+.preview-entry-icon,
+.panel-action-icon {
+  border: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
+}
+
+.glx-topbar {
+  position: relative !important;
+  min-height: 96rpx !important;
+  box-sizing: border-box !important;
+}
+
+.glx-topbar .header-content,
+.glx-topbar.navbar {
+  min-height: 96rpx !important;
+  position: relative !important;
+}
+
+.glx-topbar .header-content {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 12rpx !important;
+  padding: 0 24rpx !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+.glx-topbar.navbar {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 0 32rpx !important;
+  box-sizing: border-box !important;
+}
+
+.glx-topbar .header-content > .back-btn,
+.glx-topbar .header-content > .nav-left,
+.glx-topbar.navbar > .nav-left {
+  width: 64rpx !important;
+  min-width: 64rpx !important;
+  height: 64rpx !important;
+  min-height: 64rpx !important;
+  flex: 0 0 64rpx !important;
+}
+
+.glx-topbar .header-content > .more-btn,
+.glx-topbar .header-content > .header-placeholder,
+.glx-topbar .header-content > .nav-right,
+.glx-topbar.navbar > .nav-right {
+  width: 64rpx !important;
+  min-width: 64rpx !important;
+  height: 64rpx !important;
+  min-height: 64rpx !important;
+  flex: 0 0 64rpx !important;
+}
+
+.glx-topbar .header-content > .back-btn,
+.glx-topbar .header-content > .more-btn,
+.glx-topbar .header-content > .header-placeholder,
+.glx-topbar .header-content > .nav-left,
+.glx-topbar .header-content > .nav-right,
+.glx-topbar.navbar > .nav-left,
+.glx-topbar.navbar > .nav-right {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-sizing: border-box !important;
+}
+
+.glx-topbar .header-content > .back-btn,
+.glx-topbar .header-content > .more-btn,
+.glx-topbar .header-content > .nav-left,
+.glx-topbar .header-content > .nav-right,
+.glx-topbar.navbar > .nav-left,
+.glx-topbar.navbar > .nav-right {
+  padding: 0 !important;
+  background: var(--nb-surface) !important;
+  border: var(--nb-border-width-control) solid var(--nb-ink) !important;
+  box-shadow: var(--nb-shadow-soft) !important;
+}
+
+.glx-topbar.navbar > .nav-left,
+.glx-topbar.navbar > .nav-right {
+  position: absolute !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+}
+
+.glx-topbar.navbar > .nav-left {
+  left: 32rpx !important;
+}
+
+.glx-topbar.navbar > .nav-right {
+  right: 32rpx !important;
+}
+
+.glx-topbar.navbar > .nav-title,
+.glx-topbar .header-content > .header-title,
+.glx-topbar .header-content > .nav-title {
+  position: relative !important;
+  z-index: 1 !important;
+  max-width: calc(100% - 180rpx) !important;
+  min-width: 0 !important;
+  margin: 0 auto !important;
+  text-align: center !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8rpx !important;
+  line-height: 1.1 !important;
+}
+
+.glx-topbar__title,
+.glx-topbar .project-name {
+  font-size: 34rpx !important;
+  font-weight: 900 !important;
+  color: var(--nb-ink) !important;
+}
+
+.glx-topbar.navbar > .nav-title text,
+.glx-topbar .header-content > .header-title text,
+.glx-topbar .header-content > .nav-title text {
+  text-align: center !important;
+}
+
+.glx-topbar .header-content > .nav-right:empty,
+.glx-topbar.navbar > .nav-right:empty,
+.glx-topbar .header-content > .header-placeholder:empty {
+  visibility: hidden !important;
+  display: inline-flex !important;
+}
+
+.glx-topbar .header-content > .header-placeholder {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+.glx-topbar .header-content > .back-btn .iconfont,
+.glx-topbar .header-content > .more-btn .iconfont,
+.glx-topbar .header-content > .nav-left .iconfont,
+.glx-topbar .header-content > .nav-right .iconfont,
+.glx-topbar.navbar > .nav-left .iconfont,
+.glx-topbar.navbar > .nav-right .iconfont {
+  display: block !important;
+  line-height: 1 !important;
+}
+
+.glx-topbar .header-content > .back-btn:active,
+.glx-topbar .header-content > .more-btn:active {
+  transform: none !important;
+  box-shadow: var(--nb-shadow-soft) !important;
+}
+
+.glx-topbar.navbar > .nav-left:active,
+.glx-topbar.navbar > .nav-right:active {
+  transform: translateY(-50%) !important;
+  box-shadow: var(--nb-shadow-soft) !important;
+}
+
+.text-input,
+.form-input {
+  background: #ffffff !important;
+  border: var(--nb-border-width) solid var(--nb-ink) !important;
+  border-radius: 0 !important;
+  color: var(--nb-ink) !important;
+  box-shadow: none !important;
+}
+
+input,
+textarea {
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  color: var(--nb-ink) !important;
+  box-shadow: none !important;
+}
+
+.switch-track,
+.toggle-switch,
+.switch-item switch {
+  border-radius: 0 !important;
+}
+
+.switch-track {
+  border: var(--nb-border-width-control) solid var(--nb-ink) !important;
+  background: #ffffff !important;
+}
+
+.switch-track.active {
+  background: var(--nb-yellow) !important;
+}
+
+.switch-thumb {
+  background: var(--nb-ink) !important;
+  border-radius: 0 !important;
+}
+
+.status-bar {
+  background: var(--nb-paper) !important;
+}
+
+.modal-content,
+.modal-container {
+  background: var(--nb-surface) !important;
+  border: var(--nb-border-width-panel) solid var(--nb-ink) !important;
+  border-radius: 0 !important;
+  box-shadow: var(--nb-shadow-strong) !important;
+}
+
+.modal-header,
+.modal-footer {
+  background: var(--nb-surface) !important;
+}
+
+.modal-header {
+  border-bottom: var(--nb-border-width-panel) solid var(--nb-ink) !important;
+}
+
+.modal-footer {
+  border-top: var(--nb-border-width-panel) solid var(--nb-ink) !important;
+}
+
+.modal-title,
+.modal-text,
+.modal-description,
+.status-text,
+.btn-text,
+.confirm-btn-text,
+.project-name,
+.template-name,
+.artwork-title,
+.challenge-title {
+  color: var(--nb-ink) !important;
+}
+
+.modal-title,
+.btn-text,
+.confirm-btn-text,
+.project-name,
+.template-name,
+.artwork-title,
+.challenge-title {
+  font-weight: 900 !important;
+}
+
+.close-btn,
+.status-badge,
+.difficulty-badge,
+.input-wrapper,
+.custom-input,
+.json-input,
+.status-box,
+.help-item,
+.item-icon,
+.reject-reason {
+  border-radius: 0 !important;
+}
+
+.close-btn,
+.status-badge,
+.difficulty-badge,
+.item-icon {
+  border: var(--nb-border-width-control) solid var(--nb-ink) !important;
+  box-shadow: var(--nb-shadow-soft) !important;
+}
+
+.cancel-btn {
+  background: var(--nb-surface) !important;
+}
+
+.input-wrapper,
+.custom-input {
+  background: #ffffff !important;
+  border: var(--nb-border-width-control) solid var(--nb-ink) !important;
+  box-shadow: none !important;
+}
+
+.status-box,
+.help-item,
+.reject-reason {
+  border: var(--nb-border-width-control) solid var(--nb-ink) !important;
+  box-shadow: var(--nb-shadow-soft) !important;
+}
+
+[class*="-overlay"] {
+  backdrop-filter: none !important;
+}

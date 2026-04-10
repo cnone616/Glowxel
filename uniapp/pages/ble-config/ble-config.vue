@@ -1,21 +1,21 @@
 <template>
-  <view class="ble-page">
+  <view class="ble-page glx-page-shell">
     <!-- #ifdef MP-WEIXIN -->
     <view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
     <!-- #endif -->
 
-    <view class="navbar">
+    <view class="navbar glx-topbar glx-page-shell__fixed">
       <view class="nav-left" @click="handleBack">
         <Icon
           name="direction-left"
           :size="32"
-          color="var(--color-text-primary)"
+          color="var(--nb-ink)"
         />
       </view>
-      <text class="nav-title">蓝牙配网</text>
+      <text class="nav-title glx-topbar__title">蓝牙配网</text>
     </view>
 
-    <scroll-view scroll-y class="content">
+    <scroll-view scroll-y class="content glx-scroll-region glx-page-shell__content">
       <!-- 步骤指示 -->
       <view class="step-indicator">
         <view class="step" :class="{ active: step >= 1, done: step > 1 }">
@@ -35,10 +35,10 @@
       </view>
 
       <!-- Step 1: 扫描设备 -->
-      <view v-if="step === 1" class="card">
-        <view class="card-title-section">
-          <text class="card-title">搜索 RenLight 设备</text>
-          <text class="card-subtitle">请确保设备已开机且处于配网模式</text>
+      <view v-if="step === 1" class="card glx-panel-card">
+        <view class="card-title-section glx-panel-head">
+          <text class="card-title glx-panel-title">搜索 RenLight 设备</text>
+          <text class="card-subtitle glx-panel-subtitle">请确保设备已开机且处于配网模式</text>
         </view>
 
         <view v-if="scanning" class="scan-status">
@@ -71,7 +71,7 @@
           >
         </view>
 
-        <view class="action-btn" @click="startScan">
+        <view class="action-btn glx-cta-button" @click="startScan">
           <text class="btn-text">{{
             scanning ? "搜索中..." : "开始搜索"
           }}</text>
@@ -79,10 +79,10 @@
       </view>
 
       <!-- Step 2: 配置 WiFi -->
-      <view v-if="step === 2" class="card">
-        <view class="card-title-section">
-          <text class="card-title">配置 WiFi 网络</text>
-          <text class="card-subtitle"
+      <view v-if="step === 2" class="card glx-panel-card">
+        <view class="card-title-section glx-panel-head">
+          <text class="card-title glx-panel-title">配置 WiFi 网络</text>
+          <text class="card-subtitle glx-panel-subtitle"
             >已连接到 {{ connectedDevice?.name }}</text
           >
         </view>
@@ -117,7 +117,7 @@
         </view>
 
         <view
-          class="action-btn"
+          class="action-btn glx-cta-button"
           :class="{ disabled: sending }"
           @click="sendWifiConfig"
         >
@@ -375,8 +375,8 @@ export default {
   align-items: center;
   justify-content: center;
   padding: 0 32rpx;
-  background-color: var(--color-card-background);
-  border-bottom: 2rpx solid var(--border-primary);
+  background-color: var(--nb-surface);
+  border-bottom: 2rpx solid var(--nb-ink);
   position: relative;
 }
 
@@ -401,7 +401,7 @@ export default {
 .nav-title {
   font-size: 32rpx;
   font-weight: 600;
-  color: var(--color-text-primary);
+  color: var(--nb-ink);
 }
 
 .content {
@@ -429,7 +429,7 @@ export default {
   height: 48rpx;
   border-radius: 50%;
   background-color: var(--bg-tertiary);
-  border: 2rpx solid var(--border-primary);
+  border: 2rpx solid var(--nb-ink);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -460,7 +460,7 @@ export default {
 .step-line {
   width: 80rpx;
   height: 4rpx;
-  background-color: var(--border-primary);
+  background-color: var(--nb-ink);
   margin: 0 16rpx;
   margin-bottom: 28rpx;
 }
@@ -470,10 +470,10 @@ export default {
 
 .card {
   background-color: var(--bg-tertiary);
-  border: 2rpx solid var(--border-primary);
+  border: 2rpx solid var(--nb-ink);
   border-radius: 32rpx;
   padding: 48rpx;
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--nb-shadow-strong);
 }
 
 .card-title-section {
@@ -507,7 +507,7 @@ export default {
 .loading-spinner {
   width: 32rpx;
   height: 32rpx;
-  border: 4rpx solid var(--border-primary);
+  border: 4rpx solid var(--nb-ink);
   border-top-color: #4f7fff;
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
@@ -527,7 +527,7 @@ export default {
   gap: 20rpx;
   padding: 24rpx;
   background-color: var(--bg-secondary);
-  border: 2rpx solid var(--border-primary);
+  border: 2rpx solid var(--nb-ink);
   border-radius: 16rpx;
   margin-bottom: 16rpx;
 }
@@ -602,7 +602,7 @@ export default {
   height: 88rpx;
   line-height: 40rpx;
   background-color: var(--bg-secondary);
-  border: 2rpx solid var(--border-primary);
+  border: 2rpx solid var(--nb-ink);
   border-radius: 16rpx;
   font-size: 28rpx;
   color: var(--text-primary);

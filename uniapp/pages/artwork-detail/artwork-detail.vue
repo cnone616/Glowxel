@@ -1,25 +1,23 @@
 <template>
-  <view class="artwork-detail-page">
+  <view class="artwork-detail-page glx-page-shell">
     <!-- 状态栏占位 -->
     <!-- #ifdef MP-WEIXIN -->
     <view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
     <!-- #endif -->
 
     <!-- 顶部导航 -->
-    <view class="header">
+    <view class="header glx-topbar glx-page-shell__fixed">
       <view class="header-content">
         <view class="back-btn" @click="handleBack">
-          <Icon name="direction-left" :size="40" color="#FFFFFF" />
+          <Icon name="direction-left" :size="32" color="var(--nb-ink)" />
         </view>
-        <text class="header-title">作品详情</text>
-        <view class="more-btn" @click="showMoreActions">
-          <Icon name="more-horizontal" :size="40" color="#FFFFFF" />
-        </view>
+        <text class="header-title glx-topbar__title">作品详情</text>
+        <view class="header-placeholder"></view>
       </view>
     </view>
 
     <!-- 主要内容 -->
-    <scroll-view scroll-y class="main-content">
+    <scroll-view scroll-y class="main-content glx-scroll-region glx-page-shell__content">
       <!-- 作品展示区域 -->
       <view class="artwork-section">
         <view class="artwork-container">
@@ -38,7 +36,7 @@
 
       <!-- 作品信息 -->
       <view class="info-section">
-        <view class="artwork-info">
+        <view class="artwork-info glx-panel-card">
           <text class="artwork-title">{{ artwork.title }}</text>
           <view class="artwork-meta">
             <view class="meta-item">
@@ -69,7 +67,7 @@
         </view>
 
         <!-- 作者信息 -->
-        <view class="author-section">
+        <view class="author-section glx-panel-card">
           <view class="author-info" @click="goToUserProfile">
             <Avatar :src="artwork.author_avatar" :size="80" />
             <view class="author-details">
@@ -80,7 +78,7 @@
             </view>
           </view>
           <view
-            class="follow-btn"
+            class="follow-btn glx-cta-button"
             :class="{ following: artwork.isFollowing }"
             @click="toggleFollow"
           >
@@ -95,38 +93,38 @@
       <view class="action-section">
         <view class="action-buttons">
           <view
-            class="action-btn"
+            class="action-btn glx-action-tile"
             :class="{ active: isLiked }"
             @click="toggleLike"
           >
             <Icon
               :name="isLiked ? 'favorite-filling' : 'favorite'"
               :size="40"
-              :color="isLiked ? '#FF4757' : '#666666'"
+              color="var(--nb-ink)"
             />
             <text class="action-text">{{ artwork.likes || 0 }}</text>
           </view>
 
           <view
-            class="action-btn"
+            class="action-btn glx-action-tile"
             :class="{ active: isCollected }"
             @click="toggleCollect"
           >
             <Icon
               :name="isCollected ? 'file-common-filling' : 'file-common'"
               :size="40"
-              :color="isCollected ? '#4F7FFF' : '#666666'"
+              color="var(--nb-ink)"
             />
             <text class="action-text">{{ artwork.collects || 0 }}</text>
           </view>
 
-          <view class="action-btn" @click="showCommentInput">
-            <Icon name="comment" :size="40" color="#666666" />
+          <view class="action-btn glx-action-tile" @click="showCommentInput">
+            <Icon name="comment" :size="40" color="var(--nb-ink)" />
             <text class="action-text">{{ artwork.comments_count || 0 }}</text>
           </view>
 
-          <view class="action-btn" @click="shareArtwork">
-            <Icon name="share" :size="40" color="#666666" />
+          <view class="action-btn glx-action-tile" @click="shareArtwork">
+            <Icon name="share" :size="40" color="var(--nb-ink)" />
             <text class="action-text">分享</text>
           </view>
         </view>
@@ -134,8 +132,8 @@
 
       <!-- 评论区域 -->
       <view class="comment-section">
-        <view class="section-header">
-          <text class="section-title">评论 ({{ comments.length }})</text>
+        <view class="section-header glx-section-head">
+          <text class="section-title glx-section-title">评论 ({{ comments.length }})</text>
         </view>
 
         <!-- 评论列表 -->
@@ -171,6 +169,8 @@
           />
         </view>
       </view>
+
+      <view class="content-spacer"></view>
     </scroll-view>
 
     <!-- 底部评论输入 -->
@@ -190,6 +190,19 @@
           @click="sendComment"
         >
           <text class="send-text">发送</text>
+        </view>
+      </view>
+    </view>
+
+    <view v-else class="bottom-action-bar glx-page-shell__fixed">
+      <view class="bottom-action-shell">
+        <view class="bottom-action-main">
+          <text class="bottom-action-title">更多操作</text>
+          <text class="bottom-action-desc">下载、模板、举报</text>
+        </view>
+        <view class="bottom-action-btn" @click="showMoreActions">
+          <Icon name="more-horizontal" :size="32" color="var(--nb-ink)" />
+          <text class="bottom-action-text">打开</text>
         </view>
       </view>
     </view>
@@ -710,18 +723,18 @@ export default {
   height: 100vh;
   display: flex;
   flex-direction: column;
-  background-color: var(--color-app-background);
+  background-color: var(--nb-paper);
 }
 
 /* 状态栏占位 */
 .status-bar {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: var(--nb-paper);
   flex-shrink: 0;
 }
 
 /* 顶部导航 */
 .header {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: var(--nb-paper);
   flex-shrink: 0;
 }
 
@@ -733,26 +746,22 @@ export default {
 }
 
 .back-btn,
-.more-btn {
+.header-placeholder {
   width: 80rpx;
   height: 80rpx;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: var(--radius-medium);
+  border-radius: 0;
   transition: all 0.2s ease;
 }
 
-.back-btn:active,
-.more-btn:active {
+.back-btn:active {
   transform: scale(0.95);
-  background-color: rgba(255, 255, 255, 0.1);
+  background-color: var(--nb-paper);
 }
 
 .header-title {
-  font-size: 36rpx;
-  font-weight: 700;
-  color: #ffffff;
   flex: 1;
   text-align: center;
 }
@@ -765,21 +774,23 @@ export default {
 
 /* 作品展示区域 */
 .artwork-section {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  padding: 0 32rpx 48rpx;
+  padding: 24rpx 32rpx 0;
 }
 
 .artwork-container {
   position: relative;
-  background-color: rgba(255, 255, 255, 0.1);
-  border-radius: var(--radius-large);
+  background-color: var(--nb-surface);
+  border: var(--nb-border-width-panel) solid var(--nb-ink);
+  box-shadow: var(--nb-shadow-strong);
+  border-radius: 0;
   overflow: hidden;
 }
 
 .artwork-image {
   width: 100%;
-  height: 600rpx;
+  height: 560rpx;
   display: block;
+  background: #e9edf6;
 }
 
 .zoom-hint {
@@ -789,9 +800,10 @@ export default {
   display: flex;
   align-items: center;
   gap: 8rpx;
-  background-color: rgba(0, 0, 0, 0.6);
+  background-color: rgba(0, 0, 0, 0.74);
   padding: 12rpx 16rpx;
-  border-radius: var(--radius-small);
+  border-radius: 0;
+  border: 2rpx solid #000000;
 }
 
 .zoom-text {
@@ -801,27 +813,29 @@ export default {
 
 /* 信息区域 */
 .info-section {
-  background-color: var(--color-card-background);
-  margin: -24rpx 32rpx 32rpx;
-  border-radius: var(--radius-large);
-  padding: 32rpx;
-  box-shadow: var(--shadow-card);
+  margin: 24rpx 32rpx 24rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 24rpx;
 }
 
 .artwork-info {
-  margin-bottom: 32rpx;
+  padding: 28rpx;
+  border: var(--nb-border-width-panel) solid var(--nb-ink);
+  box-shadow: var(--nb-shadow-strong);
 }
 
 .artwork-title {
   font-size: 40rpx;
   font-weight: 700;
-  color: var(--color-text-primary);
+  color: var(--nb-ink);
   margin-bottom: 16rpx;
   display: block;
 }
 
 .artwork-meta {
   display: flex;
+  flex-wrap: wrap;
   gap: 24rpx;
   margin-bottom: 24rpx;
 }
@@ -834,7 +848,7 @@ export default {
 
 .meta-text {
   font-size: 26rpx;
-  color: var(--color-text-secondary);
+  color: #4a4a4a;
 }
 
 .tags-container {
@@ -844,16 +858,16 @@ export default {
 }
 
 .tag-item {
-  background-color: var(--color-app-background);
+  background-color: var(--nb-paper);
   padding: 8rpx 16rpx;
-  border-radius: var(--radius-small);
-  border: 2rpx solid var(--border-primary);
+  border-radius: 0;
+  border: 2rpx solid var(--nb-ink);
 }
 
 .tag-text {
   font-size: 24rpx;
-  color: var(--color-brand-primary);
-  font-weight: 500;
+  color: var(--nb-ink);
+  font-weight: 700;
 }
 
 /* 作者信息 */
@@ -861,8 +875,9 @@ export default {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding-top: 32rpx;
-  border-top: 2rpx solid var(--border-primary);
+  padding: 24rpx 28rpx;
+  border: var(--nb-border-width-panel) solid var(--nb-ink);
+  box-shadow: var(--nb-shadow-strong);
 }
 
 .author-info {
@@ -879,26 +894,27 @@ export default {
 .author-name {
   font-size: 32rpx;
   font-weight: 600;
-  color: var(--color-text-primary);
+  color: var(--nb-ink);
   display: block;
   margin-bottom: 4rpx;
 }
 
 .author-stats {
   font-size: 24rpx;
-  color: var(--color-text-secondary);
+  color: #4a4a4a;
 }
 
 .follow-btn {
   padding: 16rpx 32rpx;
-  background-color: var(--color-brand-primary);
-  border-radius: var(--radius-medium);
+  background-color: var(--nb-yellow);
+  border: 2rpx solid var(--nb-ink);
+  box-shadow: none;
   transition: all 0.2s ease;
 }
 
 .follow-btn.following {
-  background-color: var(--color-app-background);
-  border: 2rpx solid var(--border-primary);
+  background-color: var(--nb-paper);
+  border: 2rpx solid var(--nb-ink);
 }
 
 .follow-btn:active {
@@ -907,12 +923,12 @@ export default {
 
 .follow-text {
   font-size: 28rpx;
-  font-weight: 500;
-  color: #ffffff;
+  font-weight: 700;
+  color: var(--nb-ink);
 }
 
 .follow-btn.following .follow-text {
-  color: var(--color-text-secondary);
+  color: var(--nb-ink);
 }
 
 /* 交互按钮 */
@@ -922,10 +938,11 @@ export default {
 
 .action-buttons {
   display: flex;
-  background-color: var(--color-card-background);
-  border-radius: var(--radius-large);
-  padding: 24rpx;
-  box-shadow: var(--shadow-card);
+  background-color: var(--nb-surface);
+  border-radius: 0;
+  border: var(--nb-border-width-panel) solid var(--nb-ink);
+  box-shadow: var(--nb-shadow-strong);
+  overflow: hidden;
 }
 
 .action-btn {
@@ -934,34 +951,44 @@ export default {
   flex-direction: column;
   align-items: center;
   gap: 8rpx;
-  padding: 16rpx;
-  border-radius: var(--radius-medium);
+  padding: 20rpx 12rpx;
+  border-radius: 0;
   transition: all 0.2s ease;
+  border-right: 2rpx solid var(--nb-ink);
+  background: var(--nb-surface);
+}
+
+.action-btn:last-child {
+  border-right: 0;
 }
 
 .action-btn:active {
   transform: scale(0.95);
-  background-color: var(--color-app-background);
+  background-color: var(--nb-paper);
+}
+
+.action-btn.active {
+  background: var(--nb-yellow);
 }
 
 .action-text {
   font-size: 24rpx;
-  color: var(--color-text-secondary);
-  font-weight: 500;
+  color: var(--nb-ink);
+  font-weight: 700;
 }
 
 .action-btn.active .action-text {
-  color: var(--color-brand-primary);
-  font-weight: 600;
+  color: var(--nb-ink);
 }
 
 /* 评论区域 */
 .comment-section {
   margin: 0 32rpx 32rpx;
-  background-color: var(--color-card-background);
-  border-radius: var(--radius-large);
+  background-color: var(--nb-surface);
+  border-radius: 0;
   padding: 32rpx;
-  box-shadow: var(--shadow-card);
+  border: var(--nb-border-width-panel) solid var(--nb-ink);
+  box-shadow: var(--nb-shadow-strong);
 }
 
 .section-header {
@@ -971,7 +998,7 @@ export default {
 .section-title {
   font-size: 32rpx;
   font-weight: 600;
-  color: var(--color-text-primary);
+  color: var(--nb-ink);
 }
 
 .comment-list {
@@ -990,17 +1017,18 @@ export default {
 
 .empty-text {
   font-size: 28rpx;
-  color: var(--color-text-disabled);
+  color: #777777;
   margin-top: 16rpx;
 }
 
 /* 相关推荐 */
 .related-section {
   margin: 0 32rpx 32rpx;
-  background-color: var(--color-card-background);
-  border-radius: var(--radius-large);
+  background-color: var(--nb-surface);
+  border-radius: 0;
   padding: 32rpx;
-  box-shadow: var(--shadow-card);
+  border: var(--nb-border-width-panel) solid var(--nb-ink);
+  box-shadow: var(--nb-shadow-strong);
 }
 
 .related-grid {
@@ -1009,12 +1037,16 @@ export default {
   gap: 24rpx;
 }
 
+.content-spacer {
+  height: 132rpx;
+}
+
 /* 评论输入栏 */
 .comment-input-bar {
-  background-color: var(--color-card-background);
-  border-top: 2rpx solid var(--border-primary);
+  background-color: var(--nb-surface);
+  border-top: 2rpx solid var(--nb-ink);
   padding: 24rpx 32rpx;
-  padding-bottom: calc(24rpx + env(safe-area-inset-bottom));
+  padding-bottom: calc(24rpx + var(--layout-bottom-offset));
 }
 
 .comment-input-container {
@@ -1025,14 +1057,15 @@ export default {
 
 .send-btn {
   padding: 12rpx 24rpx;
-  background-color: var(--color-text-disabled);
-  border-radius: var(--radius-small);
+  background-color: #777777;
+  border-radius: 0;
+  border: 2rpx solid var(--nb-ink);
   transition: all 0.2s ease;
   flex-shrink: 0;
 }
 
 .send-btn.active {
-  background-color: var(--color-brand-primary);
+  background-color: var(--nb-yellow);
 }
 
 .send-btn:active {
@@ -1041,8 +1074,63 @@ export default {
 
 .send-text {
   font-size: 26rpx;
-  color: #ffffff;
-  font-weight: 500;
+  color: var(--nb-ink);
+  font-weight: 700;
+}
+
+.bottom-action-bar {
+  padding: 16rpx 32rpx;
+  padding-bottom: calc(16rpx + var(--layout-bottom-offset));
+  background: var(--nb-paper);
+  border-top: 2rpx solid var(--nb-ink);
+}
+
+.bottom-action-shell {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24rpx;
+  padding: 18rpx 20rpx;
+  background: var(--nb-surface);
+  border: var(--nb-border-width-panel) solid var(--nb-ink);
+  box-shadow: var(--nb-shadow-soft);
+}
+
+.bottom-action-main {
+  display: flex;
+  flex-direction: column;
+  gap: 6rpx;
+  min-width: 0;
+}
+
+.bottom-action-title {
+  font-size: 28rpx;
+  font-weight: 700;
+  color: var(--nb-ink);
+}
+
+.bottom-action-desc {
+  font-size: 22rpx;
+  color: #4a4a4a;
+}
+
+.bottom-action-btn {
+  flex-shrink: 0;
+  min-width: 148rpx;
+  height: 72rpx;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10rpx;
+  background: var(--nb-yellow);
+  border: 2rpx solid var(--nb-ink);
+  box-sizing: border-box;
+}
+
+.bottom-action-text {
+  font-size: 26rpx;
+  font-weight: 700;
+  color: var(--nb-ink);
 }
 
 /* 更多操作弹窗 */
@@ -1059,11 +1147,11 @@ export default {
 }
 
 .action-item:active {
-  background-color: var(--color-app-background);
+  background-color: var(--nb-paper);
 }
 
 .action-label {
   font-size: 32rpx;
-  color: var(--color-text-primary);
+  color: var(--nb-ink);
 }
 </style>

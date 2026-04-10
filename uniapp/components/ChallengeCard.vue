@@ -1,5 +1,5 @@
 <template>
-  <view class="challenge-card" @click="handleClick" v-if="challenge && typeof challenge === 'object'">
+  <view class="challenge-card glx-panel-card" @click="handleClick" v-if="challenge && typeof challenge === 'object'">
     <!-- 挑战横幅图片 -->
     <view class="challenge-banner">
       <image 
@@ -213,23 +213,23 @@ export default {
 
 <style scoped>
 .challenge-card {
-  background-color: var(--color-card-background);
-  border-radius: var(--radius-medium);
-  box-shadow: var(--shadow-card);
+  background-color: var(--nb-surface);
+  border-radius: 0;
+  box-shadow: var(--nb-shadow-strong);
   overflow: hidden;
   transition: all 0.2s ease;
 }
 
 .challenge-card:active {
-  transform: scale(0.98);
-  box-shadow: var(--shadow-floating);
+  transform: translate(4rpx, 4rpx);
+  box-shadow: 2rpx 2rpx 0 var(--nb-ink);
 }
 
 .challenge-banner {
   position: relative;
   width: 100%;
   height: 280rpx;
-  background: linear-gradient(135deg, #4F7FFF, #FF7A45);
+  background: #ffe49a;
 }
 
 .banner-image {
@@ -246,7 +246,7 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #4F7FFF, #FF7A45);
+  background: #ffe49a;
 }
 
 .banner-overlay {
@@ -255,11 +255,7 @@ export default {
   left: 0;
   width: 100%;
   height: 100%;
-  background: linear-gradient(
-    to bottom,
-    rgba(0, 0, 0, 0.1) 0%,
-    rgba(0, 0, 0, 0.3) 100%
-  );
+  background: linear-gradient(to bottom, rgba(255, 255, 255, 0) 0%, rgba(0, 0, 0, 0.16) 100%);
 }
 
 .challenge-icon {
@@ -268,12 +264,13 @@ export default {
   left: 24rpx;
   width: 80rpx;
   height: 80rpx;
-  background-color: rgba(255, 255, 255, 0.2);
-  border-radius: var(--radius-medium);
+  background-color: var(--nb-surface);
+  border: var(--nb-border-width-control) solid var(--nb-ink);
+  border-radius: 0;
+  box-shadow: var(--nb-shadow-soft);
   display: flex;
   align-items: center;
   justify-content: center;
-  backdrop-filter: blur(10rpx);
 }
 
 .status-badge {
@@ -281,8 +278,9 @@ export default {
   top: 24rpx;
   right: 24rpx;
   padding: 8rpx 16rpx;
-  border-radius: var(--radius-small);
-  backdrop-filter: blur(10rpx);
+  border: var(--nb-border-width-control) solid var(--nb-ink);
+  border-radius: 0;
+  box-shadow: var(--nb-shadow-soft);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -302,8 +300,8 @@ export default {
 
 .status-text {
   font-size: 22rpx;
-  color: #FFFFFF;
-  font-weight: 500;
+  color: var(--nb-ink);
+  font-weight: 900;
 }
 
 .challenge-info {
@@ -312,8 +310,8 @@ export default {
 
 .challenge-title {
   font-size: 32rpx;
-  font-weight: 700;
-  color: var(--color-text-primary);
+  font-weight: 900;
+  color: var(--nb-ink);
   line-height: 1.4;
   margin-bottom: 12rpx;
   display: -webkit-box;
@@ -324,7 +322,7 @@ export default {
 
 .challenge-description {
   font-size: 26rpx;
-  color: var(--color-text-secondary);
+  color: #4a4a4a;
   line-height: 1.5;
   margin-bottom: 20rpx;
   display: -webkit-box;
@@ -348,7 +346,7 @@ export default {
 
 .stat-text {
   font-size: 24rpx;
-  color: var(--color-text-secondary);
+  color: #4a4a4a;
   font-weight: 500;
 }
 
@@ -358,13 +356,13 @@ export default {
   gap: 8rpx;
   padding: 12rpx 16rpx;
   background-color: rgba(255, 122, 69, 0.1);
-  border-radius: var(--radius-small);
+  border-radius: 0;
   margin-bottom: 20rpx;
 }
 
 .reward-text {
   font-size: 24rpx;
-  color: var(--color-brand-accent);
+  color: var(--nb-blue);
   font-weight: 500;
 }
 
@@ -378,24 +376,24 @@ export default {
   justify-content: center;
   gap: 12rpx;
   padding: 16rpx 24rpx;
-  border-radius: var(--radius-small);
+  border-radius: 0;
   transition: all 0.2s ease;
 }
 
 .button-active {
-  background-color: var(--color-brand-primary);
+  background-color: var(--nb-yellow);
 }
 
 .button-upcoming {
-  background-color: var(--color-warning);
+  background-color: var(--nb-orange);
 }
 
 .button-ended {
-  background-color: var(--color-text-secondary);
+  background-color: #4a4a4a;
 }
 
 .button-joined {
-  background-color: var(--color-success);
+  background-color: var(--nb-green);
 }
 
 .join-button:active {

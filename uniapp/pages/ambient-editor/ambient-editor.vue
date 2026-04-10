@@ -1,20 +1,19 @@
 <template>
-  <view class="ambient-page">
+  <view class="ambient-page glx-page-shell">
     <!-- #ifdef MP-WEIXIN -->
     <view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
     <!-- #endif -->
 
-    <view class="header">
+    <view class="navbar glx-topbar glx-page-shell__fixed">
       <view class="nav-left" @click="handleBack">
         <Icon
           name="direction-left"
           :size="32"
-          color="var(--color-text-primary)"
+          color="var(--nb-ink)"
         />
       </view>
-      <view class="nav-title">
-        <text class="project-name">像素屏保</text>
-      </view>
+      <text class="nav-title glx-topbar__title">像素屏保</text>
+      <view class="nav-right"></view>
     </view>
 
     <view class="canvas-section">
@@ -35,35 +34,35 @@
           canvas-id="ambientPreviewCanvas"
         />
       </view>
-      <view class="preview-caption">
-        <view class="preview-caption-info">
+      <view class="preview-caption glx-preview-panel">
+        <view class="preview-caption-info glx-preview-panel__info">
           <text class="preview-title">预览效果</text>
         </view>
         <view class="preview-actions">
           <view
-            class="action-btn-sm primary"
+            class="action-btn-sm primary glx-primary-action"
             :class="{ disabled: isSending }"
             @click="saveAndApply"
           >
-            <Icon name="link" :size="36" color="#ffffff" />
+            <Icon name="link" :size="36" color="#000000" />
             <text>{{ isSending ? "发送中" : "发送" }}</text>
           </view>
         </view>
       </view>
     </view>
 
-    <scroll-view scroll-y class="content" :style="{ height: contentHeight }">
-      <view class="content-wrapper">
-        <view v-show="currentTab === 0" class="tab-panel">
-          <view class="card">
-            <view class="card-title-section">
-              <text class="card-title">屏保选择</text>
+    <scroll-view scroll-y class="content glx-scroll-region glx-page-shell__content" :style="{ height: contentHeight }">
+      <view class="content-wrapper glx-scroll-stack">
+        <view v-show="currentTab === 0" class="tab-panel glx-tab-panel">
+          <view class="card glx-panel-card">
+            <view class="card-title-section glx-panel-head">
+              <text class="card-title glx-panel-title">屏保选择</text>
             </view>
             <view class="scene-grid">
               <view
                 v-for="preset in presets"
                 :key="preset.value"
-                class="scene-option"
+                class="scene-option glx-feature-option"
                 :class="{ active: config.preset === preset.value }"
                 @click="applyPreset(preset)"
               >
@@ -72,41 +71,39 @@
             </view>
           </view>
 
-          <view class="card">
-            <view class="card-title-section">
-              <text class="card-title">当前场景</text>
-              <text class="card-subtitle">{{ currentPresetTag }}</text>
+          <view class="card glx-panel-card">
+            <view class="card-title-section glx-panel-head">
+              <text class="card-title glx-panel-title">当前场景</text>
+              <text class="card-subtitle glx-panel-subtitle">{{ currentPresetTag }}</text>
             </view>
             <text class="card-tip-text">{{ currentPresetHint }}</text>
           </view>
         </view>
 
-        <view v-show="currentTab === 1" class="tab-panel">
-          <view class="card">
-            <view class="card-title-section">
-              <text class="card-title">场景参数</text>
+        <view v-show="currentTab === 1" class="tab-panel glx-tab-panel">
+          <view class="card glx-panel-card">
+            <view class="card-title-section glx-panel-head">
+              <text class="card-title glx-panel-title">场景参数</text>
             </view>
 
             <view class="form-row">
               <text class="form-label">速度 {{ config.speed }}</text>
-              <slider
+              <GlxSlider
                 :value="config.speed"
-                min="1"
-                max="10"
-                step="1"
-                activeColor="#4F7FFF"
+                :min="1"
+                :max="10"
+                :step="1"
                 @change="handleSpeedChange"
               />
             </view>
 
             <view class="form-row">
               <text class="form-label">强度 {{ config.intensity }}</text>
-              <slider
+              <GlxSlider
                 :value="config.intensity"
-                min="10"
-                max="100"
-                step="1"
-                activeColor="#4F7FFF"
+                :min="10"
+                :max="100"
+                :step="1"
                 @change="handleIntensityChange"
               />
             </view>
@@ -114,8 +111,8 @@
             <view class="form-row inline-row">
               <text class="form-label">循环</text>
               <view class="toggle-switch" @click="config.loop = !config.loop">
-                <view class="switch-track" :class="{ active: config.loop }">
-                  <view class="switch-thumb"></view>
+                <view class="glx-switch-shell" :class="{ active: config.loop }">
+                  <view class="glx-switch-thumb"></view>
                 </view>
               </view>
             </view>
@@ -135,7 +132,7 @@
         <Icon
           :name="tabIconNames[index]"
           :size="36"
-          :color="currentTab === index ? '#4F7FFF' : 'var(--text-secondary)'"
+          :color="currentTab === index ? '#000000' : '#6b7280'"
         />
         <text class="bottom-tab-text">{{ tab }}</text>
       </view>
@@ -150,6 +147,7 @@ import statusBarMixin from "../../mixins/statusBar.js";
 import Icon from "../../components/Icon.vue";
 import Toast from "../../components/Toast.vue";
 import PixelCanvas from "../../components/PixelCanvas.vue";
+import GlxSlider from "../../components/GlxSlider.vue";
 import { useDeviceStore } from "../../store/device.js";
 import { useToast } from "../../composables/useToast.js";
 import { buildAmbientPreviewFrames } from "../../utils/ambientEffectPreview.js";
@@ -162,6 +160,7 @@ export default {
     Icon,
     Toast,
     PixelCanvas,
+    GlxSlider,
   },
   data() {
     return {
@@ -290,10 +289,16 @@ export default {
       query
         .select(".preview-canvas-container")
         .boundingClientRect((rect) => {
-          if (rect) {
+          if (rect && rect.width) {
             this.previewContainerSize = {
               width: rect.width,
-              height: rect.height,
+              height: rect.width,
+            };
+            const fitZoom = Math.max(2, Math.floor((rect.width * 0.96) / 64));
+            this.previewZoom = fitZoom;
+            this.previewOffset = {
+              x: (rect.width - 64 * fitZoom) / 2,
+              y: (rect.width - 64 * fitZoom) / 2,
             };
           }
           this.previewCanvasReady = true;
@@ -374,119 +379,66 @@ export default {
   background-color: #1a1a1a;
 }
 
-.header {
-  height: 88rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0 32rpx;
-  background-color: var(--bg-elevated);
-  border-bottom: 2rpx solid var(--border-primary);
-  position: relative;
-}
-
-.nav-left {
-  position: absolute;
-  left: 32rpx;
-  width: 80rpx;
-  height: 80rpx;
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-}
-
-.nav-title {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.project-name {
-  font-size: 32rpx;
-  font-weight: 600;
-  color: var(--color-text-primary);
-}
-
 .canvas-section {
-  padding: 24rpx 24rpx 16rpx;
-  background: linear-gradient(180deg, rgba(17, 24, 39, 0.98), rgba(10, 14, 24, 0.98));
-  border-bottom: 2rpx solid rgba(148, 163, 184, 0.14);
+  display: flex;
+  flex-direction: column;
+  background: #000000;
+  border-bottom: 2rpx solid var(--nb-ink);
 }
 
 .preview-canvas-container {
   width: 100%;
-  height: 420rpx;
-  border-radius: 28rpx;
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   overflow: hidden;
-  background: radial-gradient(circle at 50% 32%, rgba(59, 130, 246, 0.18), rgba(15, 23, 42, 0.98));
-  border: 2rpx solid rgba(148, 163, 184, 0.2);
+  background: #000000;
 }
 
 .preview-caption {
-  margin-top: 20rpx;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 20rpx;
+  gap: 12rpx;
+  padding: 10rpx 16rpx 12rpx;
+  background: var(--bg-tertiary);
 }
 
 .preview-caption-info {
   display: flex;
   flex-direction: column;
-  gap: 8rpx;
-}
-
-.preview-status-chip {
-  display: inline-flex;
-  align-self: flex-start;
-  padding: 8rpx 16rpx;
-  border-radius: 999rpx;
-  background: rgba(59, 130, 246, 0.16);
-}
-
-.preview-status-chip.is-sending {
-  background: rgba(245, 158, 11, 0.18);
-}
-
-.preview-status-chip.is-loading {
-  background: rgba(148, 163, 184, 0.16);
-}
-
-.preview-status-chip-text {
-  font-size: 20rpx;
-  color: #dbeafe;
+  gap: 0;
 }
 
 .preview-title {
-  font-size: 28rpx;
-  font-weight: 600;
-  color: #f8fafc;
-}
-
-.preview-subtitle {
-  font-size: 22rpx;
-  color: #94a3b8;
+  font-size: 24rpx;
+  font-weight: 700;
+  color: var(--text-primary);
 }
 
 .preview-actions {
   display: flex;
-  gap: 16rpx;
+  align-items: center;
+  gap: 12rpx;
+  flex-shrink: 0;
 }
 
 .action-btn-sm {
-  min-width: 132rpx;
-  height: 80rpx;
-  padding: 0 24rpx;
-  border-radius: 20rpx;
-  background: rgba(255, 255, 255, 0.08);
+  min-width: 118rpx;
+  height: 64rpx;
+  padding: 0 18rpx;
+  border-radius: 0;
+  background: var(--bg-tertiary);
+  border: 2rpx solid var(--nb-ink);
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8rpx;
+  gap: 10rpx;
 }
 
 .action-btn-sm.primary {
-  background: linear-gradient(135deg, #2563eb, #3b82f6);
+  background: var(--nb-yellow);
 }
 
 .action-btn-sm.disabled {
@@ -495,74 +447,79 @@ export default {
 
 .action-btn-sm text {
   font-size: 24rpx;
-  color: var(--color-text-primary);
+  color: var(--nb-ink);
+  font-weight: 600;
 }
 
 .action-btn-sm.primary text {
-  color: #ffffff;
+  color: #000000;
 }
 
 .content {
   flex: 1;
+  background: var(--bg-tertiary);
+  padding: 16rpx 20rpx 0;
 }
 
 .content-wrapper {
-  padding: 24rpx;
+  padding: 0 0 56rpx;
   display: flex;
   flex-direction: column;
-  gap: 24rpx;
+  gap: 20rpx;
 }
 
 .tab-panel {
   display: flex;
   flex-direction: column;
-  gap: 24rpx;
+  gap: 20rpx;
 }
 
 .card {
-  background: var(--bg-elevated);
-  border: 2rpx solid var(--border-primary);
-  border-radius: 28rpx;
-  padding: 24rpx;
+  background: transparent;
+  border: 0 !important;
+  border-radius: 0;
+  padding-top: 16rpx;
+  box-shadow: none !important;
 }
 
 .card-title-section {
   display: flex;
-  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
   gap: 8rpx;
-  margin-bottom: 20rpx;
+  margin-bottom: 14rpx;
 }
 
 .card-title {
-  font-size: 28rpx;
-  font-weight: 600;
-  color: var(--color-text-primary);
+  font-size: 22rpx;
+  font-weight: 500;
+  color: var(--text-primary);
 }
 
 .card-subtitle {
-  font-size: 22rpx;
-  color: var(--color-text-secondary);
+  font-size: 20rpx;
+  color: var(--text-secondary);
 }
 
 .card-tip-text {
-  font-size: 24rpx;
-  line-height: 1.6;
+  font-size: 22rpx;
+  line-height: 1.65;
   color: var(--text-secondary);
 }
 
 .scene-grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 16rpx;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14rpx;
 }
 
 .scene-option {
-  width: calc(33.333% - 11rpx);
-  min-height: 80rpx;
-  padding: 0 12rpx;
-  border-radius: 16rpx;
-  background: var(--bg-tertiary);
-  border: 2rpx solid var(--border-primary);
+  width: auto;
+  min-height: 92rpx;
+  padding: 0 10rpx;
+  border-radius: 0;
+  background: #ffffff;
+  border: 2rpx solid #000000;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -570,28 +527,29 @@ export default {
 }
 
 .scene-option.active {
-  background: rgba(79, 127, 255, 0.14);
-  border-color: var(--accent-primary);
-  box-shadow: 0 8rpx 18rpx rgba(79, 127, 255, 0.12);
+  background: var(--nb-yellow);
+  border-color: var(--nb-ink);
+  box-shadow: none;
 }
 
 .scene-option-name {
-  font-size: 24rpx;
+  font-size: 22rpx;
   color: var(--text-secondary);
   text-align: center;
-  line-height: 1.4;
+  line-height: 1.3;
 }
 
 .scene-option.active .scene-option-name {
-  color: var(--accent-primary);
-  font-weight: 600;
+  color: #000000;
+  font-weight: 700;
+  font-size: 23rpx;
 }
 
 .form-row {
   display: flex;
   flex-direction: column;
-  gap: 14rpx;
-  margin-bottom: 20rpx;
+  gap: 12rpx;
+  margin-bottom: 16rpx;
 }
 
 .form-row:last-child {
@@ -606,7 +564,7 @@ export default {
 
 .form-label {
   font-size: 24rpx;
-  color: var(--color-text-primary);
+  color: var(--nb-ink);
 }
 
 .toggle-switch {
@@ -614,39 +572,14 @@ export default {
   align-items: center;
 }
 
-.switch-track {
-  width: 92rpx;
-  height: 52rpx;
-  border-radius: 999rpx;
-  background: rgba(148, 163, 184, 0.28);
-  padding: 4rpx;
-  transition: background 0.2s ease;
-}
-
-.switch-track.active {
-  background: rgba(59, 130, 246, 0.9);
-}
-
-.switch-thumb {
-  width: 44rpx;
-  height: 44rpx;
-  border-radius: 50%;
-  background: #ffffff;
-  transition: transform 0.2s ease;
-}
-
-.switch-track.active .switch-thumb {
-  transform: translateX(40rpx);
-}
-
 .bottom-tabs {
   display: flex;
   flex-shrink: 0;
-  padding: 12rpx 16rpx;
-  padding-bottom: calc(12rpx + env(safe-area-inset-bottom));
+  padding: 2rpx 10rpx 0;
+  padding-bottom: var(--layout-bottom-offset);
   background-color: var(--bg-elevated);
-  border-top: 2rpx solid var(--border-primary);
-  gap: 8rpx;
+  border-top: 2rpx solid var(--nb-ink);
+  gap: 2rpx;
 }
 
 .bottom-tab-item {
@@ -655,11 +588,12 @@ export default {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 4rpx;
+  gap: 2rpx;
+  min-height: 68rpx;
 }
 
 .bottom-tab-item.active {
-  background-color: var(--bg-tertiary);
+  background-color: transparent;
 }
 
 .bottom-tab-text {
@@ -668,7 +602,13 @@ export default {
 }
 
 .bottom-tab-item.active .bottom-tab-text {
-  color: var(--accent-primary);
-  font-weight: 500;
+  color: #000000;
+  font-weight: 700;
+  font-size: 22rpx;
+}
+
+.bottom-tab-item.active :deep(.iconfont) {
+  color: #000000 !important;
+  font-size: 40rpx !important;
 }
 </style>

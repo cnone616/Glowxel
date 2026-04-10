@@ -1,16 +1,15 @@
 <template>
-  <view class="nb-page nb-ecosystem-preview">
+  <view class="nb-page nb-ecosystem-preview glx-scroll-region">
     <!-- #ifdef MP-WEIXIN -->
     <view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
     <!-- #endif -->
 
-    <view class="nb-navbar">
+    <view class="nb-navbar glx-topbar">
       <view class="nb-nav-action" @click="goBack">
         <Icon name="arrow-left-bold" :size="28" color="#000000" />
       </view>
       <view class="nb-nav-title-wrap">
         <text class="nb-nav-title">主题生态预览</text>
-        <text class="nb-nav-subtitle">Theme / Achievement / Assets</text>
       </view>
       <view class="nb-nav-spacer"></view>
     </view>
@@ -18,7 +17,7 @@
     <scroll-view scroll-y class="nb-scroll">
       <view class="nb-content">
         <view class="nb-card nb-card-lg ecosystem-hero">
-          <text class="nb-eyebrow">Preview System</text>
+          <text class="nb-eyebrow">预览系统</text>
           <text class="nb-display ecosystem-title">主题缩略图、成就卡、素材卡都能统一到同一套语法里。</text>
           <text class="nb-body ecosystem-desc">
             这一页重点看“高娱乐性内容”怎么统一风格，而不是继续做普通 app 卡片。缩略图保持方形，卡片统一黑边和硬阴影，设置区再适当降躁。
@@ -109,25 +108,25 @@ export default {
       themes: [
         {
           name: "世界地图时钟",
-          meta: "World Map",
+          meta: "世界地图",
           cover: "/static/clockwise-themes/cw-cf-0x03-worldmap.png",
           color: "#74B9FF",
         },
         {
           name: "高对比时钟",
-          meta: "Clock",
+          meta: "高对比时钟",
           cover: "/static/clockwise-themes/cw-cf-0x04-clock-high-contrast.png",
           color: "#FFD23F",
         },
         {
           name: "像素经典",
-          meta: "Theme",
+          meta: "像素主题",
           cover: "/static/clockwise-themes/cw-cf-0x01-thumb.jpg",
           color: "#88D498",
         },
         {
           name: "街机亮色",
-          meta: "Arcade",
+          meta: "街机亮色",
           cover: "/static/clockwise-themes/cw-cf-0x05-thumb.jpg",
           color: "#FF6B6B",
         },

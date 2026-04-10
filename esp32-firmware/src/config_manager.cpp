@@ -51,6 +51,130 @@ bool migrateLegacyDefaultClockLayout(ClockConfig& config) {
   config.time.y = 5;
   return true;
 }
+
+EyesConfig makeDefaultEyesConfig() {
+  EyesConfig defaultEyesConfig = {};
+  defaultEyesConfig.layout.eyeY = 24;
+  defaultEyesConfig.layout.eyeSpacing = 14;
+  defaultEyesConfig.layout.eyeWidth = 16;
+  defaultEyesConfig.layout.eyeHeight = 10;
+  defaultEyesConfig.layout.timeX = 18;
+  defaultEyesConfig.layout.timeY = 5;
+  defaultEyesConfig.behavior.autoSwitch = true;
+  defaultEyesConfig.behavior.blinkIntervalMs = 3200;
+  defaultEyesConfig.behavior.lookIntervalMs = 4200;
+  defaultEyesConfig.behavior.idleMove = 2;
+  defaultEyesConfig.behavior.sleepyAfterMs = 45000;
+  defaultEyesConfig.interaction.lookHoldMs = 1200;
+  defaultEyesConfig.interaction.moodHoldMs = 1800;
+  defaultEyesConfig.time.show = true;
+  defaultEyesConfig.time.showSeconds = false;
+  defaultEyesConfig.time.font = CLOCK_FONT_CLASSIC_5X7;
+  defaultEyesConfig.time.fontSize = 1;
+  memcpy(defaultEyesConfig.style.eyeColor, "#9bdcff", sizeof(defaultEyesConfig.style.eyeColor));
+  memcpy(defaultEyesConfig.style.pupilColor, "#1b6dff", sizeof(defaultEyesConfig.style.pupilColor));
+  memcpy(defaultEyesConfig.style.timeColor, "#64c8ff", sizeof(defaultEyesConfig.style.timeColor));
+  return defaultEyesConfig;
+}
+
+bool isValidHexColorString(const char* value) {
+  if (value == nullptr) {
+    return false;
+  }
+  if (strlen(value) != 7 || value[0] != '#') {
+    return false;
+  }
+  for (int i = 1; i < 7; i++) {
+    char ch = value[i];
+    bool isDigit = ch >= '0' && ch <= '9';
+    bool isLowerHex = ch >= 'a' && ch <= 'f';
+    bool isUpperHex = ch >= 'A' && ch <= 'F';
+    if (!isDigit && !isLowerHex && !isUpperHex) {
+      return false;
+    }
+  }
+  return true;
+}
+
+bool sanitizeEyesConfig(EyesConfig& config) {
+  bool changed = false;
+  EyesConfig defaults = makeDefaultEyesConfig();
+
+  if (config.layout.eyeWidth < 6 || config.layout.eyeWidth > 28) {
+    config.layout.eyeWidth = defaults.layout.eyeWidth;
+    changed = true;
+  }
+  if (config.layout.eyeHeight < 4 || config.layout.eyeHeight > 24) {
+    config.layout.eyeHeight = defaults.layout.eyeHeight;
+    changed = true;
+  }
+  if (config.layout.eyeSpacing < 4 || config.layout.eyeSpacing > 24) {
+    config.layout.eyeSpacing = defaults.layout.eyeSpacing;
+    changed = true;
+  }
+  if (config.layout.eyeY < 8 || config.layout.eyeY > 56) {
+    config.layout.eyeY = defaults.layout.eyeY;
+    changed = true;
+  }
+  if (config.layout.timeX < 0 || config.layout.timeX > 63) {
+    config.layout.timeX = defaults.layout.timeX;
+    changed = true;
+  }
+  if (config.layout.timeY < 0 || config.layout.timeY > 63) {
+    config.layout.timeY = defaults.layout.timeY;
+    changed = true;
+  }
+
+  if (config.behavior.blinkIntervalMs < 500 || config.behavior.blinkIntervalMs > 30000) {
+    config.behavior.blinkIntervalMs = defaults.behavior.blinkIntervalMs;
+    changed = true;
+  }
+  if (config.behavior.lookIntervalMs < 500 || config.behavior.lookIntervalMs > 30000) {
+    config.behavior.lookIntervalMs = defaults.behavior.lookIntervalMs;
+    changed = true;
+  }
+  if (config.behavior.idleMove > 6) {
+    config.behavior.idleMove = defaults.behavior.idleMove;
+    changed = true;
+  }
+  if (config.behavior.sleepyAfterMs < 1000 || config.behavior.sleepyAfterMs > 300000) {
+    config.behavior.sleepyAfterMs = defaults.behavior.sleepyAfterMs;
+    changed = true;
+  }
+
+  if (config.interaction.lookHoldMs < 200 || config.interaction.lookHoldMs > 10000) {
+    config.interaction.lookHoldMs = defaults.interaction.lookHoldMs;
+    changed = true;
+  }
+  if (config.interaction.moodHoldMs < 200 || config.interaction.moodHoldMs > 10000) {
+    config.interaction.moodHoldMs = defaults.interaction.moodHoldMs;
+    changed = true;
+  }
+
+  if (config.time.font > CLOCK_FONT_CLASSIC_5X7) {
+    config.time.font = defaults.time.font;
+    changed = true;
+  }
+  if (config.time.fontSize < 1 || config.time.fontSize > 3) {
+    config.time.fontSize = defaults.time.fontSize;
+    changed = true;
+  }
+
+  if (!isValidHexColorString(config.style.eyeColor)) {
+    memcpy(config.style.eyeColor, defaults.style.eyeColor, sizeof(config.style.eyeColor));
+    changed = true;
+  }
+  if (!isValidHexColorString(config.style.pupilColor)) {
+    memcpy(config.style.pupilColor, defaults.style.pupilColor, sizeof(config.style.pupilColor));
+    changed = true;
+  }
+  if (!isValidHexColorString(config.style.timeColor)) {
+    memcpy(config.style.timeColor, defaults.style.timeColor, sizeof(config.style.timeColor));
+    changed = true;
+  }
+
+  return changed;
+}
 }
 
 ClockConfig ConfigManager::clockConfig = {
@@ -135,7 +259,6 @@ void ConfigManager::loadClockConfig() {
 
   // 恢复上次的显示模式
   int savedMode = preferences.getInt("dispMode", (int)MODE_CLOCK);
-  DisplayManager::currentMode = (DeviceMode)savedMode;
   String savedBusinessMode = preferences.getString("bizMode", "");
   if (savedBusinessMode.length() == 0) {
     if (savedMode == MODE_CLOCK) {
@@ -160,6 +283,26 @@ void ConfigManager::loadClockConfig() {
       savedLastBusinessMode = savedBusinessMode;
     }
   }
+
+  // 传输模式是临时态，重启后不应停留在该模式
+  if (savedMode == MODE_TRANSFERRING) {
+    if (savedLastBusinessMode == "clock") {
+      savedMode = MODE_CLOCK;
+      savedBusinessMode = "clock";
+    } else if (savedLastBusinessMode == "theme") {
+      savedMode = MODE_THEME;
+      savedBusinessMode = "theme";
+    } else if (savedLastBusinessMode == "canvas") {
+      savedMode = MODE_CANVAS;
+      savedBusinessMode = "canvas";
+    } else {
+      savedMode = MODE_ANIMATION;
+      savedBusinessMode = savedLastBusinessMode;
+    }
+    Serial.println("检测到传输临时模式，已恢复到上次业务模式");
+  }
+
+  DisplayManager::currentMode = (DeviceMode)savedMode;
   DisplayManager::currentBusinessModeTag = savedBusinessMode;
   DisplayManager::lastBusinessModeTag = savedLastBusinessMode;
   if (savedLastBusinessMode == "clock") {
@@ -184,8 +327,14 @@ void ConfigManager::loadClockConfig() {
 void ConfigManager::saveClockConfig() {
   preferences.begin("clock", false);
   preferences.putBytes("config", &clockConfig, sizeof(ClockConfig));
-  preferences.putInt("dispMode", (int)DisplayManager::currentMode);
-  preferences.putString("bizMode", DisplayManager::currentBusinessModeTag);
+  DeviceMode modeToSave = DisplayManager::currentMode;
+  String bizModeToSave = DisplayManager::currentBusinessModeTag;
+  if (modeToSave == MODE_TRANSFERRING) {
+    modeToSave = DisplayManager::lastBusinessMode;
+    bizModeToSave = DisplayManager::lastBusinessModeTag;
+  }
+  preferences.putInt("dispMode", (int)modeToSave);
+  preferences.putString("bizMode", bizModeToSave);
   preferences.putString("lastBizMode", DisplayManager::lastBusinessModeTag);
   preferences.end();
   Serial.println("static clock config saved");
@@ -328,8 +477,13 @@ void ConfigManager::loadEyesConfig() {
   size_t configSize = preferences.getBytesLength("config");
   if (configSize == sizeof(EyesConfig)) {
     preferences.getBytes("config", &eyesConfig, sizeof(EyesConfig));
-    Serial.println("eyes config loaded");
+    if (sanitizeEyesConfig(eyesConfig)) {
+      Serial.println("eyes config loaded and sanitized");
+    } else {
+      Serial.println("eyes config loaded");
+    }
   } else {
+    eyesConfig = makeDefaultEyesConfig();
     Serial.println("eyes config: using default");
   }
 
@@ -563,28 +717,7 @@ void ConfigManager::resetToDefault() {
     .image = {false, 0, 0, 64, 64}
   };
 
-  EyesConfig defaultEyesConfig = {};
-  defaultEyesConfig.layout.eyeY = 24;
-  defaultEyesConfig.layout.eyeSpacing = 14;
-  defaultEyesConfig.layout.eyeWidth = 16;
-  defaultEyesConfig.layout.eyeHeight = 10;
-  defaultEyesConfig.layout.timeX = 22;
-  defaultEyesConfig.layout.timeY = 4;
-  defaultEyesConfig.behavior.autoSwitch = true;
-  defaultEyesConfig.behavior.blinkIntervalMs = 3200;
-  defaultEyesConfig.behavior.lookIntervalMs = 4200;
-  defaultEyesConfig.behavior.idleMove = 2;
-  defaultEyesConfig.behavior.sleepyAfterMs = 45000;
-  defaultEyesConfig.interaction.lookHoldMs = 1200;
-  defaultEyesConfig.interaction.moodHoldMs = 1800;
-  defaultEyesConfig.time.show = true;
-  defaultEyesConfig.time.showSeconds = false;
-  defaultEyesConfig.time.font = CLOCK_FONT_MINIMAL_3X5;
-  defaultEyesConfig.time.fontSize = 1;
-  memcpy(defaultEyesConfig.style.eyeColor, "#9bdcff", sizeof(defaultEyesConfig.style.eyeColor));
-  memcpy(defaultEyesConfig.style.pupilColor, "#1b6dff", sizeof(defaultEyesConfig.style.pupilColor));
-  memcpy(defaultEyesConfig.style.timeColor, "#d8f3ff", sizeof(defaultEyesConfig.style.timeColor));
-  eyesConfig = defaultEyesConfig;
+  eyesConfig = makeDefaultEyesConfig();
   DisplayManager::ambientEffectConfig = {AMBIENT_PRESET_AURORA, 6, 72, true};
   themeConfig.themeId[0] = '\0';
 

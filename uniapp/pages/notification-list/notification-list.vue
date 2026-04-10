@@ -1,53 +1,56 @@
 <template>
-  <view class="notification-list-page">
+  <view class="notification-list-page glx-page-shell">
     <!-- #ifdef MP-WEIXIN -->
     <view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
     <!-- #endif -->
 
-    <view class="header">
-      <view class="nav-left" @click="handleBack">
-        <Icon
-          name="direction-left"
-          :size="32"
-          color="var(--color-text-primary)"
-        />
-      </view>
-      <view class="nav-title">
-        <text class="project-name">通知提醒</text>
+    <view class="header glx-topbar glx-page-shell__fixed">
+      <view class="header-content">
+        <view class="nav-left" @click="handleBack">
+          <Icon
+            name="direction-left"
+            :size="32"
+            color="var(--nb-ink)"
+          />
+        </view>
+        <view class="nav-title">
+          <text class="project-name glx-topbar__title">通知提醒</text>
+        </view>
+        <view class="header-placeholder"></view>
       </view>
     </view>
 
-    <scroll-view scroll-y class="content">
-      <view class="content-wrapper">
-        <view class="card hero-card">
-          <view class="card-title-section">
-            <text class="card-title">创建定时提醒</text>
+    <scroll-view scroll-y class="content glx-scroll-region glx-page-shell__content">
+      <view class="content-wrapper glx-scroll-stack">
+        <view class="card hero-card glx-panel-card">
+          <view class="card-title-section glx-panel-head">
+            <text class="card-title glx-panel-title">创建定时提醒</text>
           </view>
           <text class="hero-text">
             先创建提醒规则，再进入具体预览和展示内容编辑。支持文字提示、静态提示和动图提示。
           </text>
           <view class="create-grid">
-            <view class="create-item" @click="createReminder('text')">
+            <view class="create-item glx-action-tile" @click="createReminder('text')">
               <Icon name="text" :size="40" color="#4F7FFF" />
               <text class="create-name">文字提示</text>
             </view>
-            <view class="create-item" @click="createReminder('static')">
+            <view class="create-item glx-action-tile" @click="createReminder('static')">
               <Icon name="picture" :size="40" color="#4F7FFF" />
               <text class="create-name">静态提示</text>
             </view>
-            <view class="create-item" @click="createReminder('animation')">
+            <view class="create-item glx-action-tile" @click="createReminder('animation')">
               <Icon name="play" :size="40" color="#4F7FFF" />
               <text class="create-name">动图提示</text>
             </view>
           </view>
         </view>
 
-        <view class="section-heading">
-          <text class="section-title">已创建提醒</text>
+        <view class="section-heading glx-section-head">
+          <text class="section-title glx-section-title">已创建提醒</text>
           <text class="section-count">{{ reminders.length }} 条</text>
         </view>
 
-        <view v-if="reminders.length === 0" class="card empty-card">
+        <view v-if="reminders.length === 0" class="card empty-card glx-panel-card">
           <text class="empty-title">还没有提醒</text>
           <text class="empty-text">从上面选择一种类型，新建第一条定时提醒。</text>
         </view>
@@ -55,7 +58,7 @@
         <view
           v-for="reminder in reminders"
           :key="reminder.reminderId"
-          class="card reminder-card"
+          class="card reminder-card glx-panel-card"
           @click="openReminder(reminder.reminderId)"
         >
           <view class="reminder-main">
@@ -72,13 +75,13 @@
             </view>
           </view>
           <view class="reminder-actions">
-            <view class="mini-btn" @click.stop="openReminder(reminder.reminderId)">
+            <view class="mini-btn glx-choice-chip--compact" @click.stop="openReminder(reminder.reminderId)">
               <text>编辑</text>
             </view>
-            <view class="mini-btn" @click.stop="duplicateReminder(reminder.reminderId)">
+            <view class="mini-btn glx-choice-chip--compact" @click.stop="duplicateReminder(reminder.reminderId)">
               <text>复制</text>
             </view>
-            <view class="mini-btn danger" @click.stop="deleteReminder(reminder.reminderId)">
+            <view class="mini-btn danger glx-choice-chip--compact" @click.stop="deleteReminder(reminder.reminderId)">
               <text>删除</text>
             </view>
           </view>
@@ -196,9 +199,6 @@ export default {
 
 <style scoped>
 .notification-list-page {
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
   background: var(--bg-secondary);
 }
 
@@ -207,30 +207,22 @@ export default {
 }
 
 .header {
-  height: 88rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0 32rpx;
   background: var(--bg-elevated);
-  border-bottom: 2rpx solid var(--border-primary);
-  position: relative;
 }
 
 .nav-left {
-  position: absolute;
-  left: 32rpx;
-  width: 80rpx;
-  height: 80rpx;
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
+  justify-content: center;
 }
 
 .nav-title {
   font-size: 32rpx;
   font-weight: 600;
-  color: var(--color-text-primary);
+  color: var(--nb-ink);
+}
+
+.header-placeholder {
+  width: 64rpx;
+  height: 64rpx;
 }
 
 .project-name {
@@ -249,8 +241,8 @@ export default {
 
 .card {
   background: var(--bg-elevated);
-  border: 2rpx solid var(--border-primary);
-  border-radius: 24rpx;
+  border: 2rpx solid var(--nb-ink);
+  border-radius: 0;
   padding: 24rpx;
   margin-bottom: 20rpx;
 }
@@ -394,7 +386,7 @@ export default {
   border-radius: 999rpx;
   background: rgba(79, 127, 255, 0.14);
   font-size: 20rpx;
-  color: var(--accent-primary);
+  color: var(--nb-yellow);
   flex-shrink: 0;
 }
 
@@ -422,7 +414,7 @@ export default {
   padding: 0 18rpx;
   border-radius: 16rpx;
   background: var(--bg-tertiary);
-  border: 2rpx solid var(--border-primary);
+  border: 2rpx solid var(--nb-ink);
 }
 
 .mini-btn text {

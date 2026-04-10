@@ -1,15 +1,16 @@
 <template>
-  <view class="community-page">
+  <view class="community-page glx-page-shell">
     <!-- 状态栏占位 -->
     <!-- #ifdef MP-WEIXIN -->
     <view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
     <!-- #endif -->
 
     <!-- 顶部导航 -->
-    <view class="header">
+    <view class="header glx-topbar glx-page-shell__fixed">
       <view class="header-content">
-        <text class="header-title">社区</text>
-        <view class="header-actions"> </view>
+        <view class="header-placeholder"></view>
+        <text class="header-title glx-topbar__title">社区</text>
+        <view class="header-placeholder"></view>
       </view>
 
       <!-- 分类标签 -->
@@ -19,7 +20,7 @@
             <view
               v-for="(category, index) in categories"
               :key="category.key"
-              class="tab-item"
+              class="tab-item glx-choice-chip"
               :class="{ active: activeCategory === category.key }"
               @click="switchCategory(category.key)"
             >
@@ -32,7 +33,7 @@
     <!-- 主要内容 -->
     <scroll-view
       scroll-y
-      class="main-content"
+      class="main-content glx-scroll-region glx-page-shell__content"
       @scrolltolower="loadMore"
       :refresher-enabled="true"
       :refresher-triggered="isRefreshing"
@@ -40,11 +41,11 @@
     >
       <!-- 推荐用户（仅推荐分类显示） -->
       <view v-if="activeCategory === 'recommended'" class="recommended-users">
-        <view class="section-header">
-          <text class="section-title">推荐创作者</text>
-          <view class="more-btn" @click="goToUserList">
+        <view class="section-header glx-section-head">
+          <text class="section-title glx-section-title">推荐创作者</text>
+          <view class="more-btn glx-inline-cta" @click="goToUserList">
             <text class="more-text">查看更多</text>
-            <Icon name="arrow-right" :size="24" color="#4F7FFF" />
+            <Icon name="arrow-right" :size="24" class="glx-inline-cta__icon" />
           </view>
         </view>
 
@@ -53,7 +54,7 @@
             <view
               v-for="user in recommendedUsers"
               :key="user.id"
-              class="user-card"
+              class="user-card glx-panel-card"
               @click="goToUserProfile(user)"
             >
               <Avatar
@@ -65,7 +66,7 @@
               <text class="user-name">{{ user.name }}</text>
               <text class="user-works">{{ user.works_count }} 作品</text>
               <view
-                class="follow-btn"
+                class="follow-btn glx-cta-button"
                 :class="{ following: followingUserIds.has(user.id) }"
                 @click.stop="toggleFollow(user)"
               >
@@ -82,7 +83,7 @@
       <view class="artworks-section">
         <view
           v-if="filteredArtworks.length === 0 && !isLoading"
-          class="empty-state"
+          class="empty-state glx-panel-card"
         >
           <view class="empty-icon">
             <Icon name="picture" :size="80" color="#AAAAAA" />
@@ -455,20 +456,20 @@ export default {
   height: 100vh;
   display: flex;
   flex-direction: column;
-  background-color: var(--color-app-background);
+  background-color: var(--nb-paper);
   overflow: hidden;
 }
 
 /* 状态栏占位 */
 .status-bar {
-  background-color: var(--color-card-background);
+  background-color: var(--nb-surface);
   flex-shrink: 0;
 }
 
 /* 顶部导航 */
 .header {
-  background-color: var(--color-card-background);
-  border-bottom: 1rpx solid var(--border-primary);
+  background-color: var(--nb-surface);
+  border-bottom: 1rpx solid var(--nb-ink);
   flex-shrink: 0;
 }
 
@@ -482,7 +483,7 @@ export default {
 .header-title {
   font-size: 36rpx;
   font-weight: 700;
-  color: var(--color-text-primary);
+  color: var(--nb-ink);
 }
 
 .header-actions {
@@ -497,14 +498,14 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: var(--radius-medium);
-  background-color: var(--color-app-background);
+  border-radius: 0;
+  background-color: var(--nb-paper);
   transition: all 0.2s ease;
 }
 
 .search-btn:active {
-  transform: scale(0.95);
-  background-color: rgba(79, 127, 255, 0.1);
+  transform: none;
+  background-color: var(--nb-yellow);
 }
 
 /* 分类标签 */
@@ -524,15 +525,15 @@ export default {
 .tab-item {
   flex-shrink: 0;
   padding: 16rpx 24rpx;
-  border-radius: var(--radius-small);
-  background-color: var(--color-app-background);
-  border: 2rpx solid var(--border-primary);
+  border-radius: 0;
+  background-color: var(--nb-paper);
+  border: 2rpx solid var(--nb-ink);
   transition: all 0.2s ease;
 }
 
 .tab-item.active {
-  background-color: var(--color-brand-primary);
-  border-color: var(--color-brand-primary);
+  background-color: var(--nb-yellow);
+  border-color: var(--nb-ink);
 }
 
 .tab-item:active {
@@ -542,20 +543,20 @@ export default {
 .tab-text {
   font-size: 26rpx;
   font-weight: 500;
-  color: var(--color-text-secondary);
+  color: #4a4a4a;
   white-space: nowrap;
 }
 
 .tab-item.active .tab-text {
-  color: #ffffff;
-  font-weight: 600;
+  color: #000000;
+  font-weight: 700;
 }
 
 /* 搜索栏 */
 .search-section {
-  background-color: var(--color-card-background);
+  background-color: var(--nb-surface);
   padding: 0 32rpx 24rpx;
-  border-bottom: 1rpx solid var(--border-primary);
+  border-bottom: 1rpx solid var(--nb-ink);
 }
 
 /* 主要内容 */
@@ -566,38 +567,38 @@ export default {
 
 /* 搜索输入框 */
 .search-section {
-  background-color: var(--color-card-background);
+  background-color: var(--nb-surface);
   padding: 0 32rpx 24rpx;
-  border-bottom: 1rpx solid var(--border-primary);
+  border-bottom: 1rpx solid var(--nb-ink);
 }
 
 .search-input-wrapper {
   display: flex;
   align-items: center;
   gap: 16rpx;
-  background-color: var(--color-app-background);
-  border-radius: var(--radius-medium);
+  background-color: var(--nb-paper);
+  border-radius: 0;
   padding: 20rpx 24rpx;
-  border: 2rpx solid var(--border-primary);
+  border: 2rpx solid var(--nb-ink);
   transition: all 0.2s ease;
 }
 
 .search-input-wrapper:focus-within {
-  border-color: var(--color-brand-primary);
-  box-shadow: 0 0 0 4rpx rgba(79, 127, 255, 0.1);
+  border-color: var(--nb-ink);
+  box-shadow: none;
 }
 
 .search-input {
   flex: 1;
   font-size: 28rpx;
-  color: var(--color-text-primary);
+  color: var(--nb-ink);
   background: transparent;
   border: none;
   outline: none;
 }
 
 .search-input::placeholder {
-  color: var(--color-text-disabled);
+  color: #777777;
 }
 
 .clear-btn {
@@ -606,13 +607,14 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 50%;
-  background-color: var(--color-app-background);
+  border-radius: 0;
+  background-color: var(--nb-paper);
+  border: 2rpx solid var(--nb-ink);
   transition: all 0.2s ease;
 }
 
 .clear-btn:active {
-  transform: scale(0.9);
+  transform: translate(2rpx, 2rpx);
 }
 
 /* 主要内容 */
@@ -625,7 +627,7 @@ export default {
 .section-title {
   font-size: 32rpx;
   font-weight: 700;
-  color: var(--color-text-primary);
+  color: var(--nb-ink);
 }
 
 .section-header {
@@ -636,23 +638,21 @@ export default {
 }
 
 .more-btn {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 8rpx;
-  padding: 12rpx 16rpx;
-  border-radius: var(--radius-small);
+  justify-content: center;
   transition: all 0.2s ease;
 }
 
 .more-btn:active {
-  background-color: rgba(79, 127, 255, 0.1);
-  transform: scale(0.95);
+  background-color: var(--nb-yellow);
+  transform: translate(2rpx, 2rpx);
 }
 
 .more-text {
   font-size: 26rpx;
-  color: var(--color-brand-primary);
-  font-weight: 500;
+  color: var(--nb-ink);
+  font-weight: 900;
 }
 
 /* 推荐用户 */
@@ -681,21 +681,21 @@ export default {
   flex-direction: column;
   align-items: center;
   padding: 32rpx 24rpx;
-  background-color: var(--color-card-background);
-  border-radius: var(--radius-medium);
-  box-shadow: var(--shadow-card);
+  background-color: var(--nb-surface);
+  border-radius: 0;
+  box-shadow: var(--nb-shadow-strong);
   transition: all 0.2s ease;
 }
 
 .user-card:active {
   transform: scale(0.95);
-  box-shadow: var(--shadow-floating);
+  box-shadow: 2rpx 2rpx 0 var(--nb-ink);
 }
 
 .user-name {
   font-size: 26rpx;
   font-weight: 600;
-  color: var(--color-text-primary);
+  color: var(--nb-ink);
   margin: 16rpx 0 8rpx;
   text-align: center;
   overflow: hidden;
@@ -706,28 +706,33 @@ export default {
 
 .user-works {
   font-size: 22rpx;
-  color: var(--color-text-secondary);
+  color: #4a4a4a;
   margin-bottom: 20rpx;
 }
 
 .follow-btn {
   padding: 12rpx 24rpx;
-  border-radius: var(--radius-small);
-  background-color: var(--color-brand-primary);
+  border-radius: 0;
+  background-color: var(--nb-yellow);
+  border: 2rpx solid var(--nb-ink);
   transition: all 0.2s ease;
 }
 
 .follow-btn.following {
-  background-color: var(--color-text-secondary);
+  background-color: #111111;
 }
 
 .follow-btn:active {
-  transform: scale(0.95);
+  transform: translate(2rpx, 2rpx);
 }
 
 .follow-text {
   font-size: 24rpx;
   font-weight: 500;
+  color: #000000;
+}
+
+.follow-btn.following .follow-text {
   color: #ffffff;
 }
 
@@ -758,7 +763,7 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: var(--color-app-background);
+  background-color: var(--nb-paper);
   border-radius: 50%;
   margin-bottom: 32rpx;
 }
@@ -766,13 +771,13 @@ export default {
 .empty-title {
   font-size: 32rpx;
   font-weight: 600;
-  color: var(--color-text-primary);
+  color: var(--nb-ink);
   margin-bottom: 12rpx;
 }
 
 .empty-subtitle {
   font-size: 26rpx;
-  color: var(--color-text-secondary);
+  color: #4a4a4a;
   line-height: 1.5;
 }
 
@@ -800,7 +805,7 @@ export default {
 
 .loading-text {
   font-size: 26rpx;
-  color: var(--color-text-secondary);
+  color: #4a4a4a;
 }
 
 .load-more-btn {
@@ -809,21 +814,21 @@ export default {
   justify-content: center;
   padding: 32rpx;
   margin: 32rpx 0;
-  background-color: var(--color-card-background);
-  border-radius: var(--radius-medium);
-  border: 2rpx solid var(--border-primary);
+  background-color: var(--nb-surface);
+  border-radius: 0;
+  border: 2rpx solid var(--nb-ink);
   transition: all 0.2s ease;
 }
 
 .load-more-btn:active {
   transform: scale(0.98);
-  background-color: var(--color-app-background);
+  background-color: var(--nb-paper);
 }
 
 .load-more-text {
   font-size: 28rpx;
-  color: var(--color-brand-primary);
-  font-weight: 500;
+  color: #000000;
+  font-weight: 700;
 }
 
 .no-more {
@@ -835,6 +840,6 @@ export default {
 
 .no-more-text {
   font-size: 24rpx;
-  color: var(--color-text-disabled);
+  color: #777777;
 }
 </style>

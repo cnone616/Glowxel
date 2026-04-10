@@ -1,5 +1,5 @@
 <template>
-  <view class="editor-page light-theme">
+  <view class="editor-page light-theme glx-page-shell">
     <!-- 状态栏占位 -->
     <!-- #ifdef MP-WEIXIN -->
     <view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
@@ -48,20 +48,21 @@
     ></canvas>
 
     <!-- 顶部栏 -->
-    <view class="navbar">
+    <view class="navbar glx-topbar glx-page-shell__fixed">
       <view class="nav-left" @click="handleBack">
         <Icon
           name="direction-left"
           :size="32"
-          color="var(--color-text-primary)"
+          color="var(--nb-ink)"
         />
       </view>
       <view class="nav-title">
-        <text class="project-name">
+        <text class="project-name glx-topbar__title">
           {{ project?.name }}
         </text>
         <text v-if="boardId" class="board-id">/ {{ boardId }}</text>
       </view>
+      <view class="nav-right"></view>
     </view>
 
     <!-- Canvas 画布区域 -->
@@ -96,45 +97,51 @@
       <view class="action-bar">
         <view class="action-group">
           <view
-            class="action-btn"
+            class="action-btn glx-action-tile"
             :class="{ disabled: historyIndex <= 0 }"
+            :style="getActionButtonStyle()"
             @click="handleUndo"
           >
-            <Icon name="back" :size="36" />
+            <Icon name="back" :size="32" :color="getActionButtonColor()" />
           </view>
           <view class="divider"></view>
           <view
-            class="action-btn"
+            class="action-btn glx-action-tile"
             :class="{ disabled: historyIndex >= history.length - 1 }"
+            :style="getActionButtonStyle()"
             @click="handleRedo"
           >
-            <Icon name="forward" :size="36" />
+            <Icon name="forward" :size="32" :color="getActionButtonColor()" />
           </view>
         </view>
 
         <view class="action-group">
-          <view class="action-btn" @click="handleZoom(-1)">
-            <Icon name="zoom-out" :size="36" />
+          <view class="action-btn glx-action-tile" :style="getActionButtonStyle()" @click="handleZoom(-1)">
+            <Icon name="zoom-out" :size="32" :color="getActionButtonColor()" />
           </view>
           <view class="divider"></view>
-          <view class="action-btn" @click="handleZoom(1)">
-            <Icon name="zoom-in" :size="36" />
+          <view class="action-btn glx-action-tile" :style="getActionButtonStyle()" @click="handleZoom(1)">
+            <Icon name="zoom-in" :size="32" :color="getActionButtonColor()" />
           </view>
           <view class="divider"></view>
-          <view class="action-btn" @click="isHelpOpen = true">
-            <Icon name="help" :size="36" />
+          <view class="action-btn" :style="getActionButtonStyle()" @click="isHelpOpen = true">
+            <Icon name="help" :size="32" :color="getActionButtonColor()" />
           </view>
           <view class="divider"></view>
           <view
             class="action-btn"
-            :class="{ active: gridVisible }"
+            :style="getActionButtonStyle(gridVisible)"
             @click="gridVisible = !gridVisible"
           >
-            <Icon name="a-Grid-ninejiugongge" :size="36" />
+            <Icon
+              name="a-Grid-ninejiugongge"
+              :size="32"
+              :color="getActionButtonColor(gridVisible)"
+            />
           </view>
           <view class="divider"></view>
-          <view class="action-btn" @click="handleFit">
-            <Icon name="fullscreen-expand" :size="36" />
+          <view class="action-btn" :style="getActionButtonStyle()" @click="handleFit">
+            <Icon name="fullscreen-expand" :size="32" :color="getActionButtonColor()" />
           </view>
         </view>
       </view>
@@ -143,39 +150,39 @@
       <view class="tools">
         <view
           class="tool-btn move"
-          :class="{ active: tool === 'move' }"
+          :style="getToolButtonStyle('move')"
           @click="setTool('move')"
         >
-          <Icon name="move" :size="40" />
-          <text class="tool-label">拖动</text>
+          <Icon name="move" :size="34" :color="getToolButtonColor('move')" />
+          <text class="tool-label" :style="{ color: getToolButtonColor('move') }">拖动</text>
         </view>
 
         <view
-          class="tool-btn"
-          :class="{ active: tool === 'pencil' }"
+          class="tool-btn pencil"
+          :style="getToolButtonStyle('pencil')"
           @click="setTool('pencil')"
         >
-          <Icon name="edit" :size="40" />
-          <text class="tool-label">绘画</text>
+          <Icon name="edit" :size="34" :color="getToolButtonColor('pencil')" />
+          <text class="tool-label" :style="{ color: getToolButtonColor('pencil') }">绘画</text>
         </view>
 
         <view
           class="tool-btn eraser"
-          :class="{ active: tool === 'eraser' }"
+          :style="getToolButtonStyle('eraser')"
           @click="setTool('eraser')"
         >
-          <Icon name="delete" :size="40" />
-          <text class="tool-label">擦除</text>
+          <Icon name="delete" :size="34" :color="getToolButtonColor('eraser')" />
+          <text class="tool-label" :style="{ color: getToolButtonColor('eraser') }">擦除</text>
         </view>
 
-        <view class="tool-btn eraser" @click="handleSave">
-          <Icon name="save" :size="40" />
-          <text class="tool-label">保存</text>
+        <view class="tool-btn tool-btn-static" :style="getToolButtonStyle('save')" @click="handleSave">
+          <Icon name="save" :size="34" :color="getToolButtonColor('save')" />
+          <text class="tool-label" :style="{ color: getToolButtonColor('save') }">保存</text>
         </view>
 
-        <view class="tool-btn eraser" @click="handlePublish">
-          <Icon name="upload" :size="40" />
-          <text class="tool-label">发布</text>
+        <view class="tool-btn tool-btn-static" :style="getToolButtonStyle('publish')" @click="handlePublish">
+          <Icon name="upload" :size="34" :color="getToolButtonColor('publish')" />
+          <text class="tool-label" :style="{ color: getToolButtonColor('publish') }">发布</text>
         </view>
       </view>
 
@@ -548,6 +555,45 @@ export default {
   },
 
   methods: {
+    getActionButtonStyle(isActive = false) {
+      if (isActive) {
+        return "background:#4f7fff;border:2rpx solid #000000;box-shadow:2rpx 2rpx 0 #000000;color:#ffffff;";
+      }
+      return "background:#ffd23f;border:2rpx solid #000000;box-shadow:2rpx 2rpx 0 #000000;color:#000000;";
+    },
+
+    getActionButtonColor(isActive = false) {
+      if (isActive) {
+        return "#ffffff";
+      }
+      return "#000000";
+    },
+
+    getToolButtonStyle(toolKey) {
+      if (this.tool === toolKey) {
+        if (toolKey === "move") {
+          return "background:#111111;border:3rpx solid #000000;box-shadow:2rpx 2rpx 0 #000000;color:#ffffff;";
+        }
+        if (toolKey === "pencil") {
+          return "background:#4f7fff;border:3rpx solid #000000;box-shadow:2rpx 2rpx 0 #000000;color:#ffffff;";
+        }
+        if (toolKey === "eraser") {
+          return "background:#d92d20;border:3rpx solid #000000;box-shadow:2rpx 2rpx 0 #000000;color:#ffffff;";
+        }
+      }
+      return "background:#ffd23f;border:3rpx solid #000000;box-shadow:2rpx 2rpx 0 #000000;color:#000000;";
+    },
+
+    getToolButtonColor(toolKey) {
+      if (
+        this.tool === toolKey &&
+        (toolKey === "move" || toolKey === "pencil" || toolKey === "eraser")
+      ) {
+        return "#ffffff";
+      }
+      return "#000000";
+    },
+
     setTool(newTool) {
       if (this.tool !== newTool) {
         this.tool = newTool;
@@ -696,53 +742,6 @@ export default {
   background-color: var(--bg-primary);
 }
 
-.navbar {
-  height: 88rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0 32rpx;
-  background-color: var(--color-card-background);
-  border-bottom: 2rpx solid var(--border-primary);
-  position: relative;
-}
-
-.nav-left {
-  position: absolute;
-  left: 32rpx;
-  width: 80rpx;
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-}
-
-.nav-right {
-  position: absolute;
-  right: 32rpx;
-  width: 80rpx;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-}
-
-.nav-title {
-  font-size: 32rpx;
-  font-weight: 600;
-  color: var(--color-text-primary);
-}
-
-.back-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-secondary);
-  transition: var(--transition-base);
-}
-
-.back-btn:active {
-  color: var(--text-primary);
-}
-
 .project-name-wrapper {
   display: flex;
   align-items: center;
@@ -782,11 +781,11 @@ export default {
 }
 
 .icon-btn:active {
-  color: var(--accent-primary);
+  color: var(--nb-yellow);
 }
 
 .device-btn.connected {
-  color: var(--accent-primary);
+  color: var(--nb-yellow);
   animation: pulse-glow 2s ease-in-out infinite;
 }
 
@@ -812,8 +811,8 @@ export default {
 /* 底部工具栏 */
 .toolbar {
   background-color: var(--bg-elevated);
-  border-top: 2rpx solid var(--border-primary);
-  padding-bottom: env(safe-area-inset-bottom);
+  border-top: 2rpx solid var(--nb-ink);
+  padding-bottom: var(--layout-bottom-offset);
   z-index: 20;
 }
 
@@ -823,23 +822,28 @@ export default {
   justify-content: space-between;
   align-items: center;
   padding: 16rpx 32rpx;
-  border-bottom: 2rpx solid var(--border-primary);
+  border-bottom: 2rpx solid var(--nb-ink);
   background-color: var(--bg-tertiary);
 }
 
 .action-group {
   display: flex;
   align-items: center;
-  gap: 4rpx;
-  padding: 4rpx;
-  background-color: var(--bg-tertiary);
-  border-radius: 12rpx;
+  gap: 12rpx;
+  padding: 0;
+  background-color: transparent;
+  border-radius: 0;
 }
 
 .action-btn {
-  padding: 12rpx;
+  width: 72rpx;
+  height: 72rpx;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   border-radius: 8rpx;
-  color: var(--text-primary);
+  box-sizing: border-box;
   transition: var(--transition-base);
 }
 
@@ -848,9 +852,10 @@ export default {
 }
 
 .action-btn.active {
-  background-color: rgba(0, 243, 255, 0.1);
-  border: 2rpx solid var(--accent-primary);
-  color: var(--accent-primary);
+  background: #4f7fff !important;
+  border: 2rpx solid #000000 !important;
+  box-shadow: none !important;
+  color: #ffffff !important;
 }
 
 .action-btn.row-mode-btn.active {
@@ -862,11 +867,17 @@ export default {
   color: var(--text-tertiary);
 }
 
+.action-btn .iconfont {
+  display: block;
+  line-height: 1;
+}
+
+.action-btn.active .iconfont {
+  color: #ffffff !important;
+}
+
 .divider {
-  width: 2rpx;
-  height: 32rpx;
-  background-color: var(--border-primary);
-  margin: 0 4rpx;
+  display: none;
 }
 
 /* 工具选择 */
@@ -875,7 +886,7 @@ export default {
   justify-content: center;
   align-items: center;
   gap: 16rpx;
-  padding: 16rpx 32rpx;
+  padding: 14rpx 24rpx;
 }
 
 .row-controls {
@@ -884,8 +895,8 @@ export default {
   gap: 16rpx;
   padding: 12rpx 24rpx;
   background-color: var(--bg-secondary);
-  border-radius: 16rpx;
-  border: 2rpx solid var(--accent-primary);
+  border-radius: 0;
+  border: 2rpx solid var(--nb-ink);
 }
 
 .row-btn {
@@ -894,36 +905,40 @@ export default {
   justify-content: center;
   width: 56rpx;
   height: 56rpx;
-  border-radius: 12rpx;
+  border-radius: 0;
   background-color: var(--bg-tertiary);
-  color: var(--accent-primary);
+  color: var(--nb-yellow);
   transition: var(--transition-base);
+  border: 2rpx solid #000000;
 }
 
 .row-btn:active {
-  transform: scale(0.95);
-  background-color: rgba(0, 243, 255, 0.2);
+  transform: translate(2rpx, 2rpx);
+  background-color: var(--nb-yellow);
+  color: #000000;
 }
 
 .row-text {
   font-size: 24rpx;
   font-weight: bold;
-  color: var(--accent-primary);
+  color: var(--nb-yellow);
   min-width: 120rpx;
   text-align: center;
 }
 
 .tool-btn {
   flex: 1;
-  max-width: 200rpx;
+  max-width: 168rpx;
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: 4rpx;
-  padding: 16rpx 12rpx;
-  border-radius: 16rpx;
-  background-color: var(--bg-tertiary);
-  border: 2rpx solid transparent;
+  min-height: 92rpx;
+  padding: 12rpx 10rpx;
+  border-radius: 0;
+  box-sizing: border-box;
+  text-align: center;
   transition: var(--transition-base);
 }
 
@@ -932,29 +947,44 @@ export default {
 }
 
 .tool-btn.active {
-  background-color: rgba(0, 243, 255, 0.1);
-  border-color: var(--accent-primary);
-  color: var(--accent-primary);
+  border-color: #000000;
+}
+
+.tool-btn.pencil.active {
+  background: #4f7fff;
+  box-shadow: none;
+  color: #ffffff;
 }
 
 .tool-btn.eraser.active {
-  background-color: rgba(255, 51, 51, 0.1);
-  border-color: var(--error-color);
-  color: var(--error-color);
+  background: #d92d20;
+  border-color: #000000;
+  box-shadow: none;
+  color: #ffffff;
 }
 
 .tool-btn.move.active {
-  background-color: rgba(0, 243, 255, 0.1);
-  border-color: var(--accent-primary);
-  color: var(--accent-primary);
+  background: #111111;
+  border-color: #000000;
+  box-shadow: none;
+  color: #ffffff;
 }
 
 .tool-label {
-  font-size: 20rpx;
+  font-size: 18rpx;
   font-weight: bold;
   color: currentColor;
-  text-transform: uppercase;
-  letter-spacing: 2rpx;
+  letter-spacing: 1rpx;
+}
+
+.tool-btn .iconfont {
+  display: block;
+  line-height: 1;
+  color: currentColor !important;
+}
+
+.tool-btn text {
+  color: currentColor !important;
 }
 
 /* 颜色选择器 */
@@ -988,14 +1018,14 @@ export default {
   flex-direction: column;
   align-items: center;
   gap: 24rpx;
-  box-shadow: 0 0 60rpx rgba(0, 243, 255, 0.15);
+  box-shadow: var(--nb-shadow-strong);
 }
 
 .modal-icon {
   width: 80rpx;
   height: 80rpx;
   border-radius: 50%;
-  background-color: rgba(0, 243, 255, 0.1);
+  background-color: #f7f7f7;
   border: 2rpx solid rgba(0, 243, 255, 0.2);
   display: flex;
   align-items: center;
@@ -1037,30 +1067,35 @@ export default {
 
 .modal-btn {
   flex: 1;
-  padding: 24rpx;
+  min-height: 88rpx;
+  padding: 0 24rpx;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 16rpx;
+  border-radius: 0;
+  box-sizing: border-box;
+  border: 2rpx solid var(--nb-ink);
+  box-shadow: 2rpx 2rpx 0 var(--nb-ink);
   transition: opacity 0.2s;
 }
 
 .modal-btn:active {
   opacity: 0.8;
+  box-shadow: none;
 }
 
 .modal-btn.primary {
-  background-color: var(--accent-color);
-  box-shadow: 0 8rpx 32rpx rgba(0, 243, 255, 0.2);
+  background-color: var(--nb-yellow);
 }
 
 .modal-btn.secondary {
-  background-color: rgba(255, 255, 255, 0.05);
-  border: 2rpx solid var(--border-color);
+  background-color: #ffffff;
 }
 
 .modal-btn.text {
   background-color: transparent;
+  border: 0;
+  box-shadow: none;
 }
 
 .modal-btn-text {
@@ -1081,8 +1116,8 @@ export default {
 /* 浅色主题适配 */
 .light-theme .tool-btn.move.active {
   background-color: rgba(0, 153, 204, 0.1);
-  border-color: var(--accent-primary);
-  color: var(--accent-primary);
+  border-color: var(--nb-yellow);
+  color: var(--nb-yellow);
 }
 
 /* 重命名弹窗 */
@@ -1090,7 +1125,7 @@ export default {
   right: 0;
   bottom: 0;
   background-color: rgba(0, 0, 0, 0.8);
-  backdrop-filter: blur(20rpx);
+  backdrop-filter: none;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1102,8 +1137,8 @@ export default {
   width: 100%;
   max-width: 500rpx;
   background-color: var(--bg-tertiary);
-  border: 2rpx solid var(--accent-primary);
-  border-radius: 24rpx;
+  border: 2rpx solid var(--nb-ink);
+  border-radius: 0;
   overflow: hidden;
 }
 
@@ -1112,7 +1147,7 @@ export default {
   justify-content: space-between;
   align-items: center;
   padding: 24rpx 32rpx;
-  border-bottom: 2rpx solid var(--border-primary);
+  border-bottom: 2rpx solid var(--nb-ink);
 }
 
 .modal-title {
@@ -1139,9 +1174,9 @@ export default {
   padding: 20rpx 24rpx;
   font-size: 28rpx;
   color: var(--text-primary);
-  background-color: var(--bg-primary);
-  border: 2rpx solid var(--border-primary);
-  border-radius: 12rpx;
+  background-color: #fff8d6;
+  border: 2rpx solid var(--nb-ink);
+  border-radius: 0;
   transition: all 0.2s;
   box-sizing: border-box;
 }
@@ -1154,7 +1189,7 @@ export default {
 .name-input-wrapper {
   position: relative;
   padding: 24rpx 0;
-  border-bottom: 3rpx solid var(--border-primary);
+  border-bottom: 3rpx solid var(--nb-ink);
   transition: var(--transition-base);
   min-height: 80rpx;
   display: flex;
@@ -1185,24 +1220,30 @@ export default {
   display: flex;
   gap: 16rpx;
   padding: 24rpx 32rpx;
-  border-top: 2rpx solid var(--border-primary);
+  border-top: 2rpx solid var(--nb-ink);
 }
 
 .modal-btn {
   flex: 1;
-  padding: 24rpx;
-  border-radius: 12rpx;
+  min-height: 88rpx;
+  padding: 0 24rpx;
+  border-radius: 0;
   text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  border: 2rpx solid var(--nb-ink);
+  box-shadow: 2rpx 2rpx 0 var(--nb-ink);
   transition: all 0.2s;
 }
 
 .modal-btn.cancel {
-  background-color: var(--bg-primary);
-  border: 2rpx solid var(--border-primary);
+  background-color: #ffffff;
 }
 
 .modal-btn.confirm {
-  background-color: #00f3ff;
+  background-color: var(--nb-yellow);
 }
 
 .modal-btn-text {
@@ -1211,7 +1252,7 @@ export default {
 }
 
 .modal-btn.cancel .modal-btn-text {
-  color: var(--text-secondary);
+  color: var(--text-primary);
 }
 
 .modal-btn.confirm .modal-btn-text {

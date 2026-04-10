@@ -1,24 +1,24 @@
 <template>
-  <view class="edit-profile-page">
+  <view class="edit-profile-page glx-page-shell">
     <!-- 状态栏占位 -->
     <!-- #ifdef MP-WEIXIN -->
     <view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
     <!-- #endif -->
 
     <!-- 导航栏 -->
-    <view class="navbar">
+    <view class="navbar glx-topbar glx-page-shell__fixed">
       <view class="nav-left" @click="handleBack">
         <Icon
           name="direction-left"
           :size="32"
-          color="var(--color-text-primary)"
+          color="var(--nb-ink)"
         />
       </view>
-      <text class="nav-title">编辑资料</text>
+      <text class="nav-title glx-topbar__title">编辑资料</text>
       <view class="nav-right"></view>
     </view>
 
-    <scroll-view scroll-y class="content">
+    <scroll-view scroll-y class="content glx-scroll-region glx-page-shell__content">
       <!-- 头像编辑 -->
       <view class="avatar-section">
         <view class="avatar-container" @click="chooseAvatar">
@@ -36,8 +36,8 @@
       </view>
 
       <!-- 基本信息 -->
-      <view class="form-section">
-        <view class="section-title">基本信息</view>
+      <view class="form-section glx-panel-card">
+        <view class="section-title glx-section-title">基本信息</view>
 
         <view class="form-item">
           <text class="form-label">昵称</text>
@@ -80,8 +80,8 @@
       </view>
 
       <!-- 兴趣标签 -->
-      <view class="form-section">
-        <view class="section-title">兴趣标签</view>
+      <view class="form-section glx-panel-card">
+        <view class="section-title glx-section-title">兴趣标签</view>
         <view class="tags-container">
           <view
             v-for="tag in availableTags"
@@ -97,8 +97,8 @@
       </view>
 
       <!-- 隐私设置 -->
-      <view class="form-section">
-        <view class="section-title">隐私设置</view>
+      <view class="form-section glx-panel-card">
+        <view class="section-title glx-section-title">隐私设置</view>
 
         <view class="form-item switch-item">
           <view class="switch-info">
@@ -295,49 +295,14 @@ export default {
 <style scoped>
 .edit-profile-page {
   height: 100vh;
-  background-color: var(--color-app-background);
+  background-color: var(--nb-paper);
   display: flex;
   flex-direction: column;
 }
 
-.navbar {
-  height: 88rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0 32rpx;
-  background-color: var(--color-card-background);
-  border-bottom: 2rpx solid var(--border-primary);
-  position: relative;
-}
-
-.nav-left {
-  position: absolute;
-  left: 32rpx;
-  width: 120rpx;
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-}
-
-.nav-right {
-  position: absolute;
-  right: 32rpx;
-  width: 120rpx;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-}
-
-.nav-title {
-  font-size: 32rpx;
-  font-weight: 600;
-  color: var(--color-text-primary);
-}
-
 .save-btn {
   font-size: 28rpx;
-  color: var(--color-brand-primary);
+  color: var(--nb-yellow);
   font-weight: 600;
 }
 
@@ -374,7 +339,7 @@ export default {
 .avatar-placeholder {
   width: 100%;
   height: 100%;
-  background-color: var(--color-app-background);
+  background-color: var(--nb-paper);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -386,31 +351,31 @@ export default {
   right: 0;
   width: 48rpx;
   height: 48rpx;
-  background-color: var(--color-brand-primary);
-  border-radius: 24rpx;
+  background-color: var(--nb-yellow);
+  border-radius: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 4rpx solid var(--color-card-background);
+  border: 4rpx solid var(--nb-surface);
 }
 
 .avatar-tip {
   font-size: 24rpx;
-  color: var(--color-text-secondary);
+  color: #4a4a4a;
 }
 
 .form-section {
-  background-color: var(--color-card-background);
-  border-radius: 16rpx;
+  background-color: var(--nb-surface);
+  border-radius: 0;
   padding: 32rpx;
   margin-bottom: 32rpx;
-  box-shadow: var(--shadow-card);
+  box-shadow: var(--nb-shadow-strong);
 }
 
 .section-title {
   font-size: 28rpx;
   font-weight: 600;
-  color: var(--color-text-primary);
+  color: var(--nb-ink);
   margin-bottom: 24rpx;
 }
 
@@ -426,7 +391,7 @@ export default {
 .form-label {
   display: block;
   font-size: 28rpx;
-  color: var(--color-text-primary);
+  color: var(--nb-ink);
   margin-bottom: 16rpx;
   font-weight: 500;
 }
@@ -434,35 +399,35 @@ export default {
 .form-input {
   width: 100%;
   padding: 24rpx;
-  background-color: var(--color-app-background);
-  border: 2rpx solid var(--border-primary);
-  border-radius: 12rpx;
+  background-color: var(--nb-paper);
+  border: 2rpx solid var(--nb-ink);
+  border-radius: 0;
   font-size: 28rpx;
-  color: var(--color-text-primary);
+  color: var(--nb-ink);
   transition: all 0.2s ease;
 }
 
 .form-input:focus {
-  border-color: var(--color-brand-primary);
-  box-shadow: 0 0 0 6rpx rgba(79, 127, 255, 0.1);
+  border-color: var(--nb-yellow);
+  box-shadow: none;
 }
 
 .form-textarea {
   width: 100%;
   min-height: 120rpx;
   padding: 24rpx;
-  background-color: var(--color-app-background);
-  border: 2rpx solid var(--border-primary);
-  border-radius: 12rpx;
+  background-color: var(--nb-paper);
+  border: 2rpx solid var(--nb-ink);
+  border-radius: 0;
   font-size: 28rpx;
-  color: var(--color-text-primary);
+  color: var(--nb-ink);
   resize: none;
   transition: all 0.2s ease;
 }
 
 .form-textarea:focus {
-  border-color: var(--color-brand-primary);
-  box-shadow: 0 0 0 6rpx rgba(79, 127, 255, 0.1);
+  border-color: var(--nb-yellow);
+  box-shadow: none;
 }
 
 .char-count {
@@ -470,7 +435,7 @@ export default {
   right: 16rpx;
   bottom: 16rpx;
   font-size: 20rpx;
-  color: var(--color-text-disabled);
+  color: #777777;
 }
 
 .gender-options {
@@ -485,16 +450,16 @@ export default {
   align-items: center;
   gap: 8rpx;
   padding: 24rpx 16rpx;
-  background-color: var(--color-app-background);
-  border: 2rpx solid var(--border-primary);
-  border-radius: 12rpx;
+  background-color: var(--nb-paper);
+  border: 2rpx solid var(--nb-ink);
+  border-radius: 0;
   transition: all 0.2s ease;
 }
 
 .gender-option.active {
-  background-color: var(--color-brand-primary);
-  border-color: var(--color-brand-primary);
-  color: #ffffff;
+  background-color: var(--nb-yellow);
+  border-color: var(--nb-ink);
+  color: #000000;
 }
 
 .gender-text {
@@ -511,29 +476,30 @@ export default {
 
 .tag-item {
   padding: 16rpx 24rpx;
-  background-color: var(--color-app-background);
-  border: 2rpx solid var(--border-primary);
-  border-radius: 32rpx;
+  background-color: var(--nb-paper);
+  border: 2rpx solid var(--nb-ink);
+  border-radius: 0;
   transition: all 0.2s ease;
 }
 
 .tag-item.active {
-  background-color: var(--color-brand-primary);
-  border-color: var(--color-brand-primary);
+  background-color: var(--nb-yellow);
+  border-color: var(--nb-ink);
 }
 
 .tag-text {
   font-size: 24rpx;
-  color: var(--color-text-secondary);
+  color: #4a4a4a;
 }
 
 .tag-item.active .tag-text {
-  color: #ffffff;
+  color: #000000;
+  font-weight: 700;
 }
 
 .tags-tip {
   font-size: 22rpx;
-  color: var(--color-text-disabled);
+  color: #777777;
 }
 
 .switch-item {
@@ -548,7 +514,7 @@ export default {
 
 .form-desc {
   font-size: 24rpx;
-  color: var(--color-text-secondary);
+  color: #4a4a4a;
   margin-top: 4rpx;
 }
 
@@ -559,37 +525,34 @@ export default {
   left: 0;
   right: 0;
   padding: 24rpx 32rpx;
-  padding-bottom: calc(24rpx + env(safe-area-inset-bottom));
-  background-color: var(--color-card-background);
-  border-top: 2rpx solid var(--border-primary);
-  box-shadow: 0 -4rpx 16rpx rgba(0, 0, 0, 0.05);
+  padding-bottom: calc(24rpx + var(--layout-bottom-offset));
+  background-color: var(--nb-surface);
+  border-top: 2rpx solid var(--nb-ink);
+  box-shadow: none;
   z-index: 100;
 }
 
 .save-button {
   width: 100%;
   height: 88rpx;
-  background: linear-gradient(
-    135deg,
-    var(--color-brand-primary),
-    var(--color-brand-accent)
-  );
-  border-radius: 16rpx;
+  background: var(--nb-yellow);
+  border-radius: 0;
+  border: 3rpx solid #000000;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 8rpx 24rpx rgba(79, 127, 255, 0.3);
+  box-shadow: 2rpx 2rpx 0 #000000;
   transition: all 0.2s ease;
 }
 
 .save-button:active {
-  transform: scale(0.98);
-  box-shadow: 0 4rpx 12rpx rgba(79, 127, 255, 0.2);
+  transform: translate(2rpx, 2rpx);
+  box-shadow: none;
 }
 
 .save-button-text {
   font-size: 32rpx;
   font-weight: 600;
-  color: #ffffff;
+  color: #000000;
 }
 </style>

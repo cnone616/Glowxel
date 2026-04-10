@@ -1,26 +1,25 @@
 <template>
-  <view class="create-page">
+  <view class="create-page glx-page-shell">
     <!-- 状态栏占位 -->
     <!-- #ifdef MP-WEIXIN -->
     <view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
     <!-- #endif -->
 
     <!-- 顶部栏 -->
-    <view class="navbar">
-      <view class="header-content">
-        <view class="nav-left" @click="handleBack">
-          <Icon
-            name="direction-left"
-            :size="32"
-            color="var(--color-text-primary)"
-          />
-        </view>
-        <text class="nav-title">新建画布</text>
+    <view class="navbar glx-topbar glx-page-shell__fixed">
+      <view class="nav-left" @click="handleBack">
+        <Icon
+          name="direction-left"
+          :size="32"
+          color="var(--nb-ink)"
+        />
       </view>
+      <text class="nav-title glx-topbar__title">新建画布</text>
+      <view class="nav-right"></view>
     </view>
 
     <!-- 创建向导 -->
-    <view class="wizard-container">
+    <view class="wizard-container glx-page-shell__stack">
       <!-- 步骤 0: 名称 -->
       <scroll-view v-if="step === 0" scroll-y class="content-area">
         <view class="step-content step-name" :class="stepAnimationClass">
@@ -35,7 +34,7 @@
                 type="text"
                 class="name-input"
                 placeholder="例如：2026新年快乐"
-                cursor-color="#00f3ff"
+                cursor-color="#ffd23f"
                 @focus="isNameFocused = true"
                 @blur="isNameFocused = false"
                 :focus="step === 0"
@@ -74,7 +73,9 @@
             </view>
 
             <view v-else class="preview-area">
-              <image :src="previewUrl" mode="aspectFit" class="preview-image" />
+              <view class="preview-image-shell">
+                <image :src="previewUrl" mode="aspectFit" class="preview-image" />
+              </view>
               <view class="preview-actions">
                 <view class="preview-btn" @click="chooseImage">
                   <text class="preview-btn-text">更换图片</text>
@@ -93,7 +94,7 @@
             @click="applyRecommendedSize"
           >
             <text class="recommend-text"
-              ><Icon name="prompt" :size="24" color="var(--accent-color)" />
+              ><Icon name="prompt" :size="24" color="#000000" />
               检测到内容尺寸，推荐 {{ recommendedSize.width }}×{{
                 recommendedSize.height
               }}</text
@@ -132,24 +133,28 @@
                 <view class="custom-size-inputs">
                   <view class="size-input-group">
                     <text class="size-input-label">宽度</text>
-                    <input
-                      v-model.number="customWidth"
-                      type="number"
-                      class="size-input"
-                      placeholder="例如: 30"
-                      @input="handleSizeInput"
-                    />
+                    <view class="size-input-shell">
+                      <input
+                        v-model.number="customWidth"
+                        type="number"
+                        class="size-input"
+                        placeholder="例如: 30"
+                        @input="handleSizeInput"
+                      />
+                    </view>
                   </view>
                   <text class="size-separator">×</text>
                   <view class="size-input-group">
                     <text class="size-input-label">高度</text>
-                    <input
-                      v-model.number="customHeight"
-                      type="number"
-                      class="size-input"
-                      placeholder="例如: 20"
-                      @input="handleSizeInput"
-                    />
+                    <view class="size-input-shell">
+                      <input
+                        v-model.number="customHeight"
+                        type="number"
+                        class="size-input"
+                        placeholder="例如: 20"
+                        @input="handleSizeInput"
+                      />
+                    </view>
                   </view>
                 </view>
               </view>
@@ -817,7 +822,7 @@ export default {
   height: 100vh;
   display: flex;
   flex-direction: column;
-  background-color: var(--color-app-background);
+  background-color: var(--nb-paper);
   position: relative;
   overflow: hidden;
   user-select: none;
@@ -839,7 +844,7 @@ export default {
 .section-title {
   font-size: 36rpx;
   font-weight: 700;
-  color: var(--color-text-primary);
+  color: var(--nb-ink);
   margin-bottom: 24rpx;
 }
 
@@ -852,55 +857,22 @@ export default {
 
 /* 状态栏占位 */
 .status-bar {
-  background-color: var(--color-app-background);
+  background-color: var(--nb-paper);
   flex-shrink: 0;
-}
-
-.back-btn {
-  width: 64rpx;
 }
 
 .back-icon {
   font-size: 36rpx;
-  color: var(--color-text-primary);
+  color: var(--nb-ink);
   line-height: 1;
 }
 
-/* 顶部导航 */
-.navbar {
-  height: 88rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0 32rpx;
-  background-color: var(--color-card-background);
-  border-bottom: 2rpx solid var(--border-primary);
-  position: relative;
+.nav-left :deep(.icon),
+.nav-left :deep(text),
+.nav-left :deep(.iconfont) {
+  line-height: 1;
 }
 
-.nav-left {
-  position: absolute;
-  left: 32rpx;
-  width: 80rpx;
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-}
-
-.nav-right {
-  position: absolute;
-  right: 32rpx;
-  width: 80rpx;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-}
-
-.nav-title {
-  font-size: 32rpx;
-  font-weight: 600;
-  color: var(--color-text-primary);
-}
 .content-area {
   flex: 1;
   padding: 0 32rpx 32rpx;
@@ -993,17 +965,20 @@ export default {
 
 .name-input-wrapper {
   position: relative;
-  padding: 32rpx 0;
-  border-bottom: 4rpx solid var(--border-primary);
+  padding: 0 28rpx;
+  border: 4rpx solid #000000;
+  border-radius: 0;
+  background: #ffffff;
   transition: var(--transition-base);
   min-height: 120rpx;
   display: flex;
   align-items: center;
+  box-shadow: none;
 }
 
 .name-input-wrapper.focused {
-  border-bottom-color: #00f3ff;
-  box-shadow: 0 4rpx 0 rgba(0, 243, 255, 0.3);
+  border-color: #ffd23f;
+  box-shadow: none;
 }
 
 .name-input {
@@ -1051,7 +1026,7 @@ export default {
   min-height: 400rpx;
   background-color: var(--bg-tertiary);
   border: 4rpx dashed var(--border-color);
-  border-radius: 24rpx;
+  border-radius: 0;
   padding: 48rpx;
   margin: 20rpx 0;
 }
@@ -1063,7 +1038,8 @@ export default {
   align-items: center;
   justify-content: center;
   background-color: var(--bg-tertiary);
-  border-radius: 50%;
+  border-radius: 0;
+  border: 4rpx solid #000000;
   margin-bottom: 32rpx;
 }
 
@@ -1085,60 +1061,84 @@ export default {
 
 .preview-area {
   position: relative;
-  border-radius: 24rpx;
-  overflow: hidden;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   min-height: 480rpx;
+  gap: 12rpx;
+}
+
+.preview-image-shell {
+  width: 100%;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .preview-image {
-  width: 100%;
+  width: auto;
+  max-width: 100%;
   max-height: 480rpx;
+  height: auto;
   object-fit: contain;
+  display: block;
+  margin: 0 auto;
 }
 
 .preview-actions {
   display: flex;
-  gap: 16rpx;
-  padding: 24rpx;
+  gap: 12rpx;
+  padding: 0;
+  width: 100%;
 }
 
 .preview-btn {
   flex: 1;
-  padding: 24rpx;
-  background-color: var(--bg-elevated);
-  border-radius: 12rpx;
+  min-height: 92rpx;
+  padding: 0 24rpx;
+  background: #ffffff;
+  border: 4rpx solid #000000;
+  border-radius: 0;
+  box-shadow: none;
   text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .preview-btn.danger {
   flex: 0 0 auto;
   width: 96rpx;
-  background-color: rgba(255, 51, 51, 0.1);
+  background: #d92d20;
+  border-color: #000000;
 }
 
 .recommend-tip {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 20rpx 24rpx;
-  margin-top: 16rpx;
-  background: rgba(0, 243, 255, 0.08);
-  border: 1rpx solid rgba(0, 243, 255, 0.2);
-  border-radius: 16rpx;
+  padding: 16rpx 20rpx;
+  margin-top: 8rpx;
+  background: #fff4c4;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
 }
 
 .recommend-text {
   font-size: 24rpx;
-  color: var(--accent-primary);
+  color: #000000;
 }
 
 .recommend-btn-text {
   font-size: 24rpx;
-  color: var(--accent-primary);
+  color: #000000;
   font-weight: bold;
   white-space: nowrap;
   margin-left: 16rpx;
@@ -1150,15 +1150,15 @@ export default {
 }
 
 .preview-btn.danger .preview-btn-text {
-  color: var(--error-color);
+  color: #ffffff;
 }
 
 /* 自定义尺寸输入 */
 .custom-size-inputs {
   display: flex;
   align-items: center;
-  gap: 32rpx;
-  margin-bottom: 32rpx;
+  gap: 24rpx;
+  margin-bottom: 20rpx;
 }
 
 .size-input-group {
@@ -1168,6 +1168,18 @@ export default {
   gap: 16rpx;
 }
 
+.size-input-shell {
+  min-height: 120rpx;
+  padding: 0 20rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #ffffff;
+  border: 4rpx solid #000000;
+  border-radius: 0;
+  box-shadow: none;
+}
+
 .size-input-label {
   font-size: 28rpx;
   color: var(--text-secondary);
@@ -1175,9 +1187,10 @@ export default {
 }
 
 .size-input {
-  background-color: var(--bg-elevated);
-  border: 3rpx solid var(--border-primary);
-  border-radius: 16rpx;
+  width: 100%;
+  background-color: transparent;
+  border: 0;
+  border-radius: 0;
   font-size: 56rpx;
   font-family: monospace;
   font-weight: bold;
@@ -1185,12 +1198,12 @@ export default {
   text-align: center;
   transition: var(--transition-base);
   min-height: 120rpx;
+  box-shadow: none;
 }
 
-.size-input:focus {
-  border-color: var(--accent-primary);
-  background-color: var(--bg-tertiary);
-  box-shadow: 0 0 0 4rpx rgba(0, 243, 255, 0.1);
+.size-input-group:focus-within .size-input-shell {
+  border-color: #ffd23f;
+  box-shadow: none;
 }
 
 .size-input::placeholder {
@@ -1200,7 +1213,7 @@ export default {
 
 .size-separator {
   font-size: 64rpx;
-  color: var(--text-secondary);
+  color: #4a4a4a;
   margin-top: 48rpx;
   font-weight: bold;
 }
@@ -1211,7 +1224,8 @@ export default {
   align-items: center;
   padding: 16rpx 24rpx;
   background-color: var(--bg-tertiary);
-  border-radius: 12rpx;
+  border-radius: 0;
+  border: 2rpx solid #000000;
   margin-bottom: 16rpx;
 }
 
@@ -1224,7 +1238,7 @@ export default {
   font-size: 28rpx;
   font-family: monospace;
   font-weight: bold;
-  color: var(--accent-primary);
+  color: var(--nb-yellow);
 }
 
 /* 内联尺寸预览（在标题右侧） */
@@ -1235,13 +1249,14 @@ export default {
 
 .size-preview-inline .size-preview-value {
   font-size: 24rpx;
+  color: #ffd23f;
 }
 
 /* 尺寸选择 */
 .size-section {
   display: flex;
   flex-direction: column;
-  gap: 32rpx;
+  gap: 20rpx;
 }
 
 .size-header {
@@ -1263,13 +1278,13 @@ export default {
 .size-grid {
   display: grid;
   grid-template-columns: repeat(1, 1fr);
-  gap: 64rpx;
+  gap: 32rpx;
 }
 
 .size-column {
   display: flex;
   flex-direction: column;
-  gap: 32rpx;
+  gap: 20rpx;
 }
 
 .size-column.full-width {
@@ -1286,7 +1301,7 @@ export default {
   font-size: 24rpx;
   font-family: monospace;
   font-weight: bold;
-  color: var(--accent-color);
+  color: #ffd23f;
 }
 
 .size-hint {
@@ -1303,17 +1318,17 @@ export default {
 
 .size-option {
   padding: 20rpx 16rpx;
-  border-radius: 12rpx;
+  border-radius: 0;
   background-color: var(--bg-tertiary);
-  border: 3rpx solid var(--border-primary);
+  border: 3rpx solid var(--nb-ink);
   transition: all 0.2s;
   text-align: center;
 }
 
 .size-option.active {
-  border-color: var(--create-size-active-border-color);
-  background-color: var(--create-size-active-bg);
-  box-shadow: var(--create-size-active-box-shadow);
+  border-color: #ffd23f;
+  background-color: #ffd23f;
+  box-shadow: none;
 }
 
 .size-option-text {
@@ -1324,7 +1339,7 @@ export default {
 }
 
 .size-option.active .size-option-text {
-  color: var(--accent-primary);
+  color: #000000;
   font-weight: bold;
 }
 
@@ -1345,7 +1360,7 @@ export default {
 .stats-card {
   background-color: var(--bg-tertiary);
   border: 2rpx solid var(--border-color);
-  border-radius: 24rpx;
+  border-radius: 0;
   padding: 32rpx;
   display: flex;
   flex-direction: column;
@@ -1394,51 +1409,61 @@ export default {
 }
 
 .preset-card {
+  position: relative;
   padding: 48rpx 32rpx;
-  border-radius: 24rpx;
-  background-color: var(--bg-tertiary);
-  border: 4rpx solid var(--border-color);
+  border-radius: 0;
+  background-color: #ffffff;
+  border: 4rpx solid #000000;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: 8rpx;
   transition: all 0.3s;
+  box-shadow: none;
 }
 
 .preset-card.active {
-  background-color: var(--create-preset-card-bg);
-  border-color: var(--create-preset-card-border-color);
-  color: var(--create-preset-name);
+  background-color: #ffd23f;
+  border-color: #000000;
+  color: #000000;
+  box-shadow: none;
+  transform: none;
 }
 
 .preset-card.active .preset-name {
-  color: var(--create-preset-name);
+  color: #000000;
 }
 
 .preset-card.active .preset-count {
-  color: var(--create-preset-count);
+  color: rgba(0, 0, 0, 0.68);
+  opacity: 1;
+}
+
+.preset-card.active::after {
+  display: none;
 }
 
 .preset-name {
   font-size: 32rpx;
   font-weight: bold;
-  color: var(--text-primary);
+  color: #000000;
 }
 
 .preset-count {
   font-size: 24rpx;
-  color: var(--text-secondary);
+  color: rgba(0, 0, 0, 0.68);
   opacity: 0.7;
 }
 
 .selected-info {
-  background-color: var(--bg-tertiary);
-  border: 2rpx solid var(--border-color);
-  border-radius: 24rpx;
+  background-color: #ffffff;
+  border: 4rpx solid #000000;
+  border-radius: 18rpx;
   padding: 48rpx;
   display: flex;
   flex-direction: column;
   gap: 32rpx;
+  box-shadow: none;
 }
 
 .info-row {
@@ -1456,7 +1481,7 @@ export default {
   font-size: 36rpx;
   font-family: monospace;
   font-weight: bold;
-  color: var(--create-info-value-clr);
+  color: #000000;
 }
 
 .info-hint {
@@ -1494,17 +1519,17 @@ export default {
   display: flex;
   justify-content: center;
   align-items: center;
-  padding: 24rpx;
-  background-color: var(--bg-tertiary);
-  border-radius: 24rpx;
-  border: 2rpx solid var(--border-primary);
+  padding: 0;
+  background-color: transparent;
+  border-radius: 0;
+  border: 0;
   position: relative;
   transform: translateZ(0);
 }
 
 .preview-canvas {
-  border-radius: 12rpx;
-  box-shadow: var(--shadow-md);
+  border-radius: 0;
+  box-shadow: none;
   display: block;
   background-color: var(--bg-primary);
   width: 260px;
@@ -1514,8 +1539,8 @@ export default {
 }
 
 .preview-image {
-  border-radius: 12rpx;
-  box-shadow: var(--shadow-md);
+  border-radius: 0;
+  box-shadow: none;
   display: block;
   width: 260px;
   height: 260px;
@@ -1535,7 +1560,7 @@ export default {
   padding: 24rpx;
   background-color: var(--bg-tertiary);
   border-radius: 16rpx;
-  border: 2rpx solid var(--border-primary);
+  border: 2rpx solid var(--nb-ink);
 }
 
 .preview-stat-label {
@@ -1547,7 +1572,7 @@ export default {
   font-size: 32rpx;
   font-weight: bold;
   font-family: monospace;
-  color: var(--accent-primary);
+  color: var(--nb-yellow);
 }
 
 .used-colors-section {
@@ -1588,14 +1613,14 @@ export default {
   padding: 16rpx;
   background-color: var(--bg-tertiary);
   border-radius: 12rpx;
-  border: 2rpx solid var(--border-primary);
+  border: 2rpx solid var(--nb-ink);
 }
 
 .color-swatch {
   width: 48rpx;
   height: 48rpx;
   border-radius: 8rpx;
-  border: 2rpx solid var(--border-primary);
+  border: 2rpx solid var(--nb-ink);
 }
 
 .color-code {
@@ -1614,34 +1639,30 @@ export default {
 .footer {
   position: relative;
   padding: 24rpx 32rpx;
-  padding-bottom: 48rpx; /* 增加底部安全距离 */
+  padding-bottom: 24rpx;
   z-index: 20;
   box-sizing: border-box;
   flex-shrink: 0;
-  background-color: var(--color-app-background);
+  background-color: var(--nb-paper);
 }
 
 /* 小程序底部安全区域 */
 /* #ifdef MP-WEIXIN */
 .footer {
-  padding-bottom: 68rpx; /* 小程序需要更多底部空间 */
+  padding-bottom: 36rpx;
 }
 /* #endif */
 
 .next-btn {
   padding: 32rpx;
-  background: linear-gradient(
-    135deg,
-    var(--text-primary) 0%,
-    var(--text-secondary) 100%
-  );
-  color: var(--text-inverse);
-  border-radius: 24rpx;
+  background: #ffd23f;
+  color: #000000;
+  border-radius: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 16rpx;
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--nb-shadow-strong);
   transition: var(--transition-base);
 }
 
@@ -1650,13 +1671,9 @@ export default {
 }
 
 .next-btn.disabled {
-  background: linear-gradient(
-    135deg,
-    var(--text-primary) 0%,
-    var(--text-secondary) 100%
-  );
+  background: #ffe49a;
   box-shadow: none;
-  opacity: 1;
+  opacity: 0.75;
   pointer-events: none;
 }
 
@@ -1665,10 +1682,18 @@ export default {
   font-weight: bold;
   letter-spacing: 0.2em;
   text-transform: uppercase;
+  color: #000000;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
 }
 
 .next-icon {
   font-size: 48rpx;
   line-height: 1;
+  color: #000000;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
 }
 </style>

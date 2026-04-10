@@ -11,8 +11,8 @@
         <view
           v-for="preset in presets"
           :key="preset.id"
-          class="theme-card"
-          :class="{ active: activeThemeId === preset.id }"
+          class="theme-card glx-feature-card-option"
+          :class="{ active: selectedThemeId === preset.id }"
           @click="$emit('apply-theme', preset.id)"
         >
           <view class="theme-preview-shell">
@@ -26,15 +26,15 @@
             <text class="theme-name">{{ preset.name }}</text>
             <text v-if="preset.styleTag" class="theme-tag">{{ preset.styleTag }}</text>
           </view>
-          <view v-if="activeThemeId === preset.id" class="theme-badge">
-            <text class="theme-badge-text">当前</text>
+          <view v-if="currentThemeId === preset.id" class="theme-badge">
+            <view class="theme-badge-text">当前</view>
           </view>
           <view
             v-if="preset.requiresImage"
             class="theme-image-badge"
-            :class="{ warn: activeThemeId === preset.id && !hasImage }"
+            :class="{ warn: selectedThemeId === preset.id && !hasImage }"
           >
-            <text class="theme-image-badge-text">图片</text>
+            <view class="theme-image-badge-text">图片</view>
           </view>
         </view>
       </view>
@@ -54,7 +54,11 @@ export default {
       type: Array,
       required: true,
     },
-    activeThemeId: {
+    selectedThemeId: {
+      type: String,
+      default: "",
+    },
+    currentThemeId: {
       type: String,
       default: "",
     },
@@ -78,7 +82,7 @@ export default {
 <style scoped>
 .settings-card {
   background-color: var(--bg-tertiary);
-  border: 2rpx solid var(--border-primary);
+  border: 2rpx solid var(--nb-ink);
   padding: 20rpx;
   margin-bottom: 16rpx;
 }
@@ -97,11 +101,17 @@ export default {
 
 .card-count {
   margin-left: auto;
-  padding: 4rpx 12rpx;
-  border-radius: 999rpx;
-  background: rgba(79, 127, 255, 0.12);
-  font-size: 20rpx;
-  color: var(--accent-primary);
+  min-height: 40rpx;
+  padding: 0 12rpx;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0;
+  background: #ffffff;
+  border: 2rpx solid #000000;
+  font-size: 18rpx;
+  font-weight: 700;
+  color: #000000;
 }
 
 .theme-sections {
@@ -117,21 +127,22 @@ export default {
 .theme-card {
   position: relative;
   width: calc((100% - 28rpx) / 3);
-  border-radius: 16rpx;
   overflow: hidden;
-  border: 2rpx solid var(--border-primary);
-  background: var(--bg-secondary);
 }
 
 .theme-card.active {
-  border-color: var(--accent-primary);
-  box-shadow: 0 0 0 2rpx rgba(79, 127, 255, 0.1);
+  box-shadow: none;
 }
 
 .theme-preview-shell {
   position: relative;
   width: 100%;
   aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8rpx;
+  box-sizing: border-box;
   background: #000000;
 }
 
@@ -140,6 +151,7 @@ export default {
   height: 100%;
   display: block;
   background: #000000;
+  image-rendering: pixelated;
 }
 
 .theme-meta {
@@ -169,35 +181,55 @@ export default {
 
 .theme-badge {
   position: absolute;
-  top: 10rpx;
-  right: 10rpx;
+  top: 12rpx;
+  right: 12rpx;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 38rpx;
+  min-width: 58rpx;
   padding: 6rpx 12rpx;
-  border-radius: 999rpx;
-  background: rgba(79, 127, 255, 0.92);
+  border-radius: 0;
+  background: var(--nb-yellow);
+  border: 2rpx solid #000000;
 }
 
 .theme-badge-text {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   font-size: 18rpx;
   font-weight: 600;
-  color: #ffffff;
+  line-height: 1;
+  color: #000000;
 }
 
 .theme-image-badge {
   position: absolute;
-  left: 10rpx;
-  top: 10rpx;
+  left: 12rpx;
+  top: 12rpx;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 38rpx;
+  min-width: 58rpx;
   padding: 6rpx 10rpx;
-  border-radius: 999rpx;
-  background: rgba(16, 16, 16, 0.72);
+  border-radius: 0;
+  background: #ffffff;
+  border: 2rpx solid #000000;
 }
 
 .theme-image-badge.warn {
-  background: rgba(255, 140, 64, 0.92);
+  background: var(--nb-yellow);
 }
 
 .theme-image-badge-text {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   font-size: 18rpx;
   font-weight: 600;
-  color: #ffffff;
+  line-height: 1;
+  color: #000000;
 }
 </style>

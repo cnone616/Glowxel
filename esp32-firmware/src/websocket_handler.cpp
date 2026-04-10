@@ -51,12 +51,32 @@ void clearClientTextState(uint32_t clientId) {
   state->clientId = 0;
   state->inUse = false;
 }
+
+const char* modeToString(DeviceMode mode) {
+  if (mode == MODE_CLOCK) {
+    return "clock";
+  }
+  if (mode == MODE_CANVAS) {
+    return "canvas";
+  }
+  if (mode == MODE_ANIMATION) {
+    return "animation";
+  }
+  if (mode == MODE_THEME) {
+    return "theme";
+  }
+  if (mode == MODE_TRANSFERRING) {
+    return "transferring";
+  }
+  return "unknown";
+}
 }
 
 // 静态成员初始化
 AsyncWebSocket WebSocketHandler::ws("/ws");
 unsigned long WebSocketHandler::lastBinaryReceiveTime = 0;
 bool WebSocketHandler::binaryDataPending = false;
+uint32_t WebSocketHandler::lastBinaryClientId = 0;
 String WebSocketHandler::fragmentBuffer = "";
 bool WebSocketHandler::isReceivingFragments = false;
 unsigned long WebSocketHandler::lastMessageTime = 0;
@@ -88,11 +108,179 @@ void WebSocketHandler::init() {
   Serial.println("WebSocket 已初始化");
 }
 
+bool WebSocketHandler::hasConnectedClients() {
+  for (AsyncWebSocketClient& client : ws.getClients()) {
+    if (client.status() == WS_CONNECTED) {
+      return true;
+    }
+  }
+  return false;
+}
+
+void WebSocketHandler::syncClientConnectionState() {
+  DisplayManager::clientConnected = hasConnectedClients();
+}
+
+void WebSocketHandler::clearAllClientTextStates() {
+  for (size_t i = 0; i < kClientTextStateCount; i++) {
+    gClientTextStates[i].fragmentBuffer = "";
+    gClientTextStates[i].clientId = 0;
+    gClientTextStates[i].inUse = false;
+  }
+}
+
+void WebSocketHandler::resetTransientTransferState() {
+  binaryDataPending = false;
+  lastBinaryReceiveTime = 0;
+  lastBinaryClientId = 0;
+  AnimationManager::receivingFrameIndex = -1;
+  DisplayManager::receivingPixels = false;
+  if (DisplayManager::isLoadingActive) {
+    DisplayManager::stopLoadingAnimation();
+  }
+}
+
+void WebSocketHandler::restoreDisplayForCurrentMode() {
+  if (DisplayManager::currentMode == MODE_CLOCK) {
+    DisplayManager::displayClock(true);
+    return;
+  }
+
+  if (DisplayManager::currentMode == MODE_THEME) {
+    DisplayManager::displayTheme(true);
+    return;
+  }
+
+  if (DisplayManager::currentMode == MODE_CANVAS) {
+    DisplayManager::renderCanvas();
+    return;
+  }
+
+  if (DisplayManager::currentMode != MODE_ANIMATION) {
+    DisplayManager::displayClock(true);
+    return;
+  }
+
+  if (DisplayManager::currentBusinessModeTag == "tetris") {
+    TetrisEffect::init(
+      TetrisEffect::doClearLines,
+      TetrisEffect::cellSize,
+      TetrisEffect::dropSpeed,
+      TetrisEffect::showClock,
+      TetrisEffect::piecesMask
+    );
+    TetrisEffect::render(DisplayManager::dma_display);
+    return;
+  }
+
+  if (DisplayManager::currentBusinessModeTag == "eyes") {
+    DisplayManager::activateEyesEffect(ConfigManager::eyesConfig);
+    DisplayManager::renderNativeEffect();
+    return;
+  }
+
+  if (DisplayManager::currentBusinessModeTag == "ambient_effect") {
+    DisplayManager::activateAmbientEffect(DisplayManager::ambientEffectConfig);
+    DisplayManager::renderNativeEffect();
+    return;
+  }
+
+  if (DisplayManager::currentBusinessModeTag == "breath_effect") {
+    DisplayManager::activateBreathEffect(DisplayManager::breathEffectConfig);
+    DisplayManager::renderNativeEffect();
+    return;
+  }
+
+  if (DisplayManager::currentBusinessModeTag == "rhythm_effect") {
+    DisplayManager::activateRhythmEffect(DisplayManager::rhythmEffectConfig);
+    DisplayManager::renderNativeEffect();
+    return;
+  }
+
+  if (AnimationManager::currentGIF != nullptr) {
+    AnimationManager::currentGIF->isPlaying = true;
+    AnimationManager::currentGIF->currentFrame = 0;
+    AnimationManager::currentGIF->lastFrameTime = millis();
+    AnimationManager::renderGIFFrame(0);
+    return;
+  }
+
+  DisplayManager::displayClock(true);
+}
+
+void WebSocketHandler::finalizeClientDisconnect(uint32_t clientId, bool fromHeartbeatTimeout) {
+  clearClientTextState(clientId);
+  if (lastBinaryClientId == clientId) {
+    lastBinaryClientId = 0;
+  }
+
+  syncClientConnectionState();
+  if (DisplayManager::clientConnected) {
+    return;
+  }
+
+  resetTransientTransferState();
+
+  if (DisplayManager::currentMode == MODE_CANVAS ||
+      DisplayManager::currentMode == MODE_TRANSFERRING) {
+    DeviceMode fromMode = DisplayManager::currentMode;
+    DisplayManager::currentMode = DisplayManager::lastBusinessMode;
+    DisplayManager::currentBusinessModeTag = DisplayManager::lastBusinessModeTag;
+    ConfigManager::saveClockConfig();
+    Serial.printf(
+      "%s自动恢复模式: %s -> %s\n",
+      fromHeartbeatTimeout ? "心跳超时后" : "客户端断开时",
+      modeToString(fromMode),
+      getCurrentModeString()
+    );
+    restoreDisplayForCurrentMode();
+    return;
+  }
+
+  if (fromHeartbeatTimeout) {
+    restoreDisplayForCurrentMode();
+  }
+}
+
+void WebSocketHandler::handleHeartbeatTimeout() {
+  Serial.println("心跳超时，主动关闭 WebSocket 客户端");
+  clearAllClientTextStates();
+  ws.closeAll(1001, "heartbeat timeout");
+  syncClientConnectionState();
+  if (!DisplayManager::clientConnected) {
+    resetTransientTransferState();
+    if (DisplayManager::currentMode == MODE_CANVAS ||
+        DisplayManager::currentMode == MODE_TRANSFERRING) {
+      DisplayManager::currentMode = DisplayManager::lastBusinessMode;
+      DisplayManager::currentBusinessModeTag = DisplayManager::lastBusinessModeTag;
+      ConfigManager::saveClockConfig();
+    }
+    restoreDisplayForCurrentMode();
+  }
+}
+
+void WebSocketHandler::sendBinaryReceiveConfirmation(int pixelCount) {
+  StaticJsonDocument<128> confirmDoc;
+  confirmDoc["status"] = "ok";
+  confirmDoc["message"] = "pixels_received";
+  confirmDoc["count"] = pixelCount;
+
+  String confirmMsg;
+  serializeJson(confirmDoc, confirmMsg);
+
+  if (lastBinaryClientId != 0 && ws.hasClient(lastBinaryClientId)) {
+    ws.text(lastBinaryClientId, confirmMsg);
+  }
+
+  lastBinaryClientId = 0;
+}
+
 void WebSocketHandler::onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, 
                                 AwsEventType type, void *arg, uint8_t *data, size_t len) {
   if (type == WS_EVT_CONNECT) {
     Serial.printf("WebSocket 客户端已连接: %u\n", client->id());
-    DisplayManager::clientConnected = true;
+    client->setCloseClientOnQueueFull(false);
+    syncClientConnectionState();
     lastMessageTime = millis();
     clearClientTextState(client->id());
     
@@ -105,40 +293,13 @@ void WebSocketHandler::onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *c
   }
   else if (type == WS_EVT_DISCONNECT) {
     Serial.printf("WebSocket 客户端已断开: %u\n", client->id());
-    DisplayManager::clientConnected = false;
-    clearClientTextState(client->id());
-
-    if (DisplayManager::currentMode == MODE_CANVAS) {
-      DisplayManager::currentMode = DisplayManager::lastBusinessMode;
-      DisplayManager::currentBusinessModeTag = DisplayManager::lastBusinessModeTag;
-      ConfigManager::saveClockConfig();
-      Serial.printf(
-        "客户端断开时自动恢复模式: canvas -> %s\n",
-        getCurrentModeString()
-      );
-
-      if (DisplayManager::currentMode == MODE_CLOCK) {
-        DisplayManager::displayClock(true);
-      } else if (DisplayManager::currentMode == MODE_THEME) {
-        DisplayManager::displayTheme(true);
-      } else if (DisplayManager::currentMode == MODE_ANIMATION) {
-        if (DisplayManager::currentBusinessModeTag == "eyes") {
-          DisplayManager::activateEyesEffect(ConfigManager::eyesConfig);
-        } else if (DisplayManager::currentBusinessModeTag == "ambient_effect") {
-          DisplayManager::activateAmbientEffect(DisplayManager::ambientEffectConfig);
-        } else if (AnimationManager::currentGIF != nullptr) {
-          AnimationManager::currentGIF->isPlaying = true;
-          AnimationManager::currentGIF->currentFrame = 0;
-          AnimationManager::currentGIF->lastFrameTime = millis();
-          AnimationManager::renderGIFFrame(0);
-        } else {
-          DisplayManager::displayClock(true);
-        }
-      }
-    } else if (AnimationManager::currentGIF != nullptr && AnimationManager::currentGIF->isPlaying) {
-      // 断开连接后，如果有动画在播放则保持动画模式
-      DisplayManager::currentMode = MODE_ANIMATION;
-    }
+    finalizeClientDisconnect(client->id(), false);
+  }
+  else if (type == WS_EVT_PING || type == WS_EVT_PONG) {
+    lastMessageTime = millis();
+  }
+  else if (type == WS_EVT_ERROR) {
+    Serial.printf("WebSocket 客户端错误: %u\n", client->id());
   }
   else if (type == WS_EVT_DATA) {
     lastMessageTime = millis();
@@ -157,6 +318,7 @@ void WebSocketHandler::onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *c
 
 void WebSocketHandler::handleBinaryData(AsyncWebSocketClient *client, uint8_t *data, size_t len) {
   // 二进制格式：每5字节一个像素 (x, y, r, g, b)
+  lastBinaryClientId = client->id();
 
   // 数据完整性检查
   if (len % 5 != 0) {

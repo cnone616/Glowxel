@@ -1,56 +1,52 @@
 <template>
-  <view class="settings-page">
+  <view class="settings-page glx-page-shell">
     <!-- 状态栏占位 -->
     <!-- #ifdef MP-WEIXIN -->
     <view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
     <!-- #endif -->
 
     <!-- 导航栏 -->
-    <view class="navbar">
+    <view class="navbar glx-topbar glx-page-shell__fixed">
       <view class="nav-left" @click="handleBack">
         <Icon
           name="direction-left"
           :size="32"
-          color="var(--color-text-primary)"
+          color="var(--nb-ink)"
         />
       </view>
-      <text class="nav-title">设置</text>
+      <text class="nav-title glx-topbar__title">设置</text>
       <view class="nav-right"></view>
     </view>
 
-    <scroll-view scroll-y class="content">
+    <scroll-view scroll-y class="content glx-scroll-region glx-page-shell__content">
       <!-- 账户设置 -->
-      <view class="settings-section">
-        <view class="section-header">
-          <text class="section-title">账户设置</text>
+      <view class="settings-section glx-panel-card">
+        <view class="section-header glx-section-head">
+          <text class="section-title glx-section-title">账户设置</text>
         </view>
 
-        <view class="setting-item" @click="goToEditProfile">
+        <view class="setting-item glx-setting-row" @click="goToEditProfile">
           <view class="setting-left">
             <view class="setting-icon">
-              <Icon name="user" :size="40" color="var(--color-brand-primary)" />
+              <Icon name="user" :size="40" color="var(--nb-yellow)" />
             </view>
             <view class="setting-info">
               <text class="setting-label">个人资料</text>
               <text class="setting-desc">编辑头像、昵称等信息</text>
             </view>
           </view>
-          <view class="setting-right">
-            <Icon
-              name="arrow-right"
-              :size="32"
-              color="var(--color-text-disabled)"
-            />
+          <view class="setting-right glx-list-meta">
+            <Icon name="arrow-right" :size="32" class="glx-list-arrow" />
           </view>
         </view>
 
-        <view class="setting-item" @click="goToPrivacy">
+        <view class="setting-item glx-setting-row" @click="goToPrivacy">
           <view class="setting-left">
             <view class="setting-icon">
               <Icon
                 name="shield"
                 :size="40"
-                color="var(--color-brand-primary)"
+                color="var(--nb-yellow)"
               />
             </view>
             <view class="setting-info">
@@ -58,26 +54,22 @@
               <text class="setting-desc">管理个人信息可见性</text>
             </view>
           </view>
-          <view class="setting-right">
-            <Icon
-              name="arrow-right"
-              :size="32"
-              color="var(--color-text-disabled)"
-            />
+          <view class="setting-right glx-list-meta">
+            <Icon name="arrow-right" :size="32" class="glx-list-arrow" />
           </view>
         </view>
       </view>
 
       <!-- 通知设置 -->
-      <view class="settings-section">
-        <view class="section-header">
-          <text class="section-title">通知设置</text>
+      <view class="settings-section glx-panel-card">
+        <view class="section-header glx-section-head">
+          <text class="section-title glx-section-title">通知设置</text>
         </view>
 
-        <view class="setting-item switch-item">
+        <view class="setting-item switch-item glx-setting-row">
           <view class="setting-left">
             <view class="setting-icon">
-              <Icon name="bell" :size="40" color="var(--color-brand-primary)" />
+              <Icon name="bell" :size="40" color="var(--nb-yellow)" />
             </view>
             <view class="setting-info">
               <text class="setting-label">推送通知</text>
@@ -88,18 +80,18 @@
             <switch
               :checked="settings.pushNotification"
               @change="togglePushNotification"
-              color="var(--color-brand-primary)"
+              color="var(--nb-yellow)"
             />
           </view>
         </view>
 
-        <view class="setting-item switch-item">
+        <view class="setting-item switch-item glx-setting-row">
           <view class="setting-left">
             <view class="setting-icon">
               <Icon
                 name="heart"
                 :size="40"
-                color="var(--color-brand-primary)"
+                color="var(--nb-yellow)"
               />
             </view>
             <view class="setting-info">
@@ -111,25 +103,25 @@
             <switch
               :checked="settings.interactionNotification"
               @change="toggleInteractionNotification"
-              color="var(--color-brand-primary)"
+              color="var(--nb-yellow)"
             />
           </view>
         </view>
       </view>
 
       <!-- 设备管理 -->
-      <view class="settings-section">
-        <view class="section-header">
-          <text class="section-title">设备管理</text>
+      <view class="settings-section glx-panel-card">
+        <view class="section-header glx-section-head">
+          <text class="section-title glx-section-title">设备管理</text>
         </view>
 
-        <view class="setting-item" @click="checkFirmwareUpdate">
+        <view class="setting-item glx-setting-row" @click="checkFirmwareUpdate">
           <view class="setting-left">
             <view class="setting-icon">
               <Icon
                 name="refresh"
                 :size="40"
-                color="var(--color-brand-primary)"
+                color="var(--nb-yellow)"
               />
             </view>
             <view class="setting-info">
@@ -139,99 +131,79 @@
               >
             </view>
           </view>
-          <view class="setting-right">
+          <view class="setting-right glx-list-meta">
             <view v-if="hasUpdate" class="update-badge">
               <text class="update-badge-text">新版本</text>
             </view>
-            <Icon
-              name="arrow-right"
-              :size="32"
-              color="var(--color-text-disabled)"
-            />
+            <Icon name="arrow-right" :size="32" class="glx-list-arrow" />
           </view>
         </view>
 
-        <view class="setting-item" @click="goToBleConfig">
+        <view class="setting-item glx-setting-row" @click="goToBleConfig">
           <view class="setting-left">
             <view class="setting-icon">
-              <Icon name="link" :size="40" color="var(--color-brand-primary)" />
+              <Icon name="link" :size="40" color="var(--nb-yellow)" />
             </view>
             <view class="setting-info">
               <text class="setting-label">蓝牙配网</text>
               <text class="setting-desc">配置设备 WiFi 网络</text>
             </view>
           </view>
-          <view class="setting-right">
-            <Icon
-              name="arrow-right"
-              :size="32"
-              color="var(--color-text-disabled)"
-            />
+          <view class="setting-right glx-list-meta">
+            <Icon name="arrow-right" :size="32" class="glx-list-arrow" />
           </view>
         </view>
       </view>
 
       <!-- 其他设置 -->
-      <view class="settings-section">
-        <view class="section-header">
-          <text class="section-title">其他</text>
+      <view class="settings-section glx-panel-card">
+        <view class="section-header glx-section-head">
+          <text class="section-title glx-section-title">其他</text>
         </view>
 
-        <view class="setting-item" @click="goToHelp">
+        <view class="setting-item glx-setting-row" @click="goToHelp">
           <view class="setting-left">
             <view class="setting-icon">
-              <Icon name="help" :size="40" color="var(--color-brand-primary)" />
+              <Icon name="help" :size="40" color="var(--nb-yellow)" />
             </view>
             <view class="setting-info">
               <text class="setting-label">帮助与反馈</text>
               <text class="setting-desc">使用帮助和问题反馈</text>
             </view>
           </view>
-          <view class="setting-right">
-            <Icon
-              name="arrow-right"
-              :size="32"
-              color="var(--color-text-disabled)"
-            />
+          <view class="setting-right glx-list-meta">
+            <Icon name="arrow-right" :size="32" class="glx-list-arrow" />
           </view>
         </view>
 
-        <view class="setting-item" @click="goToAbout">
+        <view class="setting-item glx-setting-row" @click="goToAbout">
           <view class="setting-left">
             <view class="setting-icon">
-              <Icon name="info" :size="40" color="var(--color-brand-primary)" />
+              <Icon name="info" :size="40" color="var(--nb-yellow)" />
             </view>
             <view class="setting-info">
               <text class="setting-label">关于应用</text>
               <text class="setting-desc">版本信息和开发团队</text>
             </view>
           </view>
-          <view class="setting-right">
+          <view class="setting-right glx-list-meta">
             <text class="version-text">v{{ appVersion }}</text>
-            <Icon
-              name="arrow-right"
-              :size="32"
-              color="var(--color-text-disabled)"
-            />
+            <Icon name="arrow-right" :size="32" class="glx-list-arrow" />
           </view>
         </view>
 
-        <view class="setting-item danger" @click="clearCache">
+        <view class="setting-item danger glx-setting-row" @click="clearCache">
           <view class="setting-left">
             <view class="setting-icon">
-              <Icon name="trash" :size="40" color="var(--color-error)" />
+              <Icon name="trash" :size="40" color="var(--nb-coral)" />
             </view>
             <view class="setting-info">
               <text class="setting-label">清除缓存</text>
               <text class="setting-desc">清理应用缓存数据</text>
             </view>
           </view>
-          <view class="setting-right">
-            <Icon
-              name="arrow-right"
-              :size="32"
-              color="var(--color-text-disabled)"
-            />
+          <view class="setting-right glx-list-meta">
+            <Icon name="arrow-right" :size="32" class="glx-list-arrow" />
           </view>
         </view>
       </view>
@@ -568,7 +540,7 @@ export default {
 <style scoped>
 .settings-page {
   height: 100vh;
-  background-color: var(--color-app-background);
+  background-color: var(--nb-paper);
   display: flex;
   flex-direction: column;
 }
@@ -579,33 +551,9 @@ export default {
   align-items: center;
   justify-content: center;
   padding: 0 32rpx;
-  background-color: var(--color-card-background);
-  border-bottom: 2rpx solid var(--border-primary);
+  background-color: var(--nb-surface);
+  border-bottom: 2rpx solid var(--nb-ink);
   position: relative;
-}
-
-.nav-left {
-  position: absolute;
-  left: 32rpx;
-  width: 80rpx;
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-}
-
-.nav-right {
-  position: absolute;
-  right: 32rpx;
-  width: 80rpx;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-}
-
-.nav-title {
-  font-size: 32rpx;
-  font-weight: 600;
-  color: var(--color-text-primary);
 }
 
 .content {
@@ -626,7 +574,7 @@ export default {
 .section-title {
   font-size: 24rpx;
   font-weight: 600;
-  color: var(--color-text-secondary);
+  color: #4a4a4a;
   text-transform: uppercase;
   letter-spacing: 1rpx;
 }
@@ -635,11 +583,11 @@ export default {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background-color: var(--color-card-background);
-  border-radius: 16rpx;
+  background-color: var(--nb-surface);
+  border-radius: 0;
   padding: 32rpx;
-  margin-bottom: 16rpx;
-  box-shadow: var(--shadow-card);
+  margin-bottom: 20rpx;
+  box-shadow: none;
   transition: all 0.2s ease;
 }
 
@@ -649,11 +597,11 @@ export default {
 
 .setting-item:active {
   transform: scale(0.98);
-  box-shadow: var(--shadow-floating);
+  box-shadow: 2rpx 2rpx 0 var(--nb-ink);
 }
 
 .setting-item.danger .setting-label {
-  color: var(--color-error);
+  color: var(--nb-coral);
 }
 
 .setting-left {
@@ -669,8 +617,8 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: rgba(79, 127, 255, 0.1);
-  border-radius: 16rpx;
+  background-color: transparent;
+  border-radius: 0;
 }
 
 .setting-info {
@@ -683,12 +631,12 @@ export default {
 .setting-label {
   font-size: 28rpx;
   font-weight: 500;
-  color: var(--color-text-primary);
+  color: var(--nb-ink);
 }
 
 .setting-desc {
   font-size: 24rpx;
-  color: var(--color-text-secondary);
+  color: #4a4a4a;
 }
 
 .setting-right {
@@ -700,12 +648,19 @@ export default {
 .storage-size,
 .version-text {
   font-size: 24rpx;
-  color: var(--color-text-disabled);
+  color: #777777;
+}
+
+.settings-section {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  padding: 0 !important;
 }
 
 .update-badge {
-  background: var(--color-error);
-  border-radius: 16rpx;
+  background: var(--nb-coral);
+  border-radius: 0;
   padding: 4rpx 14rpx;
   margin-right: 8rpx;
 }
@@ -733,13 +688,13 @@ export default {
 }
 
 .language-modal {
-  background-color: var(--color-card-background);
-  border-radius: 24rpx;
+  background-color: var(--nb-surface);
+  border-radius: 0;
   margin: 32rpx;
   max-width: 600rpx;
   width: 100%;
   max-height: 80vh;
-  box-shadow: var(--shadow-modal);
+  box-shadow: var(--nb-shadow-strong);
 }
 
 .modal-header {
@@ -747,17 +702,24 @@ export default {
   align-items: center;
   justify-content: space-between;
   padding: 32rpx;
-  border-bottom: 2rpx solid var(--border-primary);
+  border-bottom: 2rpx solid var(--nb-ink);
 }
 
 .modal-title {
   font-size: 32rpx;
   font-weight: 600;
-  color: var(--color-text-primary);
+  color: var(--nb-ink);
 }
 
 .modal-close {
-  padding: 8rpx;
+  width: 64rpx;
+  height: 64rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2rpx solid var(--nb-ink);
+  background: #ffffff;
+  box-shadow: 2rpx 2rpx 0 var(--nb-ink);
 }
 
 .language-options {
@@ -770,7 +732,7 @@ export default {
   align-items: center;
   justify-content: space-between;
   padding: 32rpx;
-  border-bottom: 2rpx solid var(--border-primary);
+  border-bottom: 2rpx solid var(--nb-ink);
   transition: all 0.2s ease;
 }
 
@@ -779,22 +741,22 @@ export default {
 }
 
 .language-option:active {
-  background-color: var(--color-app-background);
+  background-color: var(--nb-paper);
 }
 
 .language-option.active {
-  background-color: rgba(79, 127, 255, 0.1);
+  background-color: var(--nb-yellow);
 }
 
 .language-name {
   font-size: 28rpx;
-  color: var(--color-text-primary);
+  color: var(--nb-ink);
   font-weight: 500;
 }
 
 .language-native {
   font-size: 24rpx;
-  color: var(--color-text-secondary);
+  color: #4a4a4a;
   margin-left: 16rpx;
 }
 </style>

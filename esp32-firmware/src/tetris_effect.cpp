@@ -25,6 +25,7 @@ uint8_t (*TetrisEffect::targetMap)[TETRIS_MAX / 8] = nullptr;
 int TetrisEffect::lastClockMinute = -1;
 int TetrisEffect::lastClockHour = -1;
 bool TetrisEffect::holdClockFrame = false;
+unsigned long TetrisEffect::spawnCounter = 0;
 bool TetrisEffect::spawnBiasLeft = true;
 unsigned long TetrisEffect::holdPulseAt = 0;
 bool TetrisEffect::holdPulseBright = false;
@@ -113,6 +114,7 @@ void TetrisEffect::init(bool clearMode, int cellSz, int speed, bool clock, uint8
   lastClockMinute = -1;
   lastClockHour = -1;
   holdClockFrame = false;
+  spawnCounter = 0;
   spawnBiasLeft = true;
   holdPulseAt = 0;
   holdPulseBright = false;
@@ -185,12 +187,33 @@ int TetrisEffect::pieceMaxX(int type, int rot) {
   return maxValue;
 }
 
+uint32_t TetrisEffect::buildSequenceSeed() {
+  int minuteValue = lastClockHour * 60 + lastClockMinute;
+  if (minuteValue < 0) {
+    minuteValue = 0;
+  }
+
+  uint32_t seed = static_cast<uint32_t>(minuteValue);
+  seed = seed * 131U + static_cast<uint32_t>(cellSize * 17);
+  seed = seed * 131U + static_cast<uint32_t>(dropSpeed);
+  seed = seed * 131U + static_cast<uint32_t>(showClock ? 1 : 0);
+  seed = seed * 131U + static_cast<uint32_t>(doClearLines ? 1 : 0);
+  seed = seed * 131U + static_cast<uint32_t>(piecesMask);
+  return seed;
+}
+
+int TetrisEffect::computeSpawnDrift(int type) {
+  uint32_t seed = buildSequenceSeed();
+  uint32_t mixed = seed + spawnCounter * 29U + static_cast<uint32_t>(type) * 41U;
+  return 4 + static_cast<int>(mixed % 5U);
+}
+
 int TetrisEffect::computeSpawnX(int type, int rot, int finalX) {
   const int minOffset = pieceMinX(type, rot);
   const int maxOffset = pieceMaxX(type, rot);
   const int minSpawnX = -minOffset;
   const int maxSpawnX = cols - 1 - maxOffset;
-  int drift = 4 + random(0, 5);
+  int drift = computeSpawnDrift(type);
   int startX = finalX + (spawnBiasLeft ? -drift : drift);
   spawnBiasLeft = !spawnBiasLeft;
   if (startX < minSpawnX) {
@@ -221,7 +244,9 @@ void TetrisEffect::spawnPiece() {
     if (piecesMask & (1 << i)) enabled[count++] = i;
   }
   if (count == 0) { enabled[0] = 0; count = 1; }
-  curType = enabled[random(count)];
+  uint32_t seed = buildSequenceSeed();
+  uint32_t pieceIndex = (seed + spawnCounter * 73U + spawnCounter * spawnCounter * 11U) % static_cast<uint32_t>(count);
+  curType = enabled[pieceIndex];
   curColor = curType + 1;
 
   if (showClock) {
@@ -236,6 +261,7 @@ void TetrisEffect::spawnPiece() {
         curX = targetX;
       }
       curY = -2;
+      spawnCounter++;
       needsRender = true;
       return;
     }
@@ -351,6 +377,7 @@ void TetrisEffect::spawnPiece() {
     curX = targetX;
   }
   curY = -2;
+  spawnCounter++;
   needsRender = true;
 }
 
@@ -579,6 +606,8 @@ void TetrisEffect::update() {
         memset(prevDisplay, 0, kTetrisBoardBytes);
         rebuildClockTarget();
         holdClockFrame = false;
+        spawnCounter = 0;
+        spawnBiasLeft = true;
         spawnPiece();
         needsRender = true;
       }

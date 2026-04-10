@@ -1,7 +1,7 @@
 <template>
-  <view class="project-card">
+  <view class="project-card glx-panel-card" @click="handleClick" @longpress="handleLongPress">
     <!-- 缩略图区域 -->
-    <view class="thumbnail-area" @click="handleClick">
+    <view class="thumbnail-area">
       <!-- 像素网格背景 -->
       <view class="grid-pattern"></view>
       
@@ -40,7 +40,7 @@
     </view>
 
     <!-- 信息区域 -->
-    <view class="info-area" @click="handleClick">
+    <view class="info-area">
       <text class="project-name">{{ project.name }}</text>
       <!-- 收藏项目显示原作者 -->
       <view v-if="isCollected && project.originalAuthor" class="author-info">
@@ -78,6 +78,10 @@ export default {
     project: {
       type: Object,
       required: true
+    },
+    deferClick: {
+      type: Boolean,
+      default: false
     }
   },
   
@@ -105,6 +109,11 @@ export default {
 
   methods: {
     handleClick() {
+      if (this.deferClick) {
+        this.$emit('card-click', this.project)
+        return
+      }
+
       const status = this.project.status || 'draft'
       if (status === 'reviewing') {
         uni.showToast({ title: '审核中，暂不可编辑', icon: 'none' })
@@ -114,6 +123,10 @@ export default {
       uni.navigateTo({
         url: `/pages/overview/overview?id=${this.project.id}`
       })
+    },
+
+    handleLongPress() {
+      this.$emit('card-longpress', this.project)
     },
     
     handleImageError(e) {
@@ -139,19 +152,19 @@ export default {
 .project-card {
   display: flex;
   flex-direction: column;
-  background-color: var(--bg-tertiary);
-  border-radius: 24rpx;
+  background-color: var(--nb-surface);
+  border-radius: 0;
   overflow: hidden;
-  border: 2rpx solid var(--border-primary);
-  box-shadow: var(--shadow-md);
+  border: var(--nb-border-width-panel) solid var(--nb-ink);
+  box-shadow: var(--nb-shadow-strong);
   transition: var(--transition-base);
   height: 100%;
 }
 
 .project-card:active {
-  transform: scale(0.98);
-  border-color: var(--accent-primary);
-  box-shadow: 0 0 30rpx rgba(0, 243, 255, 0.2);
+  transform: translate(4rpx, 4rpx);
+  border-color: var(--nb-ink);
+  box-shadow: 2rpx 2rpx 0 var(--nb-ink);
 }
 
 /* 缩略图区域 */
@@ -199,7 +212,7 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: rgba(0, 0, 0, 0.1);
+  background-color: rgba(0, 0, 0, 0.06);
 }
 
 .regenerate-btn {
@@ -209,7 +222,7 @@ export default {
   width: 56rpx;
   height: 56rpx;
   background-color: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(20rpx);
+  backdrop-filter: none;
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -223,7 +236,7 @@ export default {
 .regenerate-btn:active {
   opacity: 1;
   transform: scale(0.95);
-  background-color: var(--accent-primary);
+  background-color: var(--nb-yellow);
 }
 
 .progress-bar {
@@ -237,7 +250,7 @@ export default {
 
 .progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, var(--accent-primary), var(--accent-secondary));
+  background: var(--nb-yellow);
   transition: width 0.3s ease;
 }
 
@@ -247,7 +260,9 @@ export default {
   top: 12rpx;
   right: 12rpx;
   padding: 6rpx 16rpx;
-  border-radius: 8rpx;
+  border: var(--nb-border-width-control) solid var(--nb-ink);
+  border-radius: 0;
+  box-shadow: var(--nb-shadow-soft);
   z-index: 2;
   display: flex;
   align-items: center;
@@ -256,8 +271,8 @@ export default {
 
 .status-text {
   font-size: 20rpx;
-  font-weight: 500;
-  color: #FFFFFF;
+  font-weight: 900;
+  color: var(--nb-ink);
   line-height: 1.2;
 }
 
@@ -288,17 +303,17 @@ export default {
 
 .author-label {
   font-size: 22rpx;
-  color: var(--accent-primary);
-  opacity: 0.8;
+  color: #4a4a4a;
+  opacity: 1;
 }
 
 /* 退回原因 */
 .reject-reason {
   margin-top: 8rpx;
   padding: 8rpx 12rpx;
-  background-color: rgba(255, 60, 60, 0.1);
-  border-radius: 8rpx;
-  border-left: 4rpx solid rgba(255, 60, 60, 0.6);
+  background-color: #fff1f1;
+  border-radius: 0;
+  border: var(--nb-border-width-control) solid var(--nb-ink);
 }
 
 .reject-text {
@@ -316,8 +331,8 @@ export default {
 
 .project-name {
   font-size: 28rpx;
-  font-weight: 500;
-  color: var(--text-primary);
+  font-weight: 900;
+  color: var(--nb-ink);
   display: block;
   overflow: hidden;
   text-overflow: ellipsis;

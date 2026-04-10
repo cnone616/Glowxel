@@ -13,7 +13,43 @@
 #include "theme_renderer.h"
 
 namespace {
+constexpr unsigned long kWebSocketIdleWarnMs = 180000;
+bool gStartupRestorePending = false;
+bool gStartupRestoreDone = false;
+
+void renderStartupRestoredFrame();
+
+void finishStartupRestoreIfReady() {
+  if (gStartupRestoreDone || !gStartupRestorePending) {
+    return;
+  }
+  if (!WiFiManager::isTimeSynced()) {
+    return;
+  }
+
+  if (!DisplayManager::doubleBufferEnabled) {
+    DisplayManager::enableDoubleBuffer();
+  }
+
+  Serial.printf("[BOOT] 时间同步完成，开始恢复模式首帧，模式=%d，业务模式=%s\n",
+                DisplayManager::currentMode,
+                DisplayManager::currentBusinessModeTag.c_str());
+  renderStartupRestoredFrame();
+  Serial.printf("[BOOT] 恢复模式首帧已完成，耗时=%lu ms\n", millis());
+
+  gStartupRestorePending = false;
+  gStartupRestoreDone = true;
+}
+
 void renderStartupRestoredFrame() {
+  auto renderTimeOrSyncHint = []() {
+    if (WiFiManager::isTimeSynced()) {
+      DisplayManager::displayClock(true);
+      return;
+    }
+    WiFiManager::showTimeSyncScreen();
+  };
+
   if (DisplayManager::currentMode == MODE_CLOCK) {
     DisplayManager::displayClock(true);
     return;
@@ -44,9 +80,30 @@ void renderStartupRestoredFrame() {
   }
 
   if (DisplayManager::currentMode == MODE_ANIMATION &&
-      AnimationManager::currentGIF == nullptr) {
-    DisplayManager::displayClock(true);
+      DisplayManager::currentBusinessModeTag == "breath_effect") {
+    DisplayManager::activateBreathEffect(DisplayManager::breathEffectConfig);
+    DisplayManager::renderNativeEffect();
+    return;
   }
+
+  if (DisplayManager::currentMode == MODE_ANIMATION &&
+      DisplayManager::currentBusinessModeTag == "rhythm_effect") {
+    DisplayManager::activateRhythmEffect(DisplayManager::rhythmEffectConfig);
+    DisplayManager::renderNativeEffect();
+    return;
+  }
+
+  if (DisplayManager::currentMode == MODE_ANIMATION &&
+      AnimationManager::currentGIF != nullptr) {
+    AnimationManager::currentGIF->isPlaying = true;
+    AnimationManager::currentGIF->currentFrame = 0;
+    AnimationManager::currentGIF->lastFrameTime = millis();
+    AnimationManager::renderGIFFrame(0);
+    return;
+  }
+
+  // 兜底：无论恢复到什么业务态，都保证启动时有可见画面，不出现黑屏等待。
+  renderTimeOrSyncHint();
 }
 }
 
@@ -71,20 +128,27 @@ void setup() {
   ConfigManager::init();
   WiFiManager::init();
 
-  if (!WiFiManager::isConfigMode()) {
-    DisplayManager::enableDoubleBuffer();
-  }
-
   AnimationManager::init();
   EyesEffect::init();
 
   // 只有 WiFi 连接成功才启动 HTTP/WebSocket 服务
   if (!WiFiManager::isConfigMode()) {
-    Serial.printf("[BOOT] 准备渲染恢复模式首帧，模式=%d，业务模式=%s\n",
-                  DisplayManager::currentMode,
-                  DisplayManager::currentBusinessModeTag.c_str());
-    renderStartupRestoredFrame();
-    Serial.printf("[BOOT] 恢复模式首帧已完成，耗时=%lu ms\n", millis());
+    if (WiFiManager::isTimeSynced()) {
+      if (!DisplayManager::doubleBufferEnabled) {
+        DisplayManager::enableDoubleBuffer();
+      }
+      Serial.printf("[BOOT] 准备渲染恢复模式首帧，模式=%d，业务模式=%s\n",
+                    DisplayManager::currentMode,
+                    DisplayManager::currentBusinessModeTag.c_str());
+      renderStartupRestoredFrame();
+      Serial.printf("[BOOT] 恢复模式首帧已完成，耗时=%lu ms\n", millis());
+      gStartupRestoreDone = true;
+      gStartupRestorePending = false;
+    } else {
+      gStartupRestorePending = true;
+      gStartupRestoreDone = false;
+      Serial.println("[BOOT] 时间尚未同步，保持 WiFi 成功页，等待同步后再进入恢复模式");
+    }
 
     WebSocketHandler::init();
     WebServer::init();
@@ -119,6 +183,14 @@ void loop() {
   }
 
   WiFiManager::tick();
+  finishStartupRestoreIfReady();
+
+  if (gStartupRestorePending && !gStartupRestoreDone) {
+    WebSocketHandler::ws.cleanupClients();
+    DisplayManager::updateLoadingAnimation();
+    yield();
+    return;
+  }
 
   // 检查是否有待保存的二进制像素数据
   if (WebSocketHandler::binaryDataPending && millis() - WebSocketHandler::lastBinaryReceiveTime > 500) {
@@ -141,15 +213,8 @@ void loop() {
         ConfigManager::saveStaticImagePixels();
       }
 
-      // 发送确认消息给客户端
-      StaticJsonDocument<128> confirmDoc;
-      confirmDoc["status"] = "ok";
-      confirmDoc["message"] = "pixels_received";
-      confirmDoc["count"] = imagePixelCount;
-
-      String confirmMsg;
-      serializeJson(confirmDoc, confirmMsg);
-      WebSocketHandler::ws.textAll(confirmMsg);
+      // 只向当前上传连接返回确认，避免广播扰动其他客户端状态机
+      WebSocketHandler::sendBinaryReceiveConfirmation(imagePixelCount);
 
       // 保存完成后恢复显示刷新
       DisplayManager::receivingPixels = false;
@@ -167,11 +232,19 @@ void loop() {
     }
   }
 
-  // 心跳超时检测：15秒没收到消息认为客户端已断开
+  // 连接保持策略：不因短时心跳抖动主动断开，只记录长时间空闲状态
+  static bool wsIdleLogged = false;
   if (DisplayManager::clientConnected &&
-      millis() - WebSocketHandler::lastMessageTime > 45000) {
-    Serial.println("心跳超时，客户端已断开");
-    DisplayManager::clientConnected = false;
+      millis() - WebSocketHandler::lastMessageTime > kWebSocketIdleWarnMs) {
+    if (!wsIdleLogged) {
+      Serial.printf(
+        "WebSocket 长时间空闲，保持连接不断开，空闲时长=%lu ms\n",
+        millis() - WebSocketHandler::lastMessageTime
+      );
+      wsIdleLogged = true;
+    }
+  } else {
+    wsIdleLogged = false;
   }
 
   // 根据当前模式执行不同的逻辑

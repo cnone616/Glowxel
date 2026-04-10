@@ -1,33 +1,33 @@
 <template>
-  <view class="cloud-sync-page">
+  <view class="cloud-sync-page glx-page-shell">
     <!-- 状态栏占位 -->
     <!-- #ifdef MP-WEIXIN -->
     <view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
     <!-- #endif -->
 
     <!-- 导航栏 -->
-    <view class="navbar">
+    <view class="navbar glx-topbar glx-page-shell__fixed">
       <view class="nav-left" @click="handleBack">
         <Icon
           name="direction-left"
           :size="32"
-          color="var(--color-text-primary)"
+          color="var(--nb-ink)"
         />
       </view>
-      <text class="nav-title">云同步</text>
+      <text class="nav-title glx-topbar__title">云同步</text>
       <view class="nav-right"></view>
     </view>
 
-    <scroll-view scroll-y class="content">
+    <scroll-view scroll-y class="content glx-scroll-region glx-page-shell__content">
       <!-- 同步状态卡片 -->
-      <view class="sync-status-card">
+      <view class="sync-status-card glx-panel-card">
         <view class="status-header">
           <view class="status-icon" :class="{ active: syncStatus.enabled }">
             <Icon
               :name="syncStatus.enabled ? 'cloud-check' : 'cloud-off'"
               :size="80"
               :color="
-                syncStatus.enabled ? '#FFFFFF' : 'var(--color-text-disabled)'
+                syncStatus.enabled ? '#FFFFFF' : '#777777'
               "
             />
           </view>
@@ -43,13 +43,13 @@
           <switch
             :checked="syncStatus.enabled"
             @change="toggleSync"
-            color="var(--color-brand-primary)"
+            color="var(--nb-yellow)"
           />
         </view>
       </view>
 
       <!-- 同步统计 -->
-      <view v-if="syncStatus.enabled" class="sync-stats">
+      <view v-if="syncStatus.enabled" class="sync-stats glx-panel-card">
         <view class="stats-header">
           <text class="stats-title">同步统计</text>
           <text class="last-sync">最后同步: {{ formatLastSync() }}</text>
@@ -60,7 +60,7 @@
             <Icon
               name="picture"
               :size="40"
-              color="var(--color-brand-primary)"
+              color="var(--nb-yellow)"
             />
             <text class="stat-number">{{ syncStats.projects }}</text>
             <text class="stat-label">作品</text>
@@ -70,7 +70,7 @@
             <Icon
               name="favorite"
               :size="40"
-              color="var(--color-brand-primary)"
+              color="var(--nb-yellow)"
             />
             <text class="stat-number">{{ syncStats.favorites }}</text>
             <text class="stat-label">收藏</text>
@@ -80,7 +80,7 @@
             <Icon
               name="setting"
               :size="40"
-              color="var(--color-brand-primary)"
+              color="var(--nb-yellow)"
             />
             <text class="stat-number">{{ syncStats.settings }}</text>
             <text class="stat-label">设置</text>
@@ -90,7 +90,7 @@
             <Icon
               name="database"
               :size="40"
-              color="var(--color-brand-primary)"
+              color="var(--nb-yellow)"
             />
             <text class="stat-number">{{
               formatDataSize(syncStats.dataSize)
@@ -101,16 +101,16 @@
       </view>
 
       <!-- 同步设置 -->
-      <view class="sync-settings">
-        <view class="section-title">同步设置</view>
+      <view class="sync-settings glx-panel-card">
+        <view class="section-title glx-section-title">同步设置</view>
 
-        <view class="setting-item">
+        <view class="setting-item glx-setting-row">
           <view class="setting-left">
             <view class="setting-icon">
               <Icon
                 name="refresh"
                 :size="40"
-                color="var(--color-brand-primary)"
+                color="var(--nb-yellow)"
               />
             </view>
             <view class="setting-info">
@@ -122,7 +122,7 @@
             <switch
               :checked="settings.autoSync"
               @change="toggleAutoSync"
-              color="var(--color-brand-primary)"
+              color="var(--nb-yellow)"
               :disabled="!syncStatus.enabled"
             />
           </view>
@@ -131,7 +131,7 @@
         <view class="setting-item">
           <view class="setting-left">
             <view class="setting-icon">
-              <Icon name="wifi" :size="40" color="var(--color-brand-primary)" />
+              <Icon name="wifi" :size="40" color="var(--nb-yellow)" />
             </view>
             <view class="setting-info">
               <text class="setting-label">仅WiFi同步</text>
@@ -142,7 +142,7 @@
             <switch
               :checked="settings.wifiOnly"
               @change="toggleWifiOnly"
-              color="var(--color-brand-primary)"
+              color="var(--nb-yellow)"
               :disabled="!syncStatus.enabled"
             />
           </view>
@@ -154,7 +154,7 @@
               <Icon
                 name="image"
                 :size="40"
-                color="var(--color-brand-primary)"
+                color="var(--nb-yellow)"
               />
             </view>
             <view class="setting-info">
@@ -166,7 +166,7 @@
             <switch
               :checked="settings.syncThumbnails"
               @change="toggleSyncThumbnails"
-              color="var(--color-brand-primary)"
+              color="var(--nb-yellow)"
               :disabled="!syncStatus.enabled"
             />
           </view>
@@ -183,7 +183,7 @@
               <Icon
                 name="refresh"
                 :size="40"
-                color="var(--color-brand-primary)"
+                color="var(--nb-yellow)"
               />
             </view>
             <view class="action-info">
@@ -191,12 +191,8 @@
               <text class="action-desc">手动触发数据同步</text>
             </view>
           </view>
-          <view class="action-right">
-            <Icon
-              name="arrow-right"
-              :size="32"
-              color="var(--color-text-disabled)"
-            />
+          <view class="action-right glx-list-meta">
+            <Icon name="arrow-right" :size="32" class="glx-list-arrow" />
           </view>
         </view>
 
@@ -206,7 +202,7 @@
               <Icon
                 name="download"
                 :size="40"
-                color="var(--color-brand-primary)"
+                color="var(--nb-yellow)"
               />
             </view>
             <view class="action-info">
@@ -214,12 +210,8 @@
               <text class="action-desc">下载云端数据到本地</text>
             </view>
           </view>
-          <view class="action-right">
-            <Icon
-              name="arrow-right"
-              :size="32"
-              color="var(--color-text-disabled)"
-            />
+          <view class="action-right glx-list-meta">
+            <Icon name="arrow-right" :size="32" class="glx-list-arrow" />
           </view>
         </view>
 
@@ -229,7 +221,7 @@
               <Icon
                 name="upload"
                 :size="40"
-                color="var(--color-brand-primary)"
+                color="var(--nb-yellow)"
               />
             </view>
             <view class="action-info">
@@ -237,31 +229,23 @@
               <text class="action-desc">将本地数据备份到云端</text>
             </view>
           </view>
-          <view class="action-right">
-            <Icon
-              name="arrow-right"
-              :size="32"
-              color="var(--color-text-disabled)"
-            />
+          <view class="action-right glx-list-meta">
+            <Icon name="arrow-right" :size="32" class="glx-list-arrow" />
           </view>
         </view>
 
         <view class="action-item danger" @click="clearCloudData">
           <view class="action-left">
             <view class="action-icon">
-              <Icon name="trash" :size="40" color="var(--color-error)" />
+              <Icon name="trash" :size="40" color="var(--nb-coral)" />
             </view>
             <view class="action-info">
               <text class="action-label">清除云端数据</text>
               <text class="action-desc">删除所有云端备份数据</text>
             </view>
           </view>
-          <view class="action-right">
-            <Icon
-              name="arrow-right"
-              :size="32"
-              color="var(--color-text-disabled)"
-            />
+          <view class="action-right glx-list-meta">
+            <Icon name="arrow-right" :size="32" class="glx-list-arrow" />
           </view>
         </view>
       </view>
@@ -294,9 +278,9 @@
           </view>
         </view>
 
-        <view class="view-all-logs" @click="viewAllLogs">
+        <view class="view-all-logs glx-inline-cta" @click="viewAllLogs">
           <text class="view-all-text">查看全部记录</text>
-          <Icon name="arrow-right" :size="24" />
+          <Icon name="arrow-right" :size="24" class="glx-inline-cta__icon" />
         </view>
       </view>
 
@@ -643,10 +627,10 @@ export default {
 
     getLogColor(status) {
       return status === "success"
-        ? "var(--color-success)"
+        ? "var(--nb-green)"
         : status === "error"
-          ? "var(--color-error)"
-          : "var(--color-text-secondary)";
+          ? "var(--nb-coral)"
+          : "#4a4a4a";
     },
   },
 };
@@ -655,7 +639,7 @@ export default {
 <style scoped>
 .cloud-sync-page {
   height: 100vh;
-  background-color: var(--color-app-background);
+  background-color: var(--nb-paper);
   display: flex;
   flex-direction: column;
 }
@@ -666,8 +650,8 @@ export default {
   align-items: center;
   justify-content: center;
   padding: 0 32rpx;
-  background-color: var(--color-card-background);
-  border-bottom: 2rpx solid var(--border-primary);
+  background-color: var(--nb-surface);
+  border-bottom: 2rpx solid var(--nb-ink);
   position: relative;
 }
 
@@ -692,7 +676,7 @@ export default {
 .nav-title {
   font-size: 32rpx;
   font-weight: 600;
-  color: var(--color-text-primary);
+  color: var(--nb-ink);
 }
 
 .content {
@@ -701,11 +685,11 @@ export default {
 }
 
 .sync-status-card {
-  background-color: var(--color-card-background);
-  border-radius: 16rpx;
+  background-color: var(--nb-surface);
+  border-radius: 0;
   padding: 32rpx;
   margin-bottom: 32rpx;
-  box-shadow: var(--shadow-card);
+  box-shadow: var(--nb-shadow-strong);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -721,21 +705,18 @@ export default {
 .status-icon {
   width: 120rpx;
   height: 120rpx;
-  border-radius: 60rpx;
+  border-radius: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: var(--color-app-background);
+  background-color: var(--nb-paper);
   transition: all 0.3s ease;
+  border: 2rpx solid #000000;
 }
 
 .status-icon.active {
-  background: linear-gradient(
-    135deg,
-    var(--color-brand-primary),
-    var(--color-brand-accent)
-  );
-  box-shadow: 0 8rpx 24rpx rgba(79, 127, 255, 0.3);
+  background: var(--nb-yellow);
+  box-shadow: none;
 }
 
 .status-info {
@@ -745,23 +726,23 @@ export default {
 .status-title {
   font-size: 32rpx;
   font-weight: 600;
-  color: var(--color-text-primary);
+  color: var(--nb-ink);
   margin-bottom: 8rpx;
   display: block;
 }
 
 .status-desc {
   font-size: 24rpx;
-  color: var(--color-text-secondary);
+  color: #4a4a4a;
   line-height: 1.4;
 }
 
 .sync-stats {
-  background-color: var(--color-card-background);
-  border-radius: 16rpx;
+  background-color: var(--nb-surface);
+  border-radius: 0;
   padding: 32rpx;
   margin-bottom: 32rpx;
-  box-shadow: var(--shadow-card);
+  box-shadow: var(--nb-shadow-strong);
 }
 
 .stats-header {
@@ -774,12 +755,12 @@ export default {
 .stats-title {
   font-size: 28rpx;
   font-weight: 600;
-  color: var(--color-text-primary);
+  color: var(--nb-ink);
 }
 
 .last-sync {
   font-size: 22rpx;
-  color: var(--color-text-disabled);
+  color: #777777;
 }
 
 .stats-grid {
@@ -794,36 +775,37 @@ export default {
   align-items: center;
   gap: 8rpx;
   padding: 24rpx;
-  background-color: var(--color-app-background);
-  border-radius: 12rpx;
+  background-color: var(--nb-paper);
+  border-radius: 0;
+  border: 2rpx solid #000000;
 }
 
 .stat-number {
   font-size: 28rpx;
   font-weight: 700;
-  color: var(--color-text-primary);
+  color: var(--nb-ink);
 }
 
 .stat-label {
   font-size: 22rpx;
-  color: var(--color-text-secondary);
+  color: #4a4a4a;
 }
 
 .sync-settings,
 .sync-actions,
 .sync-logs,
 .help-section {
-  background-color: var(--color-card-background);
-  border-radius: 16rpx;
+  background-color: var(--nb-surface);
+  border-radius: 0;
   padding: 32rpx;
   margin-bottom: 32rpx;
-  box-shadow: var(--shadow-card);
+  box-shadow: var(--nb-shadow-strong);
 }
 
 .section-title {
   font-size: 28rpx;
   font-weight: 600;
-  color: var(--color-text-primary);
+  color: var(--nb-ink);
   margin-bottom: 24rpx;
 }
 
@@ -833,7 +815,7 @@ export default {
   align-items: center;
   justify-content: space-between;
   padding: 24rpx 0;
-  border-bottom: 2rpx solid var(--border-primary);
+  border-bottom: 2rpx solid var(--nb-ink);
   transition: all 0.2s ease;
 }
 
@@ -843,10 +825,10 @@ export default {
 }
 
 .action-item:active {
-  background-color: var(--color-app-background);
+  background-color: var(--nb-paper);
   margin: 0 -32rpx;
   padding: 24rpx 32rpx;
-  border-radius: 12rpx;
+  border-radius: 0;
 }
 
 .setting-left,
@@ -864,8 +846,9 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: rgba(79, 127, 255, 0.1);
-  border-radius: 16rpx;
+  background-color: #ffffff;
+  border-radius: 0;
+  border: 2rpx solid #000000;
 }
 
 .setting-info,
@@ -877,7 +860,7 @@ export default {
 .action-label {
   font-size: 28rpx;
   font-weight: 500;
-  color: var(--color-text-primary);
+  color: var(--nb-ink);
   margin-bottom: 4rpx;
   display: block;
 }
@@ -885,11 +868,11 @@ export default {
 .setting-desc,
 .action-desc {
   font-size: 24rpx;
-  color: var(--color-text-secondary);
+  color: #4a4a4a;
 }
 
 .action-item.danger .action-label {
-  color: var(--color-error);
+  color: var(--nb-coral);
 }
 
 .logs-list {
@@ -901,7 +884,7 @@ export default {
   align-items: flex-start;
   gap: 16rpx;
   padding: 16rpx 0;
-  border-bottom: 2rpx solid var(--border-primary);
+  border-bottom: 2rpx solid var(--nb-ink);
 }
 
 .log-item:last-child {
@@ -923,14 +906,14 @@ export default {
 
 .log-action {
   font-size: 26rpx;
-  color: var(--color-text-primary);
+  color: var(--nb-ink);
   margin-bottom: 4rpx;
   display: block;
 }
 
 .log-time {
   font-size: 22rpx;
-  color: var(--color-text-disabled);
+  color: #777777;
 }
 
 .log-error {
@@ -939,7 +922,7 @@ export default {
 
 .error-text {
   font-size: 22rpx;
-  color: var(--color-error);
+  color: var(--nb-coral);
 }
 
 .view-all-logs {
@@ -948,18 +931,18 @@ export default {
   justify-content: center;
   gap: 8rpx;
   padding: 16rpx;
-  background-color: var(--color-app-background);
+  background-color: var(--nb-paper);
   border-radius: 12rpx;
   transition: all 0.2s ease;
 }
 
 .view-all-logs:active {
-  background-color: var(--border-primary);
+  background-color: var(--nb-ink);
 }
 
 .view-all-text {
   font-size: 24rpx;
-  color: var(--color-text-secondary);
+  color: #4a4a4a;
 }
 
 .help-content {
@@ -970,7 +953,7 @@ export default {
 
 .help-text {
   font-size: 24rpx;
-  color: var(--color-text-secondary);
+  color: #4a4a4a;
   line-height: 1.5;
 }
 </style>

@@ -182,8 +182,7 @@ export default {
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(0, 0, 0, 0.7);
-  backdrop-filter: blur(20rpx);
+  background-color: rgba(0, 0, 0, 0.45);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -194,9 +193,10 @@ export default {
 .modal-content {
   width: 100%;
   max-width: 600rpx;
-  background-color: var(--bg-tertiary);
-  border-radius: 24rpx;
-  border: 2rpx solid var(--border-primary);
+  background-color: var(--nb-surface);
+  border-radius: 0;
+  border: var(--nb-border-width-panel) solid var(--nb-ink);
+  box-shadow: var(--nb-shadow-strong);
   overflow: hidden;
   animation: scaleIn 0.2s ease-out;
 }
@@ -214,7 +214,7 @@ export default {
 
 .modal-header {
   padding: 32rpx;
-  border-bottom: 2rpx solid var(--border-primary);
+  border-bottom: var(--nb-border-width-panel) solid var(--nb-ink);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -222,8 +222,8 @@ export default {
 
 .modal-title {
   font-size: 32rpx;
-  font-weight: 600;
-  color: var(--text-primary);
+  font-weight: 900;
+  color: var(--nb-ink);
 }
 
 .close-btn {
@@ -232,13 +232,16 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 50%;
+  border: var(--nb-border-width-control) solid var(--nb-ink);
+  background: var(--nb-surface);
+  box-shadow: var(--nb-shadow-soft);
+  border-radius: 0;
   transition: var(--transition-base);
 }
 
 .close-btn:active {
-  background-color: var(--bg-secondary);
-  transform: scale(0.9);
+  background-color: var(--nb-paper);
+  transform: translate(2rpx, 2rpx);
 }
 
 .modal-body {
@@ -250,7 +253,7 @@ export default {
 
 .modal-desc {
   font-size: 24rpx;
-  color: var(--text-secondary);
+  color: #4a4a4a;
   line-height: 1.6;
 }
 
@@ -262,11 +265,11 @@ export default {
 .custom-input {
   width: 100%;
   padding: 0 24rpx;
-  background-color: var(--bg-secondary);
-  border: 2rpx solid var(--border-secondary);
-  border-radius: 12rpx;
+  background-color: #ffffff;
+  border: var(--nb-border-width-control) solid var(--nb-ink);
+  border-radius: 0;
   font-size: 32rpx;
-  color: var(--text-primary);
+  color: var(--nb-ink);
   font-family: monospace;
   transition: var(--transition-base);
   box-sizing: border-box;
@@ -275,8 +278,8 @@ export default {
 }
 
 .custom-input:focus {
-  border-color: var(--accent-primary);
-  box-shadow: 0 0 0 4rpx rgba(0, 243, 255, 0.1);
+  border-color: var(--nb-ink);
+  box-shadow: var(--nb-shadow-soft);
 }
 
 .input-placeholder {
@@ -288,7 +291,9 @@ export default {
   align-items: center;
   gap: 12rpx;
   padding: 20rpx;
-  border-radius: 12rpx;
+  border-radius: 0;
+  border: var(--nb-border-width-control) solid var(--nb-ink);
+  box-shadow: var(--nb-shadow-soft);
   animation: fadeIn 0.3s ease-out;
 }
 
@@ -304,20 +309,18 @@ export default {
 }
 
 .status-box.connecting {
-  background-color: rgba(0, 243, 255, 0.1);
-  border: 2rpx solid rgba(0, 243, 255, 0.3);
+  background-color: #eaf4ff;
 }
 
 .status-box.error {
-  background-color: rgba(255, 100, 100, 0.1);
-  border: 2rpx solid rgba(255, 100, 100, 0.3);
+  background-color: #fff1f1;
 }
 
 .loading-spinner {
   width: 32rpx;
   height: 32rpx;
-  border: 4rpx solid rgba(0, 243, 255, 0.2);
-  border-top-color: var(--accent-primary);
+  border: 3rpx solid rgba(0, 0, 0, 0.16);
+  border-top-color: var(--nb-ink);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
@@ -334,7 +337,7 @@ export default {
 }
 
 .status-box.connecting .status-text {
-  color: var(--accent-primary);
+  color: var(--nb-ink);
 }
 
 .status-box.error .status-text {
@@ -343,20 +346,25 @@ export default {
 
 .modal-footer {
   display: flex;
-  border-top: 2rpx solid var(--border-primary);
+  border-top: 2rpx solid var(--nb-ink);
 }
 
 .modal-btn {
   flex: 1;
-  padding: 28rpx;
+  min-height: 88rpx;
+  padding: 0 24rpx;
   display: flex;
   align-items: center;
   justify-content: center;
   transition: var(--transition-base);
+  box-sizing: border-box;
+  /* border: var(--nb-border-width-control) solid var(--nb-ink); */
+  box-shadow: var(--nb-shadow-soft);
 }
 
 .modal-btn:active:not(.disabled) {
   opacity: 0.7;
+  box-shadow: none;
 }
 
 .modal-btn.disabled {
@@ -364,19 +372,24 @@ export default {
 }
 
 .cancel-btn {
-  border-right: 2rpx solid var(--border-primary);
+  background: #ffffff;
+  border-right: 2rpx solid var(--nb-ink);
 }
 
 .btn-text {
   font-size: 28rpx;
-  font-weight: 500;
+  font-weight: 900;
 }
 
 .cancel-btn .btn-text {
-  color: var(--text-secondary);
+  color: var(--nb-ink);
+}
+
+.confirm-btn {
+  background: var(--nb-yellow);
 }
 
 .confirm-btn .btn-text {
-  color: var(--accent-primary);
+  color: var(--nb-ink);
 }
 </style>

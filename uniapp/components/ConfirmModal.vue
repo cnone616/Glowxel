@@ -71,8 +71,7 @@ export default {
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(0, 0, 0, 0.7);
-  backdrop-filter: blur(20rpx);
+  background-color: rgba(0, 0, 0, 0.45);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -83,9 +82,10 @@ export default {
 .modal-content {
   width: 100%;
   max-width: 560rpx;
-  background-color: var(--bg-tertiary);
-  border-radius: 24rpx;
-  border: 2rpx solid var(--border-primary);
+  background-color: var(--nb-surface);
+  border-radius: 0;
+  border: var(--nb-border-width-panel) solid var(--nb-ink);
+  box-shadow: var(--nb-shadow-strong);
   overflow: hidden;
   animation: scaleIn 0.2s ease-out;
 }
@@ -103,13 +103,13 @@ export default {
 
 .modal-header {
   padding: 32rpx 32rpx 24rpx;
-  border-bottom: 2rpx solid var(--border-primary);
+  border-bottom: var(--nb-border-width-panel) solid var(--nb-ink);
 }
 
 .modal-title {
   font-size: 32rpx;
-  font-weight: 600;
-  color: var(--text-primary);
+  font-weight: 900;
+  color: var(--nb-ink);
   text-align: center;
   display: block;
 }
@@ -120,7 +120,7 @@ export default {
 
 .modal-text {
   font-size: 28rpx;
-  color: var(--text-secondary);
+  color: #4a4a4a;
   line-height: 1.6;
   text-align: center;
   display: block;
@@ -128,40 +128,54 @@ export default {
 
 .modal-footer {
   display: flex;
-  border-top: 2rpx solid var(--border-primary);
+  border-top: var(--nb-border-width-panel) solid var(--nb-ink);
 }
 
 .modal-btn {
   flex: 1;
-  padding: 28rpx;
+  min-height: 88rpx;
+  padding: 0 24rpx;
   display: flex;
   align-items: center;
   justify-content: center;
   transition: var(--transition-base);
+  background: var(--nb-surface);
+  box-sizing: border-box;
+  border: var(--nb-border-width-control) solid var(--nb-ink);
+  box-shadow: var(--nb-shadow-soft);
 }
 
 .modal-btn:active {
-  opacity: 0.7;
+  transform: translate(2rpx, 2rpx);
+  box-shadow: none;
 }
 
 .cancel-btn {
-  border-right: 2rpx solid var(--border-primary);
+  border-right: var(--nb-border-width-control) solid var(--nb-ink);
 }
 
 .btn-text {
   font-size: 28rpx;
-  font-weight: 500;
+  font-weight: 900;
 }
 
 .cancel-btn .btn-text {
-  color: var(--text-secondary);
+  color: var(--nb-ink);
+}
+
+.confirm-btn {
+  background: var(--nb-yellow);
 }
 
 .confirm-btn .btn-text {
-  color: var(--accent-primary);
+  color: var(--nb-ink);
+}
+
+.confirm-btn.danger {
+  background: var(--nb-coral);
 }
 
 .confirm-btn.danger .btn-text {
-  color: #ff3333;
+  color: #ffffff;
 }
 </style>

@@ -1,5 +1,5 @@
 <template>
-  <view class="template-card" @click="handleClick" v-if="template && typeof template === 'object'">
+  <view class="template-card glx-panel-card" @click="handleClick" v-if="template && typeof template === 'object'">
     <!-- 模板预览图 -->
     <view class="template-image-container">
       <image 
@@ -101,23 +101,23 @@ export default {
 
 <style scoped>
 .template-card {
-  background-color: var(--color-card-background);
-  border-radius: var(--radius-medium);
-  box-shadow: var(--shadow-card);
+  background-color: var(--nb-surface);
+  border-radius: 0;
+  box-shadow: var(--nb-shadow-strong);
   overflow: hidden;
   transition: all 0.2s ease;
 }
 
 .template-card:active {
-  transform: scale(0.98);
-  box-shadow: var(--shadow-floating);
+  transform: translate(4rpx, 4rpx);
+  box-shadow: 2rpx 2rpx 0 var(--nb-ink);
 }
 
 .template-image-container {
   position: relative;
   width: 100%;
   height: 240rpx;
-  background-color: var(--color-app-background);
+  background-color: var(--nb-paper);
 }
 
 .template-image {
@@ -134,7 +134,7 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: var(--color-app-background);
+  background-color: var(--nb-paper);
 }
 
 .difficulty-badge {
@@ -142,8 +142,9 @@ export default {
   top: 12rpx;
   right: 12rpx;
   padding: 6rpx 12rpx;
-  border-radius: var(--radius-small);
-  backdrop-filter: blur(10rpx);
+  border: var(--nb-border-width-control) solid var(--nb-ink);
+  border-radius: 0;
+  box-shadow: var(--nb-shadow-soft);
 }
 
 .difficulty-easy {
@@ -160,8 +161,8 @@ export default {
 
 .difficulty-text {
   font-size: 20rpx;
-  color: #FFFFFF;
-  font-weight: 500;
+  color: var(--nb-ink);
+  font-weight: 900;
 }
 
 .template-info {
@@ -170,8 +171,8 @@ export default {
 
 .template-name {
   font-size: 26rpx;
-  font-weight: 600;
-  color: var(--color-text-primary);
+  font-weight: 900;
+  color: var(--nb-ink);
   line-height: 1.4;
   margin-bottom: 12rpx;
   display: -webkit-box;
@@ -195,7 +196,7 @@ export default {
 
 .detail-text {
   font-size: 22rpx;
-  color: var(--color-text-secondary);
+  color: #4a4a4a;
 }
 
 .template-stats {
@@ -206,7 +207,7 @@ export default {
 
 .usage-count {
   font-size: 22rpx;
-  color: var(--color-brand-primary);
-  font-weight: 500;
+  color: var(--nb-ink);
+  font-weight: 800;
 }
 </style>

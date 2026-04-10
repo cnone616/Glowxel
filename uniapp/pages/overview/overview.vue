@@ -1,35 +1,24 @@
 <template>
-  <view class="overview-page">
+  <view class="overview-page glx-page-shell">
     <!-- 状态栏占位 -->
     <!-- #ifdef MP-WEIXIN -->
     <view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
     <!-- #endif -->
 
     <!-- 顶部栏 -->
-    <view class="header">
-      <view class="header-left">
+    <view class="header glx-topbar glx-page-shell__fixed">
+      <view class="header-content">
         <view class="back-btn" @click="handleBack">
-          <Icon
-            name="direction-left"
-            :size="40"
-            color="var(--color-text-primary)"
-          />
+          <Icon name="direction-left" :size="32" color="var(--nb-ink)" />
         </view>
-        <view class="header-info">
-          <text class="header-title">画布总览</text>
-          <view class="action-btn primary" @click="handleEdit">
-            <Icon name="edit" :size="32" class="edit-icon" />
-          </view>
-          <view class="action-btn danger" @click="handleDeleteClick">
-            <Icon name="ashbin" :size="32" />
-          </view>
-        </view>
+        <text class="header-title glx-topbar__title">画布总览</text>
+        <view class="header-placeholder"></view>
       </view>
     </view>
 
     <!-- 搜索栏 -->
-    <view class="search-section">
-      <view class="search-bar">
+    <view class="search-section glx-page-shell__fixed">
+      <view class="search-bar glx-search-shell">
         <view class="search-input-wrapper">
           <Icon name="search" :size="28" color="var(--text-tertiary)" />
           <input
@@ -63,7 +52,7 @@
     <scroll-view
       scroll-y
       scroll-x
-      class="board-grid-container"
+      class="board-grid-container glx-page-shell__content"
       :scroll-top="scrollTop"
       :scroll-left="scrollLeft"
       :scroll-with-animation="true"
@@ -133,16 +122,34 @@
 
     <!-- 底部统计 -->
     <view class="footer-stats">
-      <!-- 导出完整图纸按钮 - 收藏项目不显示 -->
-      <view
-        v-if="isExportable"
-        class="export-button"
-        @click="handleBatchExport"
-      >
-        <Icon name="download" :size="32" color="#ffffff" />
-        <text class="export-text">导出完整图纸</text>
+      <view class="footer-actions">
+        <view
+          v-if="isExportable"
+          class="export-button"
+          @click="handleBatchExport"
+        >
+          <Icon name="download" :size="32" color="#000000" />
+          <text class="export-text">导出完整图纸</text>
+        </view>
+        <view class="footer-action-group">
+          <view
+            class="footer-mini-btn"
+            style="background: #4f7fff"
+            @click="handleEdit"
+          >
+            <Icon name="edit" :size="26" color="#ffffff" />
+            <text class="footer-mini-btn-text">编辑</text>
+          </view>
+          <view
+            class="footer-mini-btn"
+            style="background: #d92d20"
+            @click="handleDeleteClick"
+          >
+            <Icon name="ashbin" :size="26" color="#ffffff" />
+            <text class="footer-mini-btn-text">删除</text>
+          </view>
+        </view>
       </view>
-
       <view class="stat-row">
         <text class="stat-label">总画布数: {{ boards.length }}</text>
         <text class="stat-label"
@@ -191,12 +198,12 @@
 
         <view class="modal-actions">
           <view class="modal-action-btn primary" @click="goToEditor">
-            <Icon name="edit" :size="36" />
+            <Icon name="edit" :size="36" color="#000000" />
             <text class="modal-action-text">编辑 (绘图模式)</text>
           </view>
 
           <view class="modal-action-btn secondary" @click="goToAssist">
-            <Icon name="work" :size="36" />
+            <Icon name="work" :size="36" color="#000000" />
             <text class="modal-action-text">辅助拼豆模式</text>
           </view>
 
@@ -205,7 +212,7 @@
             class="modal-action-btn tertiary"
             @click="exportBoard"
           >
-            <Icon name="download" :size="36" />
+            <Icon name="download" :size="36" color="#000000" />
             <text class="modal-action-text">导出此画布</text>
           </view>
         </view>
@@ -696,35 +703,23 @@ export default {
 }
 
 .header {
-  height: 88rpx;
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  padding: 0 20rpx;
-  border-bottom: 2rpx solid var(--border-primary);
+  padding: 0;
+  border-bottom: 2rpx solid var(--nb-ink);
   background-color: var(--bg-elevated);
   z-index: 30;
 }
 
-.header-left {
-  display: flex;
-  align-items: center;
-  gap: 32rpx;
-  flex: 1;
-}
-
 .back-btn {
-  width: 64rpx;
-  height: 64rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 16rpx;
-  transition: var(--transition-base);
+  position: absolute;
+  left: 32rpx;
+  top: 50%;
+  transform: translateY(-50%);
 }
 
 .back-btn:active {
-  background-color: var(--bg-tertiary);
+  transform: translate(2rpx, calc(-50% + 2rpx));
 }
 
 .back-icon {
@@ -733,16 +728,8 @@ export default {
   line-height: 1;
 }
 
-.header-info {
-  display: flex;
-  flex: 1;
-  align-items: center;
-}
-
 .header-title {
-  font-size: 36rpx;
-  font-weight: 700;
-  color: var(--text-primary);
+  width: 100%;
 }
 
 .header-subtitle {
@@ -751,97 +738,48 @@ export default {
   font-family: monospace;
 }
 
-.header-actions {
-  display: flex;
-  gap: 16rpx;
-}
-
-.action-btn {
-  width: 64rpx;
-  height: 64rpx;
+.header-content {
+  position: relative;
+  width: 100%;
+  min-height: 104rpx;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 16rpx;
-  background-color: var(--bg-tertiary);
-  border: 2rpx solid var(--border-primary);
-  transition: var(--transition-base);
-  margin-left: 20rpx;
-}
-
-.action-btn:active {
-  transform: scale(0.95);
-}
-
-/* 下载按钮 - 蓝色边框 */
-.action-btn:not(.primary):not(.danger) {
-  background-color: transparent;
-  border-color: var(--accent-primary);
-  color: var(--accent-primary);
-}
-
-/* 浅色模式下的下载按钮 - 图标和边框同色 */
-.light-theme .action-btn:not(.primary):not(.danger) {
-  color: var(--accent-primary);
-}
-
-/* 编辑按钮 - 蓝底白色 */
-.action-btn.primary {
-  background-color: var(--accent-primary);
-  border-color: var(--accent-primary);
-  color: #ffffff !important;
-}
-
-.action-btn.primary:active {
-  box-shadow: var(--shadow-glow);
-}
-
-/* 删除按钮 - 红底白色 */
-.action-btn.danger {
-  background-color: #ff3333;
-  border-color: #ff3333;
-  color: #ffffff !important;
-}
-
-/* 浅色模式下的删除按钮 - 白色图标 */
-.light-theme .action-btn.danger {
-  background-color: #ff3333;
-  border-color: #ff3333;
-  color: #ffffff !important;
-}
-
-.action-icon {
-  font-size: 32rpx;
+  padding: 0 32rpx;
+  box-sizing: border-box;
 }
 
 .search-section {
   background-color: var(--bg-elevated);
-  border-bottom: 2rpx solid var(--border-primary);
+  border-bottom: 2rpx solid var(--nb-ink);
   z-index: 25;
 }
 
 .search-bar {
-  padding: 24rpx 48rpx;
+  padding: 20rpx 32rpx 24rpx;
 }
 
 .search-input-wrapper {
   display: flex;
   align-items: center;
   gap: 16rpx;
-  background-color: var(--bg-tertiary);
-  border: 2rpx solid var(--border-primary);
-  border-radius: 16rpx;
-  padding: 16rpx 24rpx;
+  min-height: 84rpx;
+  background-color: #ffffff;
+  border: 4rpx solid #000000;
+  border-radius: 0;
+  padding: 0 24rpx;
   transition: var(--transition-base);
+  box-shadow: none;
 }
 
 .search-input-wrapper:focus-within {
-  border-color: var(--accent-primary);
-  box-shadow: var(--shadow-glow);
+  border-color: #000000;
+  box-shadow: none;
 }
 
 .search-input {
   flex: 1;
+  min-height: 84rpx;
   font-size: 28rpx;
   color: var(--text-primary);
   background-color: transparent;
@@ -859,13 +797,14 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 50%;
+  border-radius: 0;
+  border: 2rpx solid #000000;
   transition: var(--transition-base);
 }
 
 .clear-btn:active {
-  background-color: var(--bg-secondary);
-  transform: scale(0.95);
+  background-color: var(--nb-yellow);
+  transform: translate(2rpx, 2rpx);
 }
 
 .sidebar-index {
@@ -882,14 +821,14 @@ export default {
 
 .index-container {
   background-color: rgba(0, 0, 0, 0.8);
-  backdrop-filter: blur(40rpx);
-  border-radius: 32rpx;
+  backdrop-filter: none;
+  border-radius: 0;
   padding: 32rpx 8rpx;
   display: flex;
   flex-direction: column;
   gap: 8rpx;
-  border: 2rpx solid var(--border-secondary);
-  box-shadow: var(--shadow-lg);
+  border: 2rpx solid var(--nb-ink);
+  box-shadow: var(--nb-shadow-strong);
   pointer-events: auto;
 }
 
@@ -905,12 +844,12 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 12rpx;
+  border-radius: 0;
   transition: var(--transition-base);
 }
 
 .index-item:active {
-  background-color: var(--accent-primary);
+  background-color: var(--nb-yellow);
   transform: scale(1.1);
 }
 
@@ -922,7 +861,7 @@ export default {
 }
 
 .index-item:active .index-text {
-  color: #ffffff;
+  color: #000000;
 }
 
 .board-grid-container {
@@ -950,13 +889,13 @@ export default {
 
 .board-card {
   position: relative;
-  background-color: var(--bg-tertiary);
-  border: 2rpx solid var(--border-primary);
-  border-radius: 16rpx;
+  background-color: #ffffff;
+  border: 4rpx solid #000000;
+  border-radius: 0;
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  box-shadow: var(--shadow-md);
+  box-shadow: none;
   transition: var(--transition-base);
   min-width: 150rpx;
   max-width: 250rpx;
@@ -966,8 +905,8 @@ export default {
 
 .board-card:active {
   transform: scale(0.98);
-  border-color: var(--accent-primary);
-  box-shadow: var(--shadow-glow);
+  border-color: #000000;
+  box-shadow: none;
 }
 
 .board-thumbnail {
@@ -1025,9 +964,10 @@ export default {
   right: 16rpx;
   width: 48rpx;
   height: 48rpx;
-  background-color: rgba(0, 255, 157, 0.9);
-  backdrop-filter: blur(20rpx);
-  border-radius: 50%;
+  background-color: var(--nb-yellow);
+  border: 3rpx solid #000000;
+  box-shadow: 2rpx 2rpx 0 #000000;
+  border-radius: 0;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1044,9 +984,9 @@ export default {
   bottom: 0;
   left: 0;
   right: 0;
-  background-color: rgba(0, 0, 0, 0.1);
-  backdrop-filter: blur(20rpx);
+  background-color: rgba(255, 255, 255, 0.92);
   padding: 5rpx 16rpx 10rpx;
+  border-top: 3rpx solid #000000;
 }
 
 .progress-info {
@@ -1070,18 +1010,15 @@ export default {
 .progress-bar {
   width: 100%;
   height: 12rpx;
-  background-color: rgba(255, 255, 255, 0.1);
-  border-radius: 6rpx;
+  background-color: #ffffff;
+  border: 2rpx solid #000000;
+  border-radius: 0;
   overflow: hidden;
 }
 
 .progress-fill {
   height: 100%;
-  background: linear-gradient(
-    90deg,
-    var(--accent-primary),
-    var(--accent-secondary)
-  );
+  background: #ffd23f;
   transition: var(--transition-slow);
 }
 
@@ -1090,35 +1027,84 @@ export default {
   bottom: 0;
   left: 0;
   right: 0;
-  padding: 32rpx 48rpx;
-  background-color: var(--bg-elevated);
-  border-top: 2rpx solid var(--border-color);
+  padding: 20rpx 32rpx 32rpx;
+  background-color: #ffffff;
+  border-top: 3rpx solid #000000;
   z-index: 30;
   display: flex;
   flex-direction: column;
   gap: 16rpx;
 }
 
+.footer-actions {
+  display: flex;
+  align-items: stretch;
+  gap: 16rpx;
+}
+
 .export-button {
+  flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 16rpx;
-  padding: 24rpx;
-  background-color: var(--accent-color);
-  border-radius: 16rpx;
-  box-shadow: 0 8rpx 32rpx rgba(0, 243, 255, 0.2);
+  padding: 20rpx 24rpx;
+  background-color: #ffd23f;
+  border: 3rpx solid #000000;
+  border-radius: 0;
+  box-shadow: 2rpx 2rpx 0 #000000;
+  box-sizing: border-box;
   transition: opacity 0.2s;
 }
 
 .export-button:active {
-  opacity: 0.8;
+  opacity: 0.9;
+  transform: translate(2rpx, 2rpx);
+  box-shadow: none;
 }
 
 .export-text {
   font-size: 28rpx;
   font-weight: bold;
+  color: #000000;
+}
+
+.footer-action-group {
+  display: flex;
+  gap: 12rpx;
+}
+
+.footer-mini-btn {
+  min-width: 132rpx;
+  min-height: 84rpx;
+  padding: 0 20rpx;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10rpx;
+  border: 3rpx solid #000000;
+  border-radius: 0;
+  box-shadow: 2rpx 2rpx 0 #000000;
+  box-sizing: border-box;
+}
+
+.footer-mini-btn:active {
+  transform: translate(2rpx, 2rpx);
+  box-shadow: none;
+}
+
+.footer-mini-btn-text {
+  font-size: 26rpx;
+  font-weight: 900;
   color: #ffffff;
+}
+
+.export-button .iconfont,
+.export-button text,
+.footer-mini-btn .iconfont,
+.footer-mini-btn text {
+  display: block;
+  line-height: 1;
 }
 
 .stat-row {
@@ -1129,7 +1115,7 @@ export default {
 
 .stat-label {
   font-size: 24rpx;
-  color: var(--text-secondary);
+  color: #4a4a4a;
   font-family: monospace;
 }
 
@@ -1153,18 +1139,15 @@ export default {
 .total-bar {
   flex: 1;
   height: 16rpx;
-  background-color: var(--bg-tertiary);
-  border-radius: 8rpx;
+  background-color: #ffffff;
+  border: 2rpx solid #000000;
+  border-radius: 0;
   overflow: hidden;
 }
 
 .total-fill {
   height: 100%;
-  background: linear-gradient(
-    90deg,
-    var(--accent-primary),
-    var(--accent-secondary)
-  );
+  background: #ffd23f;
   transition: var(--transition-slow);
 }
 
@@ -1172,7 +1155,7 @@ export default {
   font-size: 24rpx;
   font-family: monospace;
   font-weight: bold;
-  color: var(--accent-color);
+  color: #000000;
   flex-shrink: 0;
 }
 
@@ -1184,7 +1167,7 @@ export default {
   right: 0;
   bottom: 0;
   background-color: rgba(0, 0, 0, 0.8);
-  backdrop-filter: blur(20rpx);
+  backdrop-filter: none;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1196,11 +1179,11 @@ export default {
   width: 100%;
   max-width: 600rpx;
   background-color: var(--bg-tertiary);
-  border: 2rpx solid var(--accent-primary);
+  border: 2rpx solid var(--nb-yellow);
   border-radius: 32rpx;
   padding: 64rpx 32rpx;
   position: relative;
-  box-shadow: var(--shadow-lg);
+  box-shadow: var(--nb-shadow-strong);
   animation: scaleIn var(--transition-base);
   box-sizing: border-box;
 }
@@ -1254,7 +1237,7 @@ export default {
 
 .modal-action-btn {
   padding: 32rpx;
-  border-radius: 24rpx;
+  border-radius: 0;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1266,45 +1249,33 @@ export default {
   transform: scale(0.98);
 }
 
-/* 编辑按钮 - 蓝底，文字颜色根据主题自适应 */
+/* 主操作按钮：黄底黑字黑图标 */
 .modal-action-btn.primary {
-  background-color: var(--accent-primary);
-  box-shadow: var(--shadow-md);
-  border: none;
-  color: #ffffff;
-}
-
-.light-theme .modal-action-btn.primary {
-  color: #ffffff;
+  background-color: var(--nb-yellow);
+  box-shadow: var(--nb-shadow-strong);
+  border: 2rpx solid var(--nb-ink);
+  color: #000000;
 }
 
 .modal-action-btn.primary:active {
-  box-shadow: var(--shadow-glow);
+  box-shadow: none;
 }
 
-/* 编辑按钮文字和图标 - 继承父元素颜色 */
 .modal-action-btn.primary .modal-action-text {
   color: inherit;
 }
 
-/* 辅助拼豆按钮 - 透明背景蓝色边框 */
+/* 次级按钮：白底黑字，黄边强调 */
 .modal-action-btn.secondary {
-  background-color: transparent;
-  border: 2rpx solid var(--accent-primary);
-  color: var(--accent-primary);
+  background-color: #ffffff;
+  border: 2rpx solid var(--nb-yellow);
+  color: #000000;
 }
 
-/* 导出按钮 - 深色背景蓝色边框 */
 .modal-action-btn.tertiary {
-  background-color: var(--bg-tertiary);
-  border: 2rpx solid var(--accent-primary);
-  color: var(--accent-primary);
-}
-
-/* 浅色模式下的调整 */
-.light-theme .modal-action-btn.tertiary {
-  background-color: rgba(0, 153, 204, 0.05);
-  border: 2rpx solid var(--accent-primary);
+  background-color: #ffffff;
+  border: 2rpx solid var(--nb-yellow);
+  color: #000000;
 }
 
 .modal-action-icon {
@@ -1316,7 +1287,6 @@ export default {
   font-weight: bold;
 }
 
-/* 辅助拼豆和导出按钮文字和图标 - 继承父元素颜色 */
 .modal-action-btn.secondary .modal-action-text,
 .modal-action-btn.tertiary .modal-action-text {
   color: inherit;
@@ -1332,7 +1302,7 @@ export default {
   display: flex;
   flex-direction: column;
   align-items: center;
-  box-shadow: var(--shadow-lg);
+  box-shadow: var(--nb-shadow-strong);
   animation: scaleIn var(--transition-base);
   box-sizing: border-box;
 }
@@ -1380,24 +1350,28 @@ export default {
 
 .confirm-btn {
   flex: 1;
-  padding: 32rpx;
-  border-radius: 16rpx;
+  min-height: 88rpx;
+  padding: 0 24rpx;
+  border-radius: 0;
   text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  border: 2rpx solid var(--nb-ink);
+  box-shadow: 2rpx 2rpx 0 var(--nb-ink);
 }
 
 .confirm-btn.cancel {
   background-color: var(--bg-tertiary);
-  border: 2rpx solid var(--border-secondary);
 }
 
 .confirm-btn.primary {
-  background-color: var(--accent-primary);
-  border: 2rpx solid var(--accent-primary);
-  box-shadow: var(--shadow-glow);
+  background-color: var(--nb-yellow);
 }
 
 .confirm-btn.danger {
-  background-color: var(--error-color);
+  background-color: #d92d20;
 }
 
 .confirm-btn-text {
@@ -1410,11 +1384,11 @@ export default {
 }
 
 .confirm-btn.primary .confirm-btn-text {
-  color: var(--text-inverse);
+  color: #000000;
 }
 
 .confirm-btn.danger .confirm-btn-text {
-  color: var(--text-inverse);
+  color: #ffffff;
 }
 
 .thumbnail-placeholder {
@@ -1438,8 +1412,8 @@ export default {
   width: 100%;
   max-width: 600rpx;
   background-color: var(--bg-tertiary);
-  border-radius: 24rpx;
-  border: 2rpx solid var(--border-primary);
+  border-radius: 0;
+  border: 2rpx solid var(--nb-ink);
   overflow: hidden;
   animation: scaleIn 0.2s ease-out;
 }
@@ -1455,7 +1429,7 @@ export default {
 }
 .rename-header {
   padding: 32rpx;
-  border-bottom: 2rpx solid var(--border-primary);
+  border-bottom: 2rpx solid var(--nb-ink);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1469,9 +1443,9 @@ export default {
   padding: 32rpx;
 }
 .rename-input-wrap {
-  background-color: var(--bg-secondary);
-  border: 2rpx solid var(--border-primary);
-  border-radius: 16rpx;
+  background-color: #fff8d6;
+  border: 2rpx solid var(--nb-ink);
+  border-radius: 0;
   padding: 0 24rpx;
   height: 88rpx;
   display: flex;
@@ -1493,16 +1467,22 @@ export default {
 }
 .rename-btn {
   flex: 1;
-  padding: 24rpx;
-  border-radius: 16rpx;
+  min-height: 88rpx;
+  padding: 0 24rpx;
+  border-radius: 0;
   text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  border: 2rpx solid var(--nb-ink);
+  box-shadow: 2rpx 2rpx 0 var(--nb-ink);
 }
 .rename-btn.cancel {
   background-color: var(--bg-secondary);
-  border: 2rpx solid var(--border-secondary);
 }
 .rename-btn.confirm {
-  background-color: var(--accent-primary);
+  background-color: var(--nb-yellow);
 }
 .rename-btn.confirm.disabled {
   opacity: 0.5;
@@ -1513,7 +1493,7 @@ export default {
   font-weight: 600;
 }
 .rename-btn.confirm .rename-btn-text {
-  color: #fff;
+  color: #000000;
   font-size: 28rpx;
   font-weight: 600;
 }

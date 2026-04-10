@@ -1,11 +1,13 @@
+const PANEL_SIZE = 64;
+
 const PIECE_COLORS = [
-  "#00f0f0",
-  "#f0f000",
-  "#a000f0",
-  "#00f000",
-  "#f00000",
-  "#0000f0",
-  "#f0a000",
+  { r: 0, g: 240, b: 240 },
+  { r: 240, g: 240, b: 0 },
+  { r: 160, g: 0, b: 240 },
+  { r: 0, g: 240, b: 0 },
+  { r: 240, g: 0, b: 0 },
+  { r: 0, g: 0, b: 240 },
+  { r: 240, g: 160, b: 0 },
 ];
 
 const PIECE_SHAPES = {
@@ -66,74 +68,16 @@ const DIGIT_PATTERNS = [
   ["111", "101", "111", "001", "111"],
 ];
 
-function clampUnit(value) {
-  if (value < 0) {
-    return 0;
-  }
-  if (value > 1) {
-    return 1;
-  }
-  return value;
-}
-
-function parseHexColor(hex) {
-  return {
-    r: parseInt(hex.slice(1, 3), 16),
-    g: parseInt(hex.slice(3, 5), 16),
-    b: parseInt(hex.slice(5, 7), 16),
-  };
-}
-
-function toHexColor({ r, g, b }) {
-  const toHex = (value) => {
-    const safe = Math.max(0, Math.min(255, Math.round(value)));
-    return safe.toString(16).padStart(2, "0");
-  };
-  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
-}
-
-function mixHexColor(base, target, ratio) {
-  const safeRatio = clampUnit(ratio);
-  const left = parseHexColor(base);
-  const right = parseHexColor(target);
-  return toHexColor({
-    r: left.r * (1 - safeRatio) + right.r * safeRatio,
-    g: left.g * (1 - safeRatio) + right.g * safeRatio,
-    b: left.b * (1 - safeRatio) + right.b * safeRatio,
-  });
-}
-
-function scaleHexColor(base, scale) {
-  const safeScale = Math.max(0, scale);
-  const rgb = parseHexColor(base);
-  return toHexColor({
-    r: rgb.r * safeScale,
-    g: rgb.g * safeScale,
-    b: rgb.b * safeScale,
-  });
-}
-
-function setPixel(pixels, x, y, color) {
-  if (x < 0 || x >= 64 || y < 0 || y >= 64) {
-    return;
-  }
-  pixels.set(`${x},${y}`, color);
-}
-
-function fillRect(pixels, x, y, width, height, color) {
-  for (let row = 0; row < height; row += 1) {
-    for (let col = 0; col < width; col += 1) {
-      setPixel(pixels, x + col, y + row, color);
-    }
-  }
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(max, value));
 }
 
 function normalizeShape(cells) {
   let minX = Infinity;
   let minY = Infinity;
-  for (let i = 0; i < cells.length; i += 1) {
-    minX = Math.min(minX, cells[i][0]);
-    minY = Math.min(minY, cells[i][1]);
+  for (let index = 0; index < cells.length; index += 1) {
+    minX = Math.min(minX, cells[index][0]);
+    minY = Math.min(minY, cells[index][1]);
   }
   return cells
     .map(([x, y]) => [x - minX, y - minY])
@@ -161,59 +105,124 @@ function getPieceRotations(pieceType) {
   return rotations;
 }
 
-function easeOutCubic(value) {
-  const safe = Math.max(0, Math.min(1, value));
-  const inverse = 1 - safe;
-  return 1 - inverse * inverse * inverse;
+function createMatrix(rows, cols, fillValue) {
+  const matrix = [];
+  for (let row = 0; row < rows; row += 1) {
+    matrix.push(new Array(cols).fill(fillValue));
+  }
+  return matrix;
 }
 
-function chooseColors(selectedPieces) {
-  if (!Array.isArray(selectedPieces) || selectedPieces.length === 0) {
-    return PIECE_COLORS;
+function setPixel(pixels, x, y, color) {
+  if (x < 0 || x >= PANEL_SIZE || y < 0 || y >= PANEL_SIZE) {
+    return;
   }
-  return selectedPieces
-    .filter((index) => Number.isInteger(index) && index >= 0 && index < PIECE_COLORS.length)
-    .map((index) => PIECE_COLORS[index]);
+  pixels.set(`${x},${y}`, color);
 }
 
-function choosePieceTypes(selectedPieces) {
-  if (!Array.isArray(selectedPieces) || selectedPieces.length === 0) {
-    return [0, 1, 2, 3, 4, 5, 6];
+function fillRect(pixels, x, y, width, height, color) {
+  for (let row = 0; row < height; row += 1) {
+    for (let col = 0; col < width; col += 1) {
+      setPixel(pixels, x + col, y + row, color);
+    }
   }
-  const filtered = selectedPieces.filter(
-    (index) => Number.isInteger(index) && index >= 0 && index < 7,
-  );
-  return filtered.length > 0 ? filtered : [0, 1, 2, 3, 4, 5, 6];
+}
+
+function rgbToHex(color) {
+  const toHex = (value) => clamp(Math.round(value), 0, 255).toString(16).padStart(2, "0");
+  return `#${toHex(color.r)}${toHex(color.g)}${toHex(color.b)}`;
+}
+
+function brighten(color, amount) {
+  return {
+    r: clamp(color.r + amount, 0, 255),
+    g: clamp(color.g + amount, 0, 255),
+    b: clamp(color.b + amount, 0, 255),
+  };
+}
+
+function darkenHalf(color) {
+  return {
+    r: Math.floor(color.r / 2),
+    g: Math.floor(color.g / 2),
+    b: Math.floor(color.b / 2),
+  };
 }
 
 function drawGridBackground(pixels, cellSize) {
-  fillRect(pixels, 0, 0, 64, 64, "#060910");
-  for (let pos = 0; pos < 64; pos += cellSize) {
-    for (let cursor = 0; cursor < 64; cursor += 1) {
+  fillRect(pixels, 0, 0, PANEL_SIZE, PANEL_SIZE, "#000000");
+  for (let pos = 0; pos < PANEL_SIZE; pos += cellSize) {
+    for (let cursor = 0; cursor < PANEL_SIZE; cursor += 1) {
       setPixel(pixels, pos, cursor, "#0d1520");
       setPixel(pixels, cursor, pos, "#0d1520");
     }
   }
-  fillRect(pixels, 0, 0, 64, 1, "#182433");
-  fillRect(pixels, 0, 63, 64, 1, "#182433");
-  fillRect(pixels, 0, 0, 1, 64, "#182433");
-  fillRect(pixels, 63, 0, 1, 64, "#182433");
 }
 
-function buildTimeCells(showClock, cellSize) {
-  const cols = Math.floor(64 / cellSize);
-  const rows = Math.floor(64 / cellSize);
-  const placements = [];
+function drawGhostCell(pixels, cellX, cellY, cellSize) {
+  const px = cellX * cellSize;
+  const py = cellY * cellSize;
+  for (let dy = 0; dy < cellSize; dy += 1) {
+    for (let dx = 0; dx < cellSize; dx += 1) {
+      let color = { r: 16, g: 32, b: 56 };
+      if (cellSize >= 2 && (dy === 0 || dx === 0)) {
+        color = { r: 28, g: 58, b: 92 };
+      }
+      setPixel(pixels, px + dx, py + dy, rgbToHex(color));
+    }
+  }
+}
 
+function drawPieceCell(pixels, cellX, cellY, cellSize, pieceType, pulseBright) {
+  const rgb = PIECE_COLORS[pieceType];
+  const baseBoost = pulseBright ? 20 : 0;
+  const highlightBoost = pulseBright ? 60 : 40;
+  const baseColor = brighten(rgb, baseBoost);
+  const highlightColor = brighten(rgb, highlightBoost);
+  const shadowColor = darkenHalf(rgb);
+  const px = cellX * cellSize;
+  const py = cellY * cellSize;
+
+  for (let dy = 0; dy < cellSize; dy += 1) {
+    for (let dx = 0; dx < cellSize; dx += 1) {
+      let color = baseColor;
+      if (cellSize >= 2) {
+        if (dy === 0 || dx === 0) {
+          color = highlightColor;
+        } else if (dy === cellSize - 1 || dx === cellSize - 1) {
+          color = shadowColor;
+        }
+      }
+      setPixel(pixels, px + dx, py + dy, rgbToHex(color));
+    }
+  }
+}
+
+function getDropSpeed(config) {
+  if (config.speed === "slow") {
+    return 300;
+  }
+  if (config.speed === "fast") {
+    return 80;
+  }
+  return 150;
+}
+
+function getClockSnapshot() {
+  const now = new Date();
+  return {
+    hours: now.getHours(),
+    minutes: now.getMinutes(),
+  };
+}
+
+function buildTargetMap(cols, rows, showClock, clock) {
+  const targetMap = createMatrix(rows, cols, false);
   if (!showClock) {
-    return placements;
+    return targetMap;
   }
 
-  const now = new Date();
-  const digits = `${String(now.getHours()).padStart(2, "0")}${String(
-    now.getMinutes(),
-  ).padStart(2, "0")}`;
-
+  const digits = `${String(clock.hours).padStart(2, "0")}${String(clock.minutes).padStart(2, "0")}`;
   const glyphUnits = 17;
   let scale = 1;
   for (let tryScale = 1; tryScale <= 6; tryScale += 1) {
@@ -229,348 +238,569 @@ function buildTimeCells(showClock, cellSize) {
   let cursorX = startX;
 
   for (let digitIndex = 0; digitIndex < 4; digitIndex += 1) {
-    const value = Number(digits[digitIndex]);
-    const pattern = DIGIT_PATTERNS[value];
-    for (let row = 0; row < pattern.length; row += 1) {
-      for (let col = 0; col < pattern[row].length; col += 1) {
+    const digit = Number(digits[digitIndex]);
+    const pattern = DIGIT_PATTERNS[digit];
+    for (let row = 0; row < 5; row += 1) {
+      for (let col = 0; col < 3; col += 1) {
         if (pattern[row][col] !== "1") {
           continue;
         }
         for (let sy = 0; sy < scale; sy += 1) {
           for (let sx = 0; sx < scale; sx += 1) {
-            placements.push({
-              x: cursorX + col * scale + sx,
-              y: startY + row * scale + sy,
-            });
+            const x = cursorX + col * scale + sx;
+            const y = startY + row * scale + sy;
+            if (x >= 0 && x < cols && y >= 0 && y < rows) {
+              targetMap[y][x] = true;
+            }
           }
         }
       }
     }
+
     cursorX += 3 * scale + scale;
     if (digitIndex === 1) {
       for (let sy = 0; sy < scale; sy += 1) {
         for (let sx = 0; sx < scale; sx += 1) {
-          placements.push({ x: cursorX + sx, y: startY + scale + sy });
-          placements.push({ x: cursorX + sx, y: startY + scale * 3 + sy });
+          const topY = startY + scale + sy;
+          const bottomY = startY + scale * 3 + sy;
+          const x = cursorX + sx;
+          if (x >= 0 && x < cols) {
+            if (topY >= 0 && topY < rows) {
+              targetMap[topY][x] = true;
+            }
+            if (bottomY >= 0 && bottomY < rows) {
+              targetMap[bottomY][x] = true;
+            }
+          }
         }
       }
       cursorX += scale + scale;
     }
   }
 
-  return placements;
+  return targetMap;
 }
 
-function cellsToSet(cells) {
-  const result = new Set();
-  for (let index = 0; index < cells.length; index += 1) {
-    result.add(`${cells[index].x},${cells[index].y}`);
+function choosePieceTypes(selectedPieces) {
+  if (!Array.isArray(selectedPieces) || selectedPieces.length === 0) {
+    return [0, 1, 2, 3, 4, 5, 6];
+  }
+  const result = selectedPieces.filter(
+    (index) => Number.isInteger(index) && index >= 0 && index < 7,
+  );
+  if (result.length === 0) {
+    return [0, 1, 2, 3, 4, 5, 6];
   }
   return result;
 }
 
-function buildClockPlacements(targetCells, allowedPieces) {
-  const remaining = cellsToSet(targetCells);
-  const placements = [];
-  let pieceCursor = 0;
-
-  function getPriorityTypes() {
-    const offset = pieceCursor % allowedPieces.length;
-    return allowedPieces
-      .slice(offset)
-      .concat(allowedPieces.slice(0, offset));
-  }
-
-  function findPlacement(anchor) {
-    const priorityTypes = getPriorityTypes();
-    let best = null;
-
-    for (let typeIndex = 0; typeIndex < priorityTypes.length; typeIndex += 1) {
-      const pieceType = priorityTypes[typeIndex];
-      const rotations = getPieceRotations(pieceType);
-
-      for (let rotationIndex = 0; rotationIndex < rotations.length; rotationIndex += 1) {
-        const rotation = rotations[rotationIndex];
-
-        for (let anchorIndex = 0; anchorIndex < rotation.length; anchorIndex += 1) {
-          const [offsetX, offsetY] = rotation[anchorIndex];
-          const originX = anchor.x - offsetX;
-          const originY = anchor.y - offsetY;
-          const pieceCells = [];
-          let valid = true;
-          let neighborScore = 0;
-
-          for (let blockIndex = 0; blockIndex < rotation.length; blockIndex += 1) {
-            const cellX = originX + rotation[blockIndex][0];
-            const cellY = originY + rotation[blockIndex][1];
-            const key = `${cellX},${cellY}`;
-
-            if (!remaining.has(key)) {
-              valid = false;
-              break;
-            }
-
-            pieceCells.push({ x: cellX, y: cellY });
-          }
-
-          if (!valid) {
-            continue;
-          }
-
-          for (let blockIndex = 0; blockIndex < pieceCells.length; blockIndex += 1) {
-            const cell = pieceCells[blockIndex];
-            const neighbors = [
-              `${cell.x - 1},${cell.y}`,
-              `${cell.x + 1},${cell.y}`,
-              `${cell.x},${cell.y - 1}`,
-              `${cell.x},${cell.y + 1}`,
-            ];
-            for (let neighborIndex = 0; neighborIndex < neighbors.length; neighborIndex += 1) {
-              if (remaining.has(neighbors[neighborIndex])) {
-                neighborScore += 1;
-              }
-            }
-          }
-
-          const score =
-            pieceCells.length * 100 +
-            neighborScore -
-            Math.abs(originX - anchor.x) -
-            Math.abs(originY - anchor.y);
-
-          if (!best || score > best.score) {
-            best = {
-              pieceType,
-              cells: pieceCells,
-              score,
-            };
-          }
-        }
-      }
-    }
-
-    return best;
-  }
-
-  while (remaining.size > 0) {
-    const nextKey = Array.from(remaining)
-      .map((item) => {
-        const [x, y] = item.split(",").map(Number);
-        return { key: item, x, y };
-      })
-      .sort((left, right) => right.y - left.y || left.x - right.x)[0];
-
-    const placement = findPlacement(nextKey);
-    if (placement) {
-      placements.push(placement);
-      for (let index = 0; index < placement.cells.length; index += 1) {
-        remaining.delete(`${placement.cells[index].x},${placement.cells[index].y}`);
-      }
-    } else {
-      placements.push({
-        pieceType: allowedPieces[pieceCursor % allowedPieces.length],
-        cells: [{ x: nextKey.x, y: nextKey.y }],
-      });
-      remaining.delete(nextKey.key);
-    }
-    pieceCursor += 1;
-  }
-
-  return placements.sort((left, right) => {
-    const leftY = Math.max(...left.cells.map((cell) => cell.y));
-    const rightY = Math.max(...right.cells.map((cell) => cell.y));
-    const leftX = Math.min(...left.cells.map((cell) => cell.x));
-    const rightX = Math.min(...right.cells.map((cell) => cell.x));
-    return rightY - leftY || leftX - rightX;
-  });
+function buildSequenceSeed(state) {
+  const minuteValue = state.clock.hours * 60 + state.clock.minutes;
+  let seed = minuteValue < 0 ? 0 : minuteValue;
+  seed = seed * 131 + state.cellSize * 17;
+  seed = seed * 131 + state.dropSpeed;
+  seed = seed * 131 + (state.showClock ? 1 : 0);
+  seed = seed * 131 + (state.clearMode ? 1 : 0);
+  seed = seed * 131 + state.piecesMask;
+  return seed;
 }
 
-function canPlacePiece(board, cols, rows, cells, originX, originY) {
+function computeSpawnDrift(state, pieceType) {
+  const seed = buildSequenceSeed(state);
+  const mixed = seed + state.spawnCounter * 29 + pieceType * 41;
+  return 4 + (mixed % 5);
+}
+
+function getRotationCells(pieceType, rotation) {
+  return getPieceRotations(pieceType)[rotation];
+}
+
+function canMove(state, pieceType, rotation, x, y) {
+  const cells = getRotationCells(pieceType, rotation);
   for (let index = 0; index < cells.length; index += 1) {
-    const x = originX + cells[index][0];
-    const y = originY + cells[index][1];
-    if (x < 0 || x >= cols || y >= rows) {
+    const nx = x + cells[index][0];
+    const ny = y + cells[index][1];
+    if (nx < 0 || nx >= state.cols || ny >= state.rows) {
       return false;
     }
-    if (y >= 0 && board.has(`${x},${y}`)) {
+    if (ny >= 0 && state.board[ny][nx] !== 0) {
       return false;
     }
   }
   return true;
 }
 
-function buildScreenSaverPlacements(cellSize, allowedPieces) {
-  const cols = Math.floor(64 / cellSize);
-  const rows = Math.floor(64 / cellSize);
-  const board = new Set();
-  const placements = [];
-  const pieceCount = Math.max(8, Math.min(14, Math.floor((cols * 0.72) / 2)));
-
-  for (let index = 0; index < pieceCount; index += 1) {
-    const pieceType = allowedPieces[index % allowedPieces.length];
-    const rotations = getPieceRotations(pieceType);
-    const rotation = rotations[(index * 3 + pieceType) % rotations.length];
-    const width = Math.max(...rotation.map((cell) => cell[0])) + 1;
-    const maxX = Math.max(0, cols - width);
-    const originX = (index * 5 + pieceType * 3) % (maxX + 1);
-    let originY = -4;
-
-    while (canPlacePiece(board, cols, rows, rotation, originX, originY + 1)) {
-      originY += 1;
-    }
-
-    const finalCells = rotation
-      .map(([x, y]) => ({ x: originX + x, y: originY + y }))
-      .filter((cell) => cell.y >= 0 && cell.y < rows);
-
-    for (let cellIndex = 0; cellIndex < finalCells.length; cellIndex += 1) {
-      board.add(`${finalCells[cellIndex].x},${finalCells[cellIndex].y}`);
-    }
-
-    placements.push({
-      pieceType,
-      cells: finalCells,
-    });
+function pieceMinX(pieceType, rotation) {
+  const cells = getRotationCells(pieceType, rotation);
+  let minX = 4;
+  for (let index = 0; index < cells.length; index += 1) {
+    minX = Math.min(minX, cells[index][0]);
   }
-
-  return placements.sort((left, right) => {
-    const leftY = Math.max(...left.cells.map((cell) => cell.y));
-    const rightY = Math.max(...right.cells.map((cell) => cell.y));
-    return leftY - rightY;
-  });
+  return minX;
 }
 
-function buildAnimatedPlacements(config) {
-  const safeConfig = config || {};
-  const cellSize = Math.max(1, Math.min(3, Number(safeConfig.cellSize) || 2));
-  const allowedPieces = choosePieceTypes(safeConfig.pieces);
-  const showClock = safeConfig.showClock !== false;
-  const targetCells = buildTimeCells(showClock, cellSize);
-  const placements = showClock
-    ? buildClockPlacements(targetCells, allowedPieces)
-    : buildScreenSaverPlacements(cellSize, allowedPieces);
-
-  return placements.map((placement, index) => {
-    const minX = Math.min(...placement.cells.map((cell) => cell.x));
-    const minY = Math.min(...placement.cells.map((cell) => cell.y));
-    const maxX = Math.max(...placement.cells.map((cell) => cell.x));
-    const width = maxX - minX + 1;
-    const cols = Math.floor(64 / cellSize);
-    const shift = index % 2 === 0 ? -(4 + (index % 3)) : 4 + (index % 3);
-    let spawnX = minX + shift;
-    if (spawnX < 0) {
-      spawnX = 0;
-    }
-    if (spawnX > cols - width) {
-      spawnX = cols - width;
-    }
-    return {
-      ...placement,
-      spawnX,
-      spawnY: -6 - (index % 4) * 3,
-      minX,
-      minY,
-    };
-  });
-}
-
-function drawPieceCell(pixels, cellX, cellY, cellSize, color, landed) {
-  const px = cellX * cellSize;
-  const py = cellY * cellSize;
-  fillRect(pixels, px, py, cellSize, cellSize, color);
-
-  if (cellSize >= 2) {
-    const highlight = mixHexColor(color, "#ffffff", 0.32);
-    const shadow = scaleHexColor(color, 0.42);
-    fillRect(pixels, px, py, cellSize, 1, highlight);
-    fillRect(pixels, px, py, 1, cellSize, highlight);
-    if (landed) {
-      fillRect(pixels, px, py + cellSize - 1, cellSize, 1, shadow);
-      fillRect(pixels, px + cellSize - 1, py, 1, cellSize, shadow);
-    }
+function pieceMaxX(pieceType, rotation) {
+  const cells = getRotationCells(pieceType, rotation);
+  let maxX = 0;
+  for (let index = 0; index < cells.length; index += 1) {
+    maxX = Math.max(maxX, cells[index][0]);
   }
+  return maxX;
 }
 
-function drawGhostCell(pixels, cellX, cellY, cellSize) {
-  const px = cellX * cellSize;
-  const py = cellY * cellSize;
-  fillRect(pixels, px, py, cellSize, cellSize, "#102038");
-  if (cellSize >= 2) {
-    fillRect(pixels, px, py, cellSize, 1, "#214166");
-    fillRect(pixels, px, py, 1, cellSize, "#214166");
+function computeSpawnX(state, pieceType, rotation, finalX) {
+  const minOffset = pieceMinX(pieceType, rotation);
+  const maxOffset = pieceMaxX(pieceType, rotation);
+  const minSpawnX = -minOffset;
+  const maxSpawnX = state.cols - 1 - maxOffset;
+  const drift = computeSpawnDrift(state, pieceType);
+  let startX = finalX + (state.spawnBiasLeft ? -drift : drift);
+  state.spawnBiasLeft = !state.spawnBiasLeft;
+  if (startX < minSpawnX) {
+    startX = minSpawnX;
   }
+  if (startX > maxSpawnX) {
+    startX = maxSpawnX;
+  }
+  return startX;
 }
 
-export function buildTetrisPreviewFrames(config) {
-  const safeConfig = config || {};
-  const cellSize = Math.max(1, Math.min(3, Number(safeConfig.cellSize) || 2));
-  const colors = chooseColors(safeConfig.pieces);
-  const showClock = safeConfig.showClock !== false;
-  const targetCells = buildTimeCells(showClock, cellSize);
-  const animatedPlacements = buildAnimatedPlacements(safeConfig);
-  const frameCount = 36;
-  const frames = [];
-  const speedLabel =
-    typeof safeConfig.speed === "string" ? safeConfig.speed : "normal";
-  const speedFactor = speedLabel === "slow" ? 0.82 : speedLabel === "fast" ? 1.3 : 1;
+function buildClockPlacement(state, pieceType) {
+  let bestRot = 0;
+  let bestX = 0;
+  let bestScore = -999999;
 
-  for (let frameIndex = 0; frameIndex < frameCount; frameIndex += 1) {
-    const pixels = new Map();
-    drawGridBackground(pixels, cellSize);
-
-    if (showClock) {
-      for (let index = 0; index < targetCells.length; index += 1) {
-        const cell = targetCells[index];
-        drawGhostCell(pixels, cell.x, cell.y, cellSize);
+  for (let rotation = 0; rotation < 4; rotation += 1) {
+    for (let x = -2; x < state.cols; x += 1) {
+      let y = -2;
+      if (!canMove(state, pieceType, rotation, x, y)) {
+        continue;
       }
-    }
+      while (canMove(state, pieceType, rotation, x, y + 1)) {
+        y += 1;
+      }
 
-    for (let placementIndex = 0; placementIndex < animatedPlacements.length; placementIndex += 1) {
-      const placement = animatedPlacements[placementIndex];
-      let color = colors[placement.pieceType % colors.length];
-      const startFrame = placementIndex * 0.72;
-      const duration = 5.8 / speedFactor;
-      const progress = (frameIndex - startFrame) / duration;
+      const cells = getRotationCells(pieceType, rotation);
+      let score = 0;
+      let valid = true;
 
-      if (progress <= 0) {
+      for (let index = 0; index < cells.length; index += 1) {
+        const nx = x + cells[index][0];
+        const ny = y + cells[index][1];
+        if (nx < 0 || nx >= state.cols || ny < 0 || ny >= state.rows) {
+          valid = false;
+          break;
+        }
+        if (!state.targetMap[ny][nx]) {
+          valid = false;
+          break;
+        }
+        score += 2000;
+        if (
+          ny + 1 >= state.rows ||
+          state.board[ny + 1][nx] !== 0 ||
+          !state.targetMap[ny + 1][nx]
+        ) {
+          score += 40;
+        }
+        if (nx > 0 && state.board[ny][nx - 1] !== 0) {
+          score += 18;
+        }
+        if (nx + 1 < state.cols && state.board[ny][nx + 1] !== 0) {
+          score += 18;
+        }
+      }
+      if (!valid) {
         continue;
       }
 
-      const eased = easeOutCubic(Math.min(1, progress));
-      const currentOffsetX = Math.round(
-        placement.spawnX + (placement.minX - placement.spawnX) * eased,
-      );
-      const currentOffsetY = Math.round(
-        placement.spawnY + (placement.minY - placement.spawnY) * eased,
-      );
-      const landed = progress >= 1;
-      const holdPulseFrame = Math.max(0, frameIndex - (frameCount - 8));
-      const holdPulse = landed && holdPulseFrame > 0;
-      if (holdPulse) {
-        const pulse = 0.18 + 0.18 * Math.sin((holdPulseFrame / 8) * Math.PI * 2);
-        color = mixHexColor(color, "#dbeafe", pulse);
+      for (let index = 0; index < cells.length; index += 1) {
+        const nx = x + cells[index][0];
+        const ny = y + cells[index][1];
+        state.board[ny][nx] = pieceType + 1;
       }
 
-      for (let cellIndex = 0; cellIndex < placement.cells.length; cellIndex += 1) {
-        const cell = placement.cells[cellIndex];
-        const localX = cell.x - placement.minX;
-        const localY = cell.y - placement.minY;
-        const drawX = currentOffsetX + localX;
-        const drawY = currentOffsetY + localY;
-        drawPieceCell(pixels, drawX, drawY, cellSize, color, landed);
-
-        if (holdPulse && cellSize >= 2) {
-          const baseX = drawX * cellSize;
-          const baseY = drawY * cellSize;
-          setPixel(pixels, baseX - 1, baseY, "#dbeafe");
-          setPixel(pixels, baseX, baseY - 1, "#dbeafe");
-          setPixel(pixels, baseX + cellSize, baseY + cellSize - 1, "#93c5fd");
-          setPixel(pixels, baseX + cellSize - 1, baseY + cellSize, "#93c5fd");
+      let holes = 0;
+      for (let col = 0; col < state.cols; col += 1) {
+        let seenTargetBlock = false;
+        for (let row = 0; row < state.rows; row += 1) {
+          if (state.targetMap[row][col] && state.board[row][col] !== 0) {
+            seenTargetBlock = true;
+          } else if (seenTargetBlock && state.targetMap[row][col] && state.board[row][col] === 0) {
+            holes += 1;
+          }
         }
       }
-    }
+      score -= holes * 180;
 
-    frames.push(pixels);
+      for (let row = 0; row < state.rows; row += 1) {
+        let filledInTarget = 0;
+        let targetCount = 0;
+        for (let col = 0; col < state.cols; col += 1) {
+          if (state.targetMap[row][col]) {
+            targetCount += 1;
+            if (state.board[row][col] !== 0) {
+              filledInTarget += 1;
+            }
+          }
+        }
+        score += filledInTarget * 8;
+        if (targetCount > 0 && filledInTarget === targetCount) {
+          score += 120;
+        }
+      }
+
+      for (let index = 0; index < cells.length; index += 1) {
+        const nx = x + cells[index][0];
+        const ny = y + cells[index][1];
+        state.board[ny][nx] = 0;
+      }
+
+      score += y * 4;
+      if (score > bestScore) {
+        bestScore = score;
+        bestRot = rotation;
+        bestX = x;
+      }
+    }
+  }
+
+  if (bestScore <= -999999) {
+    return null;
+  }
+
+  return { rotation: bestRot, x: bestX };
+}
+
+function buildFreeFallPlacement(state, pieceType) {
+  let bestRot = 0;
+  let bestX = 0;
+  let bestScore = -99999;
+
+  for (let rotation = 0; rotation < 4; rotation += 1) {
+    for (let x = -2; x < state.cols; x += 1) {
+      let y = -2;
+      if (!canMove(state, pieceType, rotation, x, y)) {
+        continue;
+      }
+      while (canMove(state, pieceType, rotation, x, y + 1)) {
+        y += 1;
+      }
+
+      const cells = getRotationCells(pieceType, rotation);
+      let valid = true;
+      for (let index = 0; index < cells.length; index += 1) {
+        const ny = y + cells[index][1];
+        if (ny < 0) {
+          valid = false;
+          break;
+        }
+      }
+      if (!valid) {
+        continue;
+      }
+
+      for (let index = 0; index < cells.length; index += 1) {
+        const nx = x + cells[index][0];
+        const ny = y + cells[index][1];
+        if (ny >= 0 && ny < state.rows && nx >= 0 && nx < state.cols) {
+          state.board[ny][nx] = pieceType + 1;
+        }
+      }
+
+      let score = 0;
+      score += y * 20;
+
+      for (let row = 0; row < state.rows; row += 1) {
+        let full = true;
+        let filled = 0;
+        for (let col = 0; col < state.cols; col += 1) {
+          if (state.board[row][col] !== 0) {
+            filled += 1;
+          } else {
+            full = false;
+          }
+        }
+        if (full) {
+          score += 5000;
+        }
+        score += filled * 2;
+      }
+
+      for (let col = 0; col < state.cols; col += 1) {
+        let blocked = false;
+        for (let row = 0; row < state.rows; row += 1) {
+          if (state.board[row][col] !== 0) {
+            blocked = true;
+          } else if (blocked) {
+            score -= 500;
+          }
+        }
+      }
+
+      for (let index = 0; index < cells.length; index += 1) {
+        const nx = x + cells[index][0];
+        const ny = y + cells[index][1];
+        if (ny + 1 >= state.rows) {
+          score += 10;
+        } else if (
+          ny + 1 >= 0 &&
+          state.board[ny + 1][nx] !== 0 &&
+          state.board[ny + 1][nx] !== pieceType + 1
+        ) {
+          score += 10;
+        }
+        if (nx - 1 < 0 || state.board[ny][nx - 1] !== 0) {
+          score += 5;
+        }
+        if (nx + 1 >= state.cols || state.board[ny][nx + 1] !== 0) {
+          score += 5;
+        }
+      }
+
+      const maxH = new Array(state.cols).fill(state.rows);
+      for (let col = 0; col < state.cols; col += 1) {
+        for (let row = 0; row < state.rows; row += 1) {
+          if (state.board[row][col] !== 0) {
+            maxH[col] = row;
+            break;
+          }
+        }
+      }
+      for (let col = 1; col < state.cols; col += 1) {
+        score -= Math.abs(maxH[col] - maxH[col - 1]) * 30;
+      }
+
+      for (let index = 0; index < cells.length; index += 1) {
+        const nx = x + cells[index][0];
+        const ny = y + cells[index][1];
+        if (ny >= 0 && ny < state.rows && nx >= 0 && nx < state.cols) {
+          state.board[ny][nx] = 0;
+        }
+      }
+
+      if (score > bestScore) {
+        bestScore = score;
+        bestRot = rotation;
+        bestX = x;
+      }
+    }
+  }
+
+  return { rotation: bestRot, x: bestX };
+}
+
+function lockPiece(state) {
+  const cells = getRotationCells(state.curType, state.curRot);
+  for (let index = 0; index < cells.length; index += 1) {
+    const nx = state.curX + cells[index][0];
+    const ny = state.curY + cells[index][1];
+    if (ny >= 0 && ny < state.rows && nx >= 0 && nx < state.cols) {
+      state.board[ny][nx] = state.curType + 1;
+    }
+  }
+}
+
+function clearLines(state) {
+  for (let y = state.rows - 1; y >= 0; y -= 1) {
+    let full = true;
+    for (let x = 0; x < state.cols; x += 1) {
+      if (state.board[y][x] === 0) {
+        full = false;
+        break;
+      }
+    }
+    if (!full) {
+      continue;
+    }
+    for (let yy = y; yy > 0; yy -= 1) {
+      for (let col = 0; col < state.cols; col += 1) {
+        state.board[yy][col] = state.board[yy - 1][col];
+      }
+    }
+    for (let col = 0; col < state.cols; col += 1) {
+      state.board[0][col] = 0;
+    }
+    y += 1;
+  }
+}
+
+function spawnPiece(state) {
+  const enabled = choosePieceTypes(state.selectedPieces);
+  const seed = buildSequenceSeed(state);
+  const pieceIndex =
+    (seed + state.spawnCounter * 73 + state.spawnCounter * state.spawnCounter * 11) %
+    enabled.length;
+  state.curType = enabled[pieceIndex];
+
+  if (state.showClock) {
+    const placement = buildClockPlacement(state, state.curType);
+    if (placement) {
+      state.holdClockFrame = false;
+      state.curRot = placement.rotation;
+      state.targetX = placement.x;
+      state.curX = computeSpawnX(state, state.curType, state.curRot, state.targetX);
+      if (!canMove(state, state.curType, state.curRot, state.curX, -2)) {
+        state.curX = state.targetX;
+      }
+      state.curY = -2;
+      state.spawnCounter += 1;
+      return;
+    }
+    state.holdClockFrame = true;
+    state.curRot = 0;
+    state.curX = 0;
+    state.curY = -100;
+    return;
+  }
+
+  const placement = buildFreeFallPlacement(state, state.curType);
+  state.curRot = placement.rotation;
+  state.targetX = placement.x;
+  state.curX = computeSpawnX(state, state.curType, state.curRot, state.targetX);
+  if (!canMove(state, state.curType, state.curRot, state.curX, -2)) {
+    state.curX = state.targetX;
+  }
+  state.curY = -2;
+  state.spawnCounter += 1;
+}
+
+function stepState(state) {
+  if (state.showClock && state.holdClockFrame) {
+    return;
+  }
+
+  if (state.curX !== state.targetX) {
+    const step = state.curX < state.targetX ? 1 : -1;
+    if (canMove(state, state.curType, state.curRot, state.curX + step, state.curY)) {
+      state.curX += step;
+    } else {
+      state.targetX = state.curX;
+    }
+  }
+
+  if (canMove(state, state.curType, state.curRot, state.curX, state.curY + 1)) {
+    state.curY += 1;
+    return;
+  }
+
+  lockPiece(state);
+
+  if (state.clearMode && !state.showClock) {
+    clearLines(state);
+  }
+
+  let topFull = false;
+  for (let x = 0; x < state.cols; x += 1) {
+    if (state.board[0][x] !== 0 || state.board[1][x] !== 0) {
+      topFull = true;
+      break;
+    }
+  }
+  if (topFull) {
+    state.board = createMatrix(state.rows, state.cols, 0);
+  }
+
+  spawnPiece(state);
+}
+
+function buildFrameMap(state, pulseBright) {
+  const pixels = new Map();
+  drawGridBackground(pixels, state.cellSize);
+
+  for (let y = 0; y < state.rows; y += 1) {
+    for (let x = 0; x < state.cols; x += 1) {
+      let cell = state.board[y][x];
+      if (state.curY > -100) {
+        const currentCells = getRotationCells(state.curType, state.curRot);
+        for (let index = 0; index < currentCells.length; index += 1) {
+          const px = state.curX + currentCells[index][0];
+          const py = state.curY + currentCells[index][1];
+          if (px === x && py === y) {
+            cell = state.curType + 1;
+            break;
+          }
+        }
+      }
+
+      if (cell === 0 && state.showClock && state.targetMap[y][x]) {
+        drawGhostCell(pixels, x, y, state.cellSize);
+        continue;
+      }
+
+      if (cell > 0) {
+        drawPieceCell(pixels, x, y, state.cellSize, cell - 1, pulseBright);
+      }
+    }
+  }
+
+  return pixels;
+}
+
+function createSimulationState(config) {
+  const cellSize = clamp(Number(config.cellSize) || 2, 1, 3);
+  const cols = Math.floor(PANEL_SIZE / cellSize);
+  const rows = Math.floor(PANEL_SIZE / cellSize);
+  const clock = getClockSnapshot();
+  const pieces = choosePieceTypes(config.pieces);
+  let piecesMask = 0;
+  for (let index = 0; index < pieces.length; index += 1) {
+    piecesMask |= 1 << pieces[index];
+  }
+
+  const state = {
+    cellSize,
+    cols,
+    rows,
+    board: createMatrix(rows, cols, 0),
+    targetMap: buildTargetMap(cols, rows, config.showClock !== false, clock),
+    selectedPieces: pieces,
+    piecesMask,
+    dropSpeed: getDropSpeed(config),
+    showClock: config.showClock !== false,
+    clearMode: config.clearMode !== false,
+    clock,
+    spawnCounter: 0,
+    spawnBiasLeft: true,
+    holdClockFrame: false,
+    curType: 0,
+    curRot: 0,
+    curX: 0,
+    curY: -2,
+    targetX: 0,
+  };
+
+  spawnPiece(state);
+  return state;
+}
+
+export function buildTetrisPreviewFrames(config) {
+  const state = createSimulationState(config || {});
+  const frames = [];
+  const frameMs = state.dropSpeed;
+  let holdElapsed = 0;
+  let holdPulseBright = false;
+  const activeFrameLimit = state.showClock ? 64 : 40;
+
+  frames.push(buildFrameMap(state, false));
+
+  for (let index = 0; index < activeFrameLimit; index += 1) {
+    stepState(state);
+    frames.push(buildFrameMap(state, false));
+    if (state.showClock && state.holdClockFrame) {
+      break;
+    }
+  }
+
+  if (state.showClock && state.holdClockFrame) {
+    for (let index = 0; index < 10; index += 1) {
+      holdElapsed += frameMs;
+      if (holdElapsed >= 220) {
+        holdElapsed = 0;
+        holdPulseBright = !holdPulseBright;
+      }
+      frames.push(buildFrameMap(state, holdPulseBright));
+    }
   }
 
   return frames;

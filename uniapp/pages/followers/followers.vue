@@ -1,5 +1,5 @@
 <template>
-  <view class="redirect-page"></view>
+  <view class="redirect-page glx-scroll-region"></view>
 </template>
 
 <script>

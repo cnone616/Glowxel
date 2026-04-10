@@ -1,6 +1,8 @@
 import { getClockTextWidth } from "../../../utils/clockCanvas.js";
 import { uploadAnimationFrames } from "../../../utils/animationUploader.js";
 
+const CLOCK_DEVICE_THEME_ID_KEY = "clock_device_theme_id";
+
 export default {
   methods: {
     getClockEditorStorageKey() {
@@ -263,6 +265,8 @@ export default {
           }
 
           this.deviceStore.setDeviceMode("theme", { businessMode: true });
+          this.deviceThemeId = this.lastAppliedClockThemeId;
+          uni.setStorageSync(CLOCK_DEVICE_THEME_ID_KEY, this.deviceThemeId);
           this.saveConfig();
           return;
         }

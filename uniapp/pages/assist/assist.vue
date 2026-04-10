@@ -1,5 +1,5 @@
 <template>
-  <view class="assist-page" :class="{ 'light-theme': false }">
+  <view class="assist-page glx-page-shell" :class="{ 'light-theme': false }">
     <!-- 状态栏占位 -->
     <view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
 
@@ -57,18 +57,18 @@
       </view>
     </view>
     <!-- 导航栏 -->
-    <view class="navbar">
+    <view class="navbar glx-topbar glx-page-shell__fixed">
       <view class="nav-left" @click="goToOverview">
         <Icon
           name="direction-left"
           :size="32"
-          color="var(--color-text-primary)"
+          color="var(--nb-ink)"
         />
       </view>
-      <text class="nav-title">{{ boardId }}</text>
+      <text class="nav-title glx-topbar__title">{{ boardId }}</text>
     </view>
     <!-- 头部 -->
-    <view class="header" :style="{ paddingRight: capsuleRight + 'px' }">
+    <view class="header glx-topbar glx-page-shell__fixed" :style="{ paddingRight: capsuleRight + 'px' }">
       <!-- <view class="header-left">
         <view class="back-btn" @click="goToOverview">
           <text class="icon">‹</text>
@@ -1156,7 +1156,7 @@ export default {
 
 .row-grid-item.current {
   border-color: var(--accent-color);
-  background-color: rgba(0, 243, 255, 0.1);
+  background-color: #f7f7f7;
   box-shadow: 0 0 20rpx rgba(0, 243, 255, 0.3);
 }
 
@@ -1211,7 +1211,7 @@ export default {
 }
 
 .current-box {
-  background-color: rgba(0, 243, 255, 0.1);
+  background-color: #f7f7f7;
   border-color: var(--accent-color);
 }
 
@@ -1231,8 +1231,8 @@ export default {
   align-items: center;
   justify-content: center;
   padding: 0 32rpx;
-  background-color: var(--color-card-background);
-  border-bottom: 2rpx solid var(--border-primary);
+  background-color: var(--nb-surface);
+  border-bottom: 2rpx solid var(--nb-ink);
   position: relative;
 }
 
@@ -1257,7 +1257,7 @@ export default {
 .nav-title {
   font-size: 32rpx;
   font-weight: 600;
-  color: var(--color-text-primary);
+  color: var(--nb-ink);
 }
 /* 头部 */
 .header {
@@ -1265,7 +1265,7 @@ export default {
   display: flex;
   align-items: center;
   padding: 0 30rpx;
-  border-bottom: 2rpx solid var(--border-primary);
+  border-bottom: 2rpx solid var(--nb-ink);
   background-color: var(--bg-elevated);
   z-index: 20;
   display: none;
@@ -1286,7 +1286,7 @@ export default {
   justify-content: center;
   border-radius: 16rpx;
   background-color: var(--bg-tertiary);
-  border: 2rpx solid var(--border-primary);
+  border: 2rpx solid var(--nb-ink);
   transition: var(--transition-base);
 }
 
@@ -1315,8 +1315,8 @@ export default {
   gap: 8rpx;
   padding: 8rpx;
   background-color: var(--bg-tertiary);
-  border-radius: 24rpx;
-  border: 2rpx solid var(--border-primary);
+  border-radius: 0;
+  border: 2rpx solid var(--nb-ink);
 }
 
 .mode-btn {
@@ -1332,8 +1332,8 @@ export default {
 }
 
 .mode-btn.active {
-  background-color: var(--accent-primary);
-  box-shadow: var(--shadow-glow);
+  background-color: var(--nb-yellow);
+  box-shadow: none;
   color: var(--text-inverse);
 }
 
@@ -1349,8 +1349,8 @@ export default {
 
 .info-banner {
   padding: 20rpx 30rpx;
-  background-color: rgba(0, 243, 255, 0.1);
-  border-bottom: 2rpx solid var(--accent-primary);
+  background-color: #f7f7f7;
+  border-bottom: 2rpx solid var(--nb-yellow);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1362,7 +1362,7 @@ export default {
   width: 28rpx;
   height: 28rpx;
   border-radius: 50%;
-  border: 2rpx solid var(--accent-primary);
+  border: 2rpx solid var(--nb-yellow);
   box-shadow: 0 0 8rpx rgba(0, 243, 255, 0.3);
 }
 
@@ -1370,7 +1370,7 @@ export default {
   width: 28rpx;
   height: 28rpx;
   border-radius: 50%;
-  border: 2rpx solid var(--accent-primary);
+  border: 2rpx solid var(--nb-yellow);
   box-shadow: 0 0 8rpx rgba(0, 243, 255, 0.3);
   background-color: #00f3ff;
   margin-right: 20rpx;
@@ -1378,7 +1378,7 @@ export default {
 
 .info-text {
   font-size: 24rpx;
-  color: var(--accent-primary);
+  color: var(--nb-yellow);
   font-weight: bold;
   font-family: monospace;
 }
@@ -1404,7 +1404,7 @@ export default {
   max-height: 600rpx;
   background-color: var(--bg-elevated);
   border-top: 1px solid var(--border-color);
-  padding-bottom: env(safe-area-inset-bottom);
+  padding-bottom: var(--layout-bottom-offset);
   z-index: 20;
   display: flex;
   flex-direction: column;
@@ -1442,7 +1442,7 @@ export default {
   justify-content: center;
   border-radius: 12rpx;
   background-color: var(--bg-tertiary);
-  border: 2rpx solid var(--border-primary);
+  border: 2rpx solid var(--nb-ink);
   transition: var(--transition-base);
   color: var(--text-primary);
 }
@@ -1452,16 +1452,16 @@ export default {
 }
 
 .icon-btn.active {
-  background-color: rgba(0, 243, 255, 0.1);
-  border-color: var(--accent-primary);
-  box-shadow: var(--shadow-glow);
-  color: var(--accent-primary);
+  background-color: #f7f7f7;
+  border-color: var(--nb-yellow);
+  box-shadow: none;
+  color: var(--nb-yellow);
 }
 
 .icon-btn.device-btn.connected {
-  background-color: rgba(0, 243, 255, 0.1);
-  border-color: var(--accent-primary);
-  color: var(--accent-primary);
+  background-color: #f7f7f7;
+  border-color: var(--nb-yellow);
+  color: var(--nb-yellow);
   animation: pulse-glow 2s ease-in-out infinite;
 }
 
@@ -1489,8 +1489,8 @@ export default {
   padding: 12rpx 16rpx;
   margin-bottom: 16rpx;
   background: linear-gradient(90deg, rgba(0, 243, 255, 0.1), transparent);
-  backdrop-filter: blur(20rpx);
-  border-left: 4rpx solid var(--accent-primary);
+  backdrop-filter: none;
+  border-left: 4rpx solid var(--nb-yellow);
   border-radius: 0 8rpx 8rpx 0;
   z-index: 10;
 }
@@ -1498,7 +1498,7 @@ export default {
 .group-letter {
   font-size: 28rpx;
   font-weight: bold;
-  color: var(--accent-primary);
+  color: var(--nb-yellow);
   font-family: monospace;
   text-shadow: 0 0 8rpx rgba(0, 243, 255, 0.3);
 }
@@ -1522,18 +1522,18 @@ export default {
   gap: 12rpx;
   padding: 16rpx;
   background-color: var(--bg-tertiary);
-  border: 2rpx solid var(--border-primary);
+  border: 2rpx solid var(--nb-ink);
   border-radius: 16rpx;
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--nb-shadow-soft);
   transition: var(--transition-base);
   position: relative;
   overflow: hidden;
 }
 
 .color-item.active {
-  border-color: var(--accent-primary);
-  background-color: rgba(0, 243, 255, 0.1);
-  box-shadow: var(--shadow-glow);
+  border-color: var(--nb-yellow);
+  background-color: #f7f7f7;
+  box-shadow: none;
 }
 
 .color-item.completed {
@@ -1576,7 +1576,7 @@ export default {
 .check-btn {
   width: 48rpx;
   height: 48rpx;
-  border: 2rpx solid var(--border-primary);
+  border: 2rpx solid var(--nb-ink);
   border-radius: 12rpx;
   display: flex;
   align-items: center;
@@ -1642,8 +1642,8 @@ export default {
 }
 
 .index-letter.active {
-  color: var(--accent-primary);
-  background-color: rgba(0, 243, 255, 0.2);
+  color: var(--nb-yellow);
+  background-color: #ffe49a;
   transform: scale(1.3);
 }
 
@@ -1652,7 +1652,7 @@ export default {
   position: fixed;
   width: 128rpx;
   height: 128rpx;
-  background-color: var(--accent-primary);
+  background-color: var(--nb-yellow);
   color: var(--text-inverse);
   font-size: 56rpx;
   font-weight: bold;
@@ -1661,7 +1661,7 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: var(--shadow-glow);
+  box-shadow: none;
   z-index: 2000;
   pointer-events: none;
   transform: translate(-50%, -50%);
@@ -1693,8 +1693,8 @@ export default {
   width: 96rpx;
   height: 96rpx;
   background-color: var(--bg-tertiary);
-  border: 2rpx solid var(--border-primary);
-  border-radius: 24rpx;
+  border: 2rpx solid var(--nb-ink);
+  border-radius: 0;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1720,8 +1720,8 @@ export default {
   padding: 0 16rpx;
   height: 96rpx;
   background-color: var(--bg-tertiary);
-  border: 2rpx solid var(--border-primary);
-  border-radius: 24rpx;
+  border: 2rpx solid var(--nb-ink);
+  border-radius: 0;
 }
 
 .row-list-btn {
@@ -1762,7 +1762,7 @@ export default {
 .row-number {
   font-size: 48rpx;
   font-weight: bold;
-  color: var(--accent-primary);
+  color: var(--nb-yellow);
   font-family: monospace;
   line-height: 1;
   text-shadow: 0 0 8rpx rgba(0, 243, 255, 0.3);
@@ -1781,7 +1781,7 @@ export default {
   gap: 12rpx;
   padding: 20rpx 32rpx;
   background-color: var(--bg-tertiary);
-  border: 2rpx solid var(--border-primary);
+  border: 2rpx solid var(--nb-ink);
   border-radius: 16rpx;
   transition: var(--transition-base);
 }

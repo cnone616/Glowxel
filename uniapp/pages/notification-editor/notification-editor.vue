@@ -1,20 +1,19 @@
 <template>
-  <view class="notification-editor-page">
+  <view class="notification-editor-page glx-page-shell">
     <!-- #ifdef MP-WEIXIN -->
     <view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
     <!-- #endif -->
 
-    <view class="header">
+    <view class="navbar glx-topbar glx-page-shell__fixed">
       <view class="nav-left" @click="handleBack">
         <Icon
           name="direction-left"
           :size="32"
-          color="var(--color-text-primary)"
+          color="var(--nb-ink)"
         />
       </view>
-      <view class="nav-title">
-        <text class="project-name">{{ pageTitle }}</text>
-      </view>
+      <text class="nav-title glx-topbar__title">{{ pageTitle }}</text>
+      <view class="nav-right"></view>
     </view>
 
     <view class="canvas-section">
@@ -39,17 +38,17 @@
         v-else
         class="preview-canvas-container preview-canvas-placeholder"
       ></view>
-      <view class="preview-caption">
-        <view class="preview-caption-info">
+      <view class="preview-caption glx-preview-panel">
+        <view class="preview-caption-info glx-preview-panel__info">
           <text class="preview-caption-title">预览效果</text>
         </view>
         <view class="preview-actions">
           <view
-            class="action-btn-sm primary"
+            class="action-btn-sm primary glx-primary-action"
             :class="{ disabled: isSending }"
             @click="saveAndApply"
           >
-            <Icon name="link" :size="36" color="#fff" />
+            <Icon name="link" :size="36" color="#000000" />
             <text>{{ isSending ? "发送中" : "发送" }}</text>
           </view>
         </view>
@@ -59,13 +58,13 @@
     <scroll-view
       v-if="reminderReady"
       scroll-y
-      class="content"
+      class="content glx-scroll-region glx-page-shell__content"
       :style="{ height: contentHeight }"
     >
-      <view class="content-wrapper">
-        <view class="card">
-          <view class="card-title-section">
-            <text class="card-title">提醒规则</text>
+      <view class="content-wrapper glx-scroll-stack">
+        <view class="card glx-panel-card">
+          <view class="card-title-section glx-panel-head">
+            <text class="card-title glx-panel-title">提醒规则</text>
           </view>
 
           <view class="form-row">
@@ -94,7 +93,7 @@
               <view
                 v-for="item in repeatModeOptions"
                 :key="item.value"
-                class="option-btn option-btn-small"
+                class="option-btn option-btn-small glx-feature-option"
                 :class="{ active: reminder.repeatMode === item.value }"
                 @click="reminder.repeatMode = item.value"
               >
@@ -104,9 +103,9 @@
           </view>
         </view>
 
-        <view class="card">
-          <view class="card-title-section">
-            <text class="card-title">展示内容</text>
+        <view class="card glx-panel-card">
+          <view class="card-title-section glx-panel-head">
+            <text class="card-title glx-panel-title">展示内容</text>
           </view>
 
           <view class="form-row">
@@ -115,7 +114,7 @@
               <view
                 v-for="item in contentTypeOptions"
                 :key="item.value"
-                class="option-btn"
+                class="option-btn glx-feature-option"
                 :class="{ active: reminder.contentType === item.value }"
                 @click="handleContentTypeChange(item.value)"
               >
@@ -135,9 +134,9 @@
           </view>
         </view>
 
-        <view v-if="reminder.contentType === 'text'" class="card">
-          <view class="card-title-section">
-            <text class="card-title">文字样式</text>
+        <view v-if="reminder.contentType === 'text'" class="card glx-panel-card">
+          <view class="card-title-section glx-panel-head">
+            <text class="card-title glx-panel-title">文字样式</text>
           </view>
           <view class="piece-grid">
             <view
@@ -153,9 +152,9 @@
           </view>
         </view>
 
-        <view v-if="reminder.contentType === 'static'" class="card">
-          <view class="card-title-section">
-            <text class="card-title">静态样式</text>
+        <view v-if="reminder.contentType === 'static'" class="card glx-panel-card">
+          <view class="card-title-section glx-panel-head">
+            <text class="card-title glx-panel-title">静态样式</text>
           </view>
           <view class="piece-grid">
             <view
@@ -171,9 +170,9 @@
           </view>
         </view>
 
-        <view v-if="reminder.contentType === 'animation'" class="card">
-          <view class="card-title-section">
-            <text class="card-title">动图样式</text>
+        <view v-if="reminder.contentType === 'animation'" class="card glx-panel-card">
+          <view class="card-title-section glx-panel-head">
+            <text class="card-title glx-panel-title">动图样式</text>
           </view>
           <view class="piece-grid">
             <view
@@ -189,9 +188,9 @@
           </view>
         </view>
 
-        <view v-if="reminder.contentType !== 'text'" class="card">
-          <view class="card-title-section">
-            <text class="card-title">图标主题</text>
+        <view v-if="reminder.contentType !== 'text'" class="card glx-panel-card">
+          <view class="card-title-section glx-panel-head">
+            <text class="card-title glx-panel-title">图标主题</text>
           </view>
           <view class="icon-grid">
             <view
@@ -206,9 +205,9 @@
           </view>
         </view>
 
-        <view class="card">
-          <view class="card-title-section">
-            <text class="card-title">主题颜色</text>
+        <view class="card glx-panel-card">
+          <view class="card-title-section glx-panel-head">
+            <text class="card-title glx-panel-title">主题颜色</text>
           </view>
           <ColorPanelPicker
             :value="reminder.accentColor"
@@ -341,36 +340,6 @@ export default {
       }
       return this.previewFrames[this.previewFrameIndex].pixels;
     },
-    previewCaptionText() {
-      if (!this.reminderReady || !this.reminder) {
-        return "加载完成后会展示提醒触发效果";
-      }
-      if (this.reminder.contentType === "text") {
-        return "先定时间，再看标题、信息条和文字节奏";
-      }
-      if (this.reminder.contentType === "static") {
-        return "适合节日、祝福和简洁整屏提醒";
-      }
-      return "适合庆祝、强调和提醒感更强的场景";
-    },
-    previewStatusLabel() {
-      if (this.isSending) {
-        return "发送中";
-      }
-      if (!this.previewCanvasReady || !this.reminderReady) {
-        return "加载中";
-      }
-      return "就绪";
-    },
-    previewStatusClass() {
-      if (this.isSending) {
-        return "is-sending";
-      }
-      if (!this.previewCanvasReady || !this.reminderReady) {
-        return "is-loading";
-      }
-      return "is-preview";
-    },
   },
   watch: {
     reminder: {
@@ -473,7 +442,7 @@ export default {
                 return;
               }
 
-              const fitZoom = Math.max(2, Math.floor((data.width * 0.92) / 64));
+              const fitZoom = Math.max(2, Math.floor((data.width * 0.96) / 64));
               this.previewContainerSize = {
                 width: data.width,
                 height: data.width,
@@ -594,48 +563,11 @@ export default {
   background-color: #1a1a1a;
 }
 
-.header {
-  height: 88rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0 32rpx;
-  background-color: var(--bg-elevated);
-  border-bottom: 2rpx solid var(--border-primary);
-  position: relative;
-  flex-shrink: 0;
-}
-
-.nav-left {
-  position: absolute;
-  left: 32rpx;
-  width: 80rpx;
-  height: 80rpx;
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-}
-
-.nav-title {
-  font-size: 32rpx;
-  font-weight: 600;
-  color: var(--color-text-primary);
-}
-
-.project-name {
-  font-size: 33rpx;
-  font-weight: 700;
-  color: var(--text-primary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .canvas-section {
   display: flex;
   flex-direction: column;
   background: #000000;
-  border-bottom: 2rpx solid var(--border-primary);
+  border-bottom: 2rpx solid var(--nb-ink);
   flex-shrink: 0;
 }
 
@@ -655,10 +587,9 @@ export default {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16rpx;
-  padding: 14rpx 20rpx 18rpx;
+  gap: 12rpx;
+  padding: 10rpx 16rpx 12rpx;
   background: var(--bg-tertiary);
-  border-bottom: 1rpx solid var(--border-color);
 }
 
 .preview-caption-info {
@@ -666,44 +597,13 @@ export default {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 4rpx;
-}
-
-.preview-status-chip {
-  display: inline-flex;
-  width: fit-content;
-  padding: 6rpx 12rpx;
-  border-radius: 999rpx;
-  background: rgba(255, 255, 255, 0.08);
-}
-
-.preview-status-chip.is-loading {
-  background: rgba(255, 214, 102, 0.14);
-}
-
-.preview-status-chip.is-preview {
-  background: rgba(79, 127, 255, 0.14);
-}
-
-.preview-status-chip.is-sending {
-  background: rgba(52, 211, 153, 0.16);
-}
-
-.preview-status-chip-text {
-  font-size: 20rpx;
-  font-weight: 600;
-  color: var(--text-secondary);
+  gap: 0;
 }
 
 .preview-caption-title {
   font-size: 24rpx;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--text-primary);
-}
-
-.preview-caption-text {
-  font-size: 22rpx;
-  color: var(--text-secondary);
 }
 
 .preview-actions {
@@ -722,15 +622,15 @@ export default {
   justify-content: center;
   padding: 0 18rpx;
   gap: 10rpx;
-  border-radius: 18rpx;
-  border: 2rpx solid var(--accent-primary);
-  background-color: var(--accent-primary);
+  border-radius: 0;
+  border: 2rpx solid var(--nb-ink);
+  background-color: var(--nb-yellow);
 }
 
 .action-btn-sm text {
   font-size: 24rpx;
   font-weight: 600;
-  color: #ffffff;
+  color: #000000;
 }
 
 .action-btn-sm.disabled {
@@ -751,7 +651,7 @@ export default {
 .sending-modal {
   min-width: 420rpx;
   padding: 60rpx 50rpx;
-  border-radius: 24rpx;
+  border-radius: 0;
   background: var(--bg-elevated);
   display: flex;
   flex-direction: column;
@@ -764,7 +664,7 @@ export default {
   height: 60rpx;
   border-radius: 50%;
   border: 6rpx solid rgba(79, 127, 255, 0.2);
-  border-top-color: var(--accent-primary);
+  border-top-color: var(--nb-yellow);
   animation: spin 0.8s linear infinite;
 }
 
@@ -791,15 +691,18 @@ export default {
   min-height: 0;
   box-sizing: border-box;
   background: var(--bg-tertiary);
-  padding: 20rpx;
+  padding: 16rpx 20rpx 0;
 }
 
 .content-wrapper {
-  padding-bottom: 48rpx;
+  padding: 0 0 56rpx;
 }
 
 .card {
-  padding-top: 20rpx;
+  padding-top: 16rpx;
+  border: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
 }
 
 .card-title-section {
@@ -807,7 +710,7 @@ export default {
   align-items: center;
   justify-content: space-between;
   gap: 8rpx;
-  margin-bottom: 16rpx;
+  margin-bottom: 14rpx;
 }
 
 .card-title {
@@ -817,7 +720,7 @@ export default {
 }
 
 .form-row {
-  margin-top: 18rpx;
+  margin-top: 16rpx;
 }
 
 .form-label {
@@ -828,11 +731,11 @@ export default {
 }
 
 .text-input {
-  margin-top: 10rpx;
+  margin-top: 8rpx;
   height: 72rpx;
-  border-radius: 16rpx;
+  border-radius: 0;
   background: var(--bg-tertiary);
-  border: 2rpx solid var(--border-primary);
+  border: 2rpx solid var(--nb-ink);
   padding: 0 20rpx;
   box-sizing: border-box;
   font-size: 26rpx;
@@ -840,15 +743,15 @@ export default {
 }
 
 .picker-field {
-  margin-top: 10rpx;
+  margin-top: 8rpx;
   height: 72rpx;
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 0 20rpx;
-  border-radius: 16rpx;
+  border-radius: 0;
   background: var(--bg-tertiary);
-  border: 2rpx solid var(--border-primary);
+  border: 2rpx solid var(--nb-ink);
 }
 
 .picker-value {
@@ -858,9 +761,9 @@ export default {
 }
 
 .option-row {
-  margin-top: 10rpx;
+  margin-top: 8rpx;
   display: flex;
-  gap: 16rpx;
+  gap: 12rpx;
 }
 
 .option-row-wrap {
@@ -873,9 +776,6 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 16rpx;
-  background: var(--bg-tertiary);
-  border: 2rpx solid var(--border-primary);
 }
 
 .option-btn-small {
@@ -887,24 +787,12 @@ export default {
 
 .option-btn text {
   font-size: 25rpx;
-  color: var(--text-secondary);
-}
-
-.option-btn.active {
-  background: rgba(79, 127, 255, 0.14);
-  border-color: var(--accent-primary);
-  box-shadow: 0 8rpx 18rpx rgba(79, 127, 255, 0.12);
-}
-
-.option-btn.active text {
-  color: var(--accent-primary);
-  font-weight: 600;
 }
 
 .piece-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 14rpx;
+  gap: 12rpx;
 }
 
 .piece-item {
@@ -914,15 +802,15 @@ export default {
   justify-content: center;
   gap: 8rpx;
   padding: 18rpx 16rpx;
-  border-radius: 16rpx;
+  border-radius: 0;
   background: var(--bg-tertiary);
-  border: 2rpx solid var(--border-primary);
+  border: 2rpx solid var(--nb-ink);
 }
 
 .piece-item.active {
-  background: rgba(79, 127, 255, 0.14);
-  border-color: var(--accent-primary);
-  box-shadow: 0 8rpx 18rpx rgba(79, 127, 255, 0.12);
+  background: var(--nb-yellow);
+  border-color: var(--nb-ink);
+  box-shadow: none;
 }
 
 .piece-name {
@@ -940,7 +828,7 @@ export default {
 .icon-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 14rpx;
+  gap: 12rpx;
 }
 
 .icon-item {
@@ -949,14 +837,14 @@ export default {
   align-items: center;
   justify-content: center;
   padding: 12rpx;
-  border-radius: 16rpx;
+  border-radius: 0;
   background: var(--bg-tertiary);
-  border: 2rpx solid var(--border-primary);
+  border: 2rpx solid var(--nb-ink);
 }
 
 .icon-item.active {
-  background: rgba(79, 127, 255, 0.14);
-  border-color: var(--accent-primary);
+  background: var(--nb-yellow);
+  border-color: var(--nb-ink);
 }
 
 .icon-item-name {

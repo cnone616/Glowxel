@@ -1,20 +1,19 @@
 <template>
-  <view class="effect-page">
+  <view class="effect-page glx-page-shell">
     <!-- #ifdef MP-WEIXIN -->
     <view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
     <!-- #endif -->
 
-    <view class="header">
+    <view class="navbar glx-topbar glx-page-shell__fixed">
       <view class="nav-left" @click="handleBack">
         <Icon
           name="direction-left"
           :size="32"
-          color="var(--color-text-primary)"
+          color="var(--nb-ink)"
         />
       </view>
-      <view class="nav-title">
-        <text class="project-name">{{ pageTitle }}</text>
-      </view>
+      <text class="nav-title glx-topbar__title">{{ pageTitle }}</text>
+      <view class="nav-right"></view>
     </view>
 
     <view class="canvas-section">
@@ -39,29 +38,29 @@
         v-else
         class="preview-canvas-container preview-canvas-placeholder"
       ></view>
-      <view class="preview-caption">
-        <view class="preview-caption-info">
+      <view class="preview-caption glx-preview-panel">
+        <view class="preview-caption-info glx-preview-panel__info">
           <text class="preview-title">预览效果</text>
         </view>
         <view class="preview-actions">
           <view
-            class="action-btn-sm primary"
+            class="action-btn-sm primary glx-primary-action"
             :class="{ disabled: isSending }"
             @click="saveAndApply"
           >
-            <Icon name="link" :size="36" color="#fff" />
+            <Icon name="link" :size="36" color="#000000" />
             <text>{{ isSending ? "发送中" : "发送" }}</text>
           </view>
         </view>
       </view>
     </view>
 
-    <scroll-view scroll-y class="content" :style="{ height: contentHeight }">
-      <view class="content-wrapper">
-      <view v-if="effectType === 'text_display'" class="card">
-        <view class="card-title-section">
-          <text class="card-title">像素信息屏</text>
-        </view>
+    <scroll-view scroll-y class="content glx-scroll-region glx-page-shell__content" :style="{ height: contentHeight }">
+      <view class="content-wrapper glx-scroll-stack">
+        <view v-if="effectType === 'text_display'" class="card glx-panel-card">
+          <view class="card-title-section glx-panel-head">
+            <text class="card-title glx-panel-title">像素信息屏</text>
+          </view>
 
         <view class="piece-grid">
           <view
@@ -92,7 +91,7 @@
             <view
               v-for="item in textFontOptions"
               :key="item.value"
-              class="option-btn"
+                class="option-btn glx-feature-option"
               :class="{ active: textConfig.font === item.value }"
               @click="handleTextFontSelect(item.value)"
             >
@@ -107,7 +106,7 @@
             <view
               v-for="item in directionOptions"
               :key="item.value"
-              class="option-btn"
+                class="option-btn glx-feature-option"
               :class="{ active: textConfig.direction === item.value }"
               @click="handleTextDirectionSelect(item.value)"
             >
@@ -127,35 +126,17 @@
 
         <view class="form-row">
           <text class="form-label">速度 {{ textConfig.speed }}</text>
-          <slider
-            :value="textConfig.speed"
-            min="1"
-            max="10"
-            activeColor="#4F7FFF"
-            @change="handleTextSpeedChange"
-          />
+          <GlxSlider :value="textConfig.speed" :min="1" :max="10" :step="1" @change="handleTextSpeedChange" />
         </view>
 
         <view class="form-row">
           <text class="form-label">X 坐标 {{ textConfig.x }}</text>
-          <slider
-            :value="textConfig.x"
-            min="-64"
-            max="64"
-            activeColor="#4F7FFF"
-            @change="handleTextXChange"
-          />
+          <GlxSlider :value="textConfig.x" :min="-64" :max="64" :step="1" @change="handleTextXChange" />
         </view>
 
         <view class="form-row">
           <text class="form-label">Y 坐标 {{ textConfig.y }}</text>
-          <slider
-            :value="textConfig.y"
-            min="0"
-            max="64"
-            activeColor="#4F7FFF"
-            @change="handleTextYChange"
-          />
+          <GlxSlider :value="textConfig.y" :min="0" :max="64" :step="1" @change="handleTextYChange" />
         </view>
 
         <view class="form-row">
@@ -177,12 +158,12 @@
             @input="handleTextBgColorSelect"
           />
         </view>
-      </view>
-
-      <view v-if="effectType === 'breath_effect'" class="card">
-        <view class="card-title-section">
-          <text class="card-title">矩阵流光</text>
         </view>
+
+        <view v-if="effectType === 'breath_effect'" class="card glx-panel-card">
+          <view class="card-title-section glx-panel-head">
+            <text class="card-title glx-panel-title">矩阵流光</text>
+          </view>
 
         <view class="piece-grid">
           <view
@@ -202,7 +183,7 @@
             <view
               v-for="item in ringMotionOptions"
               :key="item.value"
-              class="option-btn option-btn-small"
+              class="option-btn option-btn-small glx-feature-option"
               :class="{ active: breathConfig.motion === item.value }"
               @click="handleBreathMotionSelect(item.value)"
             >
@@ -226,7 +207,7 @@
             <view
               v-for="item in ringScopeOptions"
               :key="item.value"
-              class="option-btn"
+              class="option-btn glx-feature-option"
               :class="{ active: breathConfig.scope === item.value }"
               @click="handleBreathScopeSelect(item.value)"
             >
@@ -241,7 +222,7 @@
             <view
               v-for="item in ringColorModeOptions"
               :key="item.value"
-              class="option-btn"
+              class="option-btn glx-feature-option"
               :class="{ active: breathConfig.colorMode === item.value }"
               @click="handleBreathColorModeSelect(item.value)"
             >
@@ -252,13 +233,7 @@
 
         <view class="form-row">
           <text class="form-label">速度 {{ breathConfig.speed }}</text>
-          <slider
-            :value="breathConfig.speed"
-            min="1"
-            max="10"
-            activeColor="#4F7FFF"
-            @change="handleBreathSpeedChange"
-          />
+          <GlxSlider :value="breathConfig.speed" :min="1" :max="10" :step="1" @change="handleBreathSpeedChange" />
         </view>
 
         <view class="form-row">
@@ -283,12 +258,12 @@
             @input="handleBreathColorBSelect"
           />
         </view>
-      </view>
-
-      <view v-if="effectType === 'rhythm_effect'" class="card">
-        <view class="card-title-section">
-          <text class="card-title">音频频谱</text>
         </view>
+
+        <view v-if="effectType === 'rhythm_effect'" class="card glx-panel-card">
+          <view class="card-title-section glx-panel-head">
+            <text class="card-title glx-panel-title">音频频谱</text>
+          </view>
 
         <view class="piece-grid">
           <view
@@ -308,7 +283,7 @@
             <view
               v-for="item in rhythmModeOptions"
               :key="item.value"
-              class="option-btn"
+              class="option-btn glx-feature-option"
               :class="{ active: rhythmConfig.mode === item.value }"
               @click="handleRhythmModeSelect(item.value)"
             >
@@ -323,7 +298,7 @@
             <view
               v-for="item in directionOptions"
               :key="item.value"
-              class="option-btn"
+              class="option-btn glx-feature-option"
               :class="{ active: rhythmConfig.direction === item.value }"
               @click="handleRhythmDirectionSelect(item.value)"
             >
@@ -343,35 +318,17 @@
 
         <view class="form-row">
           <text class="form-label">BPM {{ rhythmConfig.bpm }}</text>
-          <slider
-            :value="rhythmConfig.bpm"
-            min="40"
-            max="240"
-            activeColor="#4F7FFF"
-            @change="handleRhythmBpmChange"
-          />
+          <GlxSlider :value="rhythmConfig.bpm" :min="40" :max="240" :step="1" @change="handleRhythmBpmChange" />
         </view>
 
         <view class="form-row">
           <text class="form-label">速度 {{ rhythmConfig.speed }}</text>
-          <slider
-            :value="rhythmConfig.speed"
-            min="1"
-            max="10"
-            activeColor="#4F7FFF"
-            @change="handleRhythmSpeedChange"
-          />
+          <GlxSlider :value="rhythmConfig.speed" :min="1" :max="10" :step="1" @change="handleRhythmSpeedChange" />
         </view>
 
         <view class="form-row">
           <text class="form-label">强度 {{ rhythmConfig.strength }}%</text>
-          <slider
-            :value="rhythmConfig.strength"
-            min="0"
-            max="100"
-            activeColor="#4F7FFF"
-            @change="handleRhythmStrengthChange"
-          />
+          <GlxSlider :value="rhythmConfig.strength" :min="0" :max="100" :step="1" @change="handleRhythmStrengthChange" />
         </view>
 
         <view class="form-row">
@@ -393,7 +350,7 @@
             @input="handleRhythmColorBSelect"
           />
         </view>
-      </view>
+        </view>
       </view>
     </scroll-view>
 
@@ -422,6 +379,7 @@ import Icon from "../../components/Icon.vue";
 import Toast from "../../components/Toast.vue";
 import PixelCanvas from "../../components/PixelCanvas.vue";
 import ColorPanelPicker from "../../components/ColorPanelPicker.vue";
+import GlxSlider from "../../components/GlxSlider.vue";
 import { useDeviceStore } from "../../store/device.js";
 import { useToast } from "../../composables/useToast.js";
 import { uploadAnimationFrames } from "../../utils/animationUploader.js";
@@ -544,6 +502,7 @@ export default {
     Toast,
     PixelCanvas,
     ColorPanelPicker,
+    GlxSlider,
   },
   data() {
     return {
@@ -1105,7 +1064,7 @@ export default {
                 this.previewCanvasReady = true;
                 return;
               }
-              const fitZoom = Math.max(2, Math.floor((data.width * 0.92) / 64));
+              const fitZoom = Math.max(2, Math.floor((data.width * 0.96) / 64));
               this.previewContainerSize = {
                 width: data.width,
                 height: data.width,
@@ -1711,43 +1670,6 @@ export default {
   background-color: #1a1a1a;
 }
 
-.header {
-  height: 88rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0 32rpx;
-  background-color: var(--bg-elevated);
-  border-bottom: 2rpx solid var(--border-primary);
-  position: relative;
-  flex-shrink: 0;
-}
-
-.nav-left {
-  position: absolute;
-  left: 32rpx;
-  width: 80rpx;
-  height: 80rpx;
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-}
-
-.nav-title {
-  font-size: 32rpx;
-  font-weight: 600;
-  color: var(--color-text-primary);
-}
-
-.project-name {
-  font-size: 33rpx;
-  font-weight: 700;
-  color: var(--text-primary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .action-btn-sm {
   width: auto;
   min-width: 88rpx;
@@ -1758,14 +1680,14 @@ export default {
   justify-content: center;
   gap: 8rpx;
   padding: 0 16rpx;
-  border-radius: 14rpx;
-  border: 2rpx solid var(--border-primary);
+  border-radius: 0;
+  border: 2rpx solid var(--nb-ink);
   background-color: var(--bg-tertiary);
 }
 
 .action-btn-sm.primary {
-  border-color: var(--accent-primary);
-  background: var(--accent-primary);
+  border-color: var(--nb-yellow);
+  background: var(--nb-yellow);
 }
 
 .action-btn-sm.disabled {
@@ -1782,7 +1704,7 @@ export default {
   display: flex;
   flex-direction: column;
   background: #000000;
-  border-bottom: 2rpx solid var(--border-primary);
+  border-bottom: 2rpx solid var(--nb-ink);
   flex-shrink: 0;
 }
 
@@ -1802,10 +1724,9 @@ export default {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16rpx;
-  padding: 14rpx 20rpx 18rpx;
+  gap: 12rpx;
+  padding: 10rpx 16rpx 12rpx;
   background: var(--bg-tertiary);
-  border-bottom: 1rpx solid var(--border-color);
 }
 
 .preview-caption-info {
@@ -1813,12 +1734,12 @@ export default {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 4rpx;
+  gap: 0;
 }
 
 .preview-title {
   font-size: 24rpx;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--text-primary);
 }
 
@@ -1835,7 +1756,7 @@ export default {
   height: 64rpx;
   padding: 0 18rpx;
   gap: 10rpx;
-  border-radius: 18rpx;
+  border-radius: 0;
 }
 
 .preview-actions .action-btn-sm text {
@@ -1851,7 +1772,7 @@ export default {
 }
 
 .preview-actions .action-btn-sm.primary text {
-  color: #ffffff;
+  color: #000000;
 }
 
 .sending-overlay {
@@ -1867,7 +1788,7 @@ export default {
 .sending-modal {
   min-width: 420rpx;
   padding: 60rpx 50rpx;
-  border-radius: 24rpx;
+  border-radius: 0;
   background: var(--bg-elevated);
   display: flex;
   flex-direction: column;
@@ -1880,7 +1801,7 @@ export default {
   height: 60rpx;
   border-radius: 50%;
   border: 6rpx solid rgba(79, 127, 255, 0.2);
-  border-top-color: var(--accent-primary);
+  border-top-color: var(--nb-yellow);
   animation: spin 0.8s linear infinite;
 }
 
@@ -1907,15 +1828,18 @@ export default {
   min-height: 0;
   box-sizing: border-box;
   background: var(--bg-tertiary);
-  padding: 20rpx;
+  padding: 16rpx 20rpx 0;
 }
 
 .content-wrapper {
-  padding-bottom: 48rpx;
+  padding: 0 0 56rpx;
 }
 
 .card {
-  padding-top: 20rpx;
+  padding-top: 16rpx;
+  border: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
 }
 
 .card-title-section {
@@ -1923,7 +1847,7 @@ export default {
   align-items: center;
   justify-content: flex-start;
   gap: 8rpx;
-  margin-bottom: 16rpx;
+  margin-bottom: 14rpx;
 }
 
 .card-title {
@@ -1933,7 +1857,7 @@ export default {
 }
 
 .form-row {
-  margin-top: 18rpx;
+  margin-top: 16rpx;
 }
 
 .inline-row {
@@ -1950,11 +1874,11 @@ export default {
 }
 
 .text-input {
-  margin-top: 10rpx;
+  margin-top: 8rpx;
   height: 72rpx;
-  border-radius: 16rpx;
+  border-radius: 0;
   background: var(--bg-tertiary);
-  border: 2rpx solid var(--border-primary);
+  border: 2rpx solid var(--nb-ink);
   padding: 0 20rpx;
   box-sizing: border-box;
   font-size: 26rpx;
@@ -1962,9 +1886,9 @@ export default {
 }
 
 .option-row {
-  margin-top: 10rpx;
+  margin-top: 8rpx;
   display: flex;
-  gap: 16rpx;
+  gap: 12rpx;
 }
 
 .option-row-wrap {
@@ -1977,9 +1901,6 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 16rpx;
-  background: var(--bg-tertiary);
-  border: 2rpx solid var(--border-primary);
   transition: all 0.2s;
 }
 
@@ -1992,18 +1913,7 @@ export default {
 
 .option-btn text {
   font-size: 25rpx;
-  color: var(--text-secondary);
-}
-
-.option-btn.active {
-  background: rgba(79, 127, 255, 0.14);
-  border-color: var(--accent-primary);
-  box-shadow: 0 8rpx 18rpx rgba(79, 127, 255, 0.12);
-}
-
-.option-btn.active text {
-  color: var(--accent-primary);
-  font-weight: 600;
+  font-size: 26rpx;
 }
 
 .toggle-switch {
@@ -2013,8 +1923,8 @@ export default {
 .switch-track {
   width: 88rpx;
   height: 48rpx;
-  border-radius: 24rpx;
-  background: var(--border-primary);
+  border-radius: 0;
+  background: var(--nb-ink);
   display: flex;
   align-items: center;
   padding: 4rpx;
@@ -2022,13 +1932,13 @@ export default {
 }
 
 .switch-track.active {
-  background: var(--accent-primary);
+  background: var(--nb-yellow);
 }
 
 .switch-thumb {
   width: 40rpx;
   height: 40rpx;
-  border-radius: 20rpx;
+  border-radius: 0;
   background: #fff;
   transition: all 0.3s;
   box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.15);
@@ -2041,7 +1951,7 @@ export default {
 .piece-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 14rpx;
+  gap: 12rpx;
 }
 
 .piece-item {
@@ -2050,17 +1960,17 @@ export default {
   justify-content: center;
   min-height: 76rpx;
   padding: 18rpx 10rpx;
-  border-radius: 16rpx;
+  border-radius: 0;
   background: var(--bg-tertiary);
-  border: 2rpx solid var(--border-primary);
+  border: 2rpx solid var(--nb-ink);
   box-sizing: border-box;
   transition: all 0.2s;
 }
 
 .piece-item.active {
-  background: rgba(79, 127, 255, 0.14);
-  border-color: var(--accent-primary);
-  box-shadow: 0 8rpx 18rpx rgba(79, 127, 255, 0.12);
+  background: var(--nb-yellow);
+  border-color: var(--nb-ink);
+  box-shadow: none;
 }
 
 .piece-name {
@@ -2072,7 +1982,8 @@ export default {
 }
 
 .piece-item.active .piece-name {
-  color: var(--accent-primary);
+  color: #000000;
+  font-weight: 700;
 }
 
 </style>

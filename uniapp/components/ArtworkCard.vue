@@ -1,5 +1,5 @@
 <template>
-  <view class="artwork-card" @click="handleClick" v-if="artwork && typeof artwork === 'object'">
+  <view class="artwork-card glx-panel-card" @click="handleClick" v-if="artwork && typeof artwork === 'object'">
     <!-- 作品图片 -->
     <view class="artwork-image-container">
       <image 
@@ -124,23 +124,23 @@ export default {
 
 <style scoped>
 .artwork-card {
-  background-color: var(--color-card-background);
-  border-radius: var(--radius-medium);
-  box-shadow: var(--shadow-card);
+  background-color: var(--nb-surface);
+  border-radius: 0;
+  box-shadow: var(--nb-shadow-strong);
   overflow: hidden;
   transition: all 0.2s ease;
 }
 
 .artwork-card:active {
-  transform: scale(0.98);
-  box-shadow: var(--shadow-floating);
+  transform: translate(4rpx, 4rpx);
+  box-shadow: 2rpx 2rpx 0 var(--nb-ink);
 }
 
 .artwork-image-container {
   position: relative;
   width: 100%;
   height: 320rpx;
-  background-color: var(--color-app-background);
+  background-color: var(--nb-paper);
 }
 
 .artwork-image {
@@ -157,7 +157,7 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: var(--color-app-background);
+  background-color: var(--nb-paper);
 }
 
 .artwork-info {
@@ -166,8 +166,8 @@ export default {
 
 .artwork-title {
   font-size: 28rpx;
-  font-weight: 600;
-  color: var(--color-text-primary);
+  font-weight: 900;
+  color: var(--nb-ink);
   line-height: 1.4;
   margin-bottom: 16rpx;
   display: -webkit-box;
@@ -185,7 +185,7 @@ export default {
 
 .author-name {
   font-size: 24rpx;
-  color: var(--color-text-secondary);
+  color: #4a4a4a;
   flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -211,18 +211,12 @@ export default {
 
 .stat-text {
   font-size: 22rpx;
-  color: var(--color-text-secondary);
-  font-weight: 500;
+  color: #4a4a4a;
+  font-weight: 800;
 }
 
 /* 点赞动画 */
 .stat-item:first-child:active {
-  animation: likeAnimation 0.3s ease;
-}
-
-@keyframes likeAnimation {
-  0% { transform: scale(1); }
-  50% { transform: scale(1.2); }
-  100% { transform: scale(1); }
+  transform: translate(2rpx, 2rpx);
 }
 </style>

@@ -14,7 +14,8 @@ export const useDeviceStore = defineStore('device', {
     deviceMode: 'clock', // 前端当前工作模式
     lastBusinessMode: 'clock',
     isLoading: false,
-    error: null
+    error: null,
+    statusSyncInFlight: false
   }),
 
   getters: {
@@ -24,6 +25,53 @@ export const useDeviceStore = defineStore('device', {
   },
 
   actions: {
+    isDeviceStatusPayload(data) {
+      if (!data || typeof data !== 'object') {
+        return false
+      }
+
+      return (
+        data.status === 'ok' &&
+        typeof data.ip === 'string' &&
+        typeof data.width === 'number' &&
+        typeof data.height === 'number' &&
+        typeof data.brightness === 'number' &&
+        typeof data.mode === 'string'
+      )
+    },
+
+    async syncDeviceStatus() {
+      if (!this.webSocket || !this.connected || this.statusSyncInFlight) {
+        return
+      }
+
+      this.statusSyncInFlight = true
+      try {
+        const status = await this.webSocket.getStatus()
+        if (!this.connected) {
+          return
+        }
+        if (!this.isDeviceStatusPayload(status)) {
+          return
+        }
+
+        this.deviceInfo = status
+        const resolvedMode = this.resolveDeviceModeFromStatus(status)
+        if (resolvedMode) {
+          this.deviceMode = resolvedMode
+          uni.setStorageSync(DEVICE_MODE_KEY, resolvedMode)
+          if (resolvedMode !== 'canvas') {
+            this.lastBusinessMode = resolvedMode
+            uni.setStorageSync(DEVICE_LAST_BUSINESS_MODE_KEY, resolvedMode)
+          }
+        }
+      } catch (err) {
+        console.error('同步设备状态失败:', err)
+      } finally {
+        this.statusSyncInFlight = false
+      }
+    },
+
     resolveDeviceModeFromStatus(data) {
       if (!data || typeof data !== 'object') {
         return null
@@ -99,6 +147,7 @@ export const useDeviceStore = defineStore('device', {
       this.webSocket.onDisconnect(() => {
         this.connected = false
         this.deviceInfo = null
+        this.statusSyncInFlight = false
       })
 
       this.webSocket.onError((err) => {
@@ -106,12 +155,24 @@ export const useDeviceStore = defineStore('device', {
       })
 
       this.webSocket.onMessage((data) => {
-        if (data.status === 'ok') {
-          this.deviceInfo = data
-        }
         if (data.status === 'connected') {
+          const resolvedMode = this.resolveDeviceModeFromStatus(data)
+          if (resolvedMode) {
+            this.deviceMode = resolvedMode
+            uni.setStorageSync(DEVICE_MODE_KEY, resolvedMode)
+            if (resolvedMode !== 'canvas') {
+              this.lastBusinessMode = resolvedMode
+              uni.setStorageSync(DEVICE_LAST_BUSINESS_MODE_KEY, resolvedMode)
+            }
+          }
+          this.syncDeviceStatus()
+          return
+        }
+
+        if (this.isDeviceStatusPayload(data)) {
           this.deviceInfo = data
         }
+
         const resolvedMode = this.resolveDeviceModeFromStatus(data)
         if (resolvedMode) {
           this.deviceMode = resolvedMode
@@ -160,13 +221,6 @@ export const useDeviceStore = defineStore('device', {
 
       try {
         await this.webSocket.connect(ip)
-        setTimeout(async () => {
-          try {
-            await this.webSocket.getStatus()
-          } catch (statusErr) {
-            console.warn('后台获取设备状态失败:', statusErr)
-          }
-        }, 800)
         return { success: true }
       } catch (err) {
         console.error('连接失败:', err)
@@ -181,6 +235,7 @@ export const useDeviceStore = defineStore('device', {
       }
       this.connected = false
       this.deviceInfo = null
+      this.statusSyncInFlight = false
     },
 
     // 发送图片数据到设备（画板模式）

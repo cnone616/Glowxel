@@ -1,18 +1,18 @@
 <template>
-  <view class="user-detail-page">
+  <view class="user-detail-page glx-page-shell">
     <!-- 状态栏占位 -->
     <!-- #ifdef MP-WEIXIN -->
     <view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
     <!-- #endif -->
     
     <!-- 顶部导航 -->
-    <view class="header">
+    <view class="header glx-topbar glx-page-shell__fixed">
       <view class="header-content">
         <view class="back-btn" @click="handleBack">
-          <Icon name="direction-left" :size="40" color="#FFFFFF" />
+          <Icon name="direction-left" :size="32" color="var(--nb-ink)" />
         </view>
-        <text class="header-title">用户详情</text>
-        <view class="more-btn" @click="showMoreActions">
+        <text class="header-title glx-topbar__title">用户详情</text>
+        <view class="more-btn glx-cta-button" @click="showMoreActions">
           <Icon name="more-horizontal" :size="40" color="#FFFFFF" />
         </view>
       </view>
@@ -21,14 +21,14 @@
     <!-- 主要内容 -->
     <scroll-view 
       scroll-y 
-      class="main-content"
+      class="main-content glx-scroll-region glx-page-shell__content"
       :refresher-enabled="true"
       :refresher-triggered="isRefreshing"
       @refresherrefresh="handleRefresh"
     >
       <!-- 用户信息卡片 -->
       <view class="user-info-section">
-        <view class="user-card">
+        <view class="user-card glx-panel-card">
           <!-- 用户头像和基本信息 -->
           <view class="user-basic">
             <Avatar :src="userInfo.avatar" :size="120" />
@@ -65,7 +65,7 @@
           <view class="user-actions">
             <view 
               v-if="!isCurrentUser"
-              class="follow-btn"
+              class="follow-btn glx-cta-button"
               :class="{ 'following': isFollowing }"
               @click="toggleFollow"
             >
@@ -75,12 +75,12 @@
               </text>
             </view>
             
-            <view class="message-btn" @click="sendMessage">
+            <view class="message-btn glx-action-tile" @click="sendMessage">
               <Icon name="comment" :size="32" color="#666666" />
               <text class="message-text">私信</text>
             </view>
             
-            <view class="share-btn" @click="shareUser">
+            <view class="share-btn glx-action-tile" @click="shareUser">
               <Icon name="share" :size="32" color="#666666" />
               <text class="share-text">分享</text>
             </view>
@@ -94,7 +94,7 @@
           <view 
             v-for="(category, index) in categories" 
             :key="category.key"
-            class="tab-item"
+            class="tab-item glx-choice-chip"
             :class="{ 'active': activeCategory === category.key }"
             @click="switchCategory(category.key)"
           >
@@ -106,7 +106,7 @@
       
       <!-- 作品列表 -->
       <view class="works-section">
-        <view v-if="filteredWorks.length === 0 && !isLoading" class="empty-state">
+        <view v-if="filteredWorks.length === 0 && !isLoading" class="empty-state glx-panel-card">
           <view class="empty-icon">
             <Icon name="picture" :size="80" color="#AAAAAA" />
           </view>
@@ -505,7 +505,7 @@ export default {
   height: 100vh;
   display: flex;
   flex-direction: column;
-  background-color: var(--color-app-background);
+  background-color: var(--nb-paper);
 }
 
 /* 状态栏占位 */
@@ -533,7 +533,7 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: var(--radius-medium);
+  border-radius: 0;
   transition: all 0.2s ease;
 }
 
@@ -564,9 +564,9 @@ export default {
 
 .user-card {
   background-color: rgba(255, 255, 255, 0.1);
-  border-radius: var(--radius-large);
+  border-radius: 0;
   padding: 32rpx;
-  backdrop-filter: blur(10rpx);
+  backdrop-filter: none;
 }
 
 .user-basic {
@@ -653,39 +653,45 @@ export default {
   justify-content: center;
   gap: 8rpx;
   padding: 20rpx;
-  border-radius: var(--radius-medium);
+  border-radius: 0;
   transition: all 0.2s ease;
 }
 
 .follow-btn {
-  background-color: var(--color-brand-primary);
+  background-color: var(--nb-yellow);
+  border: 2rpx solid var(--nb-ink);
 }
 
 .follow-btn.following {
-  background-color: rgba(255, 255, 255, 0.2);
+  background-color: #111111;
 }
 
 .message-btn, .share-btn {
-  background-color: rgba(255, 255, 255, 0.1);
+  background-color: #ffffff;
+  border: 2rpx solid var(--nb-ink);
 }
 
 .follow-btn:active, .message-btn:active, .share-btn:active {
-  transform: scale(0.95);
+  transform: translate(2rpx, 2rpx);
 }
 
 .follow-text, .message-text, .share-text {
   font-size: 26rpx;
   font-weight: 500;
-  color: #FFFFFF;
+  color: #000000;
+}
+
+.follow-btn.following .follow-text {
+  color: #ffffff;
 }
 
 /* 分类标签 */
 .category-section {
-  background-color: var(--color-card-background);
+  background-color: var(--nb-surface);
   margin: -24rpx 32rpx 32rpx;
-  border-radius: var(--radius-large);
+  border-radius: 0;
   padding: 32rpx;
-  box-shadow: var(--shadow-card);
+  box-shadow: var(--nb-shadow-strong);
 }
 
 .category-tabs {
@@ -700,15 +706,15 @@ export default {
   justify-content: center;
   gap: 8rpx;
   padding: 16rpx 24rpx;
-  border-radius: var(--radius-medium);
-  background-color: var(--color-app-background);
-  border: 2rpx solid var(--border-primary);
+  border-radius: 0;
+  background-color: var(--nb-paper);
+  border: 2rpx solid var(--nb-ink);
   transition: all 0.2s ease;
 }
 
 .tab-item.active {
-  background-color: var(--color-brand-primary);
-  border-color: var(--color-brand-primary);
+  background-color: var(--nb-yellow);
+  border-color: var(--nb-ink);
 }
 
 .tab-item:active {
@@ -718,22 +724,22 @@ export default {
 .tab-text {
   font-size: 26rpx;
   font-weight: 500;
-  color: var(--color-text-secondary);
+  color: #4a4a4a;
   white-space: nowrap;
 }
 
 .tab-item.active .tab-text {
-  color: #FFFFFF;
-  font-weight: 600;
+  color: #000000;
+  font-weight: 700;
 }
 
 .tab-count {
   font-size: 22rpx;
-  color: var(--color-text-disabled);
+  color: #777777;
 }
 
 .tab-item.active .tab-count {
-  color: rgba(255, 255, 255, 0.8);
+  color: rgba(0, 0, 0, 0.7);
 }
 
 /* 作品区域 */
@@ -763,7 +769,7 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: var(--color-app-background);
+  background-color: var(--nb-paper);
   border-radius: 50%;
   margin-bottom: 32rpx;
 }
@@ -771,13 +777,13 @@ export default {
 .empty-title {
   font-size: 32rpx;
   font-weight: 600;
-  color: var(--color-text-primary);
+  color: var(--nb-ink);
   margin-bottom: 12rpx;
 }
 
 .empty-subtitle {
   font-size: 26rpx;
-  color: var(--color-text-secondary);
+  color: #4a4a4a;
   line-height: 1.5;
 }
 
@@ -801,7 +807,7 @@ export default {
 
 .loading-text {
   font-size: 26rpx;
-  color: var(--color-text-secondary);
+  color: #4a4a4a;
 }
 
 .load-more-btn {
@@ -810,20 +816,20 @@ export default {
   justify-content: center;
   padding: 32rpx;
   margin: 32rpx 0;
-  background-color: var(--color-card-background);
-  border-radius: var(--radius-medium);
-  border: 2rpx solid var(--border-primary);
+  background-color: var(--nb-surface);
+  border-radius: 0;
+  border: 2rpx solid var(--nb-ink);
   transition: all 0.2s ease;
 }
 
 .load-more-btn:active {
   transform: scale(0.98);
-  background-color: var(--color-app-background);
+  background-color: var(--nb-paper);
 }
 
 .load-more-text {
   font-size: 28rpx;
-  color: var(--color-brand-primary);
+  color: var(--nb-yellow);
   font-weight: 500;
 }
 
@@ -836,7 +842,7 @@ export default {
 
 .no-more-text {
   font-size: 24rpx;
-  color: var(--color-text-disabled);
+  color: #777777;
 }
 
 /* 更多操作弹窗 */
@@ -853,11 +859,11 @@ export default {
 }
 
 .action-item:active {
-  background-color: var(--color-app-background);
+  background-color: var(--nb-paper);
 }
 
 .action-label {
   font-size: 32rpx;
-  color: var(--color-text-primary);
+  color: var(--nb-ink);
 }
 </style>

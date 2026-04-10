@@ -130,7 +130,7 @@ export default {
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(0, 0, 0, 0.7);
+  background-color: rgba(0, 0, 0, 0.45);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -141,10 +141,10 @@ export default {
 .modal-container {
   width: 100%;
   max-width: 600rpx;
-  background-color: var(--bg-elevated);
-  border: 2rpx solid var(--border-primary);
-  border-radius: 32rpx;
-  box-shadow: 0 16rpx 64rpx rgba(0, 0, 0, 0.5);
+  background-color: var(--nb-surface);
+  border: var(--nb-border-width-panel) solid var(--nb-ink);
+  border-radius: 0;
+  box-shadow: var(--nb-shadow-strong);
   overflow: hidden;
 }
 
@@ -153,13 +153,13 @@ export default {
   align-items: center;
   justify-content: space-between;
   padding: 32rpx 40rpx;
-  border-bottom: 2rpx solid var(--border-primary);
+  border-bottom: var(--nb-border-width-panel) solid var(--nb-ink);
 }
 
 .modal-title {
   font-size: 32rpx;
-  font-weight: 500;
-  color: var(--text-primary);
+  font-weight: 900;
+  color: var(--nb-ink);
 }
 
 .close-btn {
@@ -168,18 +168,21 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 12rpx;
+  border: var(--nb-border-width-control) solid var(--nb-ink);
+  border-radius: 0;
+  background: var(--nb-surface);
+  box-shadow: var(--nb-shadow-soft);
   transition: var(--transition-base);
 }
 
 .close-btn:active {
-  background-color: var(--bg-tertiary);
-  transform: scale(0.95);
+  background-color: var(--nb-paper);
+  transform: translate(2rpx, 2rpx);
 }
 
 .close-icon {
   font-size: 64rpx;
-  color: var(--text-secondary);
+  color: var(--nb-ink);
   line-height: 1;
 }
 
@@ -189,22 +192,22 @@ export default {
 
 .modal-description {
   font-size: 24rpx;
-  color: var(--text-secondary);
+  color: #4a4a4a;
   margin-bottom: 24rpx;
   display: block;
 }
 
 .input-wrapper {
-  background-color: var(--bg-secondary);
-  border: 2rpx solid var(--border-secondary);
-  border-radius: 16rpx;
+  background-color: #ffffff;
+  border: var(--nb-border-width-control) solid var(--nb-ink);
+  border-radius: 0;
   padding: 24rpx;
   transition: var(--transition-base);
 }
 
 .input-wrapper:focus-within {
-  border-color: var(--accent-primary);
-  box-shadow: 0 0 0 4rpx rgba(0, 243, 255, 0.1);
+  border-color: var(--nb-ink);
+  box-shadow: var(--nb-shadow-soft);
 }
 
 .json-input {
@@ -212,7 +215,7 @@ export default {
   min-height: 300rpx;
   max-height: 600rpx;
   font-size: 24rpx;
-  color: var(--text-primary);
+  color: var(--nb-ink);
   background-color: transparent;
   font-family: 'Courier New', monospace;
   line-height: 1.6;
@@ -222,49 +225,50 @@ export default {
   display: flex;
   gap: 16rpx;
   padding: 24rpx 40rpx 32rpx;
-  border-top: 2rpx solid var(--border-primary);
+  border-top: var(--nb-border-width-panel) solid var(--nb-ink);
 }
 
 .modal-btn {
   flex: 1;
-  height: 80rpx;
+  min-height: 88rpx;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 16rpx;
+  border-radius: 0;
   transition: var(--transition-base);
-  border: 2rpx solid var(--border-primary);
+  border: var(--nb-border-width-control) solid var(--nb-ink);
+  box-shadow: var(--nb-shadow-soft);
 }
 
 .modal-btn:active {
-  transform: scale(0.98);
+  transform: translate(2rpx, 2rpx);
+  box-shadow: none;
 }
 
 .cancel-btn {
-  background-color: var(--bg-tertiary);
+  background-color: var(--nb-surface);
 }
 
 .cancel-btn:active {
-  background-color: var(--bg-secondary);
+  background-color: var(--nb-paper);
 }
 
 .confirm-btn {
-  background-color: var(--accent-primary);
-  border-color: var(--accent-primary);
-  box-shadow: 0 4rpx 16rpx rgba(0, 243, 255, 0.3);
+  background-color: var(--nb-yellow);
+  border-color: var(--nb-ink);
 }
 
 .confirm-btn:active {
-  box-shadow: 0 2rpx 8rpx rgba(0, 243, 255, 0.2);
+  box-shadow: 1rpx 1rpx 0 var(--nb-ink);
 }
 
 .btn-text {
   font-size: 28rpx;
-  font-weight: 500;
-  color: var(--text-primary);
+  font-weight: 900;
+  color: var(--nb-ink);
 }
 
 .confirm-btn .btn-text {
-  color: #000000;
+  color: var(--nb-ink);
 }
 </style>

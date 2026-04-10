@@ -213,7 +213,7 @@ export default {
 }
 
 .comment:not(:last-child) {
-  border-bottom: 1rpx solid var(--border-primary);
+  border-bottom: 1rpx solid var(--nb-ink);
 }
 
 .comment-avatar {
@@ -236,18 +236,18 @@ export default {
 .username {
   font-size: 26rpx;
   font-weight: 600;
-  color: var(--color-text-primary);
+  color: var(--nb-ink);
 }
 
 .comment-time {
   font-size: 22rpx;
-  color: var(--color-text-disabled);
+  color: #777777;
   margin-left: auto;
 }
 
 .comment-text {
   font-size: 28rpx;
-  color: var(--color-text-primary);
+  color: var(--nb-ink);
   line-height: 1.6;
   margin-bottom: 12rpx;
   word-wrap: break-word;
@@ -263,32 +263,32 @@ export default {
 .comment-image {
   width: 120rpx;
   height: 120rpx;
-  border-radius: var(--radius-small);
-  background-color: var(--color-app-background);
+  border-radius: 0;
+  background-color: var(--nb-paper);
 }
 
 .reply-content {
-  background-color: var(--color-app-background);
+  background-color: var(--nb-paper);
   padding: 12rpx 16rpx;
-  border-radius: var(--radius-small);
+  border-radius: 0;
   margin-bottom: 12rpx;
-  border-left: 4rpx solid var(--color-brand-primary);
+  border-left: 4rpx solid var(--nb-yellow);
 }
 
 .reply-prefix {
   font-size: 24rpx;
-  color: var(--color-text-secondary);
+  color: #4a4a4a;
 }
 
 .reply-username {
   font-size: 24rpx;
-  color: var(--color-brand-primary);
+  color: var(--nb-yellow);
   font-weight: 500;
 }
 
 .reply-text {
   font-size: 24rpx;
-  color: var(--color-text-secondary);
+  color: #4a4a4a;
   line-height: 1.5;
 }
 
@@ -304,29 +304,29 @@ export default {
   align-items: center;
   gap: 8rpx;
   padding: 8rpx 12rpx;
-  border-radius: var(--radius-small);
+  border-radius: 0;
   transition: all 0.2s ease;
 }
 
 .action-item:active {
-  background-color: var(--color-app-background);
+  background-color: var(--nb-paper);
   transform: scale(0.95);
 }
 
 .action-text {
   font-size: 24rpx;
-  color: var(--color-text-secondary);
+  color: #4a4a4a;
   font-weight: 500;
 }
 
 .action-active {
-  color: var(--color-error);
+  color: var(--nb-coral);
 }
 
 .sub-comments {
   margin-top: 20rpx;
   padding-left: 20rpx;
-  border-left: 2rpx solid var(--border-primary);
+  border-left: 2rpx solid var(--nb-ink);
 }
 
 .expand-replies {
@@ -343,7 +343,7 @@ export default {
 
 .expand-text {
   font-size: 24rpx;
-  color: var(--color-brand-primary);
+  color: var(--nb-yellow);
   font-weight: 500;
 }
 

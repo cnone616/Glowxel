@@ -1,31 +1,31 @@
 <template>
-  <view class="gallery-page">
+  <view class="gallery-page glx-page-shell">
     <!-- 状态栏占位 -->
     <!-- #ifdef MP-WEIXIN -->
     <view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
     <!-- #endif -->
     
     <!-- 顶部导航 -->
-    <view class="header">
+    <view class="header glx-topbar glx-page-shell__fixed">
       <view class="header-content">
         <view class="back-btn" @click="handleBack">
-          <Icon name="direction-left" :size="40" color="#1F1F1F" />
+          <Icon name="direction-left" :size="32" color="var(--nb-ink)" />
         </view>
-        <text class="header-title">{{ pageTitle }}</text>
+        <text class="header-title glx-topbar__title">{{ pageTitle }}</text>
         <view class="header-placeholder"></view>
       </view>
       
       <!-- 分类标签 -->
       <view class="category-tabs">
         <view class="search-btn" @click="toggleSearch">
-          <Icon name="search" :size="40" color="#4F7FFF" />
+          <Icon name="search" :size="34" color="var(--nb-ink)" />
         </view>
         <scroll-view scroll-x class="tabs-scroll">
           <view class="tabs-container">
             <view 
               v-for="(category, index) in categories" 
               :key="category.key"
-              class="tab-item"
+            class="tab-item glx-choice-chip"
               :class="{ 'active': activeCategory === category.key }"
               @click="switchCategory(category.key)"
             >
@@ -37,8 +37,8 @@
     </view>
     
     <!-- 搜索栏（可展开） -->
-    <view v-if="showSearch" class="search-section">
-      <view class="search-input-wrapper">
+      <view v-if="showSearch" class="search-section glx-page-shell__fixed">
+      <view class="search-input-wrapper glx-search-shell">
         <Icon name="search" :size="32" color="#666666" />
         <input 
           v-model="searchTerm"
@@ -57,7 +57,7 @@
     <!-- 主要内容 -->
     <scroll-view 
       scroll-y 
-      class="main-content"
+      class="main-content glx-scroll-region glx-page-shell__content"
       @scrolltolower="loadMore"
       :refresher-enabled="true"
       :refresher-triggered="isRefreshing"
@@ -65,7 +65,7 @@
     >
       <!-- 内容列表 -->
       <view class="content-section">
-        <view v-if="filteredContent.length === 0 && !isLoading" class="empty-state">
+        <view v-if="filteredContent.length === 0 && !isLoading" class="empty-state glx-panel-card">
           <view class="empty-icon">
             <Icon name="picture" :size="80" color="#AAAAAA" />
           </view>
@@ -515,20 +515,20 @@ export default {
   height: 100vh;
   display: flex;
   flex-direction: column;
-  background-color: var(--color-app-background);
+  background-color: var(--nb-paper);
   overflow: hidden;
 }
 
 /* 状态栏占位 */
 .status-bar {
-  background-color: var(--color-card-background);
+  background-color: var(--nb-surface);
   flex-shrink: 0;
 }
 
 /* 顶部导航 */
 .header {
-  background-color: var(--color-card-background);
-  border-bottom: 1rpx solid var(--border-primary);
+  background-color: var(--nb-surface);
+  border-bottom: 1rpx solid var(--nb-ink);
   flex-shrink: 0;
 }
 
@@ -545,19 +545,19 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: var(--radius-medium);
+  border-radius: 0;
   transition: all 0.2s ease;
 }
 
 .back-btn:active {
   transform: scale(0.95);
-  background-color: var(--color-app-background);
+  background-color: var(--nb-paper);
 }
 
 .header-title {
   font-size: 36rpx;
   font-weight: 700;
-  color: var(--color-text-primary);
+  color: var(--nb-ink);
   flex: 1;
   text-align: center;
 }
@@ -572,24 +572,27 @@ export default {
   display: flex;
   align-items: center;
   gap: 16rpx;
-  padding: 0 32rpx 24rpx;
+  padding: 0 32rpx 12rpx;
 }
 
 .search-btn {
-  width: 80rpx;
-  height: 80rpx;
+  width: 72rpx;
+  height: 72rpx;
   flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: var(--radius-medium);
-  background-color: var(--color-app-background);
+  border-radius: 0;
+  background-color: var(--nb-surface);
+  border: 2rpx solid var(--nb-ink);
+  box-shadow: none;
+  box-sizing: border-box;
   transition: all 0.2s ease;
 }
 
 .search-btn:active {
-  transform: scale(0.95);
-  background-color: rgba(79, 127, 255, 0.1);
+  transform: translate(2rpx, 2rpx);
+  background-color: var(--nb-yellow);
 }
 
 .tabs-scroll {
@@ -605,15 +608,15 @@ export default {
 .tab-item {
   flex-shrink: 0;
   padding: 16rpx 24rpx;
-  border-radius: var(--radius-small);
-  background-color: var(--color-app-background);
-  border: 2rpx solid var(--border-primary);
+  border-radius: 0;
+  background-color: var(--nb-paper);
+  border: 2rpx solid var(--nb-ink);
   transition: all 0.2s ease;
 }
 
 .tab-item.active {
-  background-color: var(--color-brand-primary);
-  border-color: var(--color-brand-primary);
+  background-color: var(--nb-yellow);
+  border-color: var(--nb-ink);
 }
 
 .tab-item:active {
@@ -623,50 +626,50 @@ export default {
 .tab-text {
   font-size: 26rpx;
   font-weight: 500;
-  color: var(--color-text-secondary);
+  color: #4a4a4a;
   white-space: nowrap;
 }
 
 .tab-item.active .tab-text {
-  color: #FFFFFF;
-  font-weight: 600;
+  color: #000000;
+  font-weight: 700;
 }
 
 /* 搜索栏 */
 .search-section {
-  background-color: var(--color-card-background);
-  padding: 0 32rpx 24rpx;
-  border-bottom: 1rpx solid var(--border-primary);
+  background-color: var(--nb-surface);
+  padding: 0 32rpx 20rpx;
+  border-bottom: 1rpx solid var(--nb-ink);
 }
 
 .search-input-wrapper {
   display: flex;
   align-items: center;
   gap: 16rpx;
-  background-color: var(--color-app-background);
-  border-radius: var(--radius-medium);
+  background-color: var(--nb-paper);
+  border-radius: 0;
   padding: 20rpx 24rpx;
-  border: 2rpx solid var(--border-primary);
+  border: 2rpx solid var(--nb-ink);
   transition: all 0.2s ease;
   box-sizing: border-box; /* 修复溢出问题 */
 }
 
 .search-input-wrapper:focus-within {
-  border-color: var(--color-brand-primary);
-  box-shadow: 0 0 0 4rpx rgba(79, 127, 255, 0.1);
+  border-color: var(--nb-ink);
+  box-shadow: none;
 }
 
 .search-input {
   flex: 1;
   font-size: 28rpx;
-  color: var(--color-text-primary);
+  color: var(--nb-ink);
   background: transparent;
   border: none;
   outline: none;
 }
 
 .search-input::placeholder {
-  color: var(--color-text-disabled);
+  color: #777777;
 }
 
 .clear-btn {
@@ -675,13 +678,14 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 50%;
-  background-color: var(--color-app-background);
+  border-radius: 0;
+  background-color: var(--nb-paper);
+  border: 2rpx solid var(--nb-ink);
   transition: all 0.2s ease;
 }
 
 .clear-btn:active {
-  transform: scale(0.9);
+  transform: translate(2rpx, 2rpx);
 }
 
 /* 主要内容 */
@@ -718,7 +722,7 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: var(--color-app-background);
+  background-color: var(--nb-paper);
   border-radius: 50%;
   margin-bottom: 32rpx;
 }
@@ -726,13 +730,13 @@ export default {
 .empty-title {
   font-size: 32rpx;
   font-weight: 600;
-  color: var(--color-text-primary);
+  color: var(--nb-ink);
   margin-bottom: 12rpx;
 }
 
 .empty-subtitle {
   font-size: 26rpx;
-  color: var(--color-text-secondary);
+  color: #4a4a4a;
   line-height: 1.5;
 }
 
@@ -756,7 +760,7 @@ export default {
 
 .loading-text {
   font-size: 26rpx;
-  color: var(--color-text-secondary);
+  color: #4a4a4a;
 }
 
 .load-more-btn {
@@ -765,20 +769,20 @@ export default {
   justify-content: center;
   padding: 32rpx;
   margin: 32rpx 0;
-  background-color: var(--color-card-background);
-  border-radius: var(--radius-medium);
-  border: 2rpx solid var(--border-primary);
+  background-color: var(--nb-surface);
+  border-radius: 0;
+  border: 2rpx solid var(--nb-ink);
   transition: all 0.2s ease;
 }
 
 .load-more-btn:active {
   transform: scale(0.98);
-  background-color: var(--color-app-background);
+  background-color: var(--nb-paper);
 }
 
 .load-more-text {
   font-size: 28rpx;
-  color: var(--color-brand-primary);
+  color: var(--nb-yellow);
   font-weight: 500;
 }
 
@@ -791,6 +795,6 @@ export default {
 
 .no-more-text {
   font-size: 24rpx;
-  color: var(--color-text-disabled);
+  color: #777777;
 }
 </style>

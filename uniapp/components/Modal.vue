@@ -132,7 +132,7 @@ export default {
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(0, 0, 0, 0.5);
+  background-color: rgba(0, 0, 0, 0.45);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -142,9 +142,10 @@ export default {
 }
 
 .modal-container {
-  background-color: var(--color-card-background);
-  border-radius: var(--radius-large);
-  box-shadow: var(--shadow-modal);
+  background-color: var(--nb-surface);
+  border: var(--nb-border-width-panel) solid var(--nb-ink);
+  border-radius: 0;
+  box-shadow: var(--nb-shadow-strong);
   max-height: 80vh;
   overflow: hidden;
   display: flex;
@@ -191,14 +192,14 @@ export default {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 32rpx 32rpx 0;
+  padding: 28rpx 28rpx 0;
   flex-shrink: 0;
 }
 
 .modal-title {
   font-size: 36rpx;
-  font-weight: 600;
-  color: var(--color-text-primary);
+  font-weight: 900;
+  color: var(--nb-ink);
   flex: 1;
 }
 
@@ -208,26 +209,29 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: var(--radius-medium);
+  border: var(--nb-border-width-control) solid var(--nb-ink);
+  background: var(--nb-surface);
+  box-shadow: var(--nb-shadow-soft);
+  border-radius: 0;
   transition: all 0.2s ease;
   margin-left: 16rpx;
 }
 
 .close-btn:active {
-  transform: scale(0.95);
-  background-color: var(--color-app-background);
+  transform: translate(2rpx, 2rpx);
+  background-color: var(--nb-paper);
 }
 
 /* 内容 */
 .modal-body {
-  padding: 32rpx;
+  padding: 28rpx;
   flex: 1;
   overflow-y: auto;
 }
 
 /* 底部 */
 .modal-footer {
-  padding: 0 32rpx 32rpx;
+  padding: 0 28rpx 28rpx;
   flex-shrink: 0;
   display: flex;
   gap: 16rpx;

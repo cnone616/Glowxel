@@ -12,7 +12,7 @@
 
     <view v-if="section.show" class="setting-group">
       <view v-if="showFontSize" class="setting-item-row">
-        <text class="setting-label">字体大小</text>
+        <text class="setting-label">{{ fontSizeLabel }}</text>
         <view class="setting-control-buttons">
           <view
             class="control-btn"
@@ -31,7 +31,7 @@
       </view>
 
       <view class="setting-item-row">
-        <text class="setting-label">X 位置</text>
+        <text class="setting-label">{{ xLabel }}</text>
         <view class="setting-control-buttons">
           <view class="control-btn" @click="$emit('adjust', 'x', -1, 0, 64)">
             <text class="control-icon">-</text>
@@ -44,7 +44,7 @@
       </view>
 
       <view class="setting-item-row">
-        <text class="setting-label">Y 位置</text>
+        <text class="setting-label">{{ yLabel }}</text>
         <view class="setting-control-buttons">
           <view class="control-btn" @click="$emit('adjust', 'y', -1, 0, 64)">
             <text class="control-icon">-</text>
@@ -66,25 +66,25 @@
         />
       </view>
 
-      <view class="setting-item">
+      <view v-if="showAlign" class="setting-item">
         <text class="setting-label">对齐方式</text>
         <view class="align-buttons">
           <view
-            class="align-btn"
+            class="align-btn glx-feature-option"
             :class="{ active: section.align === 'left' }"
             @click="$emit('set-align', 'left')"
           >
             <text class="align-text">左对齐</text>
           </view>
           <view
-            class="align-btn"
+            class="align-btn glx-feature-option"
             :class="{ active: section.align === 'center' }"
             @click="$emit('set-align', 'center')"
           >
             <text class="align-text">居中</text>
           </view>
           <view
-            class="align-btn"
+            class="align-btn glx-feature-option"
             :class="{ active: section.align === 'right' }"
             @click="$emit('set-align', 'right')"
           >
@@ -134,6 +134,22 @@ export default {
       type: Number,
       default: 3,
     },
+    showAlign: {
+      type: Boolean,
+      default: true,
+    },
+    fontSizeLabel: {
+      type: String,
+      default: "字体大小",
+    },
+    xLabel: {
+      type: String,
+      default: "X 位置",
+    },
+    yLabel: {
+      type: String,
+      default: "Y 位置",
+    },
   },
   emits: ["toggle", "adjust", "update-color", "set-align"],
 };
@@ -141,9 +157,9 @@ export default {
 
 <style scoped>
 .settings-card {
-  background-color: var(--bg-tertiary);
-  border: 2rpx solid var(--border-primary);
-  padding: 20rpx;
+  background-color: transparent;
+  border: 0;
+  padding: 0;
   margin-bottom: 16rpx;
 }
 
@@ -198,15 +214,9 @@ export default {
   align-items: center;
   justify-content: center;
   background-color: var(--bg-secondary);
-  border: 2rpx solid var(--border-primary);
-  border-radius: 12rpx;
+  border: 2rpx solid var(--nb-ink);
+  border-radius: 0;
   transition: var(--transition-base);
-}
-
-.control-btn:active {
-  transform: scale(0.9);
-  background-color: rgba(0, 243, 255, 0.1);
-  border-color: var(--accent-primary);
 }
 
 .control-icon {
@@ -219,7 +229,7 @@ export default {
   font-size: 32rpx;
   font-family: monospace;
   font-weight: bold;
-  color: var(--accent-primary);
+  color: var(--nb-yellow);
   min-width: 64rpx;
   text-align: center;
 }
@@ -233,30 +243,12 @@ export default {
 .align-btn {
   flex: 1;
   padding: 20rpx 16rpx;
-  background-color: var(--bg-secondary);
-  border: 2rpx solid var(--border-primary);
-  border-radius: 12rpx;
   text-align: center;
   transition: var(--transition-base);
 }
 
-.align-btn:active {
-  transform: scale(0.98);
-}
-
-.align-btn.active {
-  background-color: rgba(0, 243, 255, 0.1);
-  border-color: var(--accent-primary);
-}
-
 .align-text {
   font-size: 22rpx;
-  color: var(--text-secondary);
-}
-
-.align-btn.active .align-text {
-  color: var(--accent-primary);
-  font-weight: 500;
 }
 
 .toggle-switch {
@@ -267,22 +259,22 @@ export default {
   width: 80rpx;
   height: 44rpx;
   background-color: var(--bg-secondary);
-  border: 2rpx solid var(--border-primary);
-  border-radius: 22rpx;
+  border: 2rpx solid var(--nb-ink);
+  border-radius: 0;
   position: relative;
   transition: var(--transition-base);
 }
 
 .switch-track.active {
-  background-color: var(--accent-primary);
-  border-color: var(--accent-primary);
+  background-color: var(--nb-yellow);
+  border-color: var(--nb-ink);
 }
 
 .switch-thumb {
   width: 36rpx;
   height: 36rpx;
   background-color: var(--text-primary);
-  border-radius: 18rpx;
+  border-radius: 0;
   position: absolute;
   top: 2rpx;
   left: 2rpx;
@@ -291,6 +283,6 @@ export default {
 
 .switch-track.active .switch-thumb {
   left: 38rpx;
-  background-color: #ffffff;
+  background-color: #000000;
 }
 </style>
