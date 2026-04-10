@@ -79,8 +79,8 @@ export default {
   display: inline-block;
   border-radius: 50%;
   overflow: hidden;
-  background-color: var(--color-card-background);
-  border: 2rpx solid var(--border-primary);
+  background-color: var(--nb-surface);
+  border: 2rpx solid var(--nb-ink);
 }
 
 /* 尺寸变体 */
@@ -110,7 +110,7 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: var(--color-app-background);
+  background-color: var(--nb-paper);
 }
 
 /* 状态徽章 */
@@ -121,7 +121,7 @@ export default {
   width: 20rpx;
   height: 20rpx;
   border-radius: 50%;
-  border: 2rpx solid var(--color-card-background);
+  border: 2rpx solid var(--nb-surface);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -155,14 +155,14 @@ export default {
 
 /* 状态颜色 */
 .badge-online .badge-dot {
-  background-color: var(--color-success);
+  background-color: var(--nb-green);
 }
 
 .badge-offline .badge-dot {
-  background-color: var(--color-text-disabled);
+  background-color: #777777;
 }
 
 .badge-busy .badge-dot {
-  background-color: var(--color-warning);
+  background-color: var(--nb-orange);
 }
 </style>

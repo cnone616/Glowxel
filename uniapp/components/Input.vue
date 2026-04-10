@@ -1,7 +1,7 @@
 <template>
-  <view class="input-wrapper" :class="wrapperClasses">
+  <view class="glx-input-shell" :class="wrapperClasses">
     <!-- 前置图标 -->
-    <view v-if="prefixIcon" class="input-prefix">
+    <view v-if="prefixIcon" class="glx-input-prefix">
       <Icon :name="prefixIcon" :size="iconSize" :color="iconColor" />
     </view>
     
@@ -15,7 +15,7 @@
       :maxlength="maxlength"
       :focus="focus"
       :password="type === 'password'"
-      class="input-field"
+      class="glx-input-field"
       :class="inputClasses"
       @input="handleInput"
       @focus="handleFocus"
@@ -32,7 +32,7 @@
       :maxlength="maxlength"
       :focus="focus"
       :auto-height="autoHeight"
-      class="textarea-field"
+      class="glx-input-textarea"
       :class="inputClasses"
       @input="handleInput"
       @focus="handleFocus"
@@ -40,23 +40,23 @@
     />
     
     <!-- 后置内容 -->
-    <view v-if="suffixIcon || clearable || showWordCount" class="input-suffix">
+    <view v-if="suffixIcon || clearable || showWordCount" class="glx-input-suffix">
       <!-- 清除按钮 -->
       <view 
         v-if="clearable && inputValue && !disabled" 
-        class="clear-btn"
+        class="glx-input-clear"
         @click="handleClear"
       >
         <Icon name="close" :size="28" color="#AAAAAA" />
       </view>
       
       <!-- 后置图标 -->
-      <view v-if="suffixIcon" class="suffix-icon">
+      <view v-if="suffixIcon" class="glx-input-suffix-icon">
         <Icon :name="suffixIcon" :size="iconSize" :color="iconColor" />
       </view>
       
       <!-- 字数统计 -->
-      <text v-if="showWordCount && maxlength" class="word-count">
+      <text v-if="showWordCount && maxlength" class="glx-input-word-count">
         {{ inputValue.length }}/{{ maxlength }}
       </text>
     </view>
@@ -199,10 +199,10 @@ export default {
       return [
         `input-${this.size}`,
         {
-          'input-focused': this.isFocused,
-          'input-disabled': this.disabled,
-          'input-readonly': this.readonly,
-          [`input-${this.status}`]: this.status
+          'glx-input--focused': this.isFocused,
+          'glx-input--disabled': this.disabled,
+          'glx-input--readonly': this.readonly,
+          [`glx-input--${this.status}`]: this.status
         },
         this.customClass
       ].filter(Boolean)
@@ -210,8 +210,8 @@ export default {
     
     inputClasses() {
       return {
-        'has-prefix': this.prefixIcon,
-        'has-suffix': this.suffixIcon || this.clearable || this.showWordCount
+        'glx-input--has-prefix': this.prefixIcon,
+        'glx-input--has-suffix': this.suffixIcon || this.clearable || this.showWordCount
       }
     },
     
@@ -264,15 +264,17 @@ export default {
 </script>
 
 <style scoped>
-.input-wrapper {
+.glx-input-shell {
   display: flex;
   align-items: center;
-  background-color: var(--color-card-background);
-  border: 2rpx solid var(--border-primary);
-  border-radius: var(--radius-medium);
+  background: #ffffff;
+  border: 3rpx solid #000000;
+  border-radius: 0;
+  box-shadow: 2rpx 2rpx 0 #000000;
   transition: all 0.2s ease;
   position: relative;
   overflow: hidden;
+  box-sizing: border-box;
 }
 
 /* 尺寸变体 */
@@ -292,48 +294,52 @@ export default {
 }
 
 /* 状态样式 */
-.input-focused {
-  border-color: var(--color-brand-primary);
-  box-shadow: 0 0 0 4rpx rgba(79, 127, 255, 0.1);
+.glx-input--focused {
+  border-color: #000000;
+  box-shadow: 3rpx 3rpx 0 #000000;
 }
 
-.input-disabled {
-  background-color: var(--color-app-background);
-  border-color: var(--border-secondary);
+.glx-input--disabled {
+  background-color: #f1efe6;
+  border-color: #000000;
   opacity: 0.6;
+  box-shadow: none;
 }
 
-.input-readonly {
-  background-color: var(--color-app-background);
+.glx-input--readonly {
+  background-color: var(--nb-paper);
   cursor: not-allowed;
 }
 
-.input-error {
-  border-color: #FF4757;
+.glx-input--error {
+  background: #ffd7cf;
+  border-color: #000000;
 }
 
-.input-error.input-focused {
-  box-shadow: 0 0 0 4rpx rgba(255, 71, 87, 0.1);
+.glx-input--error.glx-input--focused {
+  box-shadow: 3rpx 3rpx 0 #000000;
 }
 
-.input-warning {
-  border-color: #FFA726;
+.glx-input--warning {
+  background: #ffe1c4;
+  border-color: #000000;
 }
 
-.input-warning.input-focused {
-  box-shadow: 0 0 0 4rpx rgba(255, 167, 38, 0.1);
+.glx-input--warning.glx-input--focused {
+  box-shadow: 3rpx 3rpx 0 #000000;
 }
 
-.input-success {
-  border-color: #4CAF50;
+.glx-input--success {
+  background: #fff1a8;
+  border-color: #000000;
 }
 
-.input-success.input-focused {
-  box-shadow: 0 0 0 4rpx rgba(76, 175, 80, 0.1);
+.glx-input--success.glx-input--focused {
+  box-shadow: 3rpx 3rpx 0 #000000;
 }
 
 /* 前置图标 */
-.input-prefix {
+.glx-input-prefix {
   display: flex;
   align-items: center;
   margin-right: 16rpx;
@@ -341,29 +347,30 @@ export default {
 }
 
 /* 输入框 */
-.input-field,
-.textarea-field {
+.glx-input-field,
+.glx-input-textarea {
   flex: 1;
   font-size: 28rpx;
-  color: var(--color-text-primary);
+  color: #000000;
   background: transparent;
   border: none;
   outline: none;
   line-height: 1.5;
+  font-weight: 700;
 }
 
-.input-field::placeholder,
-.textarea-field::placeholder {
-  color: var(--color-text-disabled);
+.glx-input-field::placeholder,
+.glx-input-textarea::placeholder {
+  color: #8b8b8b;
 }
 
-.textarea-field {
+.glx-input-textarea {
   min-height: 120rpx;
   resize: none;
 }
 
 /* 后置内容 */
-.input-suffix {
+.glx-input-suffix {
   display: flex;
   align-items: center;
   gap: 12rpx;
@@ -371,35 +378,37 @@ export default {
   flex-shrink: 0;
 }
 
-.clear-btn {
+.glx-input-clear {
   width: 48rpx;
   height: 48rpx;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 50%;
-  background-color: var(--color-app-background);
+  border: 3rpx solid #000000;
+  background-color: #ffffff;
   transition: all 0.2s ease;
+  box-sizing: border-box;
 }
 
-.clear-btn:active {
-  transform: scale(0.9);
+.glx-input-clear:active {
+  transform: translate(2rpx, 2rpx);
 }
 
-.suffix-icon {
+.glx-input-suffix-icon {
   display: flex;
   align-items: center;
 }
 
-.word-count {
+.glx-input-word-count {
   font-size: 24rpx;
-  color: var(--color-text-disabled);
+  color: #4a4a4a;
   white-space: nowrap;
+  font-weight: 800;
 }
 
 /* 搜索框特殊样式 */
-.input-wrapper.search-input {
-  border-radius: 40rpx;
+.glx-input-shell.search-input {
+  border-radius: 0;
 }
 
 /* 响应式适配 */
@@ -419,22 +428,22 @@ export default {
     min-height: 88rpx;
   }
   
-  .input-field,
-  .textarea-field {
+  .glx-input-field,
+  .glx-input-textarea {
     font-size: 26rpx;
   }
 }
 
 /* 禁用状态 */
-.input-disabled .input-field,
-.input-disabled .textarea-field {
-  color: var(--color-text-disabled);
+.glx-input--disabled .glx-input-field,
+.glx-input--disabled .glx-input-textarea {
+  color: #8b8b8b;
   cursor: not-allowed;
 }
 
 /* 只读状态 */
-.input-readonly .input-field,
-.input-readonly .textarea-field {
+.glx-input--readonly .glx-input-field,
+.glx-input--readonly .glx-input-textarea {
   cursor: not-allowed;
 }
 </style>

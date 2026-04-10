@@ -327,23 +327,27 @@ export default {
   align-items: center;
   justify-content: center;
   padding: 0 32rpx;
+  background: #ffffff;
+  border-bottom: 4rpx solid #000000;
 }
 .cropper-title {
-  color: #333;
+  color: #000000;
   font-size: 32rpx;
-  font-weight: 600;
+  font-weight: 700;
 }
 .cropper-body {
   flex: 1;
   position: relative;
   overflow: hidden;
-  background: #f5f5f5;
+  background: #ffffff;
 }
 .cropper-footer {
   display: flex;
   padding: 24rpx 32rpx;
-  padding-bottom: calc(24rpx + env(safe-area-inset-bottom));
+  padding-bottom: calc(24rpx + var(--layout-bottom-offset));
   gap: 24rpx;
+  background: #ffffff;
+  border-top: 4rpx solid #000000;
 }
 .footer-btn {
   flex: 1;
@@ -351,22 +355,25 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 16rpx;
+  border-radius: 0;
+  border: 4rpx solid #000000;
+  box-shadow: none;
 }
 .footer-btn.cancel {
-  background: #f0f0f0;
+  background: #ffffff;
 }
 .footer-btn.confirm {
-  background: #4f7fff;
+  background: #ffd23f;
 }
 .footer-btn.cancel .footer-btn-text {
-  color: #666;
+  color: #000000;
   font-size: 30rpx;
+  font-weight: 700;
 }
 .footer-btn.confirm .footer-btn-text {
-  color: #fff;
+  color: #000000;
   font-size: 30rpx;
-  font-weight: 600;
+  font-weight: 700;
 }
 .image-container {
   width: 100%;
@@ -387,66 +394,75 @@ export default {
   left: 0;
   right: 0;
   bottom: 0;
-  border: 2rpx solid rgba(0, 120, 255, 0.8);
+  border: 4rpx solid #000000;
   box-sizing: border-box;
+  box-shadow: inset 0 0 0 4rpx #ffd23f;
 }
 .handle {
   position: absolute;
-  width: 32rpx;
-  height: 32rpx;
+  width: 44rpx;
+  height: 44rpx;
   z-index: 11;
+  background: #ffd23f;
+  border: 4rpx solid #000000;
+  border-radius: 0;
+  box-sizing: border-box;
 }
 .handle::after {
   content: "";
   position: absolute;
-  background: #4f7fff;
+  background: #000000;
 }
 .handle.tl {
-  top: -4rpx;
-  left: -4rpx;
+  top: -10rpx;
+  left: -10rpx;
 }
 .handle.tl::after {
-  top: 0;
-  left: 0;
-  width: 16rpx;
-  height: 3rpx;
+  top: 8rpx;
+  left: 8rpx;
+  width: 20rpx;
+  height: 4rpx;
+  box-shadow: 0 0 0 0 #000000, 0 16rpx 0 #000000;
 }
 .handle.tr {
-  top: -4rpx;
-  right: -4rpx;
+  top: -10rpx;
+  right: -10rpx;
 }
 .handle.tr::after {
-  top: 0;
-  right: 0;
-  width: 16rpx;
-  height: 3rpx;
+  top: 8rpx;
+  right: 8rpx;
+  width: 20rpx;
+  height: 4rpx;
+  box-shadow: 0 0 0 0 #000000, 0 16rpx 0 #000000;
 }
 .handle.bl {
-  bottom: -4rpx;
-  left: -4rpx;
+  bottom: -10rpx;
+  left: -10rpx;
 }
 .handle.bl::after {
-  bottom: 0;
-  left: 0;
-  width: 16rpx;
-  height: 3rpx;
+  bottom: 8rpx;
+  left: 8rpx;
+  width: 20rpx;
+  height: 4rpx;
+  box-shadow: 0 0 0 0 #000000, 0 -16rpx 0 #000000;
 }
 .handle.br {
-  bottom: -4rpx;
-  right: -4rpx;
+  bottom: -10rpx;
+  right: -10rpx;
 }
 .handle.br::after {
-  bottom: 0;
-  right: 0;
-  width: 16rpx;
-  height: 3rpx;
+  bottom: 8rpx;
+  right: 8rpx;
+  width: 20rpx;
+  height: 4rpx;
+  box-shadow: 0 0 0 0 #000000, 0 -16rpx 0 #000000;
 }
 .mask-top,
 .mask-bottom,
 .mask-left,
 .mask-right {
   position: absolute;
-  background: rgba(255, 255, 255, 0.5);
+  background: rgba(255, 253, 245, 0.72);
   z-index: 5;
 }
 </style>

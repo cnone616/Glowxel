@@ -1,16 +1,15 @@
 <template>
-  <view class="nb-page nb-overview-page">
+  <view class="nb-page nb-overview-page glx-scroll-region">
     <!-- #ifdef MP-WEIXIN -->
     <view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
     <!-- #endif -->
 
-    <view class="nb-navbar">
+    <view class="nb-navbar glx-topbar">
       <view class="nb-nav-action" @click="goBack">
         <Icon name="arrow-left-bold" :size="28" color="#000000" />
       </view>
       <view class="nb-nav-title-wrap">
         <text class="nb-nav-title">新粗野总览</text>
-        <text class="nb-nav-subtitle">Glowxel Style Lab</text>
       </view>
       <view class="nb-nav-spacer"></view>
     </view>
@@ -19,7 +18,7 @@
       <view class="nb-content">
         <view class="nb-card nb-card-lg hero-card">
           <view class="hero-topline">
-            <text class="nb-eyebrow">Reference Locked</text>
+            <text class="nb-eyebrow">参考方向已锁定</text>
             <text class="hero-ref">neubrutalism.com</text>
           </view>
           <text class="nb-display hero-title">白底主导的全局新粗野，不做软卡片，不做轻飘 UI。</text>
@@ -134,6 +133,12 @@
               </view>
             </view>
             <view class="nb-grid-item">
+              <view class="nb-card nb-link-card scene-card controls-scene" @click="openPage('/pages/design-preview/controls')">
+                <text class="nb-link-title">控件总览</text>
+                <text class="nb-link-desc">集中查看 toast、输入、切换、勾选、滑杆等所有基础控件。</text>
+              </view>
+            </view>
+            <view class="nb-grid-item">
               <view class="nb-card nb-link-card scene-card ecosystem-scene" @click="openPage('/pages/design-preview/ecosystem')">
                 <text class="nb-link-title">主题 / 成就 / 素材场景</text>
                 <text class="nb-link-desc">看缩略图、成就卡、素材卡和低噪设置区如何统一到一套视觉。</text>
@@ -172,7 +177,7 @@ export default {
     return {
       palette: [
         { name: "Ink", color: "#000000" },
-        { name: "Paper", color: "#FFFDF5" },
+        { name: "Paper", color: "#FFFFFF" },
         { name: "Punch Yellow", color: "#FFD23F" },
         { name: "Coral Pink", color: "#FF6B6B" },
         { name: "Sky Blue", color: "#74B9FF" },
@@ -235,6 +240,10 @@ export default {
 .spec-card {
   padding: 22rpx;
   min-height: 280rpx;
+}
+
+.controls-scene {
+  background: var(--nb-green);
 }
 
 .spec-list {

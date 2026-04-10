@@ -1,17 +1,17 @@
 <template>
-  <view class="user-list-page">
+  <view class="user-list-page glx-page-shell">
     <!-- 状态栏占位 -->
     <!-- #ifdef MP-WEIXIN -->
     <view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
     <!-- #endif -->
     
     <!-- 顶部导航 -->
-    <view class="header">
+    <view class="header glx-topbar glx-page-shell__fixed">
       <view class="header-content">
         <view class="back-btn" @click="handleBack">
-          <Icon name="direction-left" :size="40" color="#1F1F1F" />
+          <Icon name="direction-left" :size="32" color="var(--nb-ink)" />
         </view>
-        <text class="header-title">{{ pageTitle }}</text>
+        <text class="header-title glx-topbar__title">{{ pageTitle }}</text>
         <view class="search-btn" @click="toggleSearch">
           <Icon name="search" :size="40" color="#4F7FFF" />
         </view>
@@ -19,7 +19,7 @@
     </view>
     
     <!-- 搜索栏 -->
-    <view v-if="showSearch" class="search-section">
+    <view v-if="showSearch" class="search-section glx-page-shell__fixed">
       <Input
         v-model="searchTerm"
         type="search"
@@ -34,7 +34,7 @@
     <!-- 主要内容 -->
     <scroll-view 
       scroll-y 
-      class="main-content"
+      class="main-content glx-scroll-region glx-page-shell__content"
       @scrolltolower="loadMore"
       :refresher-enabled="true"
       :refresher-triggered="isRefreshing"
@@ -42,7 +42,7 @@
     >
       <!-- 用户列表 -->
       <view class="user-section">
-        <view v-if="filteredUsers.length === 0 && !isLoading" class="empty-state">
+        <view v-if="filteredUsers.length === 0 && !isLoading" class="empty-state glx-panel-card">
           <view class="empty-icon">
             <Icon name="user" :size="80" color="#AAAAAA" />
           </view>
@@ -54,7 +54,7 @@
           <view 
             v-for="user in filteredUsers" 
             :key="user.id"
-            class="user-item"
+            class="user-item glx-list-card"
             @click="goToUserProfile(user)"
           >
             <Avatar :src="user.avatar" :size="80" />
@@ -67,7 +67,7 @@
               </view>
             </view>
             <view 
-              class="follow-btn"
+              class="follow-btn glx-cta-button"
               :class="{ 'following': user.is_following }"
               @click.stop="toggleFollow(user)"
             >
@@ -336,20 +336,20 @@ export default {
   height: 100vh;
   display: flex;
   flex-direction: column;
-  background-color: var(--color-app-background);
+  background-color: var(--nb-paper);
   overflow: hidden;
 }
 
 /* 状态栏占位 */
 .status-bar {
-  background-color: var(--color-card-background);
+  background-color: var(--nb-surface);
   flex-shrink: 0;
 }
 
 /* 顶部导航 */
 .header {
-  background-color: var(--color-card-background);
-  border-bottom: 1rpx solid var(--border-primary);
+  background-color: var(--nb-surface);
+  border-bottom: 1rpx solid var(--nb-ink);
   flex-shrink: 0;
 }
 
@@ -366,37 +366,37 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: var(--radius-medium);
+  border-radius: 0;
   transition: all 0.2s ease;
 }
 
 .back-btn:active {
-  transform: scale(0.95);
-  background-color: var(--color-app-background);
+  transform: translate(2rpx, 2rpx);
+  background-color: var(--nb-yellow);
 }
 
 .search-btn {
-  background-color: var(--color-app-background);
+  background-color: var(--nb-paper);
 }
 
 .search-btn:active {
-  transform: scale(0.95);
-  background-color: rgba(79, 127, 255, 0.1);
+  transform: translate(2rpx, 2rpx);
+  background-color: var(--nb-yellow);
 }
 
 .header-title {
   font-size: 36rpx;
   font-weight: 700;
-  color: var(--color-text-primary);
+  color: var(--nb-ink);
   flex: 1;
   text-align: center;
 }
 
 /* 搜索栏 */
 .search-section {
-  background-color: var(--color-card-background);
+  background-color: var(--nb-surface);
   padding: 0 32rpx 24rpx;
-  border-bottom: 1rpx solid var(--border-primary);
+  border-bottom: 1rpx solid var(--nb-ink);
 }
 
 /* 主要内容 */
@@ -422,16 +422,16 @@ export default {
   display: flex;
   align-items: center;
   gap: 24rpx;
-  background-color: var(--color-card-background);
-  border-radius: var(--radius-medium);
+  background-color: var(--nb-surface);
+  border-radius: 0;
   padding: 24rpx;
-  box-shadow: var(--shadow-card);
+  box-shadow: var(--nb-shadow-strong);
   transition: all 0.2s ease;
 }
 
 .user-item:active {
   transform: scale(0.98);
-  background-color: var(--color-app-background);
+  background-color: var(--nb-paper);
 }
 
 .user-info {
@@ -442,14 +442,14 @@ export default {
 .user-name {
   font-size: 32rpx;
   font-weight: 600;
-  color: var(--color-text-primary);
+  color: var(--nb-ink);
   display: block;
   margin-bottom: 8rpx;
 }
 
 .user-bio {
   font-size: 26rpx;
-  color: var(--color-text-secondary);
+  color: #4a4a4a;
   line-height: 1.4;
   display: block;
   margin-bottom: 12rpx;
@@ -465,20 +465,20 @@ export default {
 
 .stat-text {
   font-size: 24rpx;
-  color: var(--color-text-disabled);
+  color: #777777;
 }
 
 .follow-btn {
   padding: 16rpx 32rpx;
-  background-color: var(--color-brand-primary);
-  border-radius: var(--radius-medium);
+  background-color: var(--nb-yellow);
+  border-radius: 0;
   transition: all 0.2s ease;
   flex-shrink: 0;
 }
 
 .follow-btn.following {
-  background-color: var(--color-app-background);
-  border: 2rpx solid var(--border-primary);
+  background-color: var(--nb-paper);
+  border: 2rpx solid var(--nb-ink);
 }
 
 .follow-btn:active {
@@ -492,7 +492,7 @@ export default {
 }
 
 .follow-btn.following .follow-text {
-  color: var(--color-text-secondary);
+  color: #4a4a4a;
 }
 
 /* 空状态 */
@@ -510,7 +510,7 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: var(--color-app-background);
+  background-color: var(--nb-paper);
   border-radius: 50%;
   margin-bottom: 32rpx;
 }
@@ -518,13 +518,13 @@ export default {
 .empty-title {
   font-size: 32rpx;
   font-weight: 600;
-  color: var(--color-text-primary);
+  color: var(--nb-ink);
   margin-bottom: 12rpx;
 }
 
 .empty-subtitle {
   font-size: 26rpx;
-  color: var(--color-text-secondary);
+  color: #4a4a4a;
   line-height: 1.5;
 }
 
@@ -548,7 +548,7 @@ export default {
 
 .loading-text {
   font-size: 26rpx;
-  color: var(--color-text-secondary);
+  color: #4a4a4a;
 }
 
 .load-more-btn {
@@ -557,20 +557,20 @@ export default {
   justify-content: center;
   padding: 32rpx;
   margin: 32rpx 0;
-  background-color: var(--color-card-background);
-  border-radius: var(--radius-medium);
-  border: 2rpx solid var(--border-primary);
+  background-color: var(--nb-surface);
+  border-radius: 0;
+  border: 2rpx solid var(--nb-ink);
   transition: all 0.2s ease;
 }
 
 .load-more-btn:active {
   transform: scale(0.98);
-  background-color: var(--color-app-background);
+  background-color: var(--nb-paper);
 }
 
 .load-more-text {
   font-size: 28rpx;
-  color: var(--color-brand-primary);
+  color: var(--nb-yellow);
   font-weight: 500;
 }
 
@@ -583,6 +583,6 @@ export default {
 
 .no-more-text {
   font-size: 24rpx;
-  color: var(--color-text-disabled);
+  color: #777777;
 }
 </style>

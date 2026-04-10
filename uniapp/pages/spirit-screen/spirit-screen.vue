@@ -1,20 +1,19 @@
 <template>
-  <view class="spirit-page">
+  <view class="spirit-page glx-page-shell">
     <!-- #ifdef MP-WEIXIN -->
     <view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
     <!-- #endif -->
 
-    <view class="header">
+    <view class="navbar glx-topbar glx-page-shell__fixed">
       <view class="nav-left" @click="handleBack">
         <Icon
           name="direction-left"
           :size="32"
-          color="var(--color-text-primary)"
+          color="var(--nb-ink)"
         />
       </view>
-      <view class="nav-title">
-        <text class="project-name">桌面宠物</text>
-      </view>
+      <text class="nav-title glx-topbar__title">桌面宠物</text>
+      <view class="nav-right"></view>
     </view>
 
     <view class="canvas-section">
@@ -39,36 +38,36 @@
         v-else
         class="preview-canvas-container preview-canvas-placeholder"
       ></view>
-      <view class="preview-caption">
-        <view class="preview-caption-info">
+      <view class="preview-caption glx-preview-panel">
+        <view class="preview-caption-info glx-preview-panel__info">
           <text class="preview-title">预览效果</text>
         </view>
         <view class="preview-actions">
           <view
-            class="action-btn-sm primary"
+            class="action-btn-sm primary glx-primary-action"
             :class="{ disabled: isSending }"
             @click="saveAndApply"
           >
-            <Icon name="link" :size="36" color="#ffffff" />
+            <Icon name="link" :size="36" color="#000000" />
             <text>{{ isSending ? "发送中" : "发送" }}</text>
           </view>
         </view>
       </view>
     </view>
 
-    <scroll-view scroll-y class="content" :style="{ height: contentHeight }">
-      <view class="content-wrapper">
-        <view v-show="currentTab === 0" class="tab-panel">
-          <view class="card">
-            <view class="card-title-section">
-              <text class="card-title">表情模式</text>
-              <text class="card-subtitle">{{ expressionModeLabel }}</text>
+    <scroll-view scroll-y class="content glx-scroll-region glx-page-shell__content" :style="{ height: contentHeight }">
+      <view class="content-wrapper glx-scroll-stack">
+        <view v-show="currentTab === 0" class="tab-panel glx-tab-panel">
+          <view class="card glx-panel-card">
+            <view class="card-title-section glx-panel-head">
+              <text class="card-title glx-panel-title">表情模式</text>
+              <text class="card-subtitle glx-panel-subtitle">{{ expressionModeLabel }}</text>
             </view>
             <view class="option-row">
               <view
                 v-for="item in expressionModeOptions"
                 :key="item.value"
-                class="option-btn"
+                class="option-btn glx-feature-option"
                 :class="{ active: expressionModeValue === item.value }"
                 @click="handleExpressionModeChange(item.value)"
               >
@@ -77,8 +76,8 @@
             </view>
           </view>
 
-          <view v-show="expressionModeValue === 'manual'" class="card">
-            <text class="card-title">指定表情</text>
+          <view v-show="expressionModeValue === 'manual'" class="card glx-panel-card">
+            <text class="card-title glx-panel-title">指定表情</text>
             <view class="expression-grid">
               <view
                 v-for="item in expressionOptions"
@@ -92,8 +91,10 @@
             </view>
           </view>
 
-          <view class="card">
-            <text class="card-title">眼睛颜色</text>
+          <view class="card glx-panel-card">
+            <view class="card-title-section glx-panel-head">
+              <text class="card-title glx-panel-title">眼睛颜色</text>
+            </view>
             <ColorPanelPicker
               :value="eyesConfig.style.eyeColor"
               label="眼睛颜色"
@@ -102,8 +103,10 @@
             />
           </view>
 
-          <view class="card">
-            <text class="card-title">瞳孔颜色</text>
+          <view class="card glx-panel-card">
+            <view class="card-title-section glx-panel-head">
+              <text class="card-title glx-panel-title">瞳孔颜色</text>
+            </view>
             <ColorPanelPicker
               :value="eyesConfig.style.pupilColor"
               label="瞳孔颜色"
@@ -112,19 +115,20 @@
             />
           </view>
 
-          <view class="card">
-            <text class="card-title">参数调整</text>
+          <view class="card glx-panel-card">
+            <view class="card-title-section glx-panel-head">
+              <text class="card-title glx-panel-title">参数调整</text>
+            </view>
 
             <view class="form-row">
               <text class="form-label">
                 眨眼步频 {{ blinkRhythmLevel }}
               </text>
-              <slider
+              <GlxSlider
                 :value="blinkRhythmLevel"
-                min="1"
-                max="10"
-                step="1"
-                activeColor="#4F7FFF"
+                :min="1"
+                :max="10"
+                :step="1"
                 @change="handleBlinkIntervalChange"
               />
             </view>
@@ -133,12 +137,11 @@
               <text class="form-label">
                 游走步频 {{ lookRhythmLevel }}
               </text>
-              <slider
+              <GlxSlider
                 :value="lookRhythmLevel"
-                min="1"
-                max="10"
-                step="1"
-                activeColor="#4F7FFF"
+                :min="1"
+                :max="10"
+                :step="1"
                 @change="handleLookIntervalChange"
               />
             </view>
@@ -147,122 +150,63 @@
               <text class="form-label">
                 灵动幅度 {{ motionAmplitudeLevel }}
               </text>
-              <slider
+              <GlxSlider
                 :value="motionAmplitudeLevel"
-                min="1"
-                max="10"
-                step="1"
-                activeColor="#4F7FFF"
+                :min="1"
+                :max="10"
+                :step="1"
                 @change="handleIdleMoveChange"
               />
             </view>
           </view>
 
-          <view class="card">
-            <view class="card-title-section">
-              <text class="card-title">互动预览</text>
+          <view class="card glx-panel-card">
+            <view class="card-title-section glx-panel-head">
+              <text class="card-title glx-panel-title">互动预览</text>
             </view>
             <view class="option-row option-row-wrap">
-              <view class="option-btn" @click="triggerPreviewOnlyAction('blink')">
+              <view class="option-btn glx-feature-option" @click="triggerPreviewOnlyAction('blink')">
                 <text>眨眼</text>
               </view>
-              <view class="option-btn" @click="triggerPreviewOnlyAction('look_left')">
+              <view class="option-btn glx-feature-option" @click="triggerPreviewOnlyAction('look_left')">
                 <text>看左</text>
               </view>
-              <view class="option-btn" @click="triggerPreviewOnlyAction('look_center')">
+              <view class="option-btn glx-feature-option" @click="triggerPreviewOnlyAction('look_center')">
                 <text>看中</text>
               </view>
-              <view class="option-btn" @click="triggerPreviewOnlyAction('look_right')">
+              <view class="option-btn glx-feature-option" @click="triggerPreviewOnlyAction('look_right')">
                 <text>看右</text>
               </view>
             </view>
           </view>
         </view>
 
-        <view v-show="currentTab === 1" class="tab-panel">
-          <view class="card">
-            <view class="card-title-section">
-              <text class="card-title">时间显示</text>
-              <text class="card-subtitle">仅作用于桌面宠物</text>
-            </view>
-            <view class="form-row inline-row">
-              <text class="form-label">显示时间</text>
-              <switch
-                :checked="eyesConfig.time.show"
-                color="#4F7FFF"
-                @change="handleTimeShowChange"
-              />
-            </view>
-            <view class="form-row inline-row">
-              <text class="form-label">显示秒</text>
-              <switch
-                :checked="eyesConfig.time.showSeconds"
-                color="#4F7FFF"
-                @change="handleTimeSecondsChange"
-              />
-            </view>
-            <view class="form-row">
-              <text class="form-label">
-                时间字体 {{ selectedTimeFontLabel }}
-              </text>
-              <view class="font-grid">
-                <view
-                  v-for="item in timeFontOptions"
-                  :key="item.value"
-                  class="option-btn font-option-btn"
-                  :class="{ active: eyesConfig.time.font === item.value }"
-                  @click="handleTimeFontChange(item.value)"
-                >
-                  <text class="font-option-name">{{ item.label }}</text>
-                </view>
-              </view>
-            </view>
-            <view class="form-row">
-              <text class="form-label">
-                时间字号 {{ eyesConfig.time.fontSize }}
-              </text>
-              <slider
-                :value="eyesConfig.time.fontSize"
-                min="1"
-                max="3"
-                step="1"
-                activeColor="#4F7FFF"
-                @change="handleTimeFontSizeChange"
-              />
-            </view>
-            <view class="form-row">
-              <text class="form-label">
-                时间横向位置 {{ eyesConfig.layout.timeX }}
-              </text>
-              <slider
-                :value="eyesConfig.layout.timeX"
-                min="0"
-                :max="timeXMax"
-                step="1"
-                activeColor="#4F7FFF"
-                @change="handleTimeXChange"
-              />
-            </view>
-            <view class="form-row">
-              <text class="form-label">
-                时间纵向位置 {{ eyesConfig.layout.timeY }}
-              </text>
-              <slider
-                :value="eyesConfig.layout.timeY"
-                min="0"
-                :max="timeYMax"
-                step="1"
-                activeColor="#4F7FFF"
-                @change="handleTimeYChange"
-              />
-            </view>
-            <ColorPanelPicker
-              :value="eyesConfig.style.timeColor"
-              label="时间颜色"
-              :preset-colors="timeColorOptions"
-              @input="handleTimeColorChange"
-            />
-          </view>
+        <view v-show="currentTab === 1" class="tab-panel glx-tab-panel">
+          <ClockTextSettingsCard
+            icon-name="time"
+            title="时间显示"
+            :section="spiritTimeSection"
+            :preset-colors="timeColorOptions"
+            :show-font-size="true"
+            :min-font-size="1"
+            :max-font-size="3"
+            @toggle="toggleTimeShow"
+            @adjust="handleSpiritTimeAdjust"
+            @update-color="handleTimeColorChange"
+            @set-align="handleSpiritTimeAlign"
+          />
+        </view>
+
+        <view v-show="currentTab === 2" class="tab-panel glx-tab-panel">
+          <ClockFontPanel
+            :font-options="timeFontOptions"
+            :selected-font="eyesConfig.time.font"
+            :show-seconds="eyesConfig.time.showSeconds"
+            :hour-format="24"
+            :show-hour-format="false"
+            @select-font="handleTimeFontChange"
+            @toggle-seconds="toggleTimeSeconds"
+          />
         </view>
       </view>
     </scroll-view>
@@ -278,7 +222,7 @@
         <Icon
           :name="tabIconNames[index]"
           :size="36"
-          :color="currentTab === index ? '#4F7FFF' : 'var(--text-secondary)'"
+          :color="currentTab === index ? '#000000' : '#6b7280'"
         />
         <text class="bottom-tab-text">{{ tab }}</text>
       </view>
@@ -296,6 +240,9 @@ import Icon from "../../components/Icon.vue";
 import Toast from "../../components/Toast.vue";
 import PixelCanvas from "../../components/PixelCanvas.vue";
 import ColorPanelPicker from "../../components/ColorPanelPicker.vue";
+import GlxSlider from "../../components/GlxSlider.vue";
+import ClockFontPanel from "../../components/clock-editor/ClockFontPanel.vue";
+import ClockTextSettingsCard from "../../components/clock-editor/ClockTextSettingsCard.vue";
 import {
   drawClockTextToPixels,
   getClockFontOptions,
@@ -305,12 +252,9 @@ import {
 
 const EYES_CONFIG_STORAGE_KEY = "eyes_config";
 const EYES_EXPRESSION_STORAGE_KEY = "eyes_expression";
-const EYES_TIME_FONT_OPTIONS = getClockFontOptions().map((item) => ({
-  value: item.id,
-  label: item.name,
-}));
+const EYES_TIME_FONT_OPTIONS = getClockFontOptions();
 const EYES_TIME_FONT_IDS = new Set(
-  EYES_TIME_FONT_OPTIONS.map((item) => item.value),
+  EYES_TIME_FONT_OPTIONS.map((item) => item.id),
 );
 const BLINK_DURATION_MS = 150;
 const REFERENCE_EYE_SIZE = 20;
@@ -430,8 +374,8 @@ function createDefaultEyesConfig() {
       eyeSpacing: 14,
       eyeWidth: 16,
       eyeHeight: 10,
-      timeX: 22,
-      timeY: 4,
+      timeX: 32,
+      timeY: 5,
     },
     behavior: {
       autoSwitch: true,
@@ -447,13 +391,14 @@ function createDefaultEyesConfig() {
     time: {
       show: true,
       showSeconds: false,
-      font: "minimal_3x5",
+      font: "classic_5x7",
       fontSize: 1,
+      align: "center",
     },
     style: {
       eyeColor: "#9bdcff",
       pupilColor: "#1b6dff",
-      timeColor: "#d8f3ff",
+      timeColor: "#64c8ff",
     },
   };
 }
@@ -506,6 +451,14 @@ function isValidEyesConfig(config) {
     return false;
   }
   if (
+    config.time.align !== undefined &&
+    config.time.align !== "left" &&
+    config.time.align !== "center" &&
+    config.time.align !== "right"
+  ) {
+    return false;
+  }
+  if (
     config.style.eyeColor === undefined ||
     config.style.pupilColor === undefined ||
     config.style.timeColor === undefined
@@ -513,6 +466,17 @@ function isValidEyesConfig(config) {
     return false;
   }
   return true;
+}
+
+function resolveLegacyEyesTimeAnchorX(config) {
+  const font = EYES_TIME_FONT_IDS.has(config?.time?.font)
+    ? config.time.font
+    : "classic_5x7";
+  const fontSize = clamp(Number(config?.time?.fontSize) || 1, 1, 3);
+  const previewText = config?.time?.showSeconds ? "12:34:56" : "12:34";
+  const legacyX = clamp(Number(config?.layout?.timeX) || 0, 0, 64);
+  const textWidth = getClockTextWidth(previewText, font, fontSize);
+  return clamp(legacyX + Math.floor(textWidth / 2), 0, 64);
 }
 
 function clamp(value, minValue, maxValue) {
@@ -792,6 +756,9 @@ export default {
     Toast,
     PixelCanvas,
     ColorPanelPicker,
+    GlxSlider,
+    ClockFontPanel,
+    ClockTextSettingsCard,
   },
   data() {
     return {
@@ -807,8 +774,8 @@ export default {
       previewPixels: new Map(),
       previewTimer: null,
       currentTab: 0,
-      tabs: ["表情", "时间"],
-      tabIconNames: ["browse", "time"],
+      tabs: ["表情", "时间", "字体"],
+      tabIconNames: ["browse", "time", "text"],
       expressionModeOptions: [
         { label: "自动切换", value: "auto" },
         { label: "指定表情", value: "manual" },
@@ -835,12 +802,15 @@ export default {
         { name: "冰青", hex: "#36cfff" },
       ],
       timeColorOptions: [
-        { name: "冰白", hex: "#f4fbff" },
-        { name: "浅蓝", hex: "#d8f3ff" },
-        { name: "雾青", hex: "#bfe9ff" },
-        { name: "天青", hex: "#8fd8ff" },
-        { name: "薄荷", hex: "#b8fff1" },
-        { name: "暖白", hex: "#fff2d6" },
+        { name: "青色", hex: "#64c8ff" },
+        { name: "绿色", hex: "#00ff9d" },
+        { name: "黄色", hex: "#ffdc00" },
+        { name: "橙色", hex: "#ffa500" },
+        { name: "红色", hex: "#ff6464" },
+        { name: "紫色", hex: "#c864ff" },
+        { name: "白色", hex: "#ffffff" },
+        { name: "灰色", hex: "#787878" },
+        { name: "深灰", hex: "#646464" },
       ],
     };
   },
@@ -892,17 +862,18 @@ export default {
     motionAmplitudeLevel() {
       return this.idleMoveToLevel(this.eyesConfig.behavior.idleMove);
     },
+    spiritTimeSection() {
+      return {
+        show: this.eyesConfig.time.show,
+        fontSize: this.eyesConfig.time.fontSize,
+        x: this.eyesConfig.layout.timeX,
+        y: this.eyesConfig.layout.timeY,
+        color: this.eyesConfig.style.timeColor,
+        align: this.eyesConfig.time.align,
+      };
+    },
     timePreviewText() {
       return this.eyesConfig.time.showSeconds ? "12:34:56" : "12:34";
-    },
-    selectedTimeFontLabel() {
-      const matched = this.timeFontOptions.find(
-        (item) => item.value === this.eyesConfig.time.font,
-      );
-      if (!matched) {
-        return "";
-      }
-      return matched.label;
     },
     timeTextWidth() {
       return getClockTextWidth(
@@ -916,12 +887,6 @@ export default {
         this.eyesConfig.time.font,
         this.eyesConfig.time.fontSize,
       );
-    },
-    timeXMax() {
-      return Math.max(0, 64 - this.timeTextWidth);
-    },
-    timeYMax() {
-      return Math.max(0, 64 - this.timeTextHeight);
     },
   },
   onLoad() {
@@ -974,7 +939,7 @@ export default {
                 this.previewCanvasReady = true;
                 return;
               }
-              const fitZoom = Math.max(2, Math.floor((data.width * 0.92) / 64));
+              const fitZoom = Math.max(2, Math.floor((data.width * 0.96) / 64));
               this.previewContainerSize = {
                 width: data.width,
                 height: data.width,
@@ -1025,6 +990,10 @@ export default {
           ...nextConfig.style,
           ...parsedConfig.style,
         };
+        if (parsedConfig.time.align === undefined) {
+          nextConfig.time.align = "center";
+          nextConfig.layout.timeX = resolveLegacyEyesTimeAnchorX(nextConfig);
+        }
         this.eyesConfig = nextConfig;
         this.normalizeTimeLayout();
       } catch (error) {
@@ -1073,7 +1042,7 @@ export default {
       try {
         const ws = this.deviceStore.getWebSocket();
         await ws.setMode("eyes");
-        await ws.setEyesConfig(cloneEyesConfig(this.eyesConfig));
+        await ws.setEyesConfig(this.buildEyesConfigPayload());
         if (!this.eyesConfig.behavior.autoSwitch) {
           await ws.eyesInteract(`set_expression:${this.selectedEyesExpression}`);
         }
@@ -1133,8 +1102,64 @@ export default {
       this.renderPreviewFrame();
     },
 
+    toggleTimeShow() {
+      this.eyesConfig.time.show = !this.eyesConfig.time.show;
+      this.saveEyesConfig();
+      this.renderPreviewFrame();
+    },
+
+    handleSpiritTimeAdjust(field, delta, minValue, maxValue) {
+      if (field === "fontSize") {
+        this.eyesConfig.time.fontSize = clamp(
+          Number(this.eyesConfig.time.fontSize) + delta,
+          minValue,
+          maxValue,
+        );
+        this.normalizeTimeLayout();
+      }
+
+      if (field === "x") {
+        this.eyesConfig.layout.timeX = clamp(
+          Number(this.eyesConfig.layout.timeX) + delta,
+          minValue,
+          maxValue,
+        );
+      }
+
+      if (field === "y") {
+        this.eyesConfig.layout.timeY = clamp(
+          Number(this.eyesConfig.layout.timeY) + delta,
+          minValue,
+          maxValue,
+        );
+      }
+
+      this.saveEyesConfig();
+      this.renderPreviewFrame();
+    },
+
+    handleSpiritTimeAlign(align) {
+      this.eyesConfig.time.align = align;
+      if (align === "left") {
+        this.eyesConfig.layout.timeX = 0;
+      } else if (align === "center") {
+        this.eyesConfig.layout.timeX = 32;
+      } else if (align === "right") {
+        this.eyesConfig.layout.timeX = 63;
+      }
+      this.saveEyesConfig();
+      this.renderPreviewFrame();
+    },
+
     handleTimeSecondsChange(event) {
       this.eyesConfig.time.showSeconds = event.detail.value;
+      this.normalizeTimeLayout();
+      this.saveEyesConfig();
+      this.renderPreviewFrame();
+    },
+
+    toggleTimeSeconds() {
+      this.eyesConfig.time.showSeconds = !this.eyesConfig.time.showSeconds;
       this.normalizeTimeLayout();
       this.saveEyesConfig();
       this.renderPreviewFrame();
@@ -1162,7 +1187,7 @@ export default {
       this.eyesConfig.layout.timeX = clamp(
         Number(event.detail.value),
         0,
-        this.timeXMax,
+        64,
       );
       this.saveEyesConfig();
       this.renderPreviewFrame();
@@ -1172,7 +1197,7 @@ export default {
       this.eyesConfig.layout.timeY = clamp(
         Number(event.detail.value),
         0,
-        this.timeYMax,
+        64,
       );
       this.saveEyesConfig();
       this.renderPreviewFrame();
@@ -1190,16 +1215,42 @@ export default {
         1,
         3,
       );
+      if (
+        this.eyesConfig.time.align !== "left" &&
+        this.eyesConfig.time.align !== "center" &&
+        this.eyesConfig.time.align !== "right"
+      ) {
+        this.eyesConfig.time.align = "center";
+      }
       this.eyesConfig.layout.timeX = clamp(
         Number(this.eyesConfig.layout.timeX),
         0,
-        this.timeXMax,
+        64,
       );
       this.eyesConfig.layout.timeY = clamp(
         Number(this.eyesConfig.layout.timeY),
         0,
-        this.timeYMax,
+        64,
       );
+    },
+
+    getSpiritTimeStartX() {
+      const align = this.eyesConfig.time.align;
+      const anchorX = Number(this.eyesConfig.layout.timeX);
+      if (align === "center") {
+        return anchorX - Math.floor(this.timeTextWidth / 2);
+      }
+      if (align === "right") {
+        return anchorX - this.timeTextWidth;
+      }
+      return anchorX;
+    },
+
+    buildEyesConfigPayload() {
+      const payload = cloneEyesConfig(this.eyesConfig);
+      payload.layout.timeX = this.getSpiritTimeStartX();
+      delete payload.time.align;
+      return payload;
     },
 
     handleBlinkIntervalChange(event) {
@@ -1815,12 +1866,13 @@ export default {
       }
       drawClockTextToPixels(
         text,
-        clamp(this.eyesConfig.layout.timeX, 0, this.timeXMax),
-        clamp(this.eyesConfig.layout.timeY, 0, this.timeYMax),
+        this.eyesConfig.layout.timeX,
+        this.eyesConfig.layout.timeY,
         this.eyesConfig.style.timeColor,
         pixelMap,
         this.eyesConfig.time.font,
         this.eyesConfig.time.fontSize,
+        this.eyesConfig.time.align,
       );
     },
 
@@ -1877,45 +1929,11 @@ export default {
   background-color: #1a1a1a;
 }
 
-.header {
-  height: 88rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0 32rpx;
-  background-color: var(--bg-elevated);
-  border-bottom: 2rpx solid var(--border-primary);
-  position: relative;
-  flex-shrink: 0;
-}
-
-.nav-left {
-  position: absolute;
-  left: 32rpx;
-  width: 80rpx;
-  height: 80rpx;
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-}
-
-.nav-title {
-  font-size: 32rpx;
-  font-weight: 600;
-  color: var(--color-text-primary);
-}
-
-.project-name {
-  font-size: 33rpx;
-  font-weight: 700;
-  color: var(--text-primary);
-}
-
 .canvas-section {
   display: flex;
   flex-direction: column;
   background: #000000;
-  border-bottom: 2rpx solid var(--border-primary);
+  border-bottom: 2rpx solid var(--nb-ink);
   flex-shrink: 0;
 }
 
@@ -1935,10 +1953,9 @@ export default {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16rpx;
-  padding: 14rpx 20rpx 18rpx;
+  gap: 12rpx;
+  padding: 10rpx 16rpx 12rpx;
   background: var(--bg-tertiary);
-  border-bottom: 1rpx solid var(--border-color);
 }
 
 .preview-caption-info {
@@ -1946,12 +1963,12 @@ export default {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 4rpx;
+  gap: 0;
 }
 
 .preview-title {
   font-size: 24rpx;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--text-primary);
 }
 
@@ -1973,8 +1990,8 @@ export default {
   height: 64rpx;
   padding: 0 18rpx;
   gap: 10rpx;
-  border-radius: 18rpx;
-  border: 2rpx solid var(--border-primary);
+  border-radius: 0;
+  border: 2rpx solid var(--nb-ink);
   background-color: var(--bg-tertiary);
   display: flex;
   align-items: center;
@@ -1989,12 +2006,12 @@ export default {
 }
 
 .action-btn-sm.primary {
-  border-color: var(--accent-primary);
-  background: var(--accent-primary);
+  border-color: var(--nb-ink);
+  background: var(--nb-yellow);
 }
 
 .action-btn-sm.primary text {
-  color: #ffffff;
+  color: #000000;
 }
 
 .action-btn-sm.disabled {
@@ -2007,11 +2024,11 @@ export default {
   min-height: 0;
   box-sizing: border-box;
   background: var(--bg-tertiary);
-  padding: 20rpx;
+  padding: 16rpx 20rpx 0;
 }
 
 .content-wrapper {
-  padding-bottom: 48rpx;
+  padding: 0 0 56rpx;
 }
 
 .tab-panel {
@@ -2019,7 +2036,10 @@ export default {
 }
 
 .card {
-  padding-top: 20rpx;
+  padding-top: 16rpx;
+  border: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
 }
 
 .card-title-section {
@@ -2027,7 +2047,7 @@ export default {
   align-items: center;
   justify-content: space-between;
   gap: 8rpx;
-  margin-bottom: 16rpx;
+  margin-bottom: 14rpx;
 }
 
 .card-title {
@@ -2042,7 +2062,7 @@ export default {
 }
 
 .form-row {
-  margin-top: 18rpx;
+  margin-top: 16rpx;
 }
 
 .inline-row {
@@ -2066,9 +2086,9 @@ export default {
 
 .expression-item {
   min-height: 74rpx;
-  border-radius: 16rpx;
-  background: var(--bg-tertiary);
-  border: 2rpx solid var(--border-primary);
+  border-radius: 0;
+  background: #ffffff;
+  border: 2rpx solid #000000;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2077,8 +2097,13 @@ export default {
 }
 
 .expression-item.active {
-  background: rgba(79, 127, 255, 0.14);
-  border-color: var(--accent-primary);
+  background: var(--nb-yellow);
+  border-color: var(--nb-ink);
+}
+
+.expression-item.active .expression-cn {
+  color: #000000;
+  font-weight: 700;
 }
 
 .expression-cn {
@@ -2088,74 +2113,43 @@ export default {
 }
 
 .option-row {
-  margin-top: 10rpx;
+  margin-top: 8rpx;
   display: flex;
-  gap: 16rpx;
+  gap: 12rpx;
 }
 
 .option-row-wrap {
   flex-wrap: wrap;
 }
 
-.font-grid {
-  margin-top: 10rpx;
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14rpx;
-}
-
 .option-btn {
   min-width: calc(25% - 12rpx);
   height: 72rpx;
   padding: 0 16rpx;
-  border-radius: 16rpx;
-  background: var(--bg-tertiary);
-  border: 2rpx solid var(--border-primary);
   display: flex;
   align-items: center;
   justify-content: center;
   box-sizing: border-box;
 }
 
-.font-option-btn {
-  min-width: 0;
-  height: 80rpx;
-}
-
-.font-option-name {
-  font-size: 22rpx;
-  color: var(--text-secondary);
-}
-
 .option-btn text {
   font-size: 24rpx;
-  color: var(--text-secondary);
+  font-size: 26rpx;
 }
 
-.option-btn.active {
-  background: rgba(79, 127, 255, 0.14);
-  border-color: var(--accent-primary);
-  box-shadow: 0 8rpx 18rpx rgba(79, 127, 255, 0.12);
-}
-
-.option-btn.active text {
-  color: var(--accent-primary);
-  font-weight: 600;
-}
-
-.option-btn.active .font-option-name {
-  color: var(--accent-primary);
-  font-weight: 600;
+.toggle-switch {
+  display: inline-flex;
+  align-items: center;
 }
 
 .bottom-tabs {
   display: flex;
   flex-shrink: 0;
-  padding: 12rpx 16rpx;
-  padding-bottom: calc(12rpx + env(safe-area-inset-bottom));
+  padding: 2rpx 10rpx 0;
+  padding-bottom: var(--layout-bottom-offset);
   background-color: var(--bg-elevated);
-  border-top: 2rpx solid var(--border-primary);
-  gap: 8rpx;
+  border-top: 2rpx solid var(--nb-ink);
+  gap: 2rpx;
 }
 
 .bottom-tab-item {
@@ -2164,11 +2158,12 @@ export default {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 4rpx;
+  gap: 2rpx;
+  min-height: 68rpx;
 }
 
 .bottom-tab-item.active {
-  background-color: var(--bg-tertiary);
+  background-color: transparent;
 }
 
 .bottom-tab-text {
@@ -2177,7 +2172,13 @@ export default {
 }
 
 .bottom-tab-item.active .bottom-tab-text {
-  color: var(--accent-primary);
-  font-weight: 500;
+  color: #000000;
+  font-weight: 900;
+  font-size: 22rpx;
+}
+
+.bottom-tab-item.active :deep(.iconfont) {
+  color: #000000 !important;
+  font-size: 40rpx !important;
 }
 </style>

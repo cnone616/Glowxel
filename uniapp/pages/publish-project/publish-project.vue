@@ -1,27 +1,27 @@
 <template>
-  <view class="publish-page">
+  <view class="publish-page glx-page-shell">
     <!-- 状态栏占位 -->
     <!-- #ifdef MP-WEIXIN -->
     <view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
     <!-- #endif -->
 
     <!-- 导航栏 -->
-    <view class="navbar">
+    <view class="navbar glx-topbar glx-page-shell__fixed">
       <view class="nav-left" @click="handleBack">
         <Icon
           name="direction-left"
           :size="32"
-          color="var(--color-text-primary)"
+          color="var(--nb-ink)"
         />
       </view>
-      <text class="nav-title">发布作品</text>
+      <text class="nav-title glx-topbar__title">发布作品</text>
       <view class="nav-right"></view>
     </view>
 
     <!-- 主要内容 -->
-    <scroll-view scroll-y class="content">
+    <scroll-view scroll-y class="content glx-scroll-region glx-page-shell__content">
       <!-- 作品预览 -->
-      <view class="preview-section">
+      <view class="preview-section glx-panel-card">
         <view class="preview-header">
           <text class="preview-title">作品预览</text>
           <view class="preview-info">
@@ -43,7 +43,7 @@
       </view>
 
       <!-- 发布表单 -->
-      <view class="form-section">
+      <view class="form-section glx-panel-card">
         <!-- 作品标题 -->
         <view class="form-group">
           <view class="form-label">
@@ -180,7 +180,7 @@
               <switch
                 :checked="form.isPublic"
                 @change="handlePublicChange"
-                color="var(--color-brand-primary)"
+                color="var(--nb-yellow)"
               />
             </view>
           </view>
@@ -743,7 +743,7 @@ export default {
 <style scoped>
 .publish-page {
   height: 100vh;
-  background-color: var(--color-app-background);
+  background-color: var(--nb-paper);
   display: flex;
   flex-direction: column;
 }
@@ -754,8 +754,8 @@ export default {
   align-items: center;
   justify-content: center;
   padding: 0 32rpx;
-  background-color: var(--color-card-background);
-  border-bottom: 2rpx solid var(--border-primary);
+  background-color: var(--nb-surface);
+  border-bottom: 2rpx solid var(--nb-ink);
   position: relative;
 }
 
@@ -777,7 +777,7 @@ export default {
 .nav-title {
   font-size: 32rpx;
   font-weight: 600;
-  color: var(--color-text-primary);
+  color: var(--nb-ink);
 }
 
 .content {
@@ -787,11 +787,11 @@ export default {
 
 /* 预览区域 */
 .preview-section {
-  background-color: var(--color-card-background);
+  background-color: var(--nb-surface);
   border-radius: 16rpx;
   padding: 32rpx;
   margin-bottom: 32rpx;
-  box-shadow: var(--shadow-card);
+  box-shadow: var(--nb-shadow-strong);
 }
 
 .preview-header {
@@ -804,7 +804,7 @@ export default {
 .preview-title {
   font-size: 28rpx;
   font-weight: 600;
-  color: var(--color-text-primary);
+  color: var(--nb-ink);
 }
 
 .preview-info {
@@ -816,8 +816,8 @@ export default {
 .preview-size,
 .preview-pixels {
   font-size: 24rpx;
-  color: var(--color-text-secondary);
-  background-color: var(--color-app-background);
+  color: #4a4a4a;
+  background-color: var(--nb-paper);
   padding: 8rpx 16rpx;
   border-radius: 8rpx;
 }
@@ -827,8 +827,8 @@ export default {
   height: 400rpx;
   border-radius: 12rpx;
   overflow: hidden;
-  background-color: var(--color-app-background);
-  border: 2rpx solid var(--border-primary);
+  background-color: var(--nb-paper);
+  border: 2rpx solid var(--nb-ink);
 }
 
 .preview-canvas {
@@ -858,44 +858,44 @@ export default {
 .label-text {
   font-size: 28rpx;
   font-weight: 600;
-  color: var(--color-text-primary);
+  color: var(--nb-ink);
 }
 
 .required-mark {
-  color: var(--color-error);
+  color: var(--nb-coral);
   font-size: 28rpx;
 }
 
 .optional-mark {
   font-size: 24rpx;
-  color: var(--color-text-disabled);
+  color: #777777;
 }
 
 .input-wrapper,
 .textarea-wrapper {
   position: relative;
-  background-color: var(--color-card-background);
-  border: 2rpx solid var(--border-primary);
+  background-color: var(--nb-surface);
+  border: 2rpx solid var(--nb-ink);
   border-radius: 12rpx;
   transition: all 0.2s ease;
 }
 
 .input-wrapper.focused,
 .textarea-wrapper.focused {
-  border-color: var(--color-brand-primary);
+  border-color: var(--nb-yellow);
   box-shadow: 0 0 0 4rpx rgba(0, 243, 255, 0.1);
 }
 
 .input-wrapper.error,
 .textarea-wrapper.error {
-  border-color: var(--color-error);
+  border-color: var(--nb-coral);
 }
 
 .form-input {
   width: 100%;
   padding: 24rpx;
   font-size: 28rpx;
-  color: var(--color-text-primary);
+  color: var(--nb-ink);
   background-color: transparent;
   border: none;
   outline: none;
@@ -907,7 +907,7 @@ export default {
   min-height: 120rpx;
   padding: 24rpx;
   font-size: 28rpx;
-  color: var(--color-text-primary);
+  color: var(--nb-ink);
   background-color: transparent;
   border: none;
   outline: none;
@@ -920,12 +920,12 @@ export default {
   bottom: 12rpx;
   right: 16rpx;
   font-size: 20rpx;
-  color: var(--color-text-disabled);
+  color: #777777;
 }
 
 .error-text {
   font-size: 24rpx;
-  color: var(--color-error);
+  color: var(--nb-coral);
   margin-top: -8rpx;
 }
 
@@ -946,16 +946,17 @@ export default {
   display: flex;
   align-items: center;
   gap: 8rpx;
-  background-color: var(--color-brand-primary);
+  background-color: var(--nb-yellow);
   color: #000000;
   padding: 12rpx 16rpx;
-  border-radius: 20rpx;
+  border-radius: 0;
+  border: 2rpx solid #000000;
   font-size: 24rpx;
 }
 
 .tags-subtitle {
   font-size: 24rpx;
-  color: var(--color-text-secondary);
+  color: #4a4a4a;
   margin-bottom: 12rpx;
 }
 
@@ -967,17 +968,17 @@ export default {
 
 .tag-option {
   padding: 12rpx 20rpx;
-  background-color: var(--color-card-background);
-  border: 2rpx solid var(--border-primary);
-  border-radius: 20rpx;
+  background-color: var(--nb-surface);
+  border: 2rpx solid var(--nb-ink);
+  border-radius: 0;
   font-size: 24rpx;
-  color: var(--color-text-secondary);
+  color: #4a4a4a;
   transition: all 0.2s ease;
 }
 
 .tag-option.selected {
-  background-color: var(--color-brand-primary);
-  border-color: var(--color-brand-primary);
+  background-color: var(--nb-yellow);
+  border-color: var(--nb-ink);
   color: #000000;
 }
 
@@ -995,27 +996,29 @@ export default {
 .add-tag-btn {
   padding: 12rpx;
   margin-right: 12rpx;
-  background-color: var(--color-brand-primary);
-  border-radius: 8rpx;
+  background-color: var(--nb-yellow);
+  border-radius: 0;
+  border: 2rpx solid #000000;
   color: #000000;
   transition: all 0.2s ease;
 }
 
 .add-tag-btn.disabled {
-  background-color: var(--color-text-disabled);
+  background-color: #777777;
   opacity: 0.5;
 }
 
 .tags-hint {
   font-size: 20rpx;
-  color: var(--color-text-disabled);
+  color: #777777;
 }
 
 /* 开关组件 */
 .switch-group {
-  background-color: var(--color-card-background);
-  border-radius: 12rpx;
+  background-color: var(--nb-surface);
+  border-radius: 0;
   padding: 24rpx;
+  border: 2rpx solid #000000;
 }
 
 .switch-item {
@@ -1031,22 +1034,22 @@ export default {
 
 .switch-title {
   font-size: 28rpx;
-  color: var(--color-text-primary);
+  color: var(--nb-ink);
   margin-bottom: 8rpx;
 }
 
 .switch-desc {
   font-size: 24rpx;
-  color: var(--color-text-secondary);
+  color: #4a4a4a;
   line-height: 1.4;
 }
 
 /* 底部区域 */
 .footer {
   padding: 24rpx 32rpx;
-  padding-bottom: calc(24rpx + env(safe-area-inset-bottom));
-  background-color: var(--color-card-background);
-  border-top: 2rpx solid var(--border-primary);
+  padding-bottom: calc(24rpx + var(--layout-bottom-offset));
+  background-color: var(--nb-surface);
+  border-top: 2rpx solid var(--nb-ink);
 }
 
 .publish-info {
@@ -1056,7 +1059,7 @@ export default {
 
 .info-text {
   font-size: 24rpx;
-  color: var(--color-text-disabled);
+  color: #777777;
 }
 
 .publish-btn {
@@ -1066,23 +1069,21 @@ export default {
   gap: 12rpx;
   width: 100%;
   padding: 32rpx;
-  background: linear-gradient(
-    135deg,
-    var(--color-brand-primary) 0%,
-    var(--color-brand-accent) 100%
-  );
-  border-radius: 16rpx;
-  box-shadow: 0 8rpx 24rpx rgba(0, 243, 255, 0.3);
+  background: var(--nb-yellow);
+  border-radius: 0;
+  border: 3rpx solid #000000;
+  box-shadow: 2rpx 2rpx 0 #000000;
   transition: all 0.3s ease;
   color: #000000;
 }
 
 .publish-btn:active {
-  transform: scale(0.98);
+  transform: translate(2rpx, 2rpx);
+  box-shadow: none;
 }
 
 .publish-btn.disabled {
-  background: var(--color-text-disabled);
+  background: #777777;
   box-shadow: none;
   opacity: 0.6;
 }

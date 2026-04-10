@@ -1,24 +1,29 @@
 <template>
-  <view class="challenge-detail-page">
+  <view class="challenge-detail-page glx-page-shell">
     <!-- 状态栏占位 -->
     <!-- #ifdef MP-WEIXIN -->
     <view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
     <!-- #endif -->
     
     <!-- 顶部导航 -->
-    <view class="header">
-      <view class="back-btn" @click="handleBack">
-        <Icon name="direction-left" :size="40" color="#FFFFFF" />
-      </view>
-      <view class="header-actions">
-        <view class="action-btn" @click="handleShare">
-          <Icon name="share" :size="40" color="#FFFFFF" />
+    <view class="header glx-topbar glx-page-shell__fixed">
+      <view class="header-content">
+        <view class="back-btn" @click="handleBack">
+          <Icon name="direction-left" :size="32" color="var(--nb-ink)" />
+        </view>
+        <view class="header-title">
+          <text class="glx-topbar__title">挑战详情</text>
+        </view>
+        <view class="header-actions">
+          <view class="action-btn" @click="handleShare">
+            <Icon name="share" :size="32" color="var(--nb-ink)" />
+          </view>
         </view>
       </view>
     </view>
     
     <!-- 挑战横幅 -->
-    <view class="challenge-banner">
+    <view class="challenge-banner glx-page-shell__fixed">
       <image 
         :src="challenge.banner_url" 
         class="banner-image"
@@ -38,9 +43,9 @@
     </view>
     
     <!-- 主要内容 -->
-    <scroll-view scroll-y class="main-content">
+    <scroll-view scroll-y class="main-content glx-scroll-region glx-page-shell__content">
       <!-- 挑战信息卡片 -->
-      <view class="info-card">
+      <view class="info-card glx-panel-card">
         <text class="challenge-title">{{ challenge.title }}</text>
         <text class="challenge-description">{{ challenge.description }}</text>
         
@@ -77,19 +82,19 @@
         
         <!-- 奖励信息 -->
         <view class="prize-section">
-          <view class="section-header">
+          <view class="section-header glx-section-head">
             <Icon name="work" :size="32" color="#FF7A45" />
-            <text class="section-title">挑战奖励</text>
+            <text class="section-title glx-section-title">挑战奖励</text>
           </view>
           <text class="prize-text">{{ challenge.prize }}</text>
         </view>
       </view>
       
       <!-- 挑战规则 -->
-      <view class="rules-card">
-        <view class="section-header">
+      <view class="rules-card glx-panel-card">
+        <view class="section-header glx-section-head">
           <Icon name="list" :size="32" color="#4F7FFF" />
-          <text class="section-title">挑战规则</text>
+          <text class="section-title glx-section-title">挑战规则</text>
         </view>
         <view class="rules-list">
           <view 
@@ -104,10 +109,10 @@
       </view>
       
       <!-- 评审标准 -->
-      <view class="criteria-card">
-        <view class="section-header">
+      <view class="criteria-card glx-panel-card">
+        <view class="section-header glx-section-head">
           <Icon name="star" :size="32" color="#FFD700" />
-          <text class="section-title">评审标准</text>
+          <text class="section-title glx-section-title">评审标准</text>
         </view>
         <view class="criteria-list">
           <view 
@@ -136,9 +141,9 @@
     </scroll-view>
     
     <!-- 底部操作栏 -->
-    <view class="bottom-bar">
+    <view class="bottom-bar glx-page-shell__fixed">
       <view 
-        class="join-button" 
+        class="join-button glx-primary-action"
         :class="[`button-${challenge.status}`, { 'button-joined': isJoined }]"
         @click="handleJoin"
       >
@@ -319,8 +324,7 @@ export default {
 <style scoped>
 .challenge-detail-page {
   width: 100%;
-  min-height: 100vh;
-  background-color: var(--color-background);
+  background-color: var(--nb-paper);
 }
 
 .status-bar {
@@ -329,31 +333,15 @@ export default {
 }
 
 .header {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 100;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 20rpx 32rpx;
-  background: linear-gradient(
-    to bottom,
-    rgba(0, 0, 0, 0.5) 0%,
-    rgba(0, 0, 0, 0) 100%
-  );
+  background: var(--nb-paper);
 }
 
 .back-btn {
-  width: 64rpx;
-  height: 64rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background-color: rgba(0, 0, 0, 0.3);
-  border-radius: 50%;
-  backdrop-filter: blur(10rpx);
+  background-color: var(--nb-surface);
+}
+
+.header-title {
+  flex: 1;
 }
 
 .header-actions {
@@ -367,9 +355,10 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: rgba(0, 0, 0, 0.3);
-  border-radius: 50%;
-  backdrop-filter: blur(10rpx);
+  background-color: var(--nb-surface);
+  border: var(--nb-border-width-control) solid var(--nb-ink);
+  box-shadow: var(--nb-shadow-soft);
+  box-sizing: border-box;
 }
 
 .challenge-banner {
@@ -404,11 +393,11 @@ export default {
   width: 96rpx;
   height: 96rpx;
   background-color: rgba(255, 255, 255, 0.2);
-  border-radius: var(--radius-medium);
+  border-radius: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  backdrop-filter: blur(10rpx);
+  backdrop-filter: none;
 }
 
 .status-badge {
@@ -416,8 +405,8 @@ export default {
   top: 32rpx;
   right: 32rpx;
   padding: 12rpx 24rpx;
-  border-radius: var(--radius-small);
-  backdrop-filter: blur(10rpx);
+  border-radius: 0;
+  backdrop-filter: none;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -443,24 +432,25 @@ export default {
 }
 
 .main-content {
-  height: calc(100vh - 500rpx - 120rpx);
+  flex: 1;
+  min-height: 0;
   padding: 32rpx;
 }
 
 .info-card,
 .rules-card,
 .criteria-card {
-  background-color: var(--color-card-background);
-  border-radius: var(--radius-medium);
+  background-color: var(--nb-surface);
+  border-radius: 0;
   padding: 32rpx;
   margin-bottom: 24rpx;
-  box-shadow: var(--shadow-card);
+  box-shadow: var(--nb-shadow-strong);
 }
 
 .challenge-title {
   font-size: 40rpx;
   font-weight: 700;
-  color: var(--color-text-primary);
+  color: var(--nb-ink);
   line-height: 1.4;
   margin-bottom: 16rpx;
   display: block;
@@ -468,7 +458,7 @@ export default {
 
 .challenge-description {
   font-size: 28rpx;
-  color: var(--color-text-secondary);
+  color: #4a4a4a;
   line-height: 1.6;
   margin-bottom: 32rpx;
   display: block;
@@ -478,8 +468,8 @@ export default {
   display: flex;
   justify-content: space-around;
   padding: 24rpx 0;
-  border-top: 1rpx solid var(--color-border);
-  border-bottom: 1rpx solid var(--color-border);
+  border-top: 1rpx solid var(--nb-ink);
+  border-bottom: 1rpx solid var(--nb-ink);
   margin-bottom: 24rpx;
 }
 
@@ -493,12 +483,12 @@ export default {
 .stat-value {
   font-size: 32rpx;
   font-weight: 700;
-  color: var(--color-text-primary);
+  color: var(--nb-ink);
 }
 
 .stat-label {
   font-size: 24rpx;
-  color: var(--color-text-secondary);
+  color: #4a4a4a;
 }
 
 .time-info {
@@ -516,13 +506,13 @@ export default {
 
 .time-text {
   font-size: 26rpx;
-  color: var(--color-text-secondary);
+  color: #4a4a4a;
 }
 
 .prize-section {
   padding: 24rpx;
   background: linear-gradient(135deg, rgba(79, 127, 255, 0.1), rgba(255, 122, 69, 0.1));
-  border-radius: var(--radius-small);
+  border-radius: 0;
 }
 
 .section-header {
@@ -535,12 +525,12 @@ export default {
 .section-title {
   font-size: 30rpx;
   font-weight: 700;
-  color: var(--color-text-primary);
+  color: var(--nb-ink);
 }
 
 .prize-text {
   font-size: 28rpx;
-  color: var(--color-brand-accent);
+  color: var(--nb-blue);
   font-weight: 600;
   display: block;
 }
@@ -565,7 +555,7 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: var(--color-brand-primary);
+  background-color: var(--nb-yellow);
   color: #FFFFFF;
   border-radius: 50%;
   font-size: 22rpx;
@@ -575,20 +565,20 @@ export default {
 .rule-text {
   flex: 1;
   font-size: 26rpx;
-  color: var(--color-text-secondary);
+  color: #4a4a4a;
   line-height: 1.6;
 }
 
 .criterion-item {
   padding: 16rpx 20rpx;
-  background-color: var(--color-background);
-  border-radius: var(--radius-small);
-  border-left: 4rpx solid var(--color-brand-primary);
+  background-color: var(--nb-paper);
+  border-radius: 0;
+  border-left: 4rpx solid var(--nb-yellow);
 }
 
 .criterion-text {
   font-size: 26rpx;
-  color: var(--color-text-secondary);
+  color: #4a4a4a;
   line-height: 1.5;
 }
 
@@ -601,15 +591,16 @@ export default {
 
 .tag-item {
   padding: 12rpx 24rpx;
-  background-color: var(--color-card-background);
-  border-radius: var(--radius-full);
-  box-shadow: var(--shadow-card);
+  background-color: var(--nb-surface);
+  border-radius: 0;
+  border: var(--nb-border-width-control) solid var(--nb-ink);
+  box-shadow: var(--nb-shadow-soft);
 }
 
 .tag-text {
   font-size: 24rpx;
-  color: var(--color-brand-primary);
-  font-weight: 500;
+  color: var(--nb-ink);
+  font-weight: 900;
 }
 
 .bottom-spacer {
@@ -617,14 +608,10 @@ export default {
 }
 
 .bottom-bar {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
   padding: 24rpx 32rpx;
-  background-color: var(--color-card-background);
+  background-color: var(--nb-surface);
   box-shadow: 0 -4rpx 16rpx rgba(0, 0, 0, 0.1);
-  z-index: 100;
+  border-top: var(--nb-border-width-control) solid var(--nb-ink);
 }
 
 .join-button {
@@ -633,7 +620,7 @@ export default {
   justify-content: center;
   gap: 12rpx;
   padding: 24rpx;
-  border-radius: var(--radius-medium);
+  border-radius: 0;
   transition: all 0.2s ease;
 }
 
@@ -646,7 +633,7 @@ export default {
 }
 
 .button-ended {
-  background-color: var(--color-text-secondary);
+  background-color: #4a4a4a;
 }
 
 .button-joined {

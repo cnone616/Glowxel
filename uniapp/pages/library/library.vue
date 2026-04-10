@@ -1,12 +1,12 @@
 <template>
-  <view class="home-page">
+  <view class="home-page glx-page-shell">
     <!-- 状态栏占位 -->
     <!-- #ifdef MP-WEIXIN -->
     <view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
     <!-- #endif -->
     
     <!-- 顶部导航 -->
-    <view class="header">
+    <view class="header glx-topbar glx-page-shell__fixed">
       <view class="header-content">
         <Logo :size="80" :show-text="true" />
         <view class="header-actions">
@@ -15,7 +15,7 @@
     </view>
     
     <!-- 主要内容 -->
-    <scroll-view scroll-y class="main-content">
+    <scroll-view scroll-y class="main-content glx-scroll-region glx-page-shell__content">
       <!-- 横幅轮播 -->
       <view class="banner-section">
         <swiper 
@@ -47,11 +47,11 @@
       
       <!-- 推荐作品 -->
       <view class="recommended-artworks">
-        <view class="section-header">
-          <text class="section-title">推荐作品</text>
-          <view class="more-btn" @click="goToRecommendedArtworks">
+        <view class="section-header glx-section-head">
+          <text class="section-title glx-section-title">推荐作品</text>
+          <view class="more-btn glx-inline-cta" @click="goToRecommendedArtworks">
             <text class="more-text">查看更多</text>
-            <Icon name="arrow-right" :size="24" color="#4F7FFF" />
+            <Icon name="arrow-right" :size="24" class="glx-inline-cta__icon" />
           </view>
         </view>
         
@@ -70,11 +70,11 @@
       
       <!-- 官方模板 -->
       <view class="official-templates">
-        <view class="section-header">
-          <text class="section-title">官方模板</text>
-          <view class="more-btn" @click="goToTemplates">
+        <view class="section-header glx-section-head">
+          <text class="section-title glx-section-title">官方模板</text>
+          <view class="more-btn glx-inline-cta" @click="goToTemplates">
             <text class="more-text">查看全部</text>
-            <Icon name="arrow-right" :size="24" color="#4F7FFF" />
+            <Icon name="arrow-right" :size="24" class="glx-inline-cta__icon" />
           </view>
         </view>
         
@@ -90,7 +90,7 @@
       
       <!-- 每周挑战 -->
       <view class="weekly-challenge">
-        <text class="section-title">每周挑战</text>
+        <text class="section-title glx-section-title">每周挑战</text>
         <ChallengeCard 
           v-if="weeklyChallenge"
           :challenge="weeklyChallenge"
@@ -348,20 +348,20 @@ export default {
   height: 100vh;
   display: flex;
   flex-direction: column;
-  background-color: var(--color-app-background);
+  background-color: var(--nb-paper);
   overflow: hidden;
 }
 
 /* 状态栏占位 */
 .status-bar {
-  background-color: var(--color-app-background);
+  background-color: var(--nb-paper);
   flex-shrink: 0;
 }
 
 /* 顶部导航 */
 .header {
-  background-color: var(--color-card-background);
-  border-bottom: 1rpx solid var(--border-primary);
+  background-color: var(--nb-surface);
+  border-bottom: 1rpx solid var(--nb-ink);
   flex-shrink: 0;
 }
 
@@ -384,50 +384,50 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: var(--radius-medium);
-  background-color: var(--color-app-background);
+  border-radius: 0;
+  background-color: var(--nb-paper);
   transition: all 0.2s ease;
 }
 
 .search-btn:active {
-  transform: scale(0.95);
-  background-color: rgba(79, 127, 255, 0.1);
+  transform: none;
+  background-color: var(--nb-yellow);
 }
 
 /* 搜索栏 */
 .search-section {
-  background-color: var(--color-card-background);
+  background-color: var(--nb-surface);
   padding: 0 32rpx 24rpx;
-  border-bottom: 1rpx solid var(--border-primary);
+  border-bottom: 1rpx solid var(--nb-ink);
 }
 
 .search-input-wrapper {
   display: flex;
   align-items: center;
   gap: 16rpx;
-  background-color: var(--color-app-background);
-  border-radius: var(--radius-medium);
+  background-color: var(--nb-paper);
+  border-radius: 0;
   padding: 20rpx 24rpx;
-  border: 2rpx solid var(--border-primary);
+  border: 2rpx solid var(--nb-ink);
   transition: all 0.2s ease;
 }
 
 .search-input-wrapper:focus-within {
-  border-color: var(--color-brand-primary);
-  box-shadow: 0 0 0 4rpx rgba(79, 127, 255, 0.1);
+  border-color: var(--nb-yellow);
+  box-shadow: none;
 }
 
 .search-input {
   flex: 1;
   font-size: 28rpx;
-  color: var(--color-text-primary);
+  color: var(--nb-ink);
   background: transparent;
   border: none;
   outline: none;
 }
 
 .search-input::placeholder {
-  color: var(--color-text-disabled);
+  color: #777777;
 }
 
 .clear-btn {
@@ -437,7 +437,7 @@ export default {
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  background-color: var(--color-app-background);
+  background-color: var(--nb-paper);
   transition: all 0.2s ease;
 }
 
@@ -459,7 +459,7 @@ export default {
 
 .banner-swiper {
   height: 320rpx;
-  border-radius: var(--radius-large);
+  border-radius: 0;
   overflow: hidden;
 }
 
@@ -498,8 +498,8 @@ export default {
   align-items: center;
   padding: 16rpx 32rpx;
   background-color: rgba(255, 255, 255, 0.2);
-  border-radius: var(--radius-small);
-  backdrop-filter: blur(10rpx);
+  border-radius: 0;
+  backdrop-filter: none;
   transition: all 0.2s ease;
 }
 
@@ -527,7 +527,7 @@ export default {
 .section-title {
   font-size: 36rpx;
   font-weight: 700;
-  color: var(--color-text-primary);
+  color: var(--nb-ink);
   margin-bottom: 24rpx;
 }
 
@@ -540,16 +540,14 @@ export default {
 
 .project-count {
   font-size: 24rpx;
-  color: var(--color-text-secondary);
+  color: #4a4a4a;
   font-weight: 500;
 }
 
 .more-btn {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 8rpx;
-  padding: 12rpx 16rpx;
-  border-radius: var(--radius-small);
+  justify-content: center;
   transition: all 0.2s ease;
 }
 
@@ -560,8 +558,8 @@ export default {
 
 .more-text {
   font-size: 26rpx;
-  color: var(--color-brand-primary);
-  font-weight: 500;
+  color: var(--nb-ink);
+  font-weight: 900;
 }
 
 /* 我的画布 */
@@ -590,7 +588,7 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: var(--color-app-background);
+  background-color: var(--nb-paper);
   border-radius: 50%;
   margin-bottom: 32rpx;
 }
@@ -598,32 +596,33 @@ export default {
 .empty-title {
   font-size: 32rpx;
   font-weight: 600;
-  color: var(--color-text-primary);
+  color: var(--nb-ink);
   margin-bottom: 12rpx;
 }
 
 .empty-subtitle {
   font-size: 26rpx;
-  color: var(--color-text-secondary);
+  color: #4a4a4a;
   line-height: 1.5;
   margin-bottom: 32rpx;
 }
 
 .empty-btn {
   padding: 20rpx 40rpx;
-  background-color: var(--color-brand-primary);
-  border-radius: var(--radius-small);
+  background-color: var(--nb-yellow);
+  border-radius: 0;
+  border: 3rpx solid #000000;
   transition: all 0.2s ease;
 }
 
 .empty-btn:active {
-  transform: scale(0.95);
+  transform: translate(2rpx, 2rpx);
 }
 
 .empty-btn-text {
   font-size: 28rpx;
   font-weight: 600;
-  color: #FFFFFF;
+  color: #000000;
 }
 
 /* 推荐作品 */

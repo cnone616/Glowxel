@@ -1,22 +1,26 @@
 <template>
-  <view class="my-favorites-page">
+  <view class="my-favorites-page glx-page-shell">
     <!-- 状态栏占位 -->
     <!-- #ifdef MP-WEIXIN -->
     <view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
     <!-- #endif -->
 
     <!-- 导航栏 -->
-    <view class="navbar">
+    <view class="navbar glx-topbar glx-page-shell__fixed">
       <view class="nav-left" @click="handleBack">
         <Icon
           name="direction-left"
           :size="32"
-          color="var(--color-text-primary)"
+          color="var(--nb-ink)"
         />
       </view>
-      <text class="nav-title">我的收藏</text>
-      <view class="nav-right" @click="toggleEditMode">
-        <text class="edit-btn">{{ isEditMode ? "完成" : "编辑" }}</text>
+      <text class="nav-title glx-topbar__title">我的收藏</text>
+      <view class="nav-right"></view>
+    </view>
+
+    <view class="page-actions">
+      <view class="page-action-btn" @click="toggleEditMode">
+        <text class="page-action-text">{{ isEditMode ? "完成" : "编辑" }}</text>
       </view>
     </view>
 
@@ -25,7 +29,7 @@
       <view
         v-for="category in categories"
         :key="category.value"
-        class="category-tab"
+        class="category-tab glx-choice-chip"
         :class="{ active: currentCategory === category.value }"
         @click="currentCategory = category.value"
       >
@@ -38,12 +42,12 @@
     </view>
 
     <!-- 收藏列表 -->
-    <scroll-view scroll-y class="content">
-      <view v-if="filteredFavorites.length === 0" class="empty-state">
-        <Icon name="favorite" :size="120" color="var(--color-text-disabled)" />
+    <scroll-view scroll-y class="content glx-scroll-region glx-page-shell__content">
+      <view v-if="filteredFavorites.length === 0" class="empty-state glx-panel-card">
+        <Icon name="favorite" :size="120" color="#777777" />
         <text class="empty-title">暂无收藏</text>
         <text class="empty-desc">去社区发现更多精彩作品吧</text>
-        <button class="explore-btn" @click="goToExplore">
+        <button class="explore-btn glx-cta-button" @click="goToExplore">
           <Icon name="compass" :size="32" />
           <text>去探索</text>
         </button>
@@ -53,7 +57,7 @@
         <view
           v-for="item in filteredFavorites"
           :key="item.id"
-          class="favorite-item"
+          class="favorite-item glx-panel-card"
           :class="{ 'edit-mode': isEditMode }"
           @click="openFavorite(item)"
         >
@@ -67,13 +71,13 @@
               v-if="selectedItems.includes(item.id)"
               name="check-circle-fill"
               :size="40"
-              color="var(--color-brand-primary)"
+              color="var(--nb-yellow)"
             />
             <Icon
               v-else
               name="circle"
               :size="40"
-              color="var(--color-text-disabled)"
+              color="#777777"
             />
           </view>
 
@@ -89,7 +93,7 @@
               <Icon
                 :name="getTypeIcon(item.type)"
                 :size="60"
-                color="var(--color-text-disabled)"
+                color="#777777"
               />
             </view>
 
@@ -122,11 +126,11 @@
             <view class="action-btn" @click.stop="downloadFavorite(item)">
               <Icon name="download" :size="32" />
             </view>
-            <view class="action-btn" @click.stop="removeFavorite(item)">
+            <view class="action-btn danger" @click.stop="removeFavorite(item)">
               <Icon
                 name="ashbin"
                 :size="32"
-                color="var(--color-brand-primary)"
+                color="#ff6b6b"
               />
             </view>
           </view>
@@ -430,57 +434,46 @@ export default {
 <style scoped>
 .my-favorites-page {
   height: 100vh;
-  background-color: var(--color-app-background);
+  background-color: var(--nb-paper);
   display: flex;
   flex-direction: column;
 }
 
-.navbar {
-  height: 88rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0 32rpx;
-  background-color: var(--color-card-background);
-  border-bottom: 2rpx solid var(--border-primary);
-  position: relative;
-}
-
-.nav-left {
-  position: absolute;
-  left: 32rpx;
-  width: 120rpx;
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-}
-
-.nav-right {
-  position: absolute;
-  right: 32rpx;
-  width: 120rpx;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-}
-
-.nav-title {
-  font-size: 32rpx;
-  font-weight: 600;
-  color: var(--color-text-primary);
-}
-
 .edit-btn {
   font-size: 28rpx;
-  color: var(--color-brand-primary);
+  color: var(--nb-yellow);
   font-weight: 600;
+}
+
+.page-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding: 20rpx 32rpx 0;
+}
+
+.page-action-btn {
+  min-height: 68rpx;
+  padding: 0 24rpx;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #ffffff;
+  border: 4rpx solid #000000;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.page-action-text {
+  font-size: 24rpx;
+  font-weight: 700;
+  color: #000000;
 }
 
 .category-tabs {
   display: flex;
-  background-color: var(--color-card-background);
+  background-color: var(--nb-surface);
   padding: 24rpx 32rpx;
-  border-bottom: 2rpx solid var(--border-primary);
+  border-bottom: 2rpx solid var(--nb-ink);
   gap: 16rpx;
 }
 
@@ -489,34 +482,36 @@ export default {
   align-items: center;
   gap: 8rpx;
   padding: 16rpx 24rpx;
-  background-color: var(--color-app-background);
-  border: 2rpx solid var(--border-primary);
-  border-radius: 32rpx;
+  background-color: var(--nb-paper);
+  border: 2rpx solid var(--nb-ink);
+  border-radius: 0;
   transition: all 0.2s ease;
   flex-shrink: 0;
 }
 
 .category-tab.active {
-  background-color: var(--color-brand-primary);
-  border-color: var(--color-brand-primary);
-  color: #ffffff;
+  background-color: var(--nb-yellow);
+  border-color: var(--nb-ink);
+  color: #000000;
 }
 
 .category-text {
   font-size: 24rpx;
-  color: var(--color-text-secondary);
+  color: #4a4a4a;
 }
 
 .category-tab.active .category-text {
-  color: #ffffff;
+  color: #000000;
+  font-weight: 700;
 }
 
 .category-count {
   font-size: 20rpx;
-  background-color: rgba(255, 255, 255, 0.2);
+  background-color: #ffffff;
   padding: 4rpx 8rpx;
-  border-radius: 10rpx;
+  border-radius: 0;
   color: inherit;
+  border: 2rpx solid var(--nb-ink);
 }
 
 .content {
@@ -537,12 +532,12 @@ export default {
 .empty-title {
   font-size: 32rpx;
   font-weight: 600;
-  color: var(--color-text-secondary);
+  color: #4a4a4a;
 }
 
 .empty-desc {
   font-size: 24rpx;
-  color: var(--color-text-disabled);
+  color: #777777;
 }
 
 .explore-btn {
@@ -550,10 +545,10 @@ export default {
   align-items: center;
   gap: 12rpx;
   padding: 24rpx 48rpx;
-  background-color: var(--color-brand-primary);
-  color: #ffffff;
+  background-color: var(--nb-yellow);
+  color: #000000;
   border: none;
-  border-radius: 16rpx;
+  border-radius: 0;
   font-size: 28rpx;
   font-weight: 600;
 }
@@ -572,16 +567,16 @@ export default {
   display: flex;
   align-items: center;
   gap: 24rpx;
-  background-color: var(--color-card-background);
-  border-radius: 16rpx;
+  background-color: var(--nb-surface);
+  border-radius: 0;
   padding: 24rpx;
-  box-shadow: var(--shadow-card);
+  box-shadow: var(--nb-shadow-strong);
   transition: all 0.2s ease;
 }
 
 .favorite-item:active {
   transform: scale(0.98);
-  box-shadow: var(--shadow-floating);
+  box-shadow: 2rpx 2rpx 0 var(--nb-ink);
 }
 
 .favorite-item.edit-mode {
@@ -596,9 +591,9 @@ export default {
   position: relative;
   width: 120rpx;
   height: 120rpx;
-  border-radius: 12rpx;
+  border-radius: 0;
   overflow: hidden;
-  background-color: var(--color-app-background);
+  background-color: var(--nb-paper);
   flex-shrink: 0;
 }
 
@@ -621,23 +616,26 @@ export default {
   right: 8rpx;
   width: 32rpx;
   height: 32rpx;
-  border-radius: 16rpx;
+  border-radius: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #ffffff;
+  color: #000000;
+  border: 2rpx solid var(--nb-ink);
 }
 
 .type-badge.artwork {
-  background-color: var(--color-brand-primary);
+  background-color: var(--nb-yellow);
 }
 
 .type-badge.template {
-  background-color: var(--color-success);
+  background-color: #111111;
+  color: #ffffff;
 }
 
 .type-badge.pattern {
-  background-color: var(--color-warning);
+  background-color: var(--nb-coral);
+  color: #ffffff;
 }
 
 .item-info {
@@ -650,7 +648,7 @@ export default {
 .item-title {
   font-size: 28rpx;
   font-weight: 600;
-  color: var(--color-text-primary);
+  color: var(--nb-ink);
   display: -webkit-box;
   -webkit-line-clamp: 1;
   -webkit-box-orient: vertical;
@@ -659,7 +657,7 @@ export default {
 
 .item-author {
   font-size: 24rpx;
-  color: var(--color-text-secondary);
+  color: #4a4a4a;
 }
 
 .item-meta {
@@ -670,7 +668,7 @@ export default {
 .item-size,
 .item-date {
   font-size: 22rpx;
-  color: var(--color-text-disabled);
+  color: #777777;
 }
 
 .item-tags {
@@ -681,10 +679,10 @@ export default {
 
 .tag {
   font-size: 20rpx;
-  color: var(--color-brand-primary);
-  background-color: rgba(79, 127, 255, 0.1);
+  color: #000000;
+  background-color: #fff4c4;
   padding: 4rpx 8rpx;
-  border-radius: 8rpx;
+  border-radius: 0;
 }
 
 .item-actions {
@@ -699,15 +697,21 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: var(--color-app-background);
-  border: 2rpx solid var(--border-primary);
-  border-radius: 12rpx;
+  background-color: var(--nb-paper);
+  border: 2rpx solid var(--nb-ink);
+  border-radius: 0;
   transition: all 0.2s ease;
+  box-shadow: 2rpx 2rpx 0 #000000;
 }
 
 .action-btn:active {
-  transform: scale(0.95);
-  background-color: var(--border-primary);
+  transform: translate(2rpx, 2rpx);
+  box-shadow: none;
+}
+
+.action-btn.danger {
+  background-color: #d92d20;
+  border-color: #000000;
 }
 
 .batch-actions {
@@ -715,13 +719,13 @@ export default {
   align-items: center;
   justify-content: space-between;
   padding: 24rpx 32rpx;
-  background-color: var(--color-card-background);
-  border-top: 2rpx solid var(--border-primary);
+  background-color: var(--nb-surface);
+  border-top: 2rpx solid var(--nb-ink);
 }
 
 .selected-count {
   font-size: 24rpx;
-  color: var(--color-text-secondary);
+  color: #4a4a4a;
 }
 
 .batch-buttons {
@@ -732,23 +736,28 @@ export default {
 .batch-btn {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 8rpx;
-  padding: 16rpx 24rpx;
-  background-color: var(--color-brand-primary);
-  color: #ffffff;
-  border: none;
-  border-radius: 12rpx;
+  min-width: 176rpx;
+  height: 88rpx;
+  padding: 0 24rpx;
+  background-color: var(--nb-yellow);
+  color: #000000;
+  border: 3rpx solid #000000;
+  border-radius: 0;
+  box-shadow: 2rpx 2rpx 0 #000000;
   font-size: 24rpx;
   transition: all 0.2s ease;
 }
 
 .batch-btn:disabled {
-  background-color: var(--color-text-disabled);
+  background-color: #777777;
   opacity: 0.5;
 }
 
 .batch-btn.danger {
-  background-color: var(--color-error);
+  background-color: #d92d20;
+  color: #ffffff;
 }
 
 .batch-btn::after {

@@ -83,7 +83,7 @@ export default {
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(0, 0, 0, 0.8);
+  background-color: rgba(0, 0, 0, 0.45);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -95,11 +95,11 @@ export default {
   width: 100%;
   max-width: 600rpx;
   max-height: 80vh;
-  background-color: var(--bg-tertiary);
-  border: 2rpx solid rgba(0, 243, 255, 0.3);
-  border-radius: 32rpx;
+  background-color: var(--nb-surface);
+  border: var(--nb-border-width-panel) solid var(--nb-ink);
+  border-radius: 0;
   overflow: hidden;
-  box-shadow: 0 0 60rpx rgba(0, 243, 255, 0.15);
+  box-shadow: var(--nb-shadow-strong);
   display: flex;
   flex-direction: column;
 }
@@ -109,8 +109,8 @@ export default {
   align-items: center;
   justify-content: space-between;
   padding: 32rpx;
-  border-bottom: 2rpx solid var(--border-color);
-  background-color: var(--bg-tertiary);
+  border-bottom: var(--nb-border-width-panel) solid var(--nb-ink);
+  background-color: var(--nb-surface);
 }
 
 .header-icon {
@@ -129,8 +129,8 @@ export default {
 .modal-title {
   flex: 1;
   font-size: 32rpx;
-  font-weight: bold;
-  color: var(--text-primary);
+  font-weight: 900;
+  color: var(--nb-ink);
   margin-left: 16rpx;
 }
 
@@ -171,18 +171,20 @@ export default {
   display: flex;
   gap: 32rpx;
   padding: 24rpx;
-  border-radius: 16rpx;
-  background-color: rgba(0, 243, 255, 0.05);
-  border: 2rpx solid var(--border-color);
+  border-radius: 0;
+  background-color: #ffffff;
+  border: var(--nb-border-width-control) solid var(--nb-ink);
+  box-shadow: var(--nb-shadow-soft);
 }
 
 .item-icon {
   width: 80rpx;
   height: 80rpx;
   flex-shrink: 0;
-  border-radius: 50%;
-  background-color: rgba(0, 243, 255, 0.1);
-  border: 2rpx solid rgba(0, 243, 255, 0.2);
+  border-radius: 0;
+  background-color: var(--nb-yellow);
+  border: var(--nb-border-width-control) solid var(--nb-ink);
+  box-shadow: var(--nb-shadow-soft);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -202,20 +204,20 @@ export default {
 
 .item-title {
   font-size: 28rpx;
-  font-weight: bold;
-  color: var(--text-primary);
+  font-weight: 900;
+  color: var(--nb-ink);
 }
 
 .item-description {
   font-size: 24rpx;
-  color: var(--text-secondary);
+  color: #4a4a4a;
   line-height: 1.6;
 }
 
 .modal-footer {
   padding: 32rpx;
-  border-top: 2rpx solid var(--border-color);
-  background-color: var(--bg-tertiary);
+  border-top: var(--nb-border-width-panel) solid var(--nb-ink);
+  background-color: var(--nb-surface);
   box-sizing: border-box;
 }
 
@@ -229,17 +231,18 @@ export default {
 
 .confirm-btn {
   padding: 24rpx;
-  background-color: var(--accent-color);
-  border-radius: 16rpx;
+  background-color: var(--nb-yellow);
+  border: var(--nb-border-width-control) solid var(--nb-ink);
+  border-radius: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 8rpx 32rpx rgba(0, 243, 255, 0.2);
+  box-shadow: var(--nb-shadow-soft);
 }
 
 .confirm-btn-text {
   font-size: 28rpx;
-  font-weight: bold;
-  color: #000000;
+  font-weight: 900;
+  color: var(--nb-ink);
 }
 </style>

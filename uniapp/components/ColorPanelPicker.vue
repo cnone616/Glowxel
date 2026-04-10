@@ -64,53 +64,61 @@
     <view class="field-grid">
       <view class="field-item field-item-hex">
         <text class="field-label">HEX</text>
-        <input
-          class="field-input"
-          :value="hexInput"
-          maxlength="7"
-          @input="handleHexInput"
-          @blur="commitHexInput"
-          @confirm="commitHexInput"
-        />
+        <view class="field-input-shell">
+          <input
+            class="field-input"
+            :value="hexInput"
+            maxlength="7"
+            @input="handleHexInput"
+            @blur="commitHexInput"
+            @confirm="commitHexInput"
+          />
+        </view>
       </view>
 
       <view class="field-item">
         <text class="field-label">R</text>
-        <input
-          class="field-input"
-          type="number"
-          :value="redInput"
-          maxlength="3"
-          @input="handleRgbInput('r', $event)"
-          @blur="commitRgbInput"
-          @confirm="commitRgbInput"
-        />
+        <view class="field-input-shell">
+          <input
+            class="field-input"
+            type="number"
+            :value="redInput"
+            maxlength="3"
+            @input="handleRgbInput('r', $event)"
+            @blur="commitRgbInput"
+            @confirm="commitRgbInput"
+          />
+        </view>
       </view>
 
       <view class="field-item">
         <text class="field-label">G</text>
-        <input
-          class="field-input"
-          type="number"
-          :value="greenInput"
-          maxlength="3"
-          @input="handleRgbInput('g', $event)"
-          @blur="commitRgbInput"
-          @confirm="commitRgbInput"
-        />
+        <view class="field-input-shell">
+          <input
+            class="field-input"
+            type="number"
+            :value="greenInput"
+            maxlength="3"
+            @input="handleRgbInput('g', $event)"
+            @blur="commitRgbInput"
+            @confirm="commitRgbInput"
+          />
+        </view>
       </view>
 
       <view class="field-item">
         <text class="field-label">B</text>
-        <input
-          class="field-input"
-          type="number"
-          :value="blueInput"
-          maxlength="3"
-          @input="handleRgbInput('b', $event)"
-          @blur="commitRgbInput"
-          @confirm="commitRgbInput"
-        />
+        <view class="field-input-shell">
+          <input
+            class="field-input"
+            type="number"
+            :value="blueInput"
+            maxlength="3"
+            @input="handleRgbInput('b', $event)"
+            @blur="commitRgbInput"
+            @confirm="commitRgbInput"
+          />
+        </view>
       </view>
     </view>
   </view>
@@ -512,10 +520,10 @@ export default {
   display: flex;
   flex-direction: column;
   gap: 16rpx;
-  padding: 20rpx;
-  background: var(--bg-tertiary);
-  border: 2rpx solid var(--border-primary);
-  border-radius: 18rpx;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
 }
 
 .picker-header {
@@ -533,9 +541,9 @@ export default {
 .preview-swatch {
   width: 72rpx;
   height: 72rpx;
-  border-radius: 16rpx;
-  border: 2rpx solid rgba(255, 255, 255, 0.12);
-  box-shadow: 0 8rpx 20rpx rgba(0, 0, 0, 0.18);
+  border-radius: 0;
+  border: 2rpx solid #000000;
+  box-shadow: none;
 }
 
 .preview-meta {
@@ -565,21 +573,22 @@ export default {
 .preset-swatch {
   width: 42rpx;
   height: 42rpx;
-  border-radius: 12rpx;
-  border: 3rpx solid transparent;
-  box-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.18);
+  border-radius: 0;
+  border: 3rpx solid #000000;
+  box-shadow: none;
 }
 
 .preset-swatch.active {
-  border-color: var(--accent-primary);
-  box-shadow: 0 0 0 4rpx rgba(79, 127, 255, 0.18);
+  border-color: var(--nb-yellow);
+  box-shadow: none;
 }
 
 .sv-panel {
   position: relative;
   height: 240rpx;
-  border-radius: 18rpx;
+  border-radius: 0;
   overflow: hidden;
+  border: 2rpx solid #000000;
 }
 
 .sv-panel-white {
@@ -598,7 +607,7 @@ export default {
   position: absolute;
   width: 28rpx;
   height: 28rpx;
-  border-radius: 50%;
+  border-radius: 0;
   border: 4rpx solid #ffffff;
   box-shadow: 0 0 0 2rpx rgba(0, 0, 0, 0.2);
   transform: translate(-14rpx, -14rpx);
@@ -620,7 +629,7 @@ export default {
   position: relative;
   flex: 1;
   height: 24rpx;
-  border-radius: 999rpx;
+  border-radius: 0;
   background: linear-gradient(
     to right,
     #ff0000 0%,
@@ -631,6 +640,7 @@ export default {
     #ff00ff 83%,
     #ff0000 100%
   );
+  border: 2rpx solid #000000;
 }
 
 .hue-thumb {
@@ -638,7 +648,7 @@ export default {
   top: 50%;
   width: 26rpx;
   height: 26rpx;
-  border-radius: 50%;
+  border-radius: 0;
   border: 4rpx solid #ffffff;
   box-shadow: 0 0 0 2rpx rgba(0, 0, 0, 0.16);
   transform: translate(-13rpx, -50%);
@@ -667,12 +677,22 @@ export default {
   text-transform: uppercase;
 }
 
-.field-input {
+.field-input-shell {
   height: 64rpx;
-  padding: 0 16rpx;
-  border-radius: 14rpx;
-  background: var(--bg-elevated);
-  border: 2rpx solid var(--border-primary);
+  display: flex;
+  align-items: center;
+  padding: 0 14rpx;
+  border-radius: 0;
+  background: #ffffff;
+  border: 2rpx solid var(--nb-ink);
+  box-sizing: border-box;
+}
+
+.field-input {
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  border: 0;
   color: var(--text-primary);
   font-size: 24rpx;
   box-sizing: border-box;

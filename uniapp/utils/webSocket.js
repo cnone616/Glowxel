@@ -9,16 +9,26 @@ class WebSocket {
     this.connected = false;
     this.host = "";
     this.port = 80;
-    this.onMessageCallbacks = []; // 改为数组，支持多个监听器
+    this.connectionState = "idle";
+
+    this.onMessageCallbacks = [];
     this.onConnectCallback = null;
     this.onDisconnectCallback = null;
     this.onErrorCallback = null;
+
     this._reconnectAttempts = 0;
     this._reconnectTimer = null;
     this._manualDisconnect = false;
-    this._suppressReconnectOnClose = false;
     this._maxReconnectAttempts = 10;
     this._heartbeatTimer = null;
+
+    this._socketIdSeed = 0;
+    this._currentSocketId = 0;
+    this._connectPromise = null;
+    this._connectKey = "";
+    this._closeMetaBySocketId = new Map();
+    this._messageWaiters = new Set();
+    this._hasReceivedMessage = false;
   }
 
   normalizeHostInput(host) {
@@ -39,15 +49,130 @@ class WebSocket {
     return normalized;
   }
 
+  _clearReconnectTimer() {
+    if (this._reconnectTimer) {
+      clearTimeout(this._reconnectTimer);
+      this._reconnectTimer = null;
+    }
+  }
+
+  _emitError(err) {
+    if (this.onErrorCallback) {
+      this.onErrorCallback(err);
+    }
+  }
+
+  _registerCloseMeta(socketId, meta) {
+    this._closeMetaBySocketId.set(socketId, meta);
+  }
+
+  _consumeCloseMeta(socketId) {
+    const meta = this._closeMetaBySocketId.get(socketId) || null;
+    if (meta) {
+      this._closeMetaBySocketId.delete(socketId);
+    }
+    return meta;
+  }
+
+  _closeSocketTask(socketTask, socketId, meta) {
+    if (!socketTask) {
+      return;
+    }
+
+    this._registerCloseMeta(socketId, meta);
+    socketTask.close({
+      success: () => {
+        if (meta && meta.logClose) {
+          console.log(meta.logClose);
+        }
+      },
+    });
+  }
+
+  _setDisconnectedState(nextState = "idle") {
+    this.connected = false;
+    this.connectionState = nextState;
+    this._stopHeartbeat();
+    this._hasReceivedMessage = false;
+  }
+
+  _addMessageWaiter(waiter) {
+    this._messageWaiters.add(waiter);
+  }
+
+  _removeMessageWaiter(waiter) {
+    this._messageWaiters.delete(waiter);
+  }
+
+  _rejectMessageWaitersForSocket(socketId, err) {
+    Array.from(this._messageWaiters).forEach((waiter) => {
+      if (!waiter || waiter.socketId !== socketId) {
+        return;
+      }
+      this._removeMessageWaiter(waiter);
+      waiter.reject(err);
+    });
+  }
+
   /**
    * 连接到 ESP32
    * @param {string} host - IP 地址
    * @param {number} port - 端口号，默认 80
+   * @param {object} options - 内部连接选项
    */
-  connect(host, port = 80) {
-    return new Promise((resolve, reject) => {
+  connect(host, port = 80, options = {}) {
+    const normalizedHost = this.normalizeHostInput(host);
+    if (!normalizedHost) {
+      const err = new Error("设备 IP 地址无效");
+      this._emitError(err);
+      return Promise.reject(err);
+    }
+
+    const connectKey = `${normalizedHost}:${port}`;
+    const isReconnect = options.isReconnect === true;
+
+    if (
+      this.connected &&
+      this.connectionState === "open" &&
+      this.host === normalizedHost &&
+      this.port === port
+    ) {
+      return Promise.resolve();
+    }
+
+    if (
+      this.connectionState === "connecting" &&
+      this._connectPromise &&
+      this._connectKey === connectKey
+    ) {
+      return this._connectPromise;
+    }
+
+    this._clearReconnectTimer();
+    this._manualDisconnect = false;
+
+    const previousSocket = this.socket;
+    const previousSocketId = this._currentSocketId;
+    if (previousSocket) {
+      console.log("关闭旧连接");
+      this._closeSocketTask(previousSocket, previousSocketId, {
+        suppressReconnect: true,
+        logClose: "旧连接已关闭",
+      });
+    }
+
+    this.host = normalizedHost;
+    this.port = port;
+    this._connectKey = connectKey;
+    this._setDisconnectedState("connecting");
+
+    const socketId = ++this._socketIdSeed;
+    this._currentSocketId = socketId;
+
+    this._connectPromise = new Promise((resolve, reject) => {
       let settled = false;
       let connectTimeoutTimer = null;
+      let opened = false;
 
       const finishResolve = () => {
         if (settled) {
@@ -73,131 +198,137 @@ class WebSocket {
         reject(err);
       };
 
-      const normalizedHost = this.normalizeHostInput(host);
-      if (!normalizedHost) {
-        const err = new Error("设备 IP 地址无效");
-        if (this.onErrorCallback) {
-          this.onErrorCallback(err);
-        }
-        finishReject(err);
-        return;
-      }
-
-      // 主动发起新连接时，清理残留重连定时器
-      if (this._reconnectTimer) {
-        clearTimeout(this._reconnectTimer);
-        this._reconnectTimer = null;
-      }
-
-      // 如果已经有连接，先关闭
-      if (this.socket) {
-        this._suppressReconnectOnClose = true;
-        this._stopHeartbeat();
-        console.log("关闭旧连接");
-        this.socket.close({
-          success: () => {
-            console.log("旧连接已关闭");
-          },
-        });
-        this.socket = null;
-        this.connected = false;
-      }
-
-      this.host = normalizedHost;
-      this.port = port;
-
-      // 使用 WebSocket 协议，连接到 /ws 路径
       const url = `ws://${normalizedHost}/ws`;
       console.log("准备连接 WebSocket:", url);
 
-      // 创建 WebSocket 连接
       const socketTask = uni.connectSocket({
-        url: url,
+        url,
         success: () => {
           console.log("WebSocket 创建成功");
         },
         fail: (err) => {
+          if (socketId !== this._currentSocketId) {
+            return;
+          }
           console.error("WebSocket 创建失败:", err);
-          this.connected = false;
-          if (this.onErrorCallback) {
-            this.onErrorCallback(err);
+          this._setDisconnectedState("idle");
+          this._emitError(err);
+          if (isReconnect && !this._manualDisconnect) {
+            this._scheduleReconnect();
           }
           finishReject(err);
         },
       });
 
       this.socket = socketTask;
+
       connectTimeoutTimer = setTimeout(() => {
+        if (socketId !== this._currentSocketId) {
+          return;
+        }
         const err = new Error("WebSocket 连接超时");
         console.error(err.message);
-        this.connected = false;
-        if (this.onErrorCallback) {
-          this.onErrorCallback(err);
-        }
-        if (this.socket) {
-          this._suppressReconnectOnClose = true;
-          this.socket.close({});
+        this._setDisconnectedState("idle");
+        this._emitError(err);
+        this._closeSocketTask(socketTask, socketId, {
+          suppressReconnect: true,
+        });
+        if (isReconnect && !this._manualDisconnect) {
+          this._scheduleReconnect();
         }
         finishReject(err);
       }, 12000);
 
-      // 连接成功
       socketTask.onOpen(() => {
+        if (socketId !== this._currentSocketId) {
+          return;
+        }
         console.log("WebSocket 连接成功");
+        opened = true;
         this.connected = true;
+        this.connectionState = "open";
         this._reconnectAttempts = 0;
-        this._manualDisconnect = false;
-        this._startHeartbeat();
         if (this.onConnectCallback) {
           this.onConnectCallback();
         }
         finishResolve();
       });
 
-      // 接收消息
       socketTask.onMessage((res) => {
+        if (socketId !== this._currentSocketId) {
+          return;
+        }
         console.log("收到消息:", res.data);
+        if (!this._hasReceivedMessage) {
+          this._hasReceivedMessage = true;
+          this._startHeartbeat();
+        }
         try {
           const data = JSON.parse(res.data);
-          // 调用所有注册的回调
           this.onMessageCallbacks.forEach((callback) => {
-            if (callback) callback(data);
+            if (callback) {
+              callback(data);
+            }
           });
-        } catch (e) {
-          console.error("JSON 解析失败:", e);
+        } catch (err) {
+          console.error("JSON 解析失败:", err);
         }
       });
 
-      // 连接关闭
-      socketTask.onClose(() => {
-        console.log("WebSocket 连接已关闭");
-        this.connected = false;
-        this._stopHeartbeat();
+      socketTask.onClose((event) => {
+        const closeMeta = this._consumeCloseMeta(socketId);
+        if (socketId !== this._currentSocketId) {
+          return;
+        }
+
+        const closeCode =
+          event && typeof event.code !== "undefined" ? event.code : "unknown";
+        const closeReason =
+          event && typeof event.reason === "string" ? event.reason : "";
+        console.log(
+          `WebSocket 连接已关闭 code=${closeCode}${closeReason ? ` reason=${closeReason}` : ""}`,
+        );
+        if (this.socket === socketTask) {
+          this.socket = null;
+        }
+        this._rejectMessageWaitersForSocket(
+          socketId,
+          new Error("WebSocket 连接已关闭"),
+        );
+        this._setDisconnectedState("idle");
+
         if (this.onDisconnectCallback) {
           this.onDisconnectCallback();
         }
-        if (this._suppressReconnectOnClose) {
-          this._suppressReconnectOnClose = false;
-          return;
-        }
-        // 意外断线时自动重连（指数退避）
-        if (!this._manualDisconnect && this.host) {
+
+        const shouldReconnect =
+          !this._manualDisconnect &&
+          this.host &&
+          (!closeMeta || closeMeta.suppressReconnect !== true) &&
+          (opened || isReconnect);
+
+        if (shouldReconnect) {
           this._scheduleReconnect();
         }
+
         if (!settled) {
           finishReject(new Error("WebSocket 连接已关闭"));
         }
       });
 
-      // 连接错误
       socketTask.onError((err) => {
-        console.error("WebSocket 错误:", err);
-        if (this.onErrorCallback) {
-          this.onErrorCallback(err);
+        if (socketId !== this._currentSocketId) {
+          return;
         }
-        // 某些平台在握手期间会先抛一次 onError，随后仍然能 onOpen，
-        // 这里不立刻 reject，交给 onOpen / onClose / timeout 最终定论。
+        console.error("WebSocket 错误:", err);
+        this._emitError(err);
       });
+    });
+
+    return this._connectPromise.finally(() => {
+      if (this._connectPromise && this._connectKey === connectKey) {
+        this._connectPromise = null;
+      }
     });
   }
 
@@ -207,15 +338,14 @@ class WebSocket {
    */
   send(data) {
     if (!this.connected || !this.socket) {
-      console.error("未连接到设备");
-      return Promise.reject(new Error("未连接到设备"));
+      const err = new Error("未连接到设备");
+      console.error(err.message);
+      return Promise.reject(err);
     }
 
     return new Promise((resolve, reject) => {
-      const message = JSON.stringify(data);
-
       this.socket.send({
-        data: message,
+        data: JSON.stringify(data),
         success: () => {
           resolve();
         },
@@ -232,30 +362,31 @@ class WebSocket {
    */
   disconnect() {
     this._manualDisconnect = true;
-    this._suppressReconnectOnClose = false;
-    this._stopHeartbeat();
-    if (this._reconnectTimer) {
-      clearTimeout(this._reconnectTimer);
-      this._reconnectTimer = null;
-    }
+    this._clearReconnectTimer();
     this._reconnectAttempts = 0;
-    if (this.socket) {
-      this.socket.close({
-        success: () => {
-          console.log("WebSocket 已关闭");
-        },
-      });
-      this.socket = null;
-      this.connected = false;
+    this._stopHeartbeat();
+
+    if (!this.socket) {
+      this._setDisconnectedState("idle");
+      return;
     }
+
+    const socketTask = this.socket;
+    const socketId = this._currentSocketId;
+    this._setDisconnectedState("closing");
+    this._closeSocketTask(socketTask, socketId, {
+      suppressReconnect: true,
+      logClose: "WebSocket 已关闭",
+    });
   }
 
   _startHeartbeat() {
     this._stopHeartbeat();
     this._heartbeatTimer = setInterval(() => {
-      if (this.connected) {
-        this.send({ cmd: "ping" }).catch(() => {});
+      if (!this.connected || !this.socket) {
+        return;
       }
+      this.send({ cmd: "ping" }).catch(() => {});
     }, 5000);
   }
 
@@ -271,7 +402,7 @@ class WebSocket {
   }
 
   resumeHeartbeat() {
-    if (this.connected) {
+    if (this.connected && this.connectionState === "open") {
       this._startHeartbeat();
     }
   }
@@ -280,6 +411,15 @@ class WebSocket {
    * 指数退避重连（意外断线时自动调用）
    */
   _scheduleReconnect() {
+    if (!this.host) {
+      return;
+    }
+    if (this._manualDisconnect) {
+      return;
+    }
+    if (this.connected || this.connectionState === "connecting") {
+      return;
+    }
     if (this._reconnectTimer) {
       return;
     }
@@ -287,195 +427,178 @@ class WebSocket {
       console.log(`已达最大重连次数 ${this._maxReconnectAttempts}，停止重连`);
       return;
     }
+
     const delay = Math.min(1000 * Math.pow(2, this._reconnectAttempts), 30000);
-    this._reconnectAttempts++;
+    this._reconnectAttempts += 1;
+    this.connectionState = "reconnect_wait";
     console.log(`将在 ${delay}ms 后第 ${this._reconnectAttempts} 次重连...`);
+
     this._reconnectTimer = setTimeout(() => {
       this._reconnectTimer = null;
-      if (this._manualDisconnect) return;
+      if (this._manualDisconnect) {
+        return;
+      }
+      if (this.connected || this.connectionState === "connecting") {
+        return;
+      }
       console.log("正在重连...");
-      this.connect(this.host, this.port).catch((err) => {
+      this.connect(this.host, this.port, { isReconnect: true }).catch((err) => {
         console.error("重连失败:", err);
       });
     }, delay);
   }
 
-  /**
-   * 添加消息回调
-   */
   onMessage(callback) {
     if (!this.onMessageCallbacks.includes(callback)) {
       this.onMessageCallbacks.push(callback);
     }
   }
 
-  /**
-   * 移除消息回调
-   */
   offMessage(callback) {
     const index = this.onMessageCallbacks.indexOf(callback);
-    if (index > -1) {
+    if (index >= 0) {
       this.onMessageCallbacks.splice(index, 1);
     }
   }
 
-  /**
-   * 设置连接回调
-   */
   onConnect(callback) {
     this.onConnectCallback = callback;
   }
 
-  /**
-   * 设置断开回调
-   */
   onDisconnect(callback) {
     this.onDisconnectCallback = callback;
   }
 
-  /**
-   * 设置错误回调
-   */
   onError(callback) {
     this.onErrorCallback = callback;
   }
 
-  /**
-   * 发送 ping 命令
-   */
   async ping() {
     return this.send({ cmd: "ping" });
   }
 
-  /**
-   * 发送命令并等待设备回复
-   * @param {object} data - 命令数据
-   * @param {number} timeout - 超时毫秒数
-   * @returns {Promise<object>} 设备回复的 JSON 数据
-   */
-  sendAndWait(data, timeout = 3000) {
+  waitForMessage(matcher, timeout = 3000) {
     if (!this.connected || !this.socket) {
       return Promise.reject(new Error("未连接到设备"));
     }
 
     return new Promise((resolve, reject) => {
-      let timer = null;
-      const handler = (response) => {
-        clearTimeout(timer);
-        this.offMessage(handler);
-        resolve(response);
-      };
-      this.onMessage(handler);
-
-      timer = setTimeout(() => {
-        this.offMessage(handler);
-        reject(new Error("等待回复超时"));
-      }, timeout);
-
-      const message = JSON.stringify(data);
-      this.socket.send({
-        data: message,
-        fail: (err) => {
-          clearTimeout(timer);
-          this.offMessage(handler);
-          reject(err);
-        },
-      });
-    });
-  }
-
-  /**
-   * 获取设备状态
-   */
-  async getStatus() {
-    if (!this.connected || !this.socket) {
-      return Promise.reject(new Error("未连接到设备"));
-    }
-
-    return new Promise((resolve, reject) => {
+      let done = false;
       let timer = null;
 
-      const handler = (response) => {
-        if (!response || typeof response !== "object") {
+      const finishResolve = (message) => {
+        if (done) {
           return;
         }
-
-        if (response.error || response.status === "error") {
+        done = true;
+        if (timer) {
           clearTimeout(timer);
-          this.offMessage(handler);
-          reject(
-            new Error(response.error || response.message || "获取设备状态失败"),
+          timer = null;
+        }
+        this.offMessage(handler);
+        this._removeMessageWaiter(waiter);
+        resolve(message);
+      };
+
+      const finishReject = (err) => {
+        if (done) {
+          return;
+        }
+        done = true;
+        if (timer) {
+          clearTimeout(timer);
+          timer = null;
+        }
+        this.offMessage(handler);
+        this._removeMessageWaiter(waiter);
+        reject(err);
+      };
+
+      const handler = (message) => {
+        if (!matcher(message)) {
+          return;
+        }
+        if (message && (message.error || message.status === "error")) {
+          finishReject(
+            new Error(message.error || message.message || "设备返回错误"),
           );
           return;
         }
-
-        if (
-          response.status !== "ok" ||
-          typeof response.ip !== "string" ||
-          typeof response.width !== "number" ||
-          typeof response.height !== "number" ||
-          typeof response.brightness !== "number" ||
-          typeof response.mode !== "string"
-        ) {
-          return;
-        }
-
-        clearTimeout(timer);
-        this.offMessage(handler);
-        resolve(response);
+        finishResolve(message);
       };
 
       this.onMessage(handler);
+      const waiter = {
+        socketId: this._currentSocketId,
+        reject: finishReject,
+      };
+      this._addMessageWaiter(waiter);
 
       timer = setTimeout(() => {
-        this.offMessage(handler);
-        reject(new Error("等待回复超时"));
-      }, 3000);
-
-      this.send({ cmd: "status" }).catch((err) => {
-        clearTimeout(timer);
-        this.offMessage(handler);
-        reject(err);
-      });
+        finishReject(new Error("等待回复超时"));
+      }, timeout);
     });
   }
 
-  /**
-   * 设置设备模式
-   * @param {string} mode - 模式：'clock' 或 'canvas'
-   */
+  sendAndWait(data, timeout = 3000, matcher = null) {
+    const finalMatcher =
+      typeof matcher === "function"
+        ? matcher
+        : (message) => {
+            if (!message || typeof message !== "object") {
+              return false;
+            }
+            return message.status === "ok" || message.status === "error";
+          };
+
+    return new Promise((resolve, reject) => {
+      this.waitForMessage(finalMatcher, timeout)
+        .then(resolve)
+        .catch(reject);
+
+      this.send(data).catch(reject);
+    });
+  }
+
+  async getStatus() {
+    return this.sendAndWait(
+      { cmd: "status" },
+      3000,
+      (response) => {
+        if (!response || typeof response !== "object") {
+          return false;
+        }
+        if (response.error || response.status === "error") {
+          return true;
+        }
+        return (
+          response.status === "ok" &&
+          typeof response.ip === "string" &&
+          typeof response.width === "number" &&
+          typeof response.height === "number" &&
+          typeof response.brightness === "number" &&
+          typeof response.mode === "string"
+        );
+      },
+    );
+  }
+
   async setMode(mode) {
     return this.send({ cmd: "set_mode", mode });
   }
 
-  /**
-   * 设置闹钟配置
-   * @param {object} config - 闹钟配置对象
-   */
   async setClockConfig(config) {
     return this.send({ cmd: "set_clock_config", config });
   }
 
-  /**
-   * 设置主题配置
-   * @param {string} themeId - 主题 ID
-   */
   async setThemeConfig(themeId) {
     return this.send({ cmd: "set_theme_config", themeId });
   }
 
-  /**
-   * 设置眼睛模式配置
-   * @param {object} config - 眼睛模式配置对象
-   */
   async setEyesConfig(config) {
     return this.send({ cmd: "set_eyes_config", config });
   }
 
-  /**
-   * 设置像素屏保配置
-   * @param {object} config - 屏保配置对象
-   */
   async setAmbientEffect(config) {
     return this.send({
       cmd: "set_ambient_effect",
@@ -486,79 +609,45 @@ class WebSocket {
     });
   }
 
-  /**
-   * 触发眼睛模式互动动作
-   * @param {string} action - 互动动作
-   */
   async eyesInteract(action) {
     return this.send({ cmd: "eyes_interact", action });
   }
 
-  /**
-   * 清空屏幕
-   */
   async clear() {
     return this.send({ cmd: "clear" });
   }
 
-  /**
-   * 设置亮度
-   * @param {number} value - 亮度值 0-255
-   */
   async setBrightness(value) {
     return this.send({ cmd: "brightness", value });
   }
 
-  /**
-   * 显示文字
-   * @param {string} text - 文字内容
-   * @param {number} x - X 坐标
-   * @param {number} y - Y 坐标
-   */
   async showText(text, x = 0, y = 0) {
     return this.send({ cmd: "text", text, x, y });
   }
 
-  /**
-   * 设置单个像素
-   * @param {number} x - X 坐标
-   * @param {number} y - Y 坐标
-   * @param {number} r - 红色 0-255
-   * @param {number} g - 绿色 0-255
-   * @param {number} b - 蓝色 0-255
-   */
   async setPixel(x, y, r, g, b) {
     return this.send({ cmd: "pixel", x, y, r, g, b });
   }
 
-  /**
-   * 显示图片（二进制传输，最高效）
-   * @param {Array} pixels - 像素数组 [r,g,b,r,g,b,...]
-   * @param {number} width - 宽度
-   * @param {number} height - 高度
-   */
   async showImage(pixels, width, height) {
-    // 先清屏
     await this.send({ cmd: "clear" });
 
-    // 收集像素数据，坐标直接使用前端传入的位置
     const sparseData = [];
     let idx = 0;
 
-    for (let y = 0; y < height; y++) {
-      for (let x = 0; x < width; x++) {
+    for (let y = 0; y < height; y += 1) {
+      for (let x = 0; x < width; x += 1) {
         const r = pixels[idx++];
         const g = pixels[idx++];
         const b = pixels[idx++];
-
         sparseData.push(x, y, r, g, b);
       }
     }
 
-    if (sparseData.length === 0) return;
+    if (sparseData.length === 0) {
+      return;
+    }
 
-    // 使用二进制传输：每个像素5字节 (x, y, r, g, b)
-    // 分批发送，每批64个像素
     const batchSize = 64;
     const pixelsPerBatch = batchSize * 5;
 
@@ -567,10 +656,7 @@ class WebSocket {
     );
 
     for (let i = 0; i < sparseData.length; i += pixelsPerBatch) {
-      const batch = sparseData.slice(
-        i,
-        Math.min(i + pixelsPerBatch, sparseData.length),
-      );
+      const batch = sparseData.slice(i, Math.min(i + pixelsPerBatch, sparseData.length));
       const buffer = new Uint8Array(batch);
 
       await new Promise((resolve, reject) => {
@@ -581,51 +667,38 @@ class WebSocket {
         });
       });
 
-      // 每批之间等待200ms
       await new Promise((resolve) => setTimeout(resolve, 200));
     }
   }
 
-  /**
-   * 发送稀疏像素数据（只发送有颜色的像素，包括黑色）
-   * @param {Array} sparsePixels - 稀疏像素数据 [x, y, r, g, b, x, y, r, g, b, ...]
-   * @param {number} width - 画布宽度（用于计算居中偏移）
-   * @param {number} height - 画布高度（用于计算居中偏移）
-   */
   async showSparseImage(sparsePixels, width = 64, height = 64) {
-    if (sparsePixels.length === 0) return;
+    if (sparsePixels.length === 0) {
+      return;
+    }
 
-    // 根据实际画布尺寸动态计算居中偏移（板子是64x64）
     const offsetX = Math.floor((64 - width) / 2);
     const offsetY = Math.floor((64 - height) / 2);
 
-    // 先清屏
     await this.send({ cmd: "clear" });
 
-    // 添加偏移
     const offsetData = [];
     for (let i = 0; i < sparsePixels.length; i += 5) {
       offsetData.push(
-        sparsePixels[i] + offsetX, // x
-        sparsePixels[i + 1] + offsetY, // y
-        sparsePixels[i + 2], // r
-        sparsePixels[i + 3], // g
-        sparsePixels[i + 4], // b
+        sparsePixels[i] + offsetX,
+        sparsePixels[i + 1] + offsetY,
+        sparsePixels[i + 2],
+        sparsePixels[i + 3],
+        sparsePixels[i + 4],
       );
     }
 
-    // 使用二进制传输：每个像素5字节 (x, y, r, g, b)
-    // 分批发送，每批64个像素
     const batchSize = 64;
     const pixelsPerBatch = batchSize * 5;
 
     console.log(`发送稀疏像素数据: ${offsetData.length / 5} 个像素`);
 
     for (let i = 0; i < offsetData.length; i += pixelsPerBatch) {
-      const batch = offsetData.slice(
-        i,
-        Math.min(i + pixelsPerBatch, offsetData.length),
-      );
+      const batch = offsetData.slice(i, Math.min(i + pixelsPerBatch, offsetData.length));
       const buffer = new Uint8Array(batch);
 
       await new Promise((resolve, reject) => {
@@ -636,37 +709,29 @@ class WebSocket {
         });
       });
 
-      // 每批之间等待200ms
       await new Promise((resolve) => setTimeout(resolve, 200));
     }
   }
 
-  /**
-   * 发送部分更新（不清屏，直接更新像素）
-   * @param {Array} pixelData - 像素数据 [x, y, r, g, b, x, y, r, g, b, ...]
-   * @param {number} width - 画布宽度（用于计算居中偏移）
-   * @param {number} height - 画布高度（用于计算居中偏移）
-   */
   async sendPartialUpdate(pixelData, width = 64, height = 64) {
-    if (pixelData.length === 0) return;
+    if (pixelData.length === 0) {
+      return;
+    }
 
-    // 根据实际画布尺寸动态计算居中偏移（板子是64x64）
     const offsetX = Math.floor((64 - width) / 2);
     const offsetY = Math.floor((64 - height) / 2);
 
-    // 添加偏移
     const offsetData = [];
     for (let i = 0; i < pixelData.length; i += 5) {
       offsetData.push(
-        pixelData[i] + offsetX, // x
-        pixelData[i + 1] + offsetY, // y
-        pixelData[i + 2], // r
-        pixelData[i + 3], // g
-        pixelData[i + 4], // b
+        pixelData[i] + offsetX,
+        pixelData[i + 1] + offsetY,
+        pixelData[i + 2],
+        pixelData[i + 3],
+        pixelData[i + 4],
       );
     }
 
-    // 二进制传输
     const buffer = new Uint8Array(offsetData);
 
     await new Promise((resolve, reject) => {

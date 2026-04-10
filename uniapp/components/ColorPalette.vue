@@ -264,12 +264,13 @@ export default {
 
 .palette-info {
   font-size: 20rpx;
-  color: var(--text-secondary);
+  color: #000000;
+  font-weight: 900;
 }
 
 .selected-code {
   font-size: 20rpx;
-  color: var(--accent-color);
+  color: #4a4a4a;
   font-family: monospace;
   font-weight: bold;
 }
@@ -286,24 +287,30 @@ export default {
 .group-header {
   position: sticky;
   top: 0;
-  background-color: var(--bg-secondary);
-  padding: 8rpx 16rpx;
+  display: flex;
+  align-items: center;
+  background-color: #ffffff;
+  min-height: 52rpx;
+  padding: 8rpx 0;
   margin-bottom: 16rpx;
-  border-left: 4rpx solid var(--accent-color);
+  border-left: 4rpx solid #ffd23f;
   z-index: 10;
 }
 
 .group-letter {
-  font-size: 20rpx;
+  font-size: 26rpx;
   font-family: monospace;
   font-weight: bold;
-  color: var(--accent-color);
+  color: #000000;
+  margin-left: 12rpx;
+  line-height: 1;
 }
 
 .group-count {
-  font-size: 16rpx;
-  color: var(--text-tertiary);
-  margin-left: 16rpx;
+  font-size: 20rpx;
+  color: #777777;
+  margin-left: 14rpx;
+  line-height: 1;
 }
 
 .color-grid {
@@ -318,17 +325,21 @@ export default {
   align-items: center;
   gap: 8rpx;
   padding: 16rpx;
-  border-radius: 12rpx;
+  border-radius: 0;
   border: 4rpx solid var(--border-color);
   position: relative;
   transition: all 0.2s;
 }
 
 .color-item.active {
-  border-color: var(--accent-color);
-  background-color: rgba(0, 243, 255, 0.1);
-  box-shadow: 0 0 20rpx rgba(0, 243, 255, 0.3);
+  border-color: #000000;
+  background-color: #fff8d6;
+  box-shadow: 0 0 0 4rpx #ffd23f;
   z-index: 10;
+}
+
+.color-item.active .color-code {
+  color: #000000;
 }
 
 .color-swatch {
@@ -342,7 +353,7 @@ export default {
 .color-code {
   font-size: 16rpx;
   font-family: monospace;
-  color: var(--text-primary);
+  color: #000000;
   font-weight: bold;
   line-height: 1;
 }
@@ -369,7 +380,7 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 8rpx;
+  border-radius: 0;
   transition: all 0.2s;
 }
 
@@ -381,11 +392,11 @@ export default {
   font-size: 16rpx;
   font-family: monospace;
   font-weight: bold;
-  color: var(--text-tertiary);
+  color: #777777;
 }
 
 .index-letter.active .letter-text {
-  color: var(--accent-color);
+  color: #000000;
 }
 
 .letter-bubble {
@@ -401,12 +412,13 @@ export default {
   justify-content: center;
   width: 128rpx;
   height: 128rpx;
-  background-color: var(--accent-color);
+  background-color: #ffd23f;
   color: #000000;
   font-family: monospace;
   font-weight: bold;
   font-size: 48rpx;
-  border-radius: 32rpx;
-  box-shadow: 0 8rpx 32rpx rgba(0, 0, 0, 0.5);
+  border-radius: 0;
+  border: 3rpx solid #000000;
+  box-shadow: 2rpx 2rpx 0 #000000;
 }
 </style>

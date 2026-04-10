@@ -19,6 +19,7 @@ public:
   static String saved_password;
   static unsigned long last_ntp_retry_at;
   static bool ntp_sync_logged;
+  static bool time_synced_once;
 };
 
 #endif

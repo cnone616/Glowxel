@@ -1,20 +1,19 @@
 <template>
-  <view class="tetris-page">
+  <view class="tetris-page glx-page-shell">
     <!-- #ifdef MP-WEIXIN -->
     <view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
     <!-- #endif -->
 
-    <view class="header">
+    <view class="navbar glx-topbar glx-page-shell__fixed">
       <view class="nav-left" @click="handleBack">
         <Icon
           name="direction-left"
           :size="32"
-          color="var(--color-text-primary)"
+          color="var(--nb-ink)"
         />
       </view>
-      <view class="nav-title">
-        <text class="project-name">俄罗斯方块时钟</text>
-      </view>
+      <text class="nav-title glx-topbar__title">俄罗斯方块时钟</text>
+      <view class="nav-right"></view>
     </view>
 
     <view class="canvas-section">
@@ -35,32 +34,34 @@
           canvas-id="tetrisPreviewCanvas"
         />
       </view>
-      <view class="preview-caption">
-        <text class="preview-title">预览效果</text>
+      <view class="preview-caption glx-preview-panel">
+        <view class="preview-caption-info glx-preview-panel__info">
+          <text class="preview-title">预览效果</text>
+        </view>
         <view
-          class="action-btn-sm primary"
+          class="action-btn-sm primary glx-primary-action"
           :class="{ disabled: isSending }"
           @click="saveAndApply"
         >
-          <Icon name="link" :size="32" color="#ffffff" />
+          <Icon name="link" :size="36" color="#000000" />
           <text>{{ isSending ? "发送中" : "发送" }}</text>
         </view>
       </view>
     </view>
 
-    <scroll-view scroll-y class="content" :style="{ height: contentHeight }">
-      <view class="content-wrapper">
-        <view v-show="currentTab === 0" class="tab-panel">
-          <view class="card">
-            <view class="card-title-section">
-              <text class="card-title">效果风格</text>
-              <text class="card-subtitle">{{ currentSceneLabel }}</text>
+    <scroll-view scroll-y class="content glx-scroll-region glx-page-shell__content" :style="{ height: contentHeight }">
+      <view class="content-wrapper glx-scroll-stack">
+        <view class="tab-panel glx-tab-panel">
+          <view class="card glx-panel-card">
+            <view class="card-title-section glx-panel-head">
+              <text class="card-title glx-panel-title">效果风格</text>
+              <text class="card-subtitle glx-panel-subtitle">{{ currentSceneLabel }}</text>
             </view>
             <view class="scene-grid">
               <view
                 v-for="preset in scenePresets"
                 :key="preset.key"
-                class="scene-card"
+                class="scene-card glx-scene-tile"
                 :class="{ active: config.sceneKey === preset.key }"
                 @click="applyScenePreset(preset)"
               >
@@ -69,157 +70,16 @@
               </view>
             </view>
           </view>
-        </view>
 
-        <view v-show="currentTab === 1" class="tab-panel">
-          <view class="card">
-            <view class="card-title-section">
-              <text class="card-title">画面内容</text>
+          <view class="card glx-panel-card">
+            <view class="card-title-section glx-panel-head">
+              <text class="card-title glx-panel-title">风格说明</text>
             </view>
-            <view class="option-row">
-              <view
-                class="option-btn"
-                :class="{ active: config.showClock }"
-                @click="setDisplayMode(true)"
-              >
-                <text>拼时间</text>
-              </view>
-              <view
-                class="option-btn"
-                :class="{ active: !config.showClock }"
-                @click="setDisplayMode(false)"
-              >
-                <text>只下落</text>
-              </view>
-            </view>
-          </view>
-
-          <view class="card">
-            <view class="card-title-section">
-              <text class="card-title">下落速度</text>
-            </view>
-            <view class="option-row">
-              <view
-                v-for="item in dropSpeedOptions"
-                :key="item.value"
-                class="option-btn"
-                :class="{ active: config.speed === item.value }"
-                @click="setSpeed(item.value)"
-              >
-                <text>{{ item.label }}</text>
-              </view>
-            </view>
-          </view>
-
-          <view class="card">
-            <view class="card-title-section">
-              <text class="card-title">格子大小</text>
-            </view>
-            <view class="option-row">
-              <view
-                v-for="item in sizeOptions"
-                :key="item.value"
-                class="option-btn"
-                :class="{ active: config.cellSize === item.value }"
-                @click="setCellSize(item.value)"
-              >
-                <text>{{ item.label }}</text>
-              </view>
-            </view>
-          </view>
-
-          <view v-if="!config.showClock" class="card">
-            <view class="card-title-section">
-              <text class="card-title">堆叠方式</text>
-            </view>
-            <view class="option-row">
-              <view
-                class="option-btn"
-                :class="{ active: config.clearMode }"
-                @click="setClearMode(true)"
-              >
-                <text>自动消行</text>
-              </view>
-              <view
-                class="option-btn"
-                :class="{ active: !config.clearMode }"
-                @click="setClearMode(false)"
-              >
-                <text>堆满重来</text>
-              </view>
-            </view>
-          </view>
-
-          <view class="summary-card">
-            <text class="summary-text">{{ motionSummary }}</text>
-          </view>
-        </view>
-
-        <view v-show="currentTab === 2" class="tab-panel">
-          <view class="card">
-            <view class="card-title-section">
-              <text class="card-title">常用组合</text>
-              <text class="card-subtitle">{{ currentPieceGroupLabel }}</text>
-            </view>
-            <view class="scene-grid">
-              <view
-                v-for="group in pieceGroups"
-                :key="group.key"
-                class="scene-card group-card"
-                :class="{ active: config.pieceGroupKey === group.key }"
-                @click="applyPieceGroup(group)"
-              >
-                <text class="scene-card-title">{{ group.label }}</text>
-                <text class="scene-card-desc">{{ group.desc }}</text>
-              </view>
-            </view>
-          </view>
-
-          <view class="card">
-            <view class="card-title-section">
-              <text class="card-title">单独开关</text>
-              <text class="card-subtitle">至少保留一种</text>
-            </view>
-            <view class="piece-grid">
-              <view
-                v-for="(piece, idx) in pieceTypes"
-                :key="idx"
-                class="piece-item"
-                :class="{ active: config.pieces.includes(idx) }"
-                @click="togglePiece(idx)"
-              >
-                <view class="piece-preview-grid">
-                  <view
-                    v-for="(block, blockIndex) in piece.blocks"
-                    :key="blockIndex"
-                    class="piece-block"
-                    :style="getPieceBlockStyle(block, piece.color)"
-                  ></view>
-                </view>
-                <text class="piece-name">{{ piece.name }}</text>
-              </view>
-            </view>
+            <text class="summary-text">{{ currentSceneDesc }}</text>
           </view>
         </view>
       </view>
     </scroll-view>
-
-    <view class="bottom-tabs">
-      <view
-        v-for="(tab, index) in tabs"
-        :key="tab"
-        class="bottom-tab-item"
-        :class="{ active: currentTab === index }"
-        @click="currentTab = index"
-      >
-        <Icon
-          :name="tabIconNames[index]"
-          :size="36"
-          :color="currentTab === index ? '#4F7FFF' : 'var(--text-secondary)'"
-        />
-        <text class="bottom-tab-text">{{ tab }}</text>
-      </view>
-    </view>
 
     <Toast ref="toastRef" />
   </view>
@@ -277,43 +137,6 @@ const SCENE_PRESETS = [
     showClock: true,
     pieces: [0, 1, 5, 6],
   },
-  {
-    key: "free_fall",
-    label: "自由掉落",
-    desc: "不拼时间，只保留俄罗斯方块持续下落。",
-    clearMode: true,
-    cellSize: 2,
-    speed: "normal",
-    showClock: false,
-    pieces: [0, 1, 2, 3, 4, 5, 6],
-  },
-];
-
-const PIECE_GROUPS = [
-  {
-    key: "full_set",
-    label: "全部方块",
-    desc: "完整七种，更接近经典俄罗斯方块。",
-    pieces: [0, 1, 2, 3, 4, 5, 6],
-  },
-  {
-    key: "clean_set",
-    label: "规整组合",
-    desc: "形状更利落，拼出来的数字更干净。",
-    pieces: [0, 1, 5, 6],
-  },
-  {
-    key: "motion_set",
-    label: "变化组合",
-    desc: "拐角和折线更多，重组过程更活。",
-    pieces: [0, 2, 3, 4],
-  },
-  {
-    key: "corner_set",
-    label: "直角组合",
-    desc: "更偏边角块，轮廓变化更明显。",
-    pieces: [1, 5, 6],
-  },
 ];
 
 function clonePieces(source) {
@@ -323,7 +146,6 @@ function clonePieces(source) {
 function createDefaultConfig() {
   return {
     sceneKey: "clock_classic",
-    pieceGroupKey: "full_set",
     clearMode: true,
     cellSize: 2,
     speed: "normal",
@@ -363,16 +185,6 @@ function findSceneKey(config) {
   return "";
 }
 
-function findPieceGroupKey(pieces) {
-  for (let index = 0; index < PIECE_GROUPS.length; index += 1) {
-    const group = PIECE_GROUPS[index];
-    if (samePieces(group.pieces, pieces)) {
-      return group.key;
-    }
-  }
-  return "";
-}
-
 function normalizeSavedConfig(saved) {
   const config = createDefaultConfig();
   if (!saved || typeof saved !== "object") {
@@ -405,7 +217,6 @@ function normalizeSavedConfig(saved) {
   }
 
   config.sceneKey = findSceneKey(config);
-  config.pieceGroupKey = findPieceGroupKey(config.pieces);
   return config;
 }
 
@@ -421,7 +232,7 @@ export default {
       deviceStore: null,
       toast: null,
       isSending: false,
-      contentHeight: "calc(100vh - 88rpx - 520rpx - 112rpx)",
+      contentHeight: "calc(100vh - 88rpx - 520rpx)",
       previewCanvasReady: false,
       previewZoom: 4,
       previewOffset: { x: 0, y: 0 },
@@ -429,93 +240,7 @@ export default {
       previewFrameMaps: [],
       previewFrameIndex: 0,
       previewTimer: null,
-      currentTab: 0,
-      tabs: ["场景", "动画", "方块"],
-      tabIconNames: ["browse", "time", "setting"],
       scenePresets: SCENE_PRESETS,
-      pieceGroups: PIECE_GROUPS,
-      sizeOptions: [
-        { label: "细", value: 1 },
-        { label: "中", value: 2 },
-        { label: "粗", value: 3 },
-      ],
-      dropSpeedOptions: [
-        { label: "慢", value: "slow" },
-        { label: "中", value: "normal" },
-        { label: "快", value: "fast" },
-      ],
-      pieceTypes: [
-        {
-          name: "I",
-          color: "#00F0F0",
-          blocks: [
-            [0, 1],
-            [1, 1],
-            [2, 1],
-            [3, 1],
-          ],
-        },
-        {
-          name: "O",
-          color: "#F0F000",
-          blocks: [
-            [1, 0],
-            [2, 0],
-            [1, 1],
-            [2, 1],
-          ],
-        },
-        {
-          name: "T",
-          color: "#A000F0",
-          blocks: [
-            [1, 0],
-            [0, 1],
-            [1, 1],
-            [2, 1],
-          ],
-        },
-        {
-          name: "S",
-          color: "#00F000",
-          blocks: [
-            [1, 0],
-            [2, 0],
-            [0, 1],
-            [1, 1],
-          ],
-        },
-        {
-          name: "Z",
-          color: "#F00000",
-          blocks: [
-            [0, 0],
-            [1, 0],
-            [1, 1],
-            [2, 1],
-          ],
-        },
-        {
-          name: "J",
-          color: "#0000F0",
-          blocks: [
-            [0, 0],
-            [0, 1],
-            [1, 1],
-            [2, 1],
-          ],
-        },
-        {
-          name: "L",
-          color: "#F0A000",
-          blocks: [
-            [2, 0],
-            [0, 1],
-            [1, 1],
-            [2, 1],
-          ],
-        },
-      ],
       config: createDefaultConfig(),
     };
   },
@@ -531,12 +256,12 @@ export default {
     },
     previewInterval() {
       if (this.config.speed === "slow") {
-        return 150;
+        return 300;
       }
       if (this.config.speed === "fast") {
-        return 86;
+        return 80;
       }
-      return 116;
+      return 150;
     },
     currentScene() {
       const current = this.scenePresets.find((item) => item.key === this.config.sceneKey);
@@ -551,34 +276,11 @@ export default {
       }
       return "自定义";
     },
-    currentPieceGroupLabel() {
-      const current = this.pieceGroups.find(
-        (item) => item.key === this.config.pieceGroupKey,
-      );
-      if (current) {
-        return current.label;
+    currentSceneDesc() {
+      if (this.currentScene && this.currentScene.desc) {
+        return this.currentScene.desc;
       }
-      return "自定义";
-    },
-    motionSummary() {
-      const modeText = this.config.showClock ? "当前会持续拼出时间" : "当前只展示方块下落";
-      const sizeText =
-        this.config.cellSize === 1
-          ? "格子更细"
-          : this.config.cellSize === 3
-            ? "格子更粗"
-            : "格子大小适中";
-      const speedText =
-        this.config.speed === "slow"
-          ? "节奏更从容"
-          : this.config.speed === "fast"
-            ? "节奏更利落"
-            : "节奏比较均衡";
-      if (!this.config.showClock) {
-        const stackText = this.config.clearMode ? "并且会自动消行" : "堆满后重新开始";
-        return `${modeText}，${sizeText}，${speedText}，${stackText}。`;
-      }
-      return `${modeText}，${sizeText}，${speedText}。`;
+      return "当前风格将直接按预设展示，不再额外叠加旧版自定义玩法。";
     },
   },
   watch: {
@@ -616,13 +318,19 @@ export default {
       query
         .select(".preview-canvas-container")
         .boundingClientRect((rect) => {
-          if (rect) {
+          if (rect && rect.width) {
             this.previewContainerSize = {
               width: rect.width,
-              height: rect.height,
+              height: rect.width,
+            };
+            const fitZoom = Math.max(2, Math.floor((rect.width * 0.96) / 64));
+            this.previewZoom = fitZoom;
+            this.previewOffset = {
+              x: (rect.width - 64 * fitZoom) / 2,
+              y: (rect.width - 64 * fitZoom) / 2,
             };
             const nextHeight =
-              systemInfo.windowHeight - statusBarHeight - 88 - rect.height - 112;
+              systemInfo.windowHeight - statusBarHeight - 88 - rect.width;
             this.contentHeight = `${Math.max(120, nextHeight)}px`;
           }
           this.previewCanvasReady = true;
@@ -654,10 +362,6 @@ export default {
         this.previewTimer = null;
       }
     },
-    syncDerivedKeys() {
-      this.config.sceneKey = findSceneKey(this.config);
-      this.config.pieceGroupKey = findPieceGroupKey(this.config.pieces);
-    },
     applyScenePreset(preset) {
       this.config.sceneKey = preset.key;
       this.config.clearMode = preset.clearMode;
@@ -665,48 +369,6 @@ export default {
       this.config.speed = preset.speed;
       this.config.showClock = preset.showClock;
       this.config.pieces = clonePieces(preset.pieces);
-      this.config.pieceGroupKey = findPieceGroupKey(this.config.pieces);
-    },
-    applyPieceGroup(group) {
-      this.config.pieces = clonePieces(group.pieces);
-      this.syncDerivedKeys();
-    },
-    setDisplayMode(showClock) {
-      this.config.showClock = showClock;
-      this.syncDerivedKeys();
-    },
-    setSpeed(value) {
-      this.config.speed = value;
-      this.syncDerivedKeys();
-    },
-    setCellSize(value) {
-      this.config.cellSize = value;
-      this.syncDerivedKeys();
-    },
-    setClearMode(value) {
-      this.config.clearMode = value;
-      this.syncDerivedKeys();
-    },
-    togglePiece(idx) {
-      const currentIndex = this.config.pieces.indexOf(idx);
-      if (currentIndex >= 0) {
-        if (this.config.pieces.length <= 1) {
-          this.toast.showError("至少保留一种方块");
-          return;
-        }
-        this.config.pieces.splice(currentIndex, 1);
-      } else {
-        this.config.pieces.push(idx);
-        this.config.pieces.sort((left, right) => left - right);
-      }
-      this.syncDerivedKeys();
-    },
-    getPieceBlockStyle(block, color) {
-      return {
-        left: `${block[0] * 15 + 6}rpx`,
-        top: `${block[1] * 15 + 6}rpx`,
-        backgroundColor: color,
-      };
     },
     async saveAndApply() {
       if (this.isSending) {
@@ -777,65 +439,42 @@ export default {
   background-color: #1a1a1a;
 }
 
-.header {
-  height: 88rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0 32rpx;
-  background-color: var(--bg-elevated);
-  border-bottom: 2rpx solid var(--border-primary);
-  position: relative;
-  flex-shrink: 0;
-}
-
-.nav-left {
-  position: absolute;
-  left: 32rpx;
-  width: 80rpx;
-  height: 80rpx;
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-}
-
-.project-name {
-  font-size: 36rpx;
-  font-weight: 700;
-  color: var(--text-primary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .canvas-section {
-  padding: 24rpx 24rpx 16rpx;
-  background: linear-gradient(180deg, rgba(17, 24, 39, 0.98), rgba(10, 14, 24, 0.98));
-  border-bottom: 2rpx solid rgba(148, 163, 184, 0.14);
+  display: flex;
+  flex-direction: column;
+  background: #000000;
+  border-bottom: 2rpx solid var(--nb-ink);
   flex-shrink: 0;
 }
 
 .preview-canvas-container {
   width: 100%;
-  height: 420rpx;
-  border-radius: 28rpx;
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   overflow: hidden;
-  background: radial-gradient(circle at 50% 30%, rgba(59, 130, 246, 0.16), rgba(10, 16, 26, 0.98));
-  border: 2rpx solid rgba(148, 163, 184, 0.18);
+  background: #000000;
 }
 
 .preview-caption {
-  margin-top: 18rpx;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16rpx;
+  gap: 12rpx;
+  padding: 10rpx 16rpx 12rpx;
+  background: var(--bg-tertiary);
+}
+
+.preview-caption-info {
+  flex: 1;
+  min-width: 0;
 }
 
 .preview-title {
-  font-size: 28rpx;
-  font-weight: 600;
-  color: #f8fafc;
+  font-size: 24rpx;
+  font-weight: 700;
+  color: var(--text-primary);
 }
 
 .action-btn-sm {
@@ -846,14 +485,14 @@ export default {
   align-items: center;
   justify-content: center;
   gap: 10rpx;
-  border-radius: 18rpx;
-  border: 2rpx solid var(--border-primary);
+  border-radius: 0;
+  border: 2rpx solid var(--nb-ink);
   background-color: var(--bg-tertiary);
 }
 
 .action-btn-sm.primary {
-  background-color: var(--accent-primary);
-  border-color: var(--accent-primary);
+  background-color: var(--nb-yellow);
+  border-color: var(--nb-ink);
 }
 
 .action-btn-sm.disabled {
@@ -863,66 +502,70 @@ export default {
 .action-btn-sm text {
   font-size: 24rpx;
   font-weight: 600;
-  color: #ffffff;
+  color: #000000;
 }
 
 .content {
   flex: 1;
   width: 100%;
   min-height: 0;
+  box-sizing: border-box;
+  background: var(--bg-tertiary);
+  padding: 16rpx 20rpx 0;
 }
 
 .content-wrapper {
-  padding: 24rpx;
+  padding: 0 0 56rpx;
   display: flex;
   flex-direction: column;
-  gap: 24rpx;
+  gap: 20rpx;
 }
 
 .tab-panel {
   display: flex;
   flex-direction: column;
-  gap: 24rpx;
+  gap: 20rpx;
 }
 
 .card {
-  background: var(--bg-elevated);
-  border: 2rpx solid var(--border-primary);
-  border-radius: 28rpx;
-  padding: 24rpx;
+  padding-top: 16rpx;
+  border: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
 }
 
 .card-title-section {
   display: flex;
-  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
   gap: 8rpx;
-  margin-bottom: 20rpx;
+  margin-bottom: 14rpx;
 }
 
 .card-title {
-  font-size: 28rpx;
-  font-weight: 600;
-  color: var(--color-text-primary);
+  font-size: 22rpx;
+  font-weight: 500;
+  color: var(--text-primary);
 }
 
 .card-subtitle {
-  font-size: 22rpx;
-  color: var(--color-text-secondary);
+  font-size: 20rpx;
+  color: var(--text-secondary);
 }
 
 .scene-grid {
   display: flex;
   flex-wrap: wrap;
-  gap: 16rpx;
+  gap: 12rpx;
 }
 
 .scene-card {
   width: calc(50% - 8rpx);
-  min-height: 164rpx;
-  padding: 18rpx;
-  border-radius: 22rpx;
-  background: var(--bg-tertiary);
-  border: 2rpx solid var(--border-primary);
+  min-height: 152rpx;
+  padding: 16rpx;
+  border-radius: 0;
+  background: #ffffff;
+  border: 2rpx solid #000000;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -931,153 +574,33 @@ export default {
 }
 
 .scene-card.active {
-  background: rgba(79, 127, 255, 0.12);
-  border-color: var(--accent-primary);
-  box-shadow: 0 10rpx 24rpx rgba(79, 127, 255, 0.12);
+  background: var(--nb-yellow);
+  border-color: var(--nb-ink);
+  box-shadow: none;
 }
 
 .scene-card-title {
-  font-size: 28rpx;
+  font-size: 26rpx;
   font-weight: 600;
   color: var(--text-primary);
 }
 
 .scene-card-desc {
-  font-size: 22rpx;
-  line-height: 1.6;
+  font-size: 21rpx;
+  line-height: 1.55;
   color: var(--text-secondary);
 }
 
 .scene-card.active .scene-card-title,
 .scene-card.active .scene-card-desc {
-  color: var(--accent-primary);
-}
-
-.group-card {
-  min-height: 148rpx;
-}
-
-.option-row {
-  display: flex;
-  gap: 16rpx;
-}
-
-.option-btn {
-  flex: 1;
-  min-height: 76rpx;
-  padding: 0 12rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 18rpx;
-  background: var(--bg-tertiary);
-  border: 2rpx solid var(--border-primary);
-  box-sizing: border-box;
-}
-
-.option-btn text {
-  font-size: 26rpx;
-  color: var(--text-secondary);
-}
-
-.option-btn.active {
-  background: rgba(79, 127, 255, 0.12);
-  border-color: var(--accent-primary);
-}
-
-.option-btn.active text {
-  color: var(--accent-primary);
-  font-weight: 600;
-}
-
-.summary-card {
-  padding: 24rpx 28rpx;
-  border-radius: 24rpx;
-  background: rgba(79, 127, 255, 0.08);
-  border: 2rpx solid rgba(79, 127, 255, 0.16);
+  color: #000000;
+  font-weight: 700;
 }
 
 .summary-text {
-  font-size: 24rpx;
+  font-size: 22rpx;
   line-height: 1.7;
   color: var(--text-secondary);
 }
 
-.piece-grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 16rpx;
-}
-
-.piece-item {
-  width: calc(33.333% - 11rpx);
-  padding: 18rpx 0 14rpx;
-  border-radius: 20rpx;
-  background: var(--bg-tertiary);
-  border: 2rpx solid var(--border-primary);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12rpx;
-  box-sizing: border-box;
-}
-
-.piece-item.active {
-  background: rgba(79, 127, 255, 0.12);
-  border-color: var(--accent-primary);
-  box-shadow: 0 10rpx 24rpx rgba(79, 127, 255, 0.12);
-}
-
-.piece-preview-grid {
-  width: 72rpx;
-  height: 72rpx;
-  position: relative;
-}
-
-.piece-block {
-  position: absolute;
-  width: 12rpx;
-  height: 12rpx;
-  border-radius: 4rpx;
-  box-shadow: inset 0 2rpx 0 rgba(255, 255, 255, 0.28);
-}
-
-.piece-name {
-  font-size: 24rpx;
-  font-weight: 600;
-  color: var(--text-secondary);
-}
-
-.piece-item.active .piece-name {
-  color: var(--accent-primary);
-}
-
-.bottom-tabs {
-  display: flex;
-  flex-shrink: 0;
-  padding: 12rpx 16rpx;
-  padding-bottom: calc(12rpx + env(safe-area-inset-bottom));
-  background-color: var(--bg-elevated);
-  border-top: 2rpx solid var(--border-primary);
-  gap: 8rpx;
-}
-
-.bottom-tab-item {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 4rpx;
-}
-
-.bottom-tab-text {
-  font-size: 20rpx;
-  color: var(--text-secondary);
-}
-
-.bottom-tab-item.active .bottom-tab-text {
-  color: var(--accent-primary);
-  font-weight: 500;
-}
 </style>

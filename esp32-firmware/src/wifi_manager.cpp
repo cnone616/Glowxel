@@ -12,6 +12,7 @@ const char* kNtpServerFallback = "pool.ntp.org";
 const long kGmtOffsetSec = 8 * 3600;
 const int kDaylightOffsetSec = 0;
 const unsigned long kNtpRetryIntervalMs = 15000;
+const time_t kUnixTimeSyncedThreshold = 1700000000;
 
 void requestTimeSync() {
   configTime(
@@ -21,6 +22,11 @@ void requestTimeSync() {
     kNtpServerSecondary,
     kNtpServerFallback
   );
+}
+
+bool hasValidSystemTime() {
+  time_t now = time(nullptr);
+  return now >= kUnixTimeSyncedThreshold;
 }
 }
 
@@ -113,6 +119,7 @@ String WiFiManager::saved_ssid = "";
 String WiFiManager::saved_password = "";
 unsigned long WiFiManager::last_ntp_retry_at = 0;
 bool WiFiManager::ntp_sync_logged = false;
+bool WiFiManager::time_synced_once = false;
 
 void WiFiManager::init() {
   Serial.println("3. 连接WiFi...");
@@ -147,6 +154,7 @@ void WiFiManager::setupWiFi() {
       requestTimeSync();
       last_ntp_retry_at = millis();
       ntp_sync_logged = false;
+      time_synced_once = false;
       Serial.println("已发起网络时间同步，后台更新中");
       
       // 在LED上显示WiFi大图标 + 右下角绿色勾徽章
@@ -202,8 +210,14 @@ String WiFiManager::getDeviceIP() {
 }
 
 bool WiFiManager::isTimeSynced() {
-  struct tm timeinfo;
-  return getLocalTime(&timeinfo, 0);
+  if (time_synced_once) {
+    return true;
+  }
+  if (hasValidSystemTime()) {
+    time_synced_once = true;
+    return true;
+  }
+  return false;
 }
 
 void WiFiManager::showTimeSyncScreen() {
@@ -222,10 +236,12 @@ void WiFiManager::showTimeSyncScreen() {
 void WiFiManager::tick() {
   if (config_mode || WiFi.status() != WL_CONNECTED) {
     ntp_sync_logged = false;
+    time_synced_once = false;
     return;
   }
 
-  if (isTimeSynced()) {
+  if (hasValidSystemTime()) {
+    time_synced_once = true;
     if (!ntp_sync_logged) {
       ntp_sync_logged = true;
       Serial.println("NTP时间同步成功");
@@ -239,6 +255,7 @@ void WiFiManager::tick() {
   }
 
   last_ntp_retry_at = now;
+  ntp_sync_logged = false;
   Serial.println("NTP 未同步，后台重试...");
   requestTimeSync();
 }

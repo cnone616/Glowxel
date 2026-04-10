@@ -124,15 +124,6 @@
       }
     },
     {
-      "path": "pages/feature-editor/feature-editor",
-      "style": {
-        "navigationStyle": "custom",
-        "navigationBarTextStyle": "white",
-        "backgroundColor": "#1a1a1a",
-        "enablePullDownRefresh": false
-      }
-    },
-    {
       "path": "pages/ambient-editor/ambient-editor",
       "style": {
         "navigationStyle": "custom",
@@ -308,7 +299,7 @@
       "style": {
         "navigationStyle": "custom",
         "navigationBarTextStyle": "black",
-        "backgroundColor": "#FFFDF5",
+        "backgroundColor": "#FFFFFF",
         "enablePullDownRefresh": false
       }
     },
@@ -317,7 +308,7 @@
       "style": {
         "navigationStyle": "custom",
         "navigationBarTextStyle": "black",
-        "backgroundColor": "#FFFDF5",
+        "backgroundColor": "#FFFFFF",
         "enablePullDownRefresh": false
       }
     },
@@ -326,7 +317,16 @@
       "style": {
         "navigationStyle": "custom",
         "navigationBarTextStyle": "black",
-        "backgroundColor": "#FFFDF5",
+        "backgroundColor": "#FFFFFF",
+        "enablePullDownRefresh": false
+      }
+    },
+    {
+      "path": "pages/design-preview/controls",
+      "style": {
+        "navigationStyle": "custom",
+        "navigationBarTextStyle": "black",
+        "backgroundColor": "#FFFFFF",
         "enablePullDownRefresh": false
       }
     }
@@ -343,14 +343,14 @@
     "enablePullDownRefresh": false
   },
   "tabBar": {
-    "color": "#666666",
-    "selectedColor": "#4F7FFF",
+    "color": "#8A8A8A",
+    "selectedColor": "#333333",
     "backgroundColor": "#FFFFFF",
     "borderStyle": "black",
-    "height": "50px",
-    "fontSize": "10px",
-    "iconWidth": "24px",
-    "spacing": "3px",
+    "height": "58px",
+    "fontSize": "14px",
+    "iconWidth": "34px",
+    "spacing": "6px",
     "list": [
       {
         "pagePath": "pages/library/library",

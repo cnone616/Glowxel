@@ -1,16 +1,15 @@
 <template>
-  <view class="nb-page nb-control-preview">
+  <view class="nb-page nb-control-preview glx-scroll-region">
     <!-- #ifdef MP-WEIXIN -->
     <view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
     <!-- #endif -->
 
-    <view class="nb-navbar">
+    <view class="nb-navbar glx-topbar">
       <view class="nb-nav-action" @click="goBack">
         <Icon name="arrow-left-bold" :size="28" color="#000000" />
       </view>
       <view class="nb-nav-title-wrap">
         <text class="nb-nav-title">设备控制预览</text>
-        <text class="nb-nav-subtitle">Control as Neubrutalism</text>
       </view>
       <view class="nb-nav-spacer"></view>
     </view>
@@ -20,7 +19,7 @@
         <view class="nb-card nb-card-lg control-hero">
           <view class="device-meta">
             <view class="device-copy">
-              <text class="nb-eyebrow">Device Online</text>
+              <text class="nb-eyebrow">设备在线</text>
               <text class="nb-display device-title">Glowxel 控制中心可以直接做成像街机主机台一样。</text>
               <text class="nb-body device-desc">
                 顶部保留设备状态、连接入口和主操作；模式入口改成真正可识别的方形块面，而不是普通轻卡片。
@@ -28,7 +27,7 @@
             </view>
             <view class="screen-shell">
               <view class="screen-topbar">
-                <text class="screen-label">52 × 52 Live Preview</text>
+                <text class="screen-label">52 × 52 实时预览</text>
                 <text class="screen-dot"></text>
               </view>
               <view class="pixel-screen">
@@ -204,15 +203,15 @@ export default {
   data() {
     return {
       modes: [
-        { name: "主题", tag: "Clock / Theme", icon: "clock-filling", color: "#FFD23F" },
-        { name: "画板", tag: "Canvas", icon: "picture-filling", color: "#74B9FF" },
-        { name: "桌宠", tag: "Spirit", icon: "smile-filling", color: "#FF6B6B" },
-        { name: "特效", tag: "Effects", icon: "dynamic-filling", color: "#88D498" },
-        { name: "功能", tag: "Feature", icon: "layout-filling", color: "#B8A9FA" },
-        { name: "通知", tag: "Notify", icon: "notification-filling", color: "#FFA552" },
+        { name: "主题", tag: "时钟主题", icon: "clock-filling", color: "#FFD23F" },
+        { name: "画板", tag: "像素画布", icon: "picture-filling", color: "#74B9FF" },
+        { name: "桌宠", tag: "表情时间", icon: "smile-filling", color: "#FF6B6B" },
+        { name: "特效", tag: "动态效果", icon: "dynamic-filling", color: "#88D498" },
+        { name: "功能", tag: "功能应用", icon: "layout-filling", color: "#B8A9FA" },
+        { name: "通知", tag: "提醒显示", icon: "notification-filling", color: "#FFA552" },
       ],
       actions: [
-        { label: "同步网络时间", desc: "一键更新 RTC", color: "#FFFDF5" },
+        { label: "同步网络时间", desc: "一键更新 RTC", color: "#FFFFFF" },
         { label: "发送当前配置", desc: "直接推到设备", color: "#FFD23F" },
         { label: "打开主题模式", desc: "快速切入展示", color: "#74B9FF" },
       ],

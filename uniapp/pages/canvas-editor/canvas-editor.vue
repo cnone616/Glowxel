@@ -1,20 +1,19 @@
 <template>
-  <view class="canvas-page">
+  <view class="canvas-page glx-page-shell">
     <!-- #ifdef MP-WEIXIN -->
     <view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
     <!-- #endif -->
 
-    <view class="header">
+    <view class="navbar glx-topbar glx-page-shell__fixed">
       <view class="nav-left" @click="handleBack">
         <Icon
           name="direction-left"
           :size="32"
-          color="var(--color-text-primary)"
+          color="var(--nb-ink)"
         />
       </view>
-      <view class="nav-title">
-        <text class="project-name">画板模式</text>
-      </view>
+      <text class="nav-title glx-topbar__title">画板模式</text>
+      <view class="nav-right"></view>
     </view>
 
     <view class="canvas-section">
@@ -40,32 +39,28 @@
       </view>
       <view v-else class="canvas-container canvas-placeholder"></view>
 
-      <view class="preview-caption">
-        <view class="preview-caption-info">
-          <view class="preview-status-chip" :class="previewStatusClass">
-            <text class="preview-status-chip-text">{{ previewStatusLabel }}</text>
-          </view>
-          <text class="preview-caption-title">{{ previewPanelTitle }}</text>
-          <text class="preview-caption-text">{{ previewCaptionText }}</text>
+      <view class="preview-caption glx-preview-panel">
+        <view class="preview-caption-info glx-preview-panel__info">
+          <text class="preview-caption-title">预览效果</text>
         </view>
         <view class="preview-actions">
           <view
-            class="action-btn-sm primary"
+            class="action-btn-sm primary glx-primary-action"
             :class="{ disabled: isSending }"
             @click="publishCanvas"
           >
-            <Icon name="link" :size="36" color="#fff" />
+            <Icon name="link" :size="36" color="#000000" />
             <text>{{ isSending ? "发送中" : "发送" }}</text>
           </view>
         </view>
       </view>
     </view>
 
-    <scroll-view scroll-y class="content" :style="{ height: contentHeight }">
-      <view class="content-wrapper">
+    <scroll-view scroll-y class="content glx-scroll-region glx-page-shell__content" :style="{ height: contentHeight }">
+      <view class="content-wrapper glx-scroll-stack">
         <view class="action-grid">
           <view
-            class="panel-btn"
+            class="panel-btn glx-action-tile"
             :class="{ disabled: historyIndex <= 0 }"
             @click="handleUndo"
           >
@@ -73,38 +68,38 @@
             <text>撤销</text>
           </view>
           <view
-            class="panel-btn"
+            class="panel-btn glx-action-tile"
             :class="{ disabled: historyIndex >= history.length - 1 }"
             @click="handleRedo"
           >
             <Icon name="forward" :size="36" />
             <text>重做</text>
           </view>
-          <view class="panel-btn" @click="handleZoom(-1)">
+          <view class="panel-btn glx-action-tile" @click="handleZoom(-1)">
             <Icon name="zoom-out" :size="36" />
             <text>缩小</text>
           </view>
-          <view class="panel-btn" @click="handleZoom(1)">
+          <view class="panel-btn glx-action-tile" @click="handleZoom(1)">
             <Icon name="zoom-in" :size="36" />
             <text>放大</text>
           </view>
-          <view class="panel-btn" @click="handleFit">
+          <view class="panel-btn glx-action-tile" @click="handleFit">
             <Icon name="fullscreen-expand" :size="36" />
             <text>适配</text>
           </view>
-          <view class="panel-btn danger" @click="clearCanvas">
+          <view class="panel-btn danger glx-action-tile" @click="clearCanvas">
             <Icon name="delete" :size="36" />
             <text>清空</text>
           </view>
         </view>
-        <view class="card">
-          <view class="card-title-section">
-            <text class="card-title">绘制工具</text>
+        <view class="card glx-panel-card">
+          <view class="card-title-section glx-panel-head">
+            <text class="card-title glx-panel-title">绘制工具</text>
           </view>
 
           <view class="tool-grid">
             <view
-              class="tool-card"
+              class="tool-card glx-tool-tile"
               :class="{ active: currentTool === 'move' }"
               @click="setTool('move')"
             >
@@ -112,7 +107,7 @@
               <text class="tool-card-label">拖动</text>
             </view>
             <view
-              class="tool-card"
+              class="tool-card glx-tool-tile"
               :class="{ active: currentTool === 'pencil' }"
               @click="setTool('pencil')"
             >
@@ -120,7 +115,7 @@
               <text class="tool-card-label">绘画</text>
             </view>
             <view
-              class="tool-card eraser"
+              class="tool-card eraser glx-tool-tile"
               :class="{ active: currentTool === 'eraser' }"
               @click="setTool('eraser')"
             >
@@ -129,16 +124,16 @@
             </view>
           </view>
         </view>
-        <view v-if="currentTool !== 'move'" class="card">
-          <view class="card-title-section">
-            <text class="card-title">笔触大小</text>
-            <text class="card-subtitle">{{ brushSize }} x {{ brushSize }}</text>
+        <view v-if="currentTool !== 'move'" class="card glx-panel-card">
+          <view class="card-title-section glx-panel-head">
+            <text class="card-title glx-panel-title">笔触大小</text>
+            <text class="card-subtitle glx-panel-subtitle">{{ brushSize }} x {{ brushSize }}</text>
           </view>
           <view class="option-row">
             <view
               v-for="size in brushSizeOptions"
               :key="size"
-              class="option-btn"
+              class="option-btn glx-feature-option"
               :class="{ active: brushSize === size }"
               @click="brushSize = size"
             >
@@ -147,9 +142,9 @@
           </view>
         </view>
 
-        <view v-if="currentTool !== 'move'" class="card">
-          <view class="card-title-section">
-            <text class="card-title">画笔颜色</text>
+        <view v-if="currentTool !== 'move'" class="card glx-panel-card">
+          <view class="card-title-section glx-panel-head">
+            <text class="card-title glx-panel-title">画笔颜色</text>
           </view>
           <view class="color-panel-wrap">
             <ColorPanelPicker
@@ -214,44 +209,6 @@ export default {
     };
   },
   computed: {
-    previewPanelTitle() {
-      return "64 x 64 模拟预览";
-    },
-    previewCaptionText() {
-      if (!this.canvasReady) {
-        return "预览网格加载中，完成后可直接拖动或绘制";
-      }
-      if (this.currentTool === "move") {
-        return "拖动画布查看细节，缩放后可继续调整位置";
-      }
-
-      const toolLabel = this.currentTool === "pencil" ? "绘画" : "擦除";
-      return `${toolLabel}模式，当前笔触 ${this.brushSize} x ${this.brushSize}`;
-    },
-    previewStatusLabel() {
-      if (this.isSending) {
-        return "发送中";
-      }
-      if (!this.canvasReady) {
-        return "预览加载中";
-      }
-      if (this.livePreviewEnabled && this.deviceStore && this.deviceStore.connected) {
-        return "实时联动";
-      }
-      return "本地编辑";
-    },
-    previewStatusClass() {
-      if (this.isSending) {
-        return "is-sending";
-      }
-      if (!this.canvasReady) {
-        return "is-loading";
-      }
-      if (this.livePreviewEnabled && this.deviceStore && this.deviceStore.connected) {
-        return "is-live";
-      }
-      return "is-preview";
-    },
   },
   onLoad() {
     this.deviceStore = useDeviceStore();
@@ -697,48 +654,11 @@ export default {
   background-color: #1a1a1a;
 }
 
-.header {
-  height: 88rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0 32rpx;
-  background-color: var(--bg-elevated);
-  border-bottom: 2rpx solid var(--border-primary);
-  position: relative;
-  flex-shrink: 0;
-}
-
-.nav-left {
-  position: absolute;
-  left: 32rpx;
-  width: 80rpx;
-  height: 80rpx;
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-}
-
-.nav-title {
-  font-size: 32rpx;
-  font-weight: 600;
-  color: var(--color-text-primary);
-}
-
-.project-name {
-  font-size: 33rpx;
-  font-weight: 700;
-  color: var(--text-primary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .canvas-section {
   display: flex;
   flex-direction: column;
   background: #000000;
-  border-bottom: 2rpx solid var(--border-primary);
+  border-bottom: 2rpx solid var(--nb-ink);
   flex-shrink: 0;
 }
 
@@ -759,10 +679,9 @@ export default {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16rpx;
-  padding: 14rpx 20rpx 18rpx;
+  gap: 12rpx;
+  padding: 10rpx 16rpx 12rpx;
   background: var(--bg-tertiary);
-  border-bottom: 1rpx solid var(--border-color);
 }
 
 .preview-caption-info {
@@ -770,48 +689,13 @@ export default {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 4rpx;
-}
-
-.preview-status-chip {
-  display: inline-flex;
-  width: fit-content;
-  padding: 6rpx 12rpx;
-  border-radius: 999rpx;
-  background: rgba(255, 255, 255, 0.08);
-}
-
-.preview-status-chip.is-loading {
-  background: rgba(255, 214, 102, 0.14);
-}
-
-.preview-status-chip.is-preview {
-  background: rgba(79, 127, 255, 0.14);
-}
-
-.preview-status-chip.is-live {
-  background: rgba(52, 211, 153, 0.16);
-}
-
-.preview-status-chip.is-sending {
-  background: rgba(52, 211, 153, 0.22);
-}
-
-.preview-status-chip-text {
-  font-size: 20rpx;
-  font-weight: 600;
-  color: var(--text-secondary);
+  gap: 0;
 }
 
 .preview-caption-title {
   font-size: 24rpx;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--text-primary);
-}
-
-.preview-caption-text {
-  font-size: 22rpx;
-  color: var(--text-secondary);
 }
 
 .preview-actions {
@@ -827,8 +711,8 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 14rpx;
-  border: 2rpx solid var(--border-primary);
+  border-radius: 0;
+  border: 2rpx solid var(--nb-ink);
   background-color: var(--bg-tertiary);
   transition: var(--transition-base);
 }
@@ -839,8 +723,8 @@ export default {
 }
 
 .action-btn-sm.primary {
-  background-color: var(--accent-primary);
-  border-color: var(--accent-primary);
+  background-color: var(--nb-yellow);
+  border-color: var(--nb-ink);
 }
 
 .action-btn-sm.disabled,
@@ -854,7 +738,7 @@ export default {
   height: 64rpx;
   padding: 0 18rpx;
   gap: 10rpx;
-  border-radius: 18rpx;
+  border-radius: 0;
 }
 
 .preview-actions .action-btn-sm text {
@@ -865,7 +749,7 @@ export default {
 }
 
 .preview-actions .action-btn-sm.primary text {
-  color: #ffffff;
+  color: #000000;
 }
 
 .sending-overlay {
@@ -881,7 +765,7 @@ export default {
 .sending-modal {
   min-width: 420rpx;
   padding: 60rpx 50rpx;
-  border-radius: 24rpx;
+  border-radius: 0;
   background: var(--bg-elevated);
   display: flex;
   flex-direction: column;
@@ -894,7 +778,7 @@ export default {
   height: 60rpx;
   border-radius: 50%;
   border: 6rpx solid rgba(79, 127, 255, 0.2);
-  border-top-color: var(--accent-primary);
+  border-top-color: var(--nb-yellow);
   animation: spin 0.8s linear infinite;
 }
 
@@ -919,15 +803,18 @@ export default {
   flex: 1;
   min-height: 0;
   background: var(--bg-tertiary);
-  padding: 20rpx;
+  padding: 16rpx 20rpx 0;
 }
 
 .content-wrapper {
-  padding-bottom: 48rpx;
+  padding: 0 0 56rpx;
 }
 
 .card {
-  padding-top: 20rpx;
+  padding-top: 16rpx;
+  border: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
 }
 
 .card-title-section {
@@ -935,7 +822,7 @@ export default {
   align-items: center;
   justify-content: space-between;
   gap: 8rpx;
-  margin-bottom: 16rpx;
+  margin-bottom: 14rpx;
 }
 
 .card-title {
@@ -963,23 +850,23 @@ export default {
   gap: 6rpx;
   min-height: 104rpx;
   padding: 12rpx 10rpx;
-  border-radius: 14rpx;
-  background-color: #f7f7f7;
-  border: 1rpx solid #e6e6e6;
+  border-radius: 0;
+  background-color: #ffffff;
+  border: 2rpx solid #000000;
   color: var(--text-primary);
 }
 
 .tool-card.active {
-  background: #eef4ff;
-  border-color: #4f7fff;
-  color: var(--accent-primary);
+  background: var(--nb-yellow);
+  border-color: var(--nb-ink);
+  color: #000000;
   box-shadow: none;
 }
 
 .tool-card.eraser.active {
-  background: #fff1f1;
-  border-color: var(--error-color);
-  color: var(--error-color);
+  background: var(--nb-yellow);
+  border-color: var(--nb-ink);
+  color: #000000;
   box-shadow: none;
 }
 
@@ -1002,25 +889,11 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 14rpx;
-  background: #f7f7f7;
-  border: 1rpx solid #e6e6e6;
 }
 
 .option-btn text {
   font-size: 23rpx;
-  color: var(--text-secondary);
-}
-
-.option-btn.active {
-  background: #eef4ff;
-  border-color: var(--accent-primary);
-  box-shadow: none;
-}
-
-.option-btn.active text {
-  color: var(--accent-primary);
-  font-weight: 600;
+  font-size: 24rpx;
 }
 
 .action-grid {
@@ -1037,9 +910,9 @@ export default {
   gap: 6rpx;
   min-height: 88rpx;
   padding: 10rpx 8rpx;
-  border-radius: 14rpx;
-  background: #f7f7f7;
-  border: 1rpx solid #e6e6e6;
+  border-radius: 0;
+  background: #ffffff;
+  border: 2rpx solid #000000;
   color: var(--text-primary);
 }
 

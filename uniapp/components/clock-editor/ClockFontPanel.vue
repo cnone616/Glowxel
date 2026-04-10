@@ -13,7 +13,7 @@
             <view
               v-for="font in fontOptions"
               :key="font.id"
-              class="font-card"
+              class="font-card glx-feature-card-option"
               :class="{ active: selectedFont === font.id }"
               @click="$emit('select-font', font.id)"
             >
@@ -61,18 +61,18 @@
         </view>
       </view>
 
-      <view class="setting-item">
+      <view v-if="showHourFormat" class="setting-item">
         <text class="setting-label">小时制式</text>
         <view class="align-buttons">
           <view
-            class="align-btn"
+            class="align-btn glx-feature-option"
             :class="{ active: hourFormat === 24 }"
             @click="$emit('set-hour-format', 24)"
           >
             <text class="align-text">24 小时</text>
           </view>
           <view
-            class="align-btn"
+            class="align-btn glx-feature-option"
             :class="{ active: hourFormat === 12 }"
             @click="$emit('set-hour-format', 12)"
           >
@@ -116,7 +116,11 @@ export default {
     },
     hourFormat: {
       type: Number,
-      required: true,
+      default: 24,
+    },
+    showHourFormat: {
+      type: Boolean,
+      default: true,
     },
   },
   emits: ["select-font", "toggle-seconds", "set-hour-format"],
@@ -199,9 +203,9 @@ export default {
 
 <style scoped>
 .settings-card {
-  background-color: var(--bg-tertiary);
-  border: 2rpx solid var(--border-primary);
-  padding: 20rpx;
+  background-color: transparent;
+  border: 0;
+  padding: 0;
   margin-bottom: 16rpx;
 }
 
@@ -258,19 +262,11 @@ export default {
   gap: 12rpx;
   padding: 16rpx;
   min-width: 220rpx;
-  background-color: var(--bg-secondary);
-  border: 2rpx solid var(--border-primary);
-  border-radius: 16rpx;
   transition: var(--transition-base);
 }
 
-.font-card:active {
-  transform: scale(0.98);
-}
-
 .font-card.active {
-  border-color: var(--accent-primary);
-  box-shadow: 0 0 16rpx rgba(79, 127, 255, 0.2);
+  box-shadow: none;
 }
 
 .font-preview-board {
@@ -279,7 +275,7 @@ export default {
   justify-content: center;
   min-height: 104rpx;
   padding: 16rpx 12rpx;
-  border-radius: 12rpx;
+  border-radius: 0;
 }
 
 .font-preview-viewport {
@@ -321,30 +317,12 @@ export default {
 .align-btn {
   flex: 1;
   padding: 20rpx 16rpx;
-  background-color: var(--bg-secondary);
-  border: 2rpx solid var(--border-primary);
-  border-radius: 12rpx;
   text-align: center;
   transition: var(--transition-base);
 }
 
-.align-btn:active {
-  transform: scale(0.98);
-}
-
-.align-btn.active {
-  background-color: rgba(0, 243, 255, 0.1);
-  border-color: var(--accent-primary);
-}
-
 .align-text {
   font-size: 22rpx;
-  color: var(--text-secondary);
-}
-
-.align-btn.active .align-text {
-  color: var(--accent-primary);
-  font-weight: 500;
 }
 
 .toggle-switch {
@@ -355,22 +333,22 @@ export default {
   width: 80rpx;
   height: 44rpx;
   background-color: var(--bg-secondary);
-  border: 2rpx solid var(--border-primary);
-  border-radius: 22rpx;
+  border: 2rpx solid var(--nb-ink);
+  border-radius: 0;
   position: relative;
   transition: var(--transition-base);
 }
 
 .switch-track.active {
-  background-color: var(--accent-primary);
-  border-color: var(--accent-primary);
+  background-color: var(--nb-yellow);
+  border-color: var(--nb-ink);
 }
 
 .switch-thumb {
   width: 36rpx;
   height: 36rpx;
   background-color: var(--text-primary);
-  border-radius: 18rpx;
+  border-radius: 0;
   position: absolute;
   top: 2rpx;
   left: 2rpx;
@@ -379,6 +357,6 @@ export default {
 
 .switch-track.active .switch-thumb {
   left: 38rpx;
-  background-color: #ffffff;
+  background-color: #000000;
 }
 </style>

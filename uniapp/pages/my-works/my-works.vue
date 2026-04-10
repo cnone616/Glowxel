@@ -1,27 +1,27 @@
 <template>
-  <view class="my-works-page">
+  <view class="my-works-page glx-page-shell">
     <!-- 状态栏占位 -->
     <!-- #ifdef MP-WEIXIN -->
     <view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
     <!-- #endif -->
 
     <!-- 导航栏 -->
-    <view class="navbar">
+    <view class="navbar glx-topbar glx-page-shell__fixed">
       <view class="nav-left" @click="handleBack">
         <Icon
           name="direction-left"
           :size="32"
-          color="var(--color-text-primary)"
+          color="var(--nb-ink)"
         />
       </view>
-      <text class="nav-title">我的作品</text>
+      <text class="nav-title glx-topbar__title">我的作品</text>
       <view class="nav-right" @click="showSortModal = true"> </view>
     </view>
 
     <!-- 搜索和筛选 -->
     <view class="search-section">
-      <view class="search-bar">
-        <Icon name="search" :size="28" color="var(--color-text-disabled)" />
+      <view class="search-bar glx-search-shell">
+        <Icon name="search" :size="28" color="#777777" />
         <input
           v-model="searchQuery"
           class="search-input"
@@ -41,78 +41,32 @@
           @click="currentFilter = filter.value"
         >
           <text class="filter-text">{{ filter.label }}</text>
-          <text v-if="filter.count" class="filter-count">{{
-            filter.count
-          }}</text>
+          <text v-if="filter.count" class="filter-count">{{ filter.count }}</text>
         </view>
       </view>
     </view>
 
     <!-- 作品网格 -->
-    <scroll-view scroll-y class="content" @scrolltolower="loadMore">
-      <view v-if="filteredWorks.length === 0" class="empty-state">
-        <Icon name="picture" :size="120" color="var(--color-text-disabled)" />
+    <scroll-view scroll-y class="content glx-scroll-region glx-page-shell__content" @scrolltolower="loadMore">
+      <view v-if="filteredWorks.length === 0" class="empty-state glx-panel-card">
+        <Icon name="picture" :size="120" color="#777777" />
         <text class="empty-title">暂无作品</text>
         <text class="empty-desc">快去创建你的第一个作品吧</text>
-        <button class="create-btn" @click="goToCreate">
+        <button class="create-btn glx-cta-button" @click="goToCreate">
           <Icon name="plus" :size="32" />
           <text>创建作品</text>
         </button>
       </view>
 
       <view v-else class="works-grid">
-        <view
+        <ProjectCard
           v-for="work in filteredWorks"
           :key="work.id"
-          class="work-card"
-          @click="openWork(work)"
-          @longpress="showWorkMenu(work)"
-        >
-          <view class="work-thumbnail">
-            <image
-              v-if="work.thumbnail"
-              :src="work.thumbnail"
-              class="thumbnail-image"
-              mode="aspectFill"
-            />
-            <view v-else class="thumbnail-placeholder">
-              <Icon
-                name="picture"
-                :size="60"
-                color="var(--color-text-disabled)"
-              />
-            </view>
-
-            <!-- 类型标识 -->
-            <view class="type-badge" :class="work.type">
-              <text class="type-text">{{
-                work.type === "published" ? "已发布" : "草稿"
-              }}</text>
-            </view>
-
-            <!-- 发布状态标识 -->
-            <view v-if="work.type === 'published'" class="published-badge">
-              <Icon name="check" :size="20" color="#FFFFFF" />
-            </view>
-            <view v-else-if="work.isPublished" class="draft-published-badge">
-              <Icon name="upload" :size="20" color="#FFFFFF" />
-            </view>
-          </view>
-
-          <view class="work-info">
-              <text class="work-name">{{ work.name || work.title }}</text>
-            <view class="work-meta">
-              <text class="work-size">{{ work.width }}×{{ work.height }}</text>
-              <text class="work-date">{{ formatDate(work.updateTime) }}</text>
-            </view>
-            <view
-              v-if="work.type === 'published' && work.description"
-              class="work-desc"
-            >
-              <text class="desc-text">{{ work.description }}</text>
-            </view>
-          </view>
-        </view>
+          :project="work"
+          :defer-click="true"
+          @card-click="openWork"
+          @card-longpress="showWorkMenu"
+        />
       </view>
 
       <!-- 加载更多 -->
@@ -196,12 +150,14 @@ import { useToast } from "../../composables/useToast.js";
 import statusBarMixin from "../../mixins/statusBar.js";
 import Icon from "../../components/Icon.vue";
 import Toast from "../../components/Toast.vue";
+import ProjectCard from "../../components/ProjectCard.vue";
 
 export default {
   mixins: [statusBarMixin],
   components: {
     Icon,
     Toast,
+    ProjectCard,
   },
 
   data() {
@@ -508,59 +464,24 @@ export default {
 <style scoped>
 .my-works-page {
   height: 100vh;
-  background-color: var(--color-app-background);
+  background-color: var(--nb-paper);
   display: flex;
   flex-direction: column;
 }
 
-.navbar {
-  height: 88rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0 32rpx;
-  background-color: var(--color-card-background);
-  border-bottom: 2rpx solid var(--border-primary);
-  position: relative;
-}
-
-.nav-left {
-  position: absolute;
-  left: 32rpx;
-  width: 80rpx;
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-}
-
-.nav-right {
-  position: absolute;
-  right: 32rpx;
-  width: 80rpx;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-}
-
-.nav-title {
-  font-size: 32rpx;
-  font-weight: 600;
-  color: var(--color-text-primary);
-}
-
 .search-section {
-  background-color: var(--color-card-background);
+  background-color: var(--nb-surface);
   padding: 24rpx 32rpx;
-  border-bottom: 2rpx solid var(--border-primary);
+  border-bottom: 2rpx solid var(--nb-ink);
 }
 
 .search-bar {
   display: flex;
   align-items: center;
   gap: 16rpx;
-  background-color: var(--color-app-background);
-  border: 2rpx solid var(--border-primary);
-  border-radius: 12rpx;
+  background-color: var(--nb-paper);
+  border: 2rpx solid var(--nb-ink);
+  border-radius: 0;
   padding: 16rpx 24rpx;
   margin-bottom: 24rpx;
 }
@@ -568,52 +489,74 @@ export default {
 .search-input {
   flex: 1;
   font-size: 28rpx;
-  color: var(--color-text-primary);
+  color: var(--nb-ink);
 }
 
 .clear-btn {
   padding: 8rpx;
-  border-radius: 50%;
-  background-color: var(--color-text-disabled);
+  border-radius: 0;
+  background-color: #777777;
   color: #ffffff;
+  border: 2rpx solid var(--nb-ink);
 }
 
 .filter-tabs {
   display: flex;
   gap: 16rpx;
+  align-items: stretch;
 }
 
 .filter-tab {
+  position: relative;
+  flex: 1 1 0;
   display: flex;
   align-items: center;
-  gap: 8rpx;
-  padding: 16rpx 24rpx;
-  background-color: var(--color-app-background);
-  border: 2rpx solid var(--border-primary);
-  border-radius: 32rpx;
+  justify-content: center;
+  min-width: 104rpx;
+  min-height: 88rpx;
+  padding: 16rpx 18rpx;
+  background-color: var(--nb-paper);
+  border: 2rpx solid var(--nb-ink);
+  border-radius: 0;
   transition: all 0.2s ease;
+  box-sizing: border-box;
 }
 
 .filter-tab.active {
-  background-color: var(--color-brand-primary);
-  border-color: var(--color-brand-primary);
+  background-color: var(--nb-yellow);
+  border-color: var(--nb-ink);
 }
 
 .filter-text {
   font-size: 24rpx;
-  color: var(--color-text-secondary);
+  color: #4a4a4a;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
 }
 
 .filter-tab.active .filter-text {
-  color: #ffffff;
+  color: #000000;
+  font-weight: 700;
 }
 
 .filter-count {
-  font-size: 20rpx;
-  background-color: rgba(255, 255, 255, 0.2);
-  padding: 4rpx 8rpx;
-  border-radius: 10rpx;
-  color: inherit;
+  position: absolute;
+  top: 10rpx;
+  right: 10rpx;
+  min-width: 32rpx;
+  height: 32rpx;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  font-size: 18rpx;
+  font-weight: 700;
+  background-color: #ffffff;
+  padding: 0 6rpx;
+  border-radius: 0;
+  border: 2rpx solid var(--nb-ink);
+  color: var(--nb-ink);
 }
 
 .content {
@@ -633,12 +576,12 @@ export default {
 .empty-title {
   font-size: 32rpx;
   font-weight: 600;
-  color: var(--color-text-secondary);
+  color: #4a4a4a;
 }
 
 .empty-desc {
   font-size: 24rpx;
-  color: var(--color-text-disabled);
+  color: #777777;
 }
 
 .create-btn {
@@ -646,10 +589,10 @@ export default {
   align-items: center;
   gap: 12rpx;
   padding: 24rpx 48rpx;
-  background-color: var(--color-brand-primary);
-  color: #ffffff;
-  border: none;
-  border-radius: 16rpx;
+  background-color: var(--nb-yellow);
+  color: #000000;
+  border: 3rpx solid #000000;
+  border-radius: 0;
   font-size: 28rpx;
   font-weight: 600;
 }
@@ -664,162 +607,6 @@ export default {
   gap: 24rpx;
 }
 
-.work-card {
-  background-color: var(--color-card-background);
-  border-radius: 16rpx;
-  overflow: hidden;
-  box-shadow: var(--shadow-card);
-  transition: all 0.2s ease;
-}
-
-.work-card:active {
-  transform: scale(0.98);
-  box-shadow: var(--shadow-floating);
-}
-
-.work-thumbnail {
-  position: relative;
-  width: 100%;
-  height: 200rpx;
-  background-color: var(--color-app-background);
-}
-
-.thumbnail-image {
-  width: 100%;
-  height: 100%;
-}
-
-.thumbnail-placeholder {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.progress-badge {
-  position: absolute;
-  top: 12rpx;
-  right: 12rpx;
-  background-color: rgba(0, 0, 0, 0.7);
-  padding: 8rpx 12rpx;
-  border-radius: 12rpx;
-}
-
-.progress-text {
-  font-size: 20rpx;
-  color: #ffffff;
-}
-
-.complete-badge {
-  position: absolute;
-  top: 12rpx;
-  right: 12rpx;
-  width: 40rpx;
-  height: 40rpx;
-  background-color: var(--color-success);
-  border-radius: 20rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-/* 新增：类型标识 */
-.type-badge {
-  position: absolute;
-  top: 12rpx;
-  left: 12rpx;
-  padding: 6rpx 12rpx;
-  border-radius: 12rpx;
-  backdrop-filter: blur(10rpx);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.type-badge.published {
-  background-color: rgba(0, 243, 255, 0.9);
-}
-
-.type-badge.draft {
-  background-color: rgba(255, 170, 0, 0.9);
-}
-
-.type-text {
-  font-size: 18rpx;
-  font-weight: 600;
-  color: #ffffff;
-  line-height: 1.2;
-}
-
-/* 发布状态标识 */
-.published-badge {
-  position: absolute;
-  top: 12rpx;
-  right: 12rpx;
-  width: 36rpx;
-  height: 36rpx;
-  background-color: var(--color-success);
-  border-radius: 18rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.draft-published-badge {
-  position: absolute;
-  top: 12rpx;
-  right: 12rpx;
-  width: 36rpx;
-  height: 36rpx;
-  background-color: var(--color-brand-primary);
-  border-radius: 18rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.work-info {
-  padding: 24rpx;
-}
-
-.work-name {
-  font-size: 28rpx;
-  font-weight: 600;
-  color: var(--color-text-primary);
-  margin-bottom: 8rpx;
-  display: -webkit-box;
-  -webkit-line-clamp: 1;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.work-meta {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.work-size,
-.work-date {
-  font-size: 22rpx;
-  color: var(--color-text-disabled);
-}
-
-.work-desc {
-  margin-top: 8rpx;
-}
-
-.desc-text {
-  font-size: 20rpx;
-  color: var(--color-text-secondary);
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  line-height: 1.4;
-}
-
 .load-more {
   text-align: center;
   padding: 32rpx;
@@ -827,7 +614,7 @@ export default {
 
 .load-text {
   font-size: 24rpx;
-  color: var(--color-text-disabled);
+  color: #777777;
 }
 
 /* 弹窗样式 */
@@ -846,12 +633,13 @@ export default {
 
 .sort-modal,
 .work-menu {
-  background-color: var(--color-card-background);
-  border-radius: 24rpx;
+  background-color: var(--nb-surface);
+  border-radius: 0;
+  border: 2rpx solid var(--nb-ink);
   margin: 32rpx;
   max-width: 600rpx;
   width: 100%;
-  box-shadow: var(--shadow-modal);
+  box-shadow: var(--nb-shadow-strong);
 }
 
 .modal-header {
@@ -859,18 +647,25 @@ export default {
   align-items: center;
   justify-content: space-between;
   padding: 32rpx;
-  border-bottom: 2rpx solid var(--border-primary);
+  border-bottom: 2rpx solid var(--nb-ink);
 }
 
 .modal-title,
 .menu-title {
   font-size: 32rpx;
   font-weight: 600;
-  color: var(--color-text-primary);
+  color: var(--nb-ink);
 }
 
 .modal-close {
-  padding: 8rpx;
+  width: 64rpx;
+  height: 64rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2rpx solid var(--nb-ink);
+  background: #ffffff;
+  box-shadow: 2rpx 2rpx 0 var(--nb-ink);
 }
 
 .sort-options,
@@ -889,17 +684,17 @@ export default {
 
 .sort-option:active,
 .menu-action:active {
-  background-color: var(--color-app-background);
+  background-color: var(--nb-paper);
 }
 
 .sort-option.active {
-  background-color: rgba(79, 127, 255, 0.1);
+  background-color: var(--nb-yellow);
 }
 
 .sort-text,
 .action-text {
   font-size: 28rpx;
-  color: var(--color-text-primary);
+  color: var(--nb-ink);
 }
 
 .menu-action {
@@ -908,11 +703,11 @@ export default {
 }
 
 .menu-action.danger .action-text {
-  color: var(--color-error);
+  color: var(--nb-coral);
 }
 
 .menu-header {
   padding: 32rpx;
-  border-bottom: 2rpx solid var(--border-primary);
+  border-bottom: 2rpx solid var(--nb-ink);
 }
 </style>

@@ -42,6 +42,7 @@ private:
   static int lastClockMinute;
   static int lastClockHour;
   static bool holdClockFrame;
+  static unsigned long spawnCounter;
   static bool spawnBiasLeft;
   static unsigned long holdPulseAt;
   static bool holdPulseBright;
@@ -60,6 +61,8 @@ private:
   static void getPieceCells(int type, int rot, int cells[4][2]);
   static int pieceMinX(int type, int rot);
   static int pieceMaxX(int type, int rot);
+  static uint32_t buildSequenceSeed();
+  static int computeSpawnDrift(int type);
   static int computeSpawnX(int type, int rot, int finalX);
   static void rebuildClockTarget();
   static bool buildClockPlacement(int& outRot, int& outX);

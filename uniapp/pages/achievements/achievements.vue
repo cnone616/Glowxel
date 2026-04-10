@@ -1,20 +1,25 @@
 <template>
-  <view class="achievements-page">
+  <view class="achievements-page glx-page-shell">
     <!-- #ifdef MP-WEIXIN -->
     <view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
     <!-- #endif -->
 
-    <view class="navbar">
+    <view class="navbar glx-topbar glx-page-shell__fixed">
       <view class="nav-left" @click="handleBack">
-        <Icon name="direction-left" :size="32" color="#0F172A" />
+        <Icon name="direction-left" :size="32" color="var(--nb-ink)" />
       </view>
-      <text class="nav-title">成就</text>
-      <view class="nav-right" @click="shareAchievements">
-        <Icon name="share" :size="32" color="#0F172A" />
-      </view>
+      <text class="nav-title glx-topbar__title">成就</text>
+      <view class="nav-right"></view>
     </view>
 
-    <scroll-view scroll-y class="content">
+    <scroll-view scroll-y class="content glx-scroll-region glx-page-shell__content">
+      <view class="hero-actions">
+        <view class="hero-action-btn" @click="shareAchievements">
+          <Icon name="share" :size="28" color="#0F172A" />
+          <text class="hero-action-text">分享成就</text>
+        </view>
+      </view>
+
       <view class="achievement-hero">
         <view class="hero-copy">
           <text class="hero-badge">荣誉系统</text>
@@ -48,8 +53,8 @@
       </view>
 
       <view class="section-block">
-        <view class="section-header">
-          <text class="section-title">稀有度层级</text>
+        <view class="section-header glx-section-head">
+          <text class="section-title glx-section-title">稀有度层级</text>
           <text class="section-meta">当前成就体系</text>
         </view>
         <view class="rarity-grid">
@@ -69,8 +74,8 @@
       </view>
 
       <view class="section-block">
-        <view class="section-header">
-          <text class="section-title">成就分类</text>
+        <view class="section-header glx-section-head">
+          <text class="section-title glx-section-title">成就分类</text>
           <text class="section-meta">按系列查看</text>
         </view>
         <view class="category-tabs">
@@ -91,8 +96,8 @@
       </view>
 
       <view class="section-block">
-        <view class="section-header">
-          <text class="section-title">成就卡片</text>
+        <view class="section-header glx-section-head">
+          <text class="section-title glx-section-title">成就卡片</text>
           <text class="section-meta">点击查看详情</text>
         </view>
         <view class="achievements-grid">
@@ -549,9 +554,9 @@ export default {
     },
 
     getIconColor(achievement) {
-      if (!achievement.unlocked) return "var(--color-text-disabled)";
+      if (!achievement.unlocked) return "#777777";
       const map = { rare: "#4F7FFF", epic: "#9333EA", legendary: "#F59E0B" };
-      return map[achievement.rarity] || "var(--color-text-primary)";
+      return map[achievement.rarity] || "var(--nb-ink)";
     },
 
     getRarityText(rarity) {
@@ -587,7 +592,7 @@ export default {
   padding: 0 32rpx;
   background: rgba(255, 255, 255, 0.86);
   border-bottom: 2rpx solid rgba(148, 163, 184, 0.16);
-  backdrop-filter: blur(24rpx);
+  backdrop-filter: none;
   position: relative;
 }
 
@@ -619,6 +624,31 @@ export default {
   flex: 1;
   padding: 28rpx 28rpx 0;
   box-sizing: border-box;
+}
+
+.hero-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 20rpx;
+}
+
+.hero-action-btn {
+  min-height: 68rpx;
+  padding: 0 24rpx;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10rpx;
+  background: #ffffff;
+  border: 4rpx solid #000000;
+  border-radius: 16rpx;
+  box-shadow: none;
+}
+
+.hero-action-text {
+  font-size: 24rpx;
+  font-weight: 700;
+  color: #0f172a;
 }
 
 .achievement-hero {
@@ -1045,11 +1075,12 @@ export default {
 .achievement-modal {
   width: 100%;
   max-width: 640rpx;
-  border-radius: 36rpx;
-  background: linear-gradient(180deg, #ffffff 0%, #f8faff 100%);
+  border-radius: 0;
+  border: 2rpx solid var(--nb-ink);
+  background: #ffffff;
   padding: 40rpx 32rpx 32rpx;
   position: relative;
-  box-shadow: 0 30rpx 80rpx rgba(15, 23, 42, 0.22);
+  box-shadow: var(--nb-shadow-strong);
 }
 
 .modal-close {
@@ -1058,8 +1089,10 @@ export default {
   right: 24rpx;
   width: 64rpx;
   height: 64rpx;
-  border-radius: 18rpx;
-  background: rgba(148, 163, 184, 0.12);
+  border-radius: 0;
+  border: 2rpx solid var(--nb-ink);
+  background: #ffffff;
+  box-shadow: 2rpx 2rpx 0 var(--nb-ink);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1129,7 +1162,7 @@ export default {
 }
 
 .modal-meta-card {
-  border-radius: 24rpx;
+  border-radius: 0;
   background: rgba(148, 163, 184, 0.08);
   padding: 20rpx;
   display: flex;
@@ -1149,7 +1182,9 @@ export default {
 .modal-action-button {
   flex: 1;
   min-height: 88rpx;
-  border-radius: 24rpx;
+  border-radius: 0;
+  border: 2rpx solid var(--nb-ink);
+  box-shadow: 2rpx 2rpx 0 var(--nb-ink);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1157,11 +1192,11 @@ export default {
 }
 
 .modal-action-button.ghost {
-  background: rgba(148, 163, 184, 0.1);
+  background: #ffffff;
 }
 
 .modal-action-button.primary {
-  background: linear-gradient(90deg, #4f7fff 0%, #8b5cf6 100%);
+  background: var(--nb-yellow);
 }
 
 .modal-action-text {
@@ -1171,6 +1206,6 @@ export default {
 }
 
 .modal-action-text.white {
-  color: #ffffff;
+  color: #000000;
 }
 </style>
