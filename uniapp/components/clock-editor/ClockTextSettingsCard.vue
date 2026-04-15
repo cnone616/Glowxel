@@ -1,13 +1,13 @@
 <template>
-  <view class="settings-card">
-    <view class="card-title-section">
+  <view class="settings-card glx-panel-card">
+    <view class="card-title-section glx-panel-head">
       <Icon :name="iconName" :size="32" />
-      <text class="card-title">{{ title }}</text>
-      <view class="toggle-switch" @click="$emit('toggle')">
-        <view class="switch-track" :class="{ active: section.show }">
-          <view class="switch-thumb"></view>
-        </view>
-      </view>
+      <text class="card-title glx-panel-title">{{ title }}</text>
+      <GlxSwitch
+        class="glx-row-switch"
+        :checked="section.show"
+        @change="$emit('toggle')"
+      />
     </view>
 
     <view v-if="section.show" class="setting-group">
@@ -56,7 +56,34 @@
         </view>
       </view>
 
-      <view class="setting-item">
+      <view v-if="showAlign" class="settings-block">
+        <text class="setting-label">对齐方式</text>
+        <view class="align-buttons">
+          <view
+            class="align-btn glx-feature-option"
+            :class="{ active: section.align === 'left' }"
+            @click="$emit('set-align', 'left')"
+          >
+            <text class="glx-feature-option__label">左对齐</text>
+          </view>
+          <view
+            class="align-btn glx-feature-option"
+            :class="{ active: section.align === 'center' }"
+            @click="$emit('set-align', 'center')"
+          >
+            <text class="glx-feature-option__label">居中</text>
+          </view>
+          <view
+            class="align-btn glx-feature-option"
+            :class="{ active: section.align === 'right' }"
+            @click="$emit('set-align', 'right')"
+          >
+            <text class="glx-feature-option__label">右对齐</text>
+          </view>
+        </view>
+      </view>
+
+      <view class="settings-block">
         <text class="setting-label">颜色</text>
         <ColorPanelPicker
           :value="section.color"
@@ -65,33 +92,6 @@
           @input="$emit('update-color', $event)"
         />
       </view>
-
-      <view v-if="showAlign" class="setting-item">
-        <text class="setting-label">对齐方式</text>
-        <view class="align-buttons">
-          <view
-            class="align-btn glx-feature-option"
-            :class="{ active: section.align === 'left' }"
-            @click="$emit('set-align', 'left')"
-          >
-            <text class="align-text">左对齐</text>
-          </view>
-          <view
-            class="align-btn glx-feature-option"
-            :class="{ active: section.align === 'center' }"
-            @click="$emit('set-align', 'center')"
-          >
-            <text class="align-text">居中</text>
-          </view>
-          <view
-            class="align-btn glx-feature-option"
-            :class="{ active: section.align === 'right' }"
-            @click="$emit('set-align', 'right')"
-          >
-            <text class="align-text">右对齐</text>
-          </view>
-        </view>
-      </view>
     </view>
   </view>
 </template>
@@ -99,11 +99,13 @@
 <script>
 import Icon from "../Icon.vue";
 import ColorPanelPicker from "../ColorPanelPicker.vue";
+import GlxSwitch from "../GlxSwitch.vue";
 
 export default {
   components: {
     Icon,
     ColorPanelPicker,
+    GlxSwitch,
   },
   props: {
     iconName: {
@@ -159,34 +161,22 @@ export default {
 .settings-card {
   background-color: transparent;
   border: 0;
-  padding: 0;
+  padding: 8rpx 12rpx 14rpx;
   margin-bottom: 16rpx;
-}
-
-.card-title-section {
-  display: flex;
-  align-items: center;
-  gap: 8rpx;
-  margin-bottom: 16rpx;
-}
-
-.card-title {
-  font-size: 22rpx;
-  font-weight: 500;
-  color: var(--text-primary);
-  flex: 1;
+  box-shadow: none;
 }
 
 .setting-group {
   display: flex;
   flex-direction: column;
-  gap: 12rpx;
+  gap: 16rpx;
 }
 
-.setting-item {
+.settings-block {
   display: flex;
   flex-direction: column;
   gap: 8rpx;
+  padding: 0 2rpx;
 }
 
 .setting-item-row {
@@ -194,6 +184,7 @@ export default {
   align-items: center;
   justify-content: space-between;
   gap: 16rpx;
+  padding: 0 2rpx;
 }
 
 .setting-label {
@@ -245,44 +236,5 @@ export default {
   padding: 20rpx 16rpx;
   text-align: center;
   transition: var(--transition-base);
-}
-
-.align-text {
-  font-size: 22rpx;
-}
-
-.toggle-switch {
-  margin-left: auto;
-}
-
-.switch-track {
-  width: 80rpx;
-  height: 44rpx;
-  background-color: var(--bg-secondary);
-  border: 2rpx solid var(--nb-ink);
-  border-radius: 0;
-  position: relative;
-  transition: var(--transition-base);
-}
-
-.switch-track.active {
-  background-color: var(--nb-yellow);
-  border-color: var(--nb-ink);
-}
-
-.switch-thumb {
-  width: 36rpx;
-  height: 36rpx;
-  background-color: var(--text-primary);
-  border-radius: 0;
-  position: absolute;
-  top: 2rpx;
-  left: 2rpx;
-  transition: var(--transition-base);
-}
-
-.switch-track.active .switch-thumb {
-  left: 38rpx;
-  background-color: #000000;
 }
 </style>

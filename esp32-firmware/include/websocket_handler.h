@@ -32,6 +32,7 @@ public:
   static unsigned long lastMessageTime;
   static void handleHeartbeatTimeout();
   static void sendBinaryReceiveConfirmation(int pixelCount);
+  static void restoreDisplayForCurrentMode();
   
 private:
   static const char* getCurrentModeString();
@@ -39,7 +40,6 @@ private:
   static void syncClientConnectionState();
   static void clearAllClientTextStates();
   static void resetTransientTransferState();
-  static void restoreDisplayForCurrentMode();
   static void finalizeClientDisconnect(uint32_t clientId, bool fromHeartbeatTimeout);
   static void handleJsonCommand(AsyncWebSocketClient *client, JsonDocument& doc);
   static void handleJsonCommand(AsyncWebSocketClient *client, uint8_t *data, size_t len, AwsFrameInfo *info);

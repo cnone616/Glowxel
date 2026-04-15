@@ -19,12 +19,11 @@
             <image
               :src="preset.previewImage"
               class="theme-preview-image"
-              mode="aspectFill"
+              mode="aspectFit"
             />
           </view>
           <view class="theme-meta">
             <text class="theme-name">{{ preset.name }}</text>
-            <text v-if="preset.styleTag" class="theme-tag">{{ preset.styleTag }}</text>
           </view>
           <view v-if="currentThemeId === preset.id" class="theme-badge">
             <view class="theme-badge-text">当前</view>
@@ -85,6 +84,7 @@ export default {
   border: 2rpx solid var(--nb-ink);
   padding: 20rpx;
   margin-bottom: 16rpx;
+  box-shadow: none;
 }
 
 .card-title-section {
@@ -141,7 +141,7 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 8rpx;
+  padding: 14rpx;
   box-sizing: border-box;
   background: #000000;
 }
@@ -155,7 +155,7 @@ export default {
 }
 
 .theme-meta {
-  padding: 12rpx 12rpx 14rpx;
+  padding: 12rpx;
 }
 
 .theme-name {
@@ -167,15 +167,6 @@ export default {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  text-align: center;
-}
-
-.theme-tag {
-  display: block;
-  margin-top: 6rpx;
-  font-size: 18rpx;
-  line-height: 1.3;
-  color: var(--text-secondary);
   text-align: center;
 }
 

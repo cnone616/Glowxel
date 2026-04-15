@@ -81,6 +81,10 @@ export default {
     canvasId: {
       type: String,
       default: 'pixelCanvas'
+    },
+    refreshToken: {
+      type: [Number, String],
+      default: 0
     }
   },
   
@@ -89,6 +93,8 @@ export default {
       canvas: null,
       ctx: null,
       canvasRect: null,  // 缓存 canvas 位置
+      initRetryCount: 0,
+      initRetryTimer: null,
       activePointers: new Map(),
       lastCenter: null,
       lastDist: null,
@@ -117,11 +123,21 @@ export default {
     highlightRow() { this.drawCanvas() },
     isDarkMode() { this.drawCanvas() },
     canvasWidth() { this.updateCanvasSize() },
-    canvasHeight() { this.updateCanvasSize() }
+    canvasHeight() { this.updateCanvasSize() },
+    refreshToken() { this.drawCanvas() }
   },
   
   mounted() {
-    this.initCanvas()
+    this.$nextTick(() => {
+      this.initCanvas()
+    })
+  },
+
+  beforeUnmount() {
+    if (this.initRetryTimer) {
+      clearTimeout(this.initRetryTimer)
+      this.initRetryTimer = null
+    }
   },
   
   methods: {
@@ -130,11 +146,23 @@ export default {
       query.select(`#${this.canvasId}`)
         .fields({ node: true, size: true })
         .exec((res) => {
-          if (!res || !res[0]) return
+          if (!res || !res[0] || !res[0].node) {
+            if (this.initRetryCount >= 6) return
+            this.initRetryCount += 1
+            if (this.initRetryTimer) {
+              clearTimeout(this.initRetryTimer)
+            }
+            this.initRetryTimer = setTimeout(() => {
+              this.initRetryTimer = null
+              this.initCanvas()
+            }, 50)
+            return
+          }
           
           const canvas = res[0].node
           this.canvas = canvas
           this.ctx = canvas.getContext('2d')
+          this.initRetryCount = 0
           
           // 获取设备像素比
           const dpr = uni.getSystemInfoSync().pixelRatio || 1
@@ -268,10 +296,10 @@ export default {
       if (this.gridVisible && this.zoom > 1.5) {
         const gridColor = this.isDarkMode ? '#eef6ff' : '#5a6472'
         
-        const gridLineWidth = this.isDarkMode ? 0.14 : 0.1
+        const gridLineWidth = this.isDarkMode ? 0.18 : 0.12
         ctx.lineWidth = gridLineWidth
         ctx.strokeStyle = gridColor
-        ctx.globalAlpha = this.isDarkMode ? 0.18 : 0.12
+        ctx.globalAlpha = this.isDarkMode ? 0.28 : 0.16
         
         ctx.beginPath()
         for (let x = 0; x <= this.width; x++) {
@@ -285,9 +313,9 @@ export default {
         ctx.stroke()
         
         // 板子外边界稍微强调，但不压画面
-        ctx.lineWidth = this.isDarkMode ? 0.18 : gridLineWidth
+        ctx.lineWidth = this.isDarkMode ? 0.22 : gridLineWidth
         ctx.strokeStyle = gridColor
-        ctx.globalAlpha = this.isDarkMode ? 0.32 : 0.16
+        ctx.globalAlpha = this.isDarkMode ? 0.42 : 0.22
         ctx.beginPath()
         ctx.rect(0, 0, this.width, this.height)
         ctx.stroke()

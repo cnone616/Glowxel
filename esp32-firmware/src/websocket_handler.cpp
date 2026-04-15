@@ -2,9 +2,11 @@
 #include "display_manager.h"
 #include "config_manager.h"
 #include "animation_manager.h"
+#include "board_native_effect.h"
 #include "wifi_manager.h"
 #include "ota_manager.h"
 #include "tetris_effect.h"
+#include "game_screensaver_effect.h"
 #include "clock_font_renderer.h"
 #include "websocket_command_handlers.h"
 
@@ -171,6 +173,23 @@ void WebSocketHandler::restoreDisplayForCurrentMode() {
     );
     TetrisEffect::render(DisplayManager::dma_display);
     return;
+  }
+
+  if (DisplayManager::currentBusinessModeTag == "game_screensaver") {
+    GameScreensaverEffect::applyConfig(ConfigManager::gameScreensaverConfig);
+    GameScreensaverEffect::render();
+    return;
+  }
+
+  if (DisplayManager::currentBusinessModeTag == "text_display" ||
+      DisplayManager::currentBusinessModeTag == "weather" ||
+      DisplayManager::currentBusinessModeTag == "countdown" ||
+      DisplayManager::currentBusinessModeTag == "stopwatch" ||
+      DisplayManager::currentBusinessModeTag == "notification") {
+    if (BoardNativeEffect::isActive()) {
+      BoardNativeEffect::render();
+      return;
+    }
   }
 
   if (DisplayManager::currentBusinessModeTag == "eyes") {
@@ -593,7 +612,7 @@ void WebSocketHandler::handleJsonCommand(AsyncWebSocketClient *client, JsonDocum
   String cmd = doc["cmd"].as<String>();
   Serial.println("命令: " + cmd);
   
-  StaticJsonDocument<512> response;
+  StaticJsonDocument<768> response;
   response["status"] = "ok";
 
   bool responseSent = false;

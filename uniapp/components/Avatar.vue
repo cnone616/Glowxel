@@ -10,7 +10,7 @@
     />
     <!-- 默认头像 -->
     <view v-else class="avatar-placeholder">
-      <Icon name="user" :size="iconSize" color="#AAAAAA" />
+      <Icon name="user" :size="iconSize" color="var(--text-tertiary)" />
     </view>
     
     <!-- 状态徽章 -->

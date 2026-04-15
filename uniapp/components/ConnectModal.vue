@@ -176,29 +176,16 @@ export default {
 </script>
 
 <style scoped>
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(0, 0, 0, 0.45);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 9999;
-  padding: 64rpx;
-}
-
 .modal-content {
   width: 100%;
-  max-width: 600rpx;
+  max-width: 620rpx;
   background-color: var(--nb-surface);
   border-radius: 0;
   border: var(--nb-border-width-panel) solid var(--nb-ink);
   box-shadow: var(--nb-shadow-strong);
   overflow: hidden;
-  animation: scaleIn 0.2s ease-out;
+  animation: scaleIn 0.18s ease-out;
+  box-sizing: border-box;
 }
 
 @keyframes scaleIn {
@@ -213,11 +200,12 @@ export default {
 }
 
 .modal-header {
-  padding: 32rpx;
+  padding: 24rpx 24rpx 22rpx;
   border-bottom: var(--nb-border-width-panel) solid var(--nb-ink);
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 16rpx;
 }
 
 .modal-title {
@@ -227,8 +215,8 @@ export default {
 }
 
 .close-btn {
-  width: 48rpx;
-  height: 48rpx;
+  width: 56rpx;
+  height: 56rpx;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -236,19 +224,15 @@ export default {
   background: var(--nb-surface);
   box-shadow: var(--nb-shadow-soft);
   border-radius: 0;
-  transition: var(--transition-base);
+  box-sizing: border-box;
 }
 
-.close-btn:active {
-  background-color: var(--nb-paper);
-  transform: translate(2rpx, 2rpx);
-}
 
 .modal-body {
-  padding: 32rpx;
+  padding: 24rpx;
   display: flex;
   flex-direction: column;
-  gap: 24rpx;
+  gap: 18rpx;
 }
 
 .modal-desc {
@@ -264,17 +248,17 @@ export default {
 
 .custom-input {
   width: 100%;
-  padding: 0 24rpx;
+  padding: 0 20rpx;
   background-color: #ffffff;
   border: var(--nb-border-width-control) solid var(--nb-ink);
   border-radius: 0;
-  font-size: 32rpx;
+  font-size: 30rpx;
   color: var(--nb-ink);
   font-family: monospace;
   transition: var(--transition-base);
   box-sizing: border-box;
   line-height: 1.2;
-  height: 80rpx;
+  height: 84rpx;
 }
 
 .custom-input:focus {
@@ -290,7 +274,7 @@ export default {
   display: flex;
   align-items: center;
   gap: 12rpx;
-  padding: 20rpx;
+  padding: 18rpx;
   border-radius: 0;
   border: var(--nb-border-width-control) solid var(--nb-ink);
   box-shadow: var(--nb-shadow-soft);
@@ -309,11 +293,11 @@ export default {
 }
 
 .status-box.connecting {
-  background-color: #eaf4ff;
+  background-color: #e7f0ff;
 }
 
 .status-box.error {
-  background-color: #fff1f1;
+  background-color: #f8dede;
 }
 
 .loading-spinner {
@@ -333,7 +317,7 @@ export default {
 
 .status-text {
   font-size: 24rpx;
-  font-weight: 500;
+  font-weight: 800;
 }
 
 .status-box.connecting .status-text {
@@ -346,26 +330,23 @@ export default {
 
 .modal-footer {
   display: flex;
-  border-top: 2rpx solid var(--nb-ink);
+  gap: 12rpx;
+  padding: 18rpx 24rpx 24rpx;
+  border-top: 3rpx solid var(--nb-ink);
 }
 
 .modal-btn {
   flex: 1;
-  min-height: 88rpx;
-  padding: 0 24rpx;
+  min-height: 84rpx;
+  padding: 0 20rpx;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: var(--transition-base);
   box-sizing: border-box;
-  /* border: var(--nb-border-width-control) solid var(--nb-ink); */
+  border: var(--nb-border-width-control) solid var(--nb-ink);
   box-shadow: var(--nb-shadow-soft);
 }
 
-.modal-btn:active:not(.disabled) {
-  opacity: 0.7;
-  box-shadow: none;
-}
 
 .modal-btn.disabled {
   opacity: 0.5;
@@ -373,7 +354,6 @@ export default {
 
 .cancel-btn {
   background: #ffffff;
-  border-right: 2rpx solid var(--nb-ink);
 }
 
 .btn-text {
@@ -386,7 +366,7 @@ export default {
 }
 
 .confirm-btn {
-  background: var(--nb-yellow);
+  background: #f2cf4a;
 }
 
 .confirm-btn .btn-text {

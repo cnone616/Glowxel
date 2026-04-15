@@ -28,7 +28,7 @@
         <view class="setting-item glx-setting-row" @click="goToEditProfile">
           <view class="setting-left">
             <view class="setting-icon">
-              <Icon name="user" :size="40" color="var(--nb-yellow)" />
+              <Icon name="user" :size="40" color="var(--nb-ink)" />
             </view>
             <view class="setting-info">
               <text class="setting-label">个人资料</text>
@@ -46,7 +46,7 @@
               <Icon
                 name="shield"
                 :size="40"
-                color="var(--nb-yellow)"
+                color="var(--nb-ink)"
               />
             </view>
             <view class="setting-info">
@@ -69,7 +69,7 @@
         <view class="setting-item switch-item glx-setting-row">
           <view class="setting-left">
             <view class="setting-icon">
-              <Icon name="bell" :size="40" color="var(--nb-yellow)" />
+              <Icon name="bell" :size="40" color="var(--nb-ink)" />
             </view>
             <view class="setting-info">
               <text class="setting-label">推送通知</text>
@@ -77,10 +77,9 @@
             </view>
           </view>
           <view class="setting-right">
-            <switch
+            <GlxSwitch
               :checked="settings.pushNotification"
               @change="togglePushNotification"
-              color="var(--nb-yellow)"
             />
           </view>
         </view>
@@ -91,7 +90,7 @@
               <Icon
                 name="heart"
                 :size="40"
-                color="var(--nb-yellow)"
+                color="var(--nb-ink)"
               />
             </view>
             <view class="setting-info">
@@ -100,10 +99,9 @@
             </view>
           </view>
           <view class="setting-right">
-            <switch
+            <GlxSwitch
               :checked="settings.interactionNotification"
               @change="toggleInteractionNotification"
-              color="var(--nb-yellow)"
             />
           </view>
         </view>
@@ -121,7 +119,7 @@
               <Icon
                 name="refresh"
                 :size="40"
-                color="var(--nb-yellow)"
+                color="var(--nb-ink)"
               />
             </view>
             <view class="setting-info">
@@ -139,14 +137,14 @@
           </view>
         </view>
 
-        <view class="setting-item glx-setting-row" @click="goToBleConfig">
+        <view class="setting-item glx-setting-row" @click="goToWifiConfig">
           <view class="setting-left">
             <view class="setting-icon">
-              <Icon name="link" :size="40" color="var(--nb-yellow)" />
+              <Icon name="link" :size="40" color="var(--nb-ink)" />
             </view>
             <view class="setting-info">
-              <text class="setting-label">蓝牙配网</text>
-              <text class="setting-desc">配置设备 WiFi 网络</text>
+              <text class="setting-label">WiFi 配网</text>
+              <text class="setting-desc">连接设备热点配置 WiFi 网络</text>
             </view>
           </view>
           <view class="setting-right glx-list-meta">
@@ -164,7 +162,7 @@
         <view class="setting-item glx-setting-row" @click="goToHelp">
           <view class="setting-left">
             <view class="setting-icon">
-              <Icon name="help" :size="40" color="var(--nb-yellow)" />
+              <Icon name="help" :size="40" color="var(--nb-ink)" />
             </view>
             <view class="setting-info">
               <text class="setting-label">帮助与反馈</text>
@@ -179,7 +177,7 @@
         <view class="setting-item glx-setting-row" @click="goToAbout">
           <view class="setting-left">
             <view class="setting-icon">
-              <Icon name="info" :size="40" color="var(--nb-yellow)" />
+              <Icon name="info" :size="40" color="var(--nb-ink)" />
             </view>
             <view class="setting-info">
               <text class="setting-label">关于应用</text>
@@ -195,7 +193,7 @@
         <view class="setting-item danger glx-setting-row" @click="clearCache">
           <view class="setting-left">
             <view class="setting-icon">
-              <Icon name="trash" :size="40" color="var(--nb-coral)" />
+              <Icon name="trash" :size="40" color="var(--nb-ink)" />
             </view>
             <view class="setting-info">
               <text class="setting-label">清除缓存</text>
@@ -253,12 +251,14 @@ import { useToast } from "../../composables/useToast.js";
 import statusBarMixin from "../../mixins/statusBar.js";
 import Icon from "../../components/Icon.vue";
 import Toast from "../../components/Toast.vue";
+import GlxSwitch from "../../components/GlxSwitch.vue";
 
 export default {
   mixins: [statusBarMixin],
   components: {
     Icon,
     Toast,
+    GlxSwitch,
   },
 
   data() {
@@ -342,7 +342,7 @@ export default {
       uni.showModal({
         title: "帮助与反馈",
         content:
-          "创作前请先创建或导入画布；设备功能需先完成蓝牙配网；如遇同步异常，可在云同步页面重新执行同步。",
+          "创作前请先创建或导入画布；设备功能需先完成热点配网；如遇同步异常，可在云同步页面重新执行同步。",
         showCancel: false,
       });
     },
@@ -355,7 +355,7 @@ export default {
       });
     },
 
-    goToBleConfig() {
+    goToWifiConfig() {
       uni.navigateTo({ url: "/pages/ble-config/ble-config" });
     },
 
@@ -574,7 +574,7 @@ export default {
 .section-title {
   font-size: 24rpx;
   font-weight: 600;
-  color: #4a4a4a;
+  color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 1rpx;
 }
@@ -595,11 +595,6 @@ export default {
   margin-bottom: 0;
 }
 
-.setting-item:active {
-  transform: scale(0.98);
-  box-shadow: 2rpx 2rpx 0 var(--nb-ink);
-}
-
 .setting-item.danger .setting-label {
   color: var(--nb-coral);
 }
@@ -617,7 +612,9 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: transparent;
+  background-color: var(--nb-yellow);
+  border: 2rpx solid var(--nb-ink);
+  box-shadow: var(--nb-shadow-soft);
   border-radius: 0;
 }
 
@@ -636,7 +633,7 @@ export default {
 
 .setting-desc {
   font-size: 24rpx;
-  color: #4a4a4a;
+  color: var(--text-secondary);
 }
 
 .setting-right {
@@ -648,7 +645,7 @@ export default {
 .storage-size,
 .version-text {
   font-size: 24rpx;
-  color: #777777;
+  color: var(--text-tertiary);
 }
 
 .settings-section {
@@ -756,7 +753,7 @@ export default {
 
 .language-native {
   font-size: 24rpx;
-  color: #4a4a4a;
+  color: var(--text-secondary);
   margin-left: 16rpx;
 }
 </style>

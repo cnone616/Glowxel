@@ -21,7 +21,7 @@
         <view class="action-grid">
           <view class="action-card glx-panel-card" @click="startBlankCanvas">
             <view class="action-icon">
-              <Icon name="add" :size="48" color="#4F7FFF" />
+              <Icon name="add" :size="48" color="var(--nb-ink)" />
             </view>
             <text class="action-title">新建画布</text>
             <text class="action-subtitle">从空白开始创作</text>
@@ -29,7 +29,7 @@
 
           <view class="action-card glx-panel-card" @click="startImageImport">
             <view class="action-icon">
-              <Icon name="upload" :size="48" color="#2ECC71" />
+              <Icon name="upload" :size="48" color="var(--nb-ink)" />
             </view>
             <text class="action-title">导入图片</text>
             <text class="action-subtitle">转换为像素画</text>
@@ -46,7 +46,7 @@
 
         <view v-if="filteredProjects.length === 0" class="empty-state glx-panel-card">
           <view class="empty-icon">
-            <Icon name="picture" :size="80" color="#AAAAAA" />
+            <Icon name="picture" :size="80" color="var(--text-tertiary)" />
           </view>
           <text class="empty-title">还没有画布</text>
           <text class="empty-subtitle">开始您的第一个创作吧！</text>
@@ -189,7 +189,7 @@ export default {
 
 .project-count {
   font-size: 24rpx;
-  color: #4a4a4a;
+  color: var(--text-secondary);
   font-weight: 500;
 }
 
@@ -217,7 +217,6 @@ export default {
 }
 
 .action-card:active {
-  transform: none;
   box-shadow: var(--nb-shadow-strong);
 }
 
@@ -227,9 +226,15 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: var(--nb-paper);
+  background-color: var(--nb-blue);
+  border: 2rpx solid var(--nb-ink);
+  box-shadow: var(--nb-shadow-soft);
   border-radius: 0;
   margin-bottom: 16rpx;
+}
+
+.action-card:nth-child(2) .action-icon {
+  background-color: var(--nb-green);
 }
 
 .action-title {
@@ -242,7 +247,7 @@ export default {
 
 .action-subtitle {
   font-size: 22rpx;
-  color: #4a4a4a;
+  color: var(--text-secondary);
   text-align: center;
   line-height: 1.4;
 }
@@ -259,22 +264,17 @@ export default {
 }
 
 /* 空状态 */
-.empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 64rpx 32rpx;
-  text-align: center;
-}
 
 .empty-icon {
-  width: 160rpx;
-  height: 160rpx;
+  width: 152rpx;
+  height: 152rpx;
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: var(--nb-paper);
-  border-radius: 50%;
+  background-color: var(--nb-surface);
+  border: 2rpx solid var(--nb-ink);
+  box-shadow: var(--nb-shadow-soft);
+  border-radius: 0;
   margin-bottom: 32rpx;
 }
 
@@ -287,7 +287,7 @@ export default {
 
 .empty-subtitle {
   font-size: 26rpx;
-  color: #4a4a4a;
+  color: var(--text-secondary);
   line-height: 1.5;
   margin-bottom: 32rpx;
 }
@@ -298,10 +298,6 @@ export default {
   border-radius: 0;
   border: 3rpx solid #000000;
   transition: all 0.2s ease;
-}
-
-.empty-btn:active {
-  transform: translate(2rpx, 2rpx);
 }
 
 .empty-btn-text {

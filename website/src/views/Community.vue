@@ -17,7 +17,7 @@
             <div class="meta">
               <span class="author">{{ item.author_name || '匿名' }}</span>
               <span class="likes">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style="color:#e53e3e;vertical-align:-1px"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style="color:var(--nb-coral);vertical-align:-1px"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
                 {{ item.likes || 0 }}
               </span>
             </div>
@@ -65,47 +65,116 @@ onMounted(() => fetchList())
 </script>
 
 <style scoped>
-.container { max-width: 1200px; margin: 0 auto; padding: 0 20px; }
+.community {
+  padding: 28px 0 64px;
+}
 
-.page-title { font-size: 28px; font-weight: 700; color: #1a1a1a; text-align: center; padding-top: 40px; }
-.page-desc { text-align: center; color: #999; font-size: 14px; margin-top: 8px; }
+.container {
+  max-width: var(--content-max-width);
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+.page-title {
+  font-size: 40px;
+  font-weight: 900;
+  color: var(--nb-ink);
+  text-align: center;
+  padding-top: 20px;
+}
+
+.page-desc {
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 15px;
+  margin-top: 10px;
+}
 
 .tabs {
-  display: flex; justify-content: center; gap: 12px; margin: 32px 0;
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin: 28px 0 36px;
 }
+
 .tabs button {
-  padding: 8px 24px; border-radius: 20px; border: 1px solid #e0e0e0;
-  background: #fff; color: #666; font-size: 14px; cursor: pointer; transition: all 0.2s;
+  min-height: 42px;
+  padding: 8px 22px;
+  border: 2px solid var(--nb-ink);
+  background: var(--tone-paper-soft);
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 4px 4px 0 #000000;
 }
-.tabs button.active { background: var(--color-primary); color: #fff; border-color: var(--color-primary); }
+
+.tabs button.active {
+  background: var(--nb-blue);
+  color: var(--nb-ink);
+}
 
 .artwork-grid {
-  display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px;
 }
 
 .artwork-card {
-  background: #fafafa; border: 1px solid #f0f0f0; border-radius: 12px;
-  overflow: hidden; cursor: pointer; transition: border-color 0.2s;
+  background: var(--tone-paper-soft);
+  border: 3px solid var(--nb-ink);
+  overflow: hidden;
+  cursor: pointer;
+  box-shadow: var(--nb-shadow-card);
 }
-.artwork-card:hover { border-color: #ddd; }
 
-.artwork-img { width: 100%; height: 180px; }
-
-.artwork-info { padding: 12px; }
-.title { font-size: 14px; font-weight: 500; color: #1a1a1a; display: block; margin-bottom: 6px; }
-.meta { display: flex; justify-content: space-between; }
-.author { font-size: 12px; color: #999; }
-.likes { font-size: 12px; color: #999; }
-
-.load-more { text-align: center; margin: 32px 0; }
-.btn-outline {
-  padding: 10px 28px; border-radius: 8px; border: 1px solid #e0e0e0;
-  background: #fff; color: #1a1a1a; font-size: 14px; cursor: pointer;
+.artwork-img {
+  width: 100%;
+  height: 190px;
+  border-bottom: 3px solid var(--nb-ink);
 }
-.btn-outline:hover { border-color: var(--color-primary); color: var(--color-primary); }
+
+.artwork-info {
+  padding: 14px;
+}
+
+.title {
+  font-size: 15px;
+  font-weight: 900;
+  color: var(--nb-ink);
+  display: block;
+  margin-bottom: 8px;
+}
+
+.meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.author,
+.likes {
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-weight: 700;
+}
+
+.load-more {
+  text-align: center;
+  margin: 36px 0 0;
+}
 
 @media (max-width: 768px) {
-  .artwork-grid { grid-template-columns: repeat(2, 1fr); }
-  .page-title { font-size: 22px; }
+  .container {
+    padding: 0 16px;
+  }
+
+  .artwork-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .page-title {
+    font-size: 28px;
+  }
 }
 </style>

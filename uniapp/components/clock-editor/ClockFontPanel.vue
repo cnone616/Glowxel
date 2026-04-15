@@ -1,12 +1,12 @@
 <template>
-  <view class="settings-card">
-    <view class="card-title-section">
+  <view class="settings-card glx-panel-card">
+    <view class="card-title-section glx-panel-head">
       <Icon name="text" :size="32" />
-      <text class="card-title">字体样式</text>
+      <text class="card-title glx-panel-title">字体样式</text>
     </view>
 
     <view class="setting-group">
-      <view class="setting-item">
+      <view class="settings-block">
         <text class="setting-label">统一字体</text>
         <scroll-view scroll-x class="font-scroll" show-scrollbar="false">
           <view class="font-list">
@@ -44,24 +44,27 @@
                   </view>
                 </view>
               </view>
-              <text class="font-card-name">{{ font.name }}</text>
+              <text
+                class="glx-feature-card-option__label glx-feature-card-option__label--single-line"
+                >{{ font.name }}</text
+              >
             </view>
           </view>
         </scroll-view>
       </view>
 
-      <view class="setting-item">
+      <view class="settings-block">
         <view class="setting-header-row">
           <text class="setting-label">显示秒钟</text>
-          <view class="toggle-switch" @click="$emit('toggle-seconds')">
-            <view class="switch-track" :class="{ active: showSeconds }">
-              <view class="switch-thumb"></view>
-            </view>
-          </view>
+          <GlxSwitch
+            class="glx-row-switch"
+            :checked="showSeconds"
+            @change="$emit('toggle-seconds')"
+          />
         </view>
       </view>
 
-      <view v-if="showHourFormat" class="setting-item">
+      <view v-if="showHourFormat" class="settings-block">
         <text class="setting-label">小时制式</text>
         <view class="align-buttons">
           <view
@@ -69,14 +72,14 @@
             :class="{ active: hourFormat === 24 }"
             @click="$emit('set-hour-format', 24)"
           >
-            <text class="align-text">24 小时</text>
+            <text class="glx-feature-option__label">24 小时</text>
           </view>
           <view
             class="align-btn glx-feature-option"
             :class="{ active: hourFormat === 12 }"
             @click="$emit('set-hour-format', 12)"
           >
-            <text class="align-text">12 小时</text>
+            <text class="glx-feature-option__label">12 小时</text>
           </view>
         </view>
       </view>
@@ -86,6 +89,7 @@
 
 <script>
 import Icon from "../Icon.vue";
+import GlxSwitch from "../GlxSwitch.vue";
 import {
   drawClockTextToPixels,
   getClockTextHeight,
@@ -100,6 +104,7 @@ const PREVIEW_VIEWPORT_HEIGHT_RPX = 72;
 export default {
   components: {
     Icon,
+    GlxSwitch,
   },
   props: {
     fontOptions: {
@@ -137,8 +142,7 @@ export default {
       const gridWidth =
         width * PREVIEW_PIXEL_SIZE_RPX + (width - 1) * PREVIEW_PIXEL_GAP_RPX;
       const gridHeight =
-        height * PREVIEW_PIXEL_SIZE_RPX +
-        (height - 1) * PREVIEW_PIXEL_GAP_RPX;
+        height * PREVIEW_PIXEL_SIZE_RPX + (height - 1) * PREVIEW_PIXEL_GAP_RPX;
 
       const widthScale = PREVIEW_VIEWPORT_WIDTH_RPX / gridWidth;
       const heightScale = PREVIEW_VIEWPORT_HEIGHT_RPX / gridHeight;
@@ -205,34 +209,22 @@ export default {
 .settings-card {
   background-color: transparent;
   border: 0;
-  padding: 0;
+  padding: 8rpx 12rpx 14rpx;
   margin-bottom: 16rpx;
-}
-
-.card-title-section {
-  display: flex;
-  align-items: center;
-  gap: 8rpx;
-  margin-bottom: 16rpx;
-}
-
-.card-title {
-  font-size: 22rpx;
-  font-weight: 500;
-  color: var(--text-primary);
-  flex: 1;
+  box-shadow: none;
 }
 
 .setting-group {
   display: flex;
   flex-direction: column;
-  gap: 12rpx;
+  gap: 16rpx;
 }
 
-.setting-item {
+.settings-block {
   display: flex;
   flex-direction: column;
   gap: 8rpx;
+  padding: 0 2rpx;
 }
 
 .setting-label {
@@ -248,20 +240,28 @@ export default {
 
 .font-scroll {
   width: 100%;
+  height: 197rpx;
+  padding: 2rpx 0 6rpx;
+  box-sizing: border-box;
+  white-space: nowrap;
 }
 
 .font-list {
-  display: flex;
+  display: inline-flex;
   gap: 16rpx;
-  padding: 4rpx 0;
+  padding: 4rpx 14rpx 4rpx 2rpx;
+  box-sizing: border-box;
+  min-width: 100%;
 }
 
 .font-card {
   display: flex;
   flex-direction: column;
+  flex: 0 0 220rpx;
   gap: 12rpx;
   padding: 16rpx;
-  min-width: 220rpx;
+  width: 220rpx;
+  box-sizing: border-box;
   transition: var(--transition-base);
 }
 
@@ -273,9 +273,11 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
+  width: 100%;
   min-height: 104rpx;
   padding: 16rpx 12rpx;
   border-radius: 0;
+  box-sizing: border-box;
 }
 
 .font-preview-viewport {
@@ -301,13 +303,6 @@ export default {
   border-radius: 2rpx;
 }
 
-.font-card-name {
-  font-size: 22rpx;
-  color: var(--text-primary);
-  text-align: center;
-  white-space: nowrap;
-}
-
 .align-buttons {
   display: flex;
   gap: 12rpx;
@@ -319,44 +314,5 @@ export default {
   padding: 20rpx 16rpx;
   text-align: center;
   transition: var(--transition-base);
-}
-
-.align-text {
-  font-size: 22rpx;
-}
-
-.toggle-switch {
-  margin-left: auto;
-}
-
-.switch-track {
-  width: 80rpx;
-  height: 44rpx;
-  background-color: var(--bg-secondary);
-  border: 2rpx solid var(--nb-ink);
-  border-radius: 0;
-  position: relative;
-  transition: var(--transition-base);
-}
-
-.switch-track.active {
-  background-color: var(--nb-yellow);
-  border-color: var(--nb-ink);
-}
-
-.switch-thumb {
-  width: 36rpx;
-  height: 36rpx;
-  background-color: var(--text-primary);
-  border-radius: 0;
-  position: absolute;
-  top: 2rpx;
-  left: 2rpx;
-  transition: var(--transition-base);
-}
-
-.switch-track.active .switch-thumb {
-  left: 38rpx;
-  background-color: #000000;
 }
 </style>

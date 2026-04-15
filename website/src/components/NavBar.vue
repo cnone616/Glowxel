@@ -2,8 +2,7 @@
   <nav class="navbar">
     <div class="nav-container">
       <router-link to="/" class="logo">
-        <img :src="iconUrl" alt="光格像素工坊" class="logo-icon" />
-        <img :src="logoUrl" alt="光格像素工坊" class="logo-logo" />
+        <BrandLogo />
       </router-link>
 
       <div class="nav-links" :class="{ active: mobileMenuOpen }">
@@ -86,8 +85,7 @@
 <script setup>
 import { computed, ref } from "vue";
 import { useRouter } from "vue-router";
-import iconUrl from "@/assets/images/glowxel-icon.png";
-import logoUrl from "@/assets/images/glowxel-logo.png";
+import BrandLogo from "@/components/BrandLogo.vue";
 
 const router = useRouter();
 const mobileMenuOpen = ref(false);
@@ -108,122 +106,142 @@ const handleLogout = () => {
 
 <style scoped>
 .navbar {
-  background: #fff;
-  border-bottom: 1px solid var(--color-border);
+  background: var(--nb-paper);
+  border-bottom: var(--nb-border-width) solid var(--nb-ink);
   position: sticky;
   top: 0;
   z-index: 1000;
 }
 
 .nav-container {
-  max-width: 1200px;
+  max-width: var(--content-max-width);
   margin: 0 auto;
   padding: 0 24px;
   display: flex;
   align-items: center;
-  height: 60px;
-  gap: 32px;
+  min-height: var(--navbar-height);
+  gap: 24px;
 }
 
 .logo {
   display: flex;
   align-items: center;
-  gap: 8px;
   text-decoration: none;
   flex-shrink: 0;
-}
-.logo-icon {
-  width: 26px;
-  height: 26px;
-}
-.logo-logo {
-  height: 15px;
-  width: auto;
+  padding: 6px 10px;
 }
 
 .nav-links {
   display: flex;
-  gap: 4px;
+  gap: 8px;
   flex: 1;
+  flex-wrap: wrap;
 }
+
 .nav-links a {
-  color: var(--color-text-secondary);
+  color: var(--text-secondary);
   text-decoration: none;
   font-size: 14px;
-  font-weight: 500;
-  padding: 6px 12px;
-  border-radius: var(--radius-sm);
-  transition: all 0.15s;
+  font-weight: 800;
+  min-height: 38px;
+  padding: 8px 14px;
+  border: var(--nb-border-width) solid var(--nb-ink);
+  background: var(--tone-paper-soft);
+  box-shadow: 3px 3px 0 #000000;
+  transition: background-color 0.15s ease, color 0.15s ease;
 }
+
 .nav-links a:hover {
-  color: var(--color-text-primary);
-  background: var(--color-bg-muted);
+  background: var(--nb-muted);
 }
+
 .nav-links a.router-link-exact-active {
-  color: var(--color-text-primary);
-  background: var(--color-bg-muted);
+  color: var(--nb-ink);
+  background: var(--nb-blue);
 }
 
 .nav-actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   flex-shrink: 0;
 }
 
 .btn-create {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 7px 14px;
-  background: var(--color-primary);
-  color: #fff;
-  border-radius: var(--radius-sm);
+  justify-content: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 8px 16px;
+  background: var(--nb-yellow);
+  color: var(--nb-ink);
+  border: var(--nb-border-width) solid var(--nb-ink);
+  box-shadow: var(--nb-shadow-soft);
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 800;
   text-decoration: none;
-  transition: background 0.15s;
+  transition: background-color 0.15s ease;
 }
+
 .btn-create:hover {
   background: var(--color-primary-hover);
 }
 
 .btn-login {
-  padding: 7px 14px;
-  color: var(--color-text-secondary);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: 8px 16px;
+  color: var(--text-secondary);
+  border: var(--nb-border-width) solid var(--nb-ink);
+  background: var(--tone-paper-soft);
+  box-shadow: var(--nb-shadow-soft);
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 800;
   text-decoration: none;
-  transition: all 0.15s;
+  transition: background-color 0.15s ease, color 0.15s ease;
 }
+
 .btn-login:hover {
-  color: var(--color-text-primary);
-  border-color: var(--color-border-hover);
+  color: var(--nb-ink);
+  background: var(--nb-muted);
 }
+
 .btn-logout {
-  background: #fff;
+  background: var(--tone-paper-soft);
   cursor: pointer;
 }
 
 .mobile-menu-btn {
   display: none;
-  background: none;
-  border: none;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  background: var(--tone-paper-soft);
+  border: var(--nb-border-width) solid var(--nb-ink);
+  box-shadow: 3px 3px 0 #000000;
   cursor: pointer;
-  padding: 6px;
-  color: var(--color-text-primary);
-  border-radius: var(--radius-sm);
+  padding: 0;
+  color: var(--nb-text-primary);
 }
+
 .mobile-menu-btn:hover {
-  background: var(--color-bg-muted);
+  background: var(--nb-muted);
 }
 
 @media (max-width: 768px) {
   .nav-container {
+    min-height: 64px;
     gap: 0;
   }
+
+  .logo {
+    padding: 4px 0;
+  }
+
   .mobile-menu-btn {
     display: flex;
     margin-left: auto;
@@ -235,20 +253,24 @@ const handleLogout = () => {
   .nav-links {
     display: none;
     position: fixed;
-    top: 60px;
-    left: 0;
-    right: 0;
-    background: #fff;
+    top: 64px;
+    left: 12px;
+    right: 12px;
+    background: var(--nb-paper);
     flex-direction: column;
-    padding: 12px 16px 20px;
-    gap: 2px;
-    border-bottom: 1px solid var(--color-border);
-    box-shadow: var(--shadow-md);
+    padding: 14px;
+    gap: 8px;
+    border: var(--nb-border-width) solid var(--nb-ink);
+    box-shadow: var(--nb-shadow-strong);
   }
+
   .nav-links.active {
     display: flex;
   }
+
   .nav-links a {
+    width: 100%;
+    justify-content: center;
     padding: 10px 12px;
     font-size: 15px;
   }

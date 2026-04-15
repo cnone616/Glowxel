@@ -2,6 +2,17 @@ import { GIFParser } from "../../../utils/gifParser.js";
 
 export default {
   methods: {
+    resumeAnimationGifPreview() {
+      if (
+        this.clockMode === "animation" &&
+        this.config.image.show &&
+        ((this.gifRenderedFrameMaps && this.gifRenderedFrameMaps.length > 1) ||
+          (this._needsFullRender && this._gifParser))
+      ) {
+        this.startGifAnimation();
+      }
+    },
+
     adjustImageValue(key, delta) {
       const limits = {
         width: { min: 1, max: 256 },
@@ -64,6 +75,7 @@ export default {
             } else {
               this.convertImageToPixels(this.config.image.data);
             }
+            this.resumeAnimationGifPreview();
             this.drawCanvas();
           }, 300);
         }
@@ -85,7 +97,9 @@ export default {
       this.config.image.width = size;
       this.config.image.height = size;
 
-      if (this.config.image.data) {
+      if (this.clockMode === "animation" && this._gifParser) {
+        this.startGifAnimation();
+      } else if (this.config.image.data) {
         this.convertImageToPixels(this.config.image.data);
       }
 
@@ -94,6 +108,17 @@ export default {
 
     toggleImageShow() {
       this.config.image.show = !this.config.image.show;
+      if (
+        this.clockMode === "animation" &&
+        this.gifRenderedFrameMaps &&
+        this.gifRenderedFrameMaps.length > 1
+      ) {
+        if (this.config.image.show) {
+          this.startGifAnimation();
+        } else {
+          this.stopGifAnimation();
+        }
+      }
       this.drawCanvas();
     },
 
@@ -182,6 +207,7 @@ export default {
               success: (b64Res) => {
                 this.config.image.data = "data:image/gif;base64," + b64Res.data;
                 this.config.image.show = true;
+                this.resumeAnimationGifPreview();
                 this.drawCanvas();
                 this.toast.showSuccess(
                   `GIF 已解析！${this.gifAnimationData.frameCount} 帧`,
@@ -298,9 +324,8 @@ export default {
                   const base64 = uni.arrayBufferToBase64(res.data);
                   this.config.image.data = "data:image/gif;base64," + base64;
                   this.config.image.show = true;
-                  if (this.canvasCtx) {
-                    this.drawCanvas();
-                  }
+                  this.resumeAnimationGifPreview();
+                  this.drawCanvas();
                   console.log("GIF 动画已从本地恢复");
                 } catch (e) {
                   console.error("恢复 GIF 解析失败:", e);
@@ -460,6 +485,9 @@ export default {
 
       this.gifIsPlaying = true;
       this.gifFrameIndex = 0;
+      this.imagePixels = this._rgbaFrameToPixelMap(this.gifRenderedFrameMaps[0]);
+      this.drawGIFFrame();
+
       const playNextFrame = () => {
         if (!this.gifRenderedFrameMaps || !this.gifIsPlaying) {
           return;

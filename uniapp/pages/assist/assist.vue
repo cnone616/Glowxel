@@ -112,10 +112,10 @@
     <!-- Canvas 画布 -->
     <view
       class="canvas-container"
-      v-if="!isHelpOpen && !isRowListOpen && !showConnectModal"
+      :style="{ visibility: hasCanvasOverlayOpen ? 'hidden' : 'visible' }"
     >
       <PixelCanvas
-        v-if="canvasReady"
+        v-if="canvasReady && !hasCanvasOverlayOpen"
         :width="boardSize"
         :height="boardSize"
         :pixels="isCalculated ? localPixels : new Map()"
@@ -598,10 +598,13 @@ export default {
     availableColorLetters() {
       return this.colorGroups.map((g) => g.letter);
     },
+    hasCanvasOverlayOpen() {
+      return this.isHelpOpen || this.isRowListOpen || this.showConnectModal;
+    },
   },
 
   watch: {
-    // 弹窗关闭时重试 canvas 初始化（canvas-container 被 v-if 控制，弹窗打开时不在 DOM 中）
+    // 弹窗关闭时，如果画布尚未初始化则重试
     isHelpOpen(newVal) {
       if (!newVal && !this.canvasReady) {
         this.$nextTick(() => this.initCanvas());
@@ -691,7 +694,7 @@ export default {
   },
 
   methods: {
-    // Canvas 初始化（弹窗可能遮挡 canvas-container 导致首次查询失败，需重试）
+    // Canvas 初始化
     initCanvas() {
       if (this.canvasReady) return;
       setTimeout(() => {
@@ -1290,11 +1293,6 @@ export default {
   transition: var(--transition-base);
 }
 
-.back-btn:active {
-  transform: scale(0.95);
-  background-color: var(--bg-elevated);
-}
-
 .icon {
   font-size: 48rpx;
   color: var(--text-primary);
@@ -1447,9 +1445,6 @@ export default {
   color: var(--text-primary);
 }
 
-.icon-btn:active {
-  transform: scale(0.9);
-}
 
 .icon-btn.active {
   background-color: #f7f7f7;
@@ -1486,27 +1481,31 @@ export default {
 .group-header {
   position: sticky;
   top: 0;
-  padding: 12rpx 16rpx;
+  display: flex;
+  align-items: center;
+  min-height: 52rpx;
+  padding: 8rpx 0;
   margin-bottom: 16rpx;
-  background: linear-gradient(90deg, rgba(0, 243, 255, 0.1), transparent);
-  backdrop-filter: none;
+  background-color: #ffffff;
   border-left: 4rpx solid var(--nb-yellow);
-  border-radius: 0 8rpx 8rpx 0;
+  border-radius: 0;
   z-index: 10;
 }
 
 .group-letter {
-  font-size: 28rpx;
+  font-size: 26rpx;
   font-weight: bold;
-  color: var(--nb-yellow);
+  color: #000000;
   font-family: monospace;
-  text-shadow: 0 0 8rpx rgba(0, 243, 255, 0.3);
+  margin-left: 12rpx;
+  line-height: 1;
 }
 
 .group-count {
   font-size: 20rpx;
-  color: var(--text-tertiary);
-  margin-left: 12rpx;
+  color: #777777;
+  margin-left: 14rpx;
+  line-height: 1;
 }
 
 .color-grid {
@@ -1585,9 +1584,6 @@ export default {
   z-index: 10;
 }
 
-.check-btn:active {
-  transform: scale(0.9);
-}
 
 .check-btn.checked {
   background-color: var(--success-color);
@@ -1703,7 +1699,6 @@ export default {
 }
 
 .row-btn:active {
-  transform: scale(0.95);
   background-color: var(--bg-elevated);
 }
 
@@ -1786,9 +1781,6 @@ export default {
   transition: var(--transition-base);
 }
 
-.row-complete-btn:active {
-  transform: scale(0.95);
-}
 
 .row-complete-btn.completed {
   background-color: var(--success-color);

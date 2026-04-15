@@ -3,6 +3,26 @@
  * 用于与 ESP32 LED 矩阵板进行 WebSocket 通讯
  */
 
+function normalizeHexColor(value) {
+  if (typeof value !== "string") {
+    return "#64c8ff";
+  }
+  const body = value.trim().replace(/^#/, "");
+  if (!/^[0-9a-fA-F]{6}$/.test(body)) {
+    return "#64c8ff";
+  }
+  return `#${body.toLowerCase()}`;
+}
+
+function hexToRgb(value) {
+  const normalized = normalizeHexColor(value);
+  return {
+    r: parseInt(normalized.slice(1, 3), 16),
+    g: parseInt(normalized.slice(3, 5), 16),
+    b: parseInt(normalized.slice(5, 7), 16),
+  };
+}
+
 class WebSocket {
   constructor() {
     this.socket = null;
@@ -600,12 +620,33 @@ class WebSocket {
   }
 
   async setAmbientEffect(config) {
+    if (config.preset === "rain_scene") {
+      return this.send({
+        cmd: "set_ambient_effect",
+        preset: config.preset,
+        speed: config.speed,
+        density: config.density,
+        color: hexToRgb(config.color),
+        loop: config.loop,
+      });
+    }
+
     return this.send({
       cmd: "set_ambient_effect",
       preset: config.preset,
       speed: config.speed,
       intensity: config.intensity,
       loop: config.loop,
+    });
+  }
+
+  async setCountdownBoard(config) {
+    return this.send({
+      cmd: "set_countdown_board",
+      hours: config.hours,
+      minutes: config.minutes,
+      seconds: config.seconds,
+      progress: config.progress,
     });
   }
 

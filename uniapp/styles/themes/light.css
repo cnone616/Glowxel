@@ -2,24 +2,24 @@
 
 page {
   /* 主品牌色系 */
-  --color-brand-primary: #FFD23F;
-  --color-brand-accent: #74B9FF;
+  --color-brand-primary: #FFCB45;
+  --color-brand-accent: #5EA8FF;
   
   /* 背景色系 */
   --color-app-background: #FFFFFF;
   --color-card-background: #FFFFFF;
   --bg-primary: #FFFFFF;
-  --bg-secondary: #F7F7F7;
+  --bg-secondary: #FFF8EF;
   --bg-tertiary: #FFFFFF;
   --bg-elevated: #FFFFFF;
   
   /* 文字色系 */
   --color-text-primary: #000000;
-  --color-text-secondary: #444444;
-  --color-text-disabled: #777777;
+  --color-text-secondary: #374151;
+  --color-text-disabled: #667085;
   --text-primary: #000000;
-  --text-secondary: #444444;
-  --text-tertiary: #777777;
+  --text-secondary: #374151;
+  --text-tertiary: #667085;
   --text-inverse: #000000;
   
   /* 边框色系 */
@@ -28,27 +28,36 @@ page {
   --border-color: #000000;
   
   /* 强调色系 */
-  --accent-primary: #FFD23F;
-  --accent-secondary: #74B9FF;
-  --accent-hover: #FFC93A;
-  --accent-color: #FFD23F;
+  --accent-primary: #FFCB45;
+  --accent-secondary: #5EA8FF;
+  --accent-hover: #F5BC1C;
+  --accent-color: #FFCB45;
   
   /* 状态色系 */
-  --color-success: #88D498;
-  --color-warning: #FFA552;
-  --color-error: #FF6B6B;
-  --success-color: #88D498;
-  --error-color: #FF6B6B;
-  --warning-color: #FFA552;
-  --info-color: #74B9FF;
+  --color-success: #59D39E;
+  --color-warning: #FFB35C;
+  --color-error: #FF8A78;
+  --success-color: #59D39E;
+  --error-color: #FF8A78;
+  --warning-color: #FFB35C;
+  --info-color: #5EA8FF;
+
+  /* 柔和彩色面 */
+  --tone-yellow-soft: #FFF1B8;
+  --tone-blue-soft: #E3F0FF;
+  --tone-green-soft: #E2F8EE;
+  --tone-orange-soft: #FFE6CC;
+  --tone-coral-soft: #FFE1DB;
+  --tone-lavender-soft: #EEE8FF;
+  --tone-paper-soft: #ffffff;
   
   /* 阴影系统 */
-  --shadow-card: 4rpx 4rpx 0 #000000;
-  --shadow-floating: 6rpx 6rpx 0 #000000;
-  --shadow-modal: 8rpx 8rpx 0 #000000;
+  --shadow-card: 5rpx 5rpx 0 #000000;
+  --shadow-floating: 7rpx 7rpx 0 #000000;
+  --shadow-modal: 9rpx 9rpx 0 #000000;
   --shadow-sm: 3rpx 3rpx 0 #000000;
-  --shadow-md: 5rpx 5rpx 0 #000000;
-  --shadow-lg: 7rpx 7rpx 0 #000000;
+  --shadow-md: 6rpx 6rpx 0 #000000;
+  --shadow-lg: 8rpx 8rpx 0 #000000;
   --shadow-glow: 0 0 0 transparent;
   
   /* 间距系统 (8px网格) */

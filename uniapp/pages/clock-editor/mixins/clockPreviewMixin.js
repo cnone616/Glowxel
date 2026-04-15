@@ -6,7 +6,6 @@ import {
   getCurrentDateText,
   getCurrentWeekText,
 } from "../../../utils/clockCanvas.js";
-import { getClockThemePreviewPixels } from "../../../utils/clockThemeRenderer.js";
 
 export default {
   methods: {
@@ -116,162 +115,20 @@ export default {
     },
 
     initCanvas() {
-      return new Promise((resolve, reject) => {
-        const query = uni.createSelectorQuery().in(this);
-        query
-          .select("#clockCanvas")
-          .fields({ node: true, size: true })
-          .exec((res) => {
-            if (res && res[0]) {
-              const canvas = res[0].node;
-              this.canvasNode = canvas;
-              this.canvasCtx = canvas.getContext("2d");
+      this.drawCanvas();
+      return Promise.resolve();
+    },
 
-              const dpr = uni.getSystemInfoSync().pixelRatio || 1;
-              canvas.width = 320 * dpr;
-              canvas.height = 320 * dpr;
-              this.canvasCtx.scale(dpr, dpr);
-
-              console.log("Canvas 初始化成功");
-              this.drawCanvas();
-              resolve();
-            } else {
-              console.error("Canvas 节点获取失败");
-              reject(new Error("Canvas 节点获取失败"));
-            }
-          });
-      });
+    requestPreviewRefresh() {
+      this.previewTick += 1;
     },
 
     drawCanvas() {
-      if (!this.canvasCtx || !this.canvasNode) return;
-      const ctx = this.canvasCtx;
-      const pixelSize = 5;
-
-      ctx.fillStyle = "#000000";
-      ctx.fillRect(0, 0, 320, 320);
-
-      ctx.strokeStyle = "rgba(255, 255, 255, 0.15)";
-      ctx.lineWidth = 0.5;
-      for (let i = 0; i <= 64; i++) {
-        ctx.beginPath();
-        ctx.moveTo(i * pixelSize, 0);
-        ctx.lineTo(i * pixelSize, 320);
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.moveTo(0, i * pixelSize);
-        ctx.lineTo(320, i * pixelSize);
-        ctx.stroke();
-      }
-
-      this._drawPixelLayer(ctx, pixelSize, false);
-
-      if (this.showPreview) {
-        this._drawClockLayer(ctx, pixelSize);
-      }
-
-      this._lastClockPixels = this.showPreview
-        ? this.getPreviewPixels()
-        : new Map();
+      this.requestPreviewRefresh();
     },
 
     drawGIFFrame() {
-      if (!this.canvasCtx || !this.canvasNode) return;
-      const ctx = this.canvasCtx;
-      const pixelSize = 5;
-
-      if (this._lastImagePixels) {
-        const offsetX = this.config.image.x || 0;
-        const offsetY = this.config.image.y || 0;
-        this._lastImagePixels.forEach((_, key) => {
-          const [rx, ry] = key.split(",").map(Number);
-          const fx = rx + offsetX;
-          const fy = ry + offsetY;
-          if (fx >= 0 && fx < 64 && fy >= 0 && fy < 64) {
-            ctx.fillStyle = "#000000";
-            ctx.fillRect(fx * pixelSize, fy * pixelSize, pixelSize, pixelSize);
-            ctx.strokeStyle = "rgba(255,255,255,0.15)";
-            ctx.lineWidth = 0.5;
-          }
-        });
-      }
-
-      const offsetX = this.config.image.x || 0;
-      const offsetY = this.config.image.y || 0;
-      if (this.imagePixels) {
-        this.imagePixels.forEach((color, key) => {
-          const [rx, ry] = key.split(",").map(Number);
-          const fx = rx + offsetX;
-          const fy = ry + offsetY;
-          if (fx >= 0 && fx < 64 && fy >= 0 && fy < 64) {
-            ctx.fillStyle = color;
-            ctx.fillRect(fx * pixelSize, fy * pixelSize, pixelSize, pixelSize);
-          }
-        });
-      }
-      this._lastImagePixels = this.imagePixels;
-
-      if (this.showPreview) {
-        this._redrawClockOnly(ctx, pixelSize);
-      }
-    },
-
-    _redrawClockOnly(ctx, pixelSize) {
-      if (this._lastClockPixels) {
-        this._lastClockPixels.forEach((_, key) => {
-          const [x, y] = key.split(",").map(Number);
-          const imgKey = this._getImagePixelAt(x, y);
-          ctx.fillStyle = imgKey || "#000000";
-          ctx.fillRect(x * pixelSize, y * pixelSize, pixelSize, pixelSize);
-        });
-      }
-      this._drawClockLayer(ctx, pixelSize);
-      this._lastClockPixels = this.getPreviewPixels();
-    },
-
-    _getImagePixelAt(x, y) {
-      if (!this.imagePixels) return null;
-      const offsetX = this.config.image.x || 0;
-      const offsetY = this.config.image.y || 0;
-      const rx = x - offsetX;
-      const ry = y - offsetY;
-      return this.imagePixels.get(`${rx},${ry}`) || null;
-    },
-
-    _drawPixelLayer(ctx, pixelSize, includeClockText) {
-      const allPixels = includeClockText
-        ? this.getAllPixels()
-        : (() => {
-            const pixels = new Map();
-            if (this.imagePixels) {
-              const offsetX = this.config.image.x || 0;
-              const offsetY = this.config.image.y || 0;
-              this.imagePixels.forEach((color, key) => {
-                const [rx, ry] = key.split(",").map(Number);
-                const fx = rx + offsetX;
-                const fy = ry + offsetY;
-                if (fx >= 0 && fx < 64 && fy >= 0 && fy < 64) {
-                  pixels.set(`${fx},${fy}`, color);
-                }
-              });
-            }
-            return pixels;
-          })();
-
-      allPixels.forEach((color, key) => {
-        const [x, y] = key.split(",").map(Number);
-        ctx.fillStyle = color;
-        ctx.fillRect(x * pixelSize, y * pixelSize, pixelSize, pixelSize);
-      });
-    },
-
-    _drawClockLayer(ctx, pixelSize) {
-      const previewPixels = this.getPreviewPixels();
-      previewPixels.forEach((color, key) => {
-        const [x, y] = key.split(",").map(Number);
-        ctx.fillStyle = color;
-        ctx.fillRect(x * pixelSize, y * pixelSize, pixelSize, pixelSize);
-      });
+      this.requestPreviewRefresh();
     },
 
     getClockExcludePixels() {
@@ -378,32 +235,6 @@ export default {
       return pixelSet;
     },
 
-    getAllPixels() {
-      const allPixels = new Map();
-
-      if (this.imagePixels && this.imagePixels.size > 0) {
-        const offsetX = this.config.image.x || 0;
-        const offsetY = this.config.image.y || 0;
-        this.imagePixels.forEach((color, key) => {
-          const [rx, ry] = key.split(",").map(Number);
-          const finalX = rx + offsetX;
-          const finalY = ry + offsetY;
-          if (finalX >= 0 && finalX < 64 && finalY >= 0 && finalY < 64) {
-            allPixels.set(`${finalX},${finalY}`, color);
-          }
-        });
-      }
-
-      if (this.showPreview) {
-        const previewPixels = this.getPreviewPixels();
-        previewPixels.forEach((color, key) => {
-          allPixels.set(key, color);
-        });
-      }
-
-      return allPixels;
-    },
-
     getDefaultPreviewPixels() {
       const pixels = new Map();
 
@@ -449,20 +280,95 @@ export default {
       return pixels;
     },
 
-    getPreviewPixels() {
-      const themePixels = getClockThemePreviewPixels({
-        themeId: this.displayClockThemeId,
-        config: this.config,
-        timeText: this.getTimeText(),
-        dateText: this.getDateText(),
-        weekText: this.getWeekText(),
-        hasImage: !!this.imagePixels,
-      });
+    buildImageLayerPixels() {
+      const pixels = new Map();
 
-      if (themePixels) {
-        return themePixels;
+      if (!this.config.image.show || !this.imagePixels) {
+        return pixels;
       }
 
+      const offsetX = this.config.image.x;
+      const offsetY = this.config.image.y;
+
+      this.imagePixels.forEach((color, key) => {
+        const [rawX, rawY] = key.split(",").map(Number);
+        const finalX = rawX + offsetX;
+        const finalY = rawY + offsetY;
+
+        if (finalX >= 0 && finalX < 64 && finalY >= 0 && finalY < 64) {
+          pixels.set(`${finalX},${finalY}`, color);
+        }
+      });
+
+      return pixels;
+    },
+
+    getDefaultConfigSnapshot() {
+      if (!this.$options || typeof this.$options.data !== "function") {
+        return null;
+      }
+
+      const initialState = this.$options.data.call(this);
+      if (!initialState || !initialState.config) {
+        return null;
+      }
+
+      return JSON.parse(JSON.stringify(initialState.config));
+    },
+
+    isReadablePreviewColor(color) {
+      if (typeof color !== "string" || !/^#?[0-9a-fA-F]{6}$/.test(color)) {
+        return false;
+      }
+
+      const normalized = color.startsWith("#") ? color : `#${color}`;
+      const r = parseInt(normalized.slice(1, 3), 16);
+      const g = parseInt(normalized.slice(3, 5), 16);
+      const b = parseInt(normalized.slice(5, 7), 16);
+      const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+
+      return luminance >= 22;
+    },
+
+    hasReadablePreviewPixels(pixelMap) {
+      if (!pixelMap || pixelMap.size === 0) {
+        return false;
+      }
+
+      for (const color of pixelMap.values()) {
+        if (this.isReadablePreviewColor(color)) {
+          return true;
+        }
+      }
+
+      return false;
+    },
+
+    ensureVisiblePreviewBaseline() {
+      if (this.clockMode === "theme") {
+        return;
+      }
+
+      const imageLayerPixels = this.buildImageLayerPixels();
+      if (this.hasReadablePreviewPixels(imageLayerPixels)) {
+        return;
+      }
+
+      const previewPixels = this.getDefaultPreviewPixels();
+      if (this.hasReadablePreviewPixels(previewPixels)) {
+        return;
+      }
+
+      const defaultConfig = this.getDefaultConfigSnapshot();
+      if (!defaultConfig) {
+        return;
+      }
+
+      this.config = defaultConfig;
+      this.drawCanvas();
+    },
+
+    getPreviewPixels() {
       return this.getDefaultPreviewPixels();
     },
   },

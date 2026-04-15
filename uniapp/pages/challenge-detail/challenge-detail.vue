@@ -33,7 +33,7 @@
       
       <!-- 挑战图标 -->
       <view class="challenge-icon">
-        <Icon name="work" :size="64" color="#FFFFFF" />
+        <Icon name="work" :size="64" color="currentColor" />
       </view>
       
       <!-- 状态标签 -->
@@ -52,17 +52,17 @@
         <!-- 挑战统计 -->
         <view class="stats-row">
           <view class="stat-item">
-            <Icon name="user" :size="32" color="#4F7FFF" />
+            <Icon name="user" :size="32" color="currentColor" />
             <text class="stat-value">{{ challenge.participants }}</text>
             <text class="stat-label">参与者</text>
           </view>
           <view class="stat-item">
-            <Icon name="picture" :size="32" color="#FF7A45" />
+            <Icon name="picture" :size="32" color="currentColor" />
             <text class="stat-value">{{ challenge.submissions }}</text>
             <text class="stat-label">作品数</text>
           </view>
           <view class="stat-item">
-            <Icon name="work" :size="32" color="#FFD700" />
+            <Icon name="work" :size="32" color="currentColor" />
             <text class="stat-value">{{ challenge.difficulty }}</text>
             <text class="stat-label">难度</text>
           </view>
@@ -71,11 +71,11 @@
         <!-- 时间信息 -->
         <view class="time-info">
           <view class="time-item">
-            <Icon name="time" :size="28" color="#666666" />
+            <Icon name="time" :size="28" color="currentColor" />
             <text class="time-text">开始: {{ formatDate(challenge.start_date) }}</text>
           </view>
           <view class="time-item">
-            <Icon name="time" :size="28" color="#666666" />
+            <Icon name="time" :size="28" color="currentColor" />
             <text class="time-text">结束: {{ formatDate(challenge.end_date) }}</text>
           </view>
         </view>
@@ -83,7 +83,7 @@
         <!-- 奖励信息 -->
         <view class="prize-section">
           <view class="section-header glx-section-head">
-            <Icon name="work" :size="32" color="#FF7A45" />
+            <Icon name="work" :size="32" color="currentColor" />
             <text class="section-title glx-section-title">挑战奖励</text>
           </view>
           <text class="prize-text">{{ challenge.prize }}</text>
@@ -93,7 +93,7 @@
       <!-- 挑战规则 -->
       <view class="rules-card glx-panel-card">
         <view class="section-header glx-section-head">
-          <Icon name="list" :size="32" color="#4F7FFF" />
+          <Icon name="list" :size="32" color="currentColor" />
           <text class="section-title glx-section-title">挑战规则</text>
         </view>
         <view class="rules-list">
@@ -111,7 +111,7 @@
       <!-- 评审标准 -->
       <view class="criteria-card glx-panel-card">
         <view class="section-header glx-section-head">
-          <Icon name="star" :size="32" color="#FFD700" />
+          <Icon name="star" :size="32" color="currentColor" />
           <text class="section-title glx-section-title">评审标准</text>
         </view>
         <view class="criteria-list">
@@ -392,12 +392,15 @@ export default {
   left: 32rpx;
   width: 96rpx;
   height: 96rpx;
-  background-color: rgba(255, 255, 255, 0.2);
+  background-color: var(--tone-paper-soft);
+  border: 2rpx solid var(--nb-ink);
+  box-shadow: var(--nb-shadow-soft);
   border-radius: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   backdrop-filter: none;
+  color: var(--nb-ink);
 }
 
 .status-badge {
@@ -413,15 +416,15 @@ export default {
 }
 
 .status-active {
-  background-color: rgba(46, 204, 113, 0.9);
+  background-color: var(--nb-green);
 }
 
 .status-upcoming {
-  background-color: rgba(241, 156, 18, 0.9);
+  background-color: #f59e0b;
 }
 
 .status-ended {
-  background-color: rgba(170, 170, 170, 0.9);
+  background-color: var(--nb-ink);
 }
 
 .status-text {
@@ -458,7 +461,7 @@ export default {
 
 .challenge-description {
   font-size: 28rpx;
-  color: #4a4a4a;
+  color: var(--text-secondary);
   line-height: 1.6;
   margin-bottom: 32rpx;
   display: block;
@@ -478,17 +481,18 @@ export default {
   flex-direction: column;
   align-items: center;
   gap: 8rpx;
+  color: var(--nb-ink);
 }
 
 .stat-value {
   font-size: 32rpx;
   font-weight: 700;
-  color: var(--nb-ink);
+  color: currentColor;
 }
 
 .stat-label {
   font-size: 24rpx;
-  color: #4a4a4a;
+  color: currentColor;
 }
 
 .time-info {
@@ -502,17 +506,20 @@ export default {
   display: flex;
   align-items: center;
   gap: 12rpx;
+  color: var(--text-secondary);
 }
 
 .time-text {
   font-size: 26rpx;
-  color: #4a4a4a;
+  color: currentColor;
 }
 
 .prize-section {
   padding: 24rpx;
-  background: linear-gradient(135deg, rgba(79, 127, 255, 0.1), rgba(255, 122, 69, 0.1));
+  background: var(--tone-orange-soft);
+  border: 2rpx solid var(--nb-ink);
   border-radius: 0;
+  color: var(--nb-ink);
 }
 
 .section-header {
@@ -520,6 +527,7 @@ export default {
   align-items: center;
   gap: 12rpx;
   margin-bottom: 16rpx;
+  color: var(--nb-ink);
 }
 
 .section-title {
@@ -556,8 +564,9 @@ export default {
   align-items: center;
   justify-content: center;
   background-color: var(--nb-yellow);
-  color: #FFFFFF;
-  border-radius: 50%;
+  color: var(--nb-ink);
+  border-radius: 0;
+  border: 2rpx solid var(--nb-ink);
   font-size: 22rpx;
   font-weight: 600;
 }
@@ -565,7 +574,7 @@ export default {
 .rule-text {
   flex: 1;
   font-size: 26rpx;
-  color: #4a4a4a;
+  color: var(--text-secondary);
   line-height: 1.6;
 }
 
@@ -578,7 +587,7 @@ export default {
 
 .criterion-text {
   font-size: 26rpx;
-  color: #4a4a4a;
+  color: var(--text-secondary);
   line-height: 1.5;
 }
 
@@ -625,24 +634,21 @@ export default {
 }
 
 .button-active {
-  background: linear-gradient(135deg, #4F7FFF, #6B9FFF);
+  background: #5a90ff;
 }
 
 .button-upcoming {
-  background: linear-gradient(135deg, #F19C12, #F39C12);
+  background: #f59e0b;
 }
 
 .button-ended {
-  background-color: #4a4a4a;
+  background-color: var(--nb-ink);
 }
 
 .button-joined {
-  background: linear-gradient(135deg, #2ECC71, #27AE60);
+  background: #42c78f;
 }
 
-.join-button:active {
-  transform: scale(0.98);
-}
 
 .button-text {
   font-size: 32rpx;

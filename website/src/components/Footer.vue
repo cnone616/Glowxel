@@ -1,87 +1,86 @@
 <template>
-  <footer class="footer">
-    <div class="container">
-      <div class="footer-content">
-        <div class="footer-brand">
-          <span class="brand-name">光格像素工坊</span>
-          <p class="brand-desc">像素内容创作与设备连接平台</p>
-        </div>
-        <div class="footer-links">
-          <router-link to="/community">社区</router-link>
-          <router-link to="/create">创作</router-link>
-          <router-link to="/templates">模板</router-link>
-          <router-link to="/challenges">挑战</router-link>
-        </div>
-      </div>
-      <div class="footer-bottom">
-        <p>&copy; 2026 光格像素工坊</p>
-      </div>
-    </div>
-  </footer>
+  <button
+    v-if="isVisible"
+    class="back-to-top"
+    type="button"
+    aria-label="返回顶部"
+    @click="scrollToTop"
+  >
+    <span class="back-to-top__arrow">↑</span>
+  </button>
 </template>
 
+<script setup>
+import { onMounted, onUnmounted, ref } from "vue";
+
+const isVisible = ref(false);
+
+const updateVisibility = () => {
+  const scrollTop = window.scrollY || document.documentElement.scrollTop || 0;
+  const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+  const documentHeight = document.documentElement.scrollHeight || 0;
+  const isNearBottom = scrollTop + viewportHeight >= documentHeight - 160;
+  isVisible.value = isNearBottom && scrollTop > 240;
+};
+
+const scrollToTop = () => {
+  window.scrollTo({
+    top: 0,
+    behavior: "smooth",
+  });
+};
+
+onMounted(() => {
+  updateVisibility();
+  window.addEventListener("scroll", updateVisibility, { passive: true });
+  window.addEventListener("resize", updateVisibility);
+});
+
+onUnmounted(() => {
+  window.removeEventListener("scroll", updateVisibility);
+  window.removeEventListener("resize", updateVisibility);
+});
+</script>
+
 <style scoped>
-.footer {
-  background: #fafafa;
-  border-top: 1px solid #f0f0f0;
-  padding: 40px 0 20px;
-  margin-top: 60px;
-}
-
-.container {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 0 20px;
-}
-
-.footer-content {
-  display: flex;
-  justify-content: space-between;
+.back-to-top {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  width: 56px;
+  height: 56px;
+  display: inline-flex;
   align-items: center;
-  margin-bottom: 24px;
+  justify-content: center;
+  border: var(--nb-border-width) solid var(--nb-ink);
+  background: var(--tone-paper-soft);
+  box-shadow: 6px 6px 0 #000000;
+  color: var(--nb-ink);
+  cursor: pointer;
+  z-index: 1100;
 }
 
-.brand-name {
-  font-size: 18px;
-  font-weight: 700;
-  color: #1a1a1a;
+.back-to-top:hover {
+  background: var(--nb-blue);
 }
 
-.brand-desc {
-  color: #999;
-  font-size: 13px;
-  margin-top: 4px;
-}
-
-.footer-links {
-  display: flex;
-  gap: 24px;
-}
-
-.footer-links a {
-  color: #666;
-  text-decoration: none;
-  font-size: 14px;
-  transition: color 0.2s;
-}
-
-.footer-links a:hover {
-  color: #1a1a1a;
-}
-
-.footer-bottom {
-  text-align: center;
-  padding-top: 20px;
-  border-top: 1px solid #f0f0f0;
-  color: #bbb;
-  font-size: 13px;
+.back-to-top__arrow {
+  font-size: 28px;
+  font-weight: 900;
+  line-height: 1;
 }
 
 @media (max-width: 768px) {
-  .footer-content {
-    flex-direction: column;
-    gap: 20px;
-    text-align: center;
+  .back-to-top {
+    right: 16px;
+    bottom: 16px;
+    width: 52px;
+    height: 52px;
+    box-shadow: 4px 4px 0 #000000;
+  }
+
+  .back-to-top__arrow {
+    font-size: 24px;
   }
 }
 </style>

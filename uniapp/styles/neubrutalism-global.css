@@ -2,17 +2,17 @@ page {
   --nb-ink: #000000;
   --nb-paper: #ffffff;
   --nb-surface: #ffffff;
-  --nb-yellow: #ffd23f;
-  --nb-blue: #74b9ff;
-  --nb-green: #88d498;
-  --nb-coral: #ff6b6b;
-  --nb-orange: #ffa552;
-  --nb-lavender: #b8a9fa;
+  --nb-yellow: #ffcb45;
+  --nb-blue: #5ea8ff;
+  --nb-green: #59d39e;
+  --nb-coral: #ff8a78;
+  --nb-orange: #ffb35c;
+  --nb-lavender: #a88bff;
   --nb-border-width: 4rpx;
   --nb-border-width-panel: 4rpx;
   --nb-border-width-control: 3rpx;
-  --nb-shadow-soft: 2rpx 2rpx 0 #000000;
-  --nb-shadow-strong: 5rpx 5rpx 0 #000000;
+  --nb-shadow-soft: 3rpx 3rpx 0 #000000;
+  --nb-shadow-strong: 6rpx 6rpx 0 #000000;
   --layout-bottom-offset: 32rpx;
 }
 
@@ -39,8 +39,6 @@ body {
 .ambient-page,
 .canvas-page,
 .tetris-page,
-.notification-list-page,
-.notification-editor-page,
 .artwork-detail-page,
 .user-detail-page,
 .user-list-page,
@@ -97,7 +95,7 @@ body {
 .empty-subtitle,
 .preview-theme-chip-text,
 .preview-status-chip-text {
-  color: #4a4a4a !important;
+  color: var(--text-secondary) !important;
 }
 
 .console-card,
@@ -120,7 +118,7 @@ body {
   background: var(--nb-surface) !important;
   border: var(--nb-border-width-panel) solid var(--nb-ink) !important;
   border-radius: 0 !important;
-  box-shadow: var(--nb-shadow-strong) !important;
+  box-shadow: var(--shadow-card) !important;
 }
 
 .preview-caption,
@@ -150,7 +148,7 @@ body {
 .image-preview,
 .banner-item {
   border: var(--nb-border-width-panel) solid var(--nb-ink) !important;
-  box-shadow: var(--nb-shadow-strong) !important;
+  box-shadow: var(--shadow-card) !important;
 }
 
 .nav-left,
@@ -182,9 +180,9 @@ body {
 .action-icon,
 .preview-entry-icon,
 .panel-action-icon {
-  border: 0 !important;
-  box-shadow: none !important;
-  background: transparent !important;
+  border: var(--nb-border-width-control) solid var(--nb-ink) !important;
+  box-shadow: var(--nb-shadow-soft) !important;
+  background: var(--nb-surface) !important;
 }
 
 .glx-topbar {
@@ -258,7 +256,7 @@ body {
 .glx-topbar.navbar > .nav-left,
 .glx-topbar.navbar > .nav-right {
   padding: 0 !important;
-  background: var(--nb-surface) !important;
+  background: var(--tone-paper-soft) !important;
   border: var(--nb-border-width-control) solid var(--nb-ink) !important;
   box-shadow: var(--nb-shadow-soft) !important;
 }
@@ -330,25 +328,13 @@ body {
   line-height: 1 !important;
 }
 
-.glx-topbar .header-content > .back-btn:active,
-.glx-topbar .header-content > .more-btn:active {
-  transform: none !important;
-  box-shadow: var(--nb-shadow-soft) !important;
-}
-
-.glx-topbar.navbar > .nav-left:active,
-.glx-topbar.navbar > .nav-right:active {
-  transform: translateY(-50%) !important;
-  box-shadow: var(--nb-shadow-soft) !important;
-}
-
 .text-input,
 .form-input {
-  background: #ffffff !important;
+  background: var(--tone-paper-soft) !important;
   border: var(--nb-border-width) solid var(--nb-ink) !important;
   border-radius: 0 !important;
   color: var(--nb-ink) !important;
-  box-shadow: none !important;
+  box-shadow: var(--nb-shadow-soft) !important;
 }
 
 input,
@@ -368,11 +354,11 @@ textarea {
 
 .switch-track {
   border: var(--nb-border-width-control) solid var(--nb-ink) !important;
-  background: #ffffff !important;
+  background: var(--tone-paper-soft) !important;
 }
 
 .switch-track.active {
-  background: var(--nb-yellow) !important;
+  background: var(--tone-yellow-soft) !important;
 }
 
 .switch-thumb {
@@ -450,14 +436,14 @@ textarea {
 }
 
 .cancel-btn {
-  background: var(--nb-surface) !important;
+  background: var(--tone-paper-soft) !important;
 }
 
 .input-wrapper,
 .custom-input {
-  background: #ffffff !important;
+  background: var(--tone-paper-soft) !important;
   border: var(--nb-border-width-control) solid var(--nb-ink) !important;
-  box-shadow: none !important;
+  box-shadow: var(--nb-shadow-soft) !important;
 }
 
 .status-box,
@@ -469,4 +455,222 @@ textarea {
 
 [class*="-overlay"] {
   backdrop-filter: none !important;
+}
+
+.save-button,
+.join-button,
+.confirm-btn,
+.modal-btn.primary,
+.modal-btn.confirm,
+.modal-action-button.primary,
+.panel-action-icon.warm,
+.panel-action-icon.blue,
+.panel-action-icon.mint {
+  box-shadow: var(--nb-shadow-soft) !important;
+}
+
+/* 全项目样式收口：高频页面与编辑器家族共用骨架 */
+.action-card,
+.menu-item,
+.setting-item,
+.language-option,
+.search-btn,
+.clear-btn,
+.banner-btn,
+.empty-btn,
+.logout-btn,
+.follow-btn,
+.message-btn,
+.share-btn,
+.load-more-btn,
+.sort-option,
+.menu-action,
+.publish-btn,
+.save-button,
+.export-button,
+.footer-mini-btn,
+.modal-action-btn,
+.modal-action-button,
+.view-all-logs,
+.user-item,
+.favorite-item,
+.device-item,
+.board-card,
+.index-item,
+.action-btn,
+.quick-size-btn,
+.palette-toggle,
+.upload-placeholder,
+.image-action-btn,
+.control-btn,
+.option-btn,
+.expression-item,
+.picker-field,
+.search-input-wrapper,
+.size-input-shell,
+.param-picker-value,
+.value-box,
+.readonly-value,
+.number-input,
+.text-input {
+  border-radius: 0 !important;
+}
+
+.action-card,
+.menu-item,
+.setting-item,
+.language-option,
+.search-btn,
+.clear-btn,
+.banner-btn,
+.empty-btn,
+.logout-btn,
+.follow-btn,
+.message-btn,
+.share-btn,
+.load-more-btn,
+.sort-option,
+.menu-action,
+.publish-btn,
+.save-button,
+.export-button,
+.footer-mini-btn,
+.modal-action-btn,
+.modal-action-button,
+.view-all-logs,
+.user-item,
+.favorite-item,
+.device-item,
+.board-card,
+.index-item,
+.action-btn,
+.quick-size-btn,
+.palette-toggle,
+.upload-placeholder,
+.image-action-btn,
+.control-btn,
+.option-btn,
+.expression-item {
+  border: var(--nb-border-width-control) solid var(--nb-ink) !important;
+  box-shadow: var(--nb-shadow-soft) !important;
+  transition: background-color 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease !important;
+}
+
+.action-card,
+.menu-item,
+.setting-item,
+.language-option,
+.empty-btn,
+.load-more-btn,
+.sort-option,
+.menu-action,
+.follow-btn,
+.view-all-logs,
+.user-item,
+.favorite-item,
+.device-item,
+.board-card,
+.index-item,
+.quick-size-btn,
+.palette-toggle,
+.upload-placeholder,
+.control-btn,
+.option-btn,
+.expression-item {
+  background: var(--tone-paper-soft) !important;
+}
+
+.picker-field,
+.search-input-wrapper,
+.size-input-shell,
+.param-picker-value,
+.value-box,
+.readonly-value,
+.number-input,
+.text-input {
+  background: var(--tone-paper-soft) !important;
+  border: var(--nb-border-width-control) solid var(--nb-ink) !important;
+  box-shadow: var(--nb-shadow-soft) !important;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease !important;
+}
+
+.search-btn,
+.clear-btn {
+  background: var(--tone-paper-soft) !important;
+}
+
+.banner-btn {
+  background: rgba(255, 255, 255, 0.2) !important;
+}
+
+.publish-btn,
+.save-button,
+.next-btn,
+.export-button,
+.modal-action-btn.primary,
+.modal-action-button.primary {
+  background: var(--nb-yellow) !important;
+  color: var(--nb-ink) !important;
+}
+
+.logout-btn,
+.image-action-btn.danger,
+.modal-action-btn.tertiary {
+  background: var(--nb-coral) !important;
+  border-color: var(--nb-ink) !important;
+  color: var(--nb-ink) !important;
+}
+
+.image-action-btn {
+  background: var(--nb-blue) !important;
+  color: var(--nb-ink) !important;
+}
+
+.follow-btn.following,
+.join-button.button-joined {
+  background: var(--nb-green) !important;
+  color: var(--nb-ink) !important;
+}
+
+.join-button.button-active,
+.join-button.button-upcoming,
+.join-button.button-ended {
+  border: var(--nb-border-width-control) solid var(--nb-ink) !important;
+  box-shadow: var(--nb-shadow-soft) !important;
+}
+
+.menu-icon,
+.setting-icon,
+.empty-icon,
+.challenge-icon {
+  border: var(--nb-border-width-control) solid var(--nb-ink) !important;
+  border-radius: 0 !important;
+  box-shadow: var(--nb-shadow-soft) !important;
+}
+
+.menu-icon,
+.setting-icon {
+  background: var(--nb-surface) !important;
+}
+
+.action-icon,
+.preview-entry-icon,
+.panel-action-icon {
+  background: var(--nb-surface) !important;
+}
+
+.panel-action-icon.warm {
+  background: var(--nb-yellow) !important;
+}
+
+.panel-action-icon.blue {
+  background: var(--nb-blue) !important;
+}
+
+.panel-action-icon.mint {
+  background: var(--nb-green) !important;
+}
+
+.panel-action-icon.danger {
+  background: var(--nb-coral) !important;
 }

@@ -1,21 +1,23 @@
 #include "websocket_command_handlers.h"
 #include "animation_manager.h"
+#include "board_native_effect.h"
 #include "clock_font_renderer.h"
 #include "config_manager.h"
 #include "display_manager.h"
 #include "eyes_effect.h"
+#include "game_screensaver_effect.h"
 #include "ota_manager.h"
 #include "tetris_effect.h"
 #include "wifi_manager.h"
 #include <string.h>
 
 namespace {
-  void setErrorResponse(StaticJsonDocument<512>& response, const char* message) {
+  void setErrorResponse(StaticJsonDocument<768>& response, const char* message) {
     response["status"] = "error";
     response["message"] = message;
   }
 
-  void sendResponse(AsyncWebSocketClient* client, StaticJsonDocument<512>& response) {
+  void sendResponse(AsyncWebSocketClient* client, StaticJsonDocument<768>& response) {
     String responseStr;
     serializeJson(response, responseStr);
     client->text(responseStr);
@@ -40,6 +42,36 @@ namespace {
     }
 
     return true;
+  }
+
+  bool parseRequiredColorObject(
+    JsonDocument& doc,
+    const char* fieldName,
+    uint8_t& outR,
+    uint8_t& outG,
+    uint8_t& outB
+  ) {
+    if (!doc.containsKey(fieldName)) {
+      return false;
+    }
+    JsonObject color = doc[fieldName].as<JsonObject>();
+    if (!color.containsKey("r") || !color.containsKey("g") || !color.containsKey("b")) {
+      return false;
+    }
+    outR = color["r"].as<uint8_t>();
+    outG = color["g"].as<uint8_t>();
+    outB = color["b"].as<uint8_t>();
+    return true;
+  }
+
+  int clampInt(int value, int minValue, int maxValue) {
+    if (value < minValue) {
+      return minValue;
+    }
+    if (value > maxValue) {
+      return maxValue;
+    }
+    return value;
   }
 
   const char* ambientPresetToString(uint8_t preset) {
@@ -180,7 +212,7 @@ namespace {
 bool WebSocketCommandHandlers::handleBasicCommand(
   AsyncWebSocketClient* client,
   JsonDocument& doc,
-  StaticJsonDocument<512>& response,
+  StaticJsonDocument<768>& response,
   const char* currentMode
 ) {
   String cmd = doc["cmd"].as<String>();
@@ -195,11 +227,109 @@ bool WebSocketCommandHandlers::handleBasicCommand(
     response["width"] = DisplayManager::PANEL_RES_X;
     response["height"] = DisplayManager::PANEL_RES_Y;
     response["brightness"] = DisplayManager::currentBrightness;
+    response["displayBright"] = ConfigManager::deviceParamsConfig.displayBright;
+    response["brightnessDay"] = ConfigManager::deviceParamsConfig.brightnessDay;
+    response["brightnessNight"] = ConfigManager::deviceParamsConfig.brightnessNight;
+    response["displayRotation"] = ConfigManager::deviceParamsConfig.displayRotation;
+    response["swapBlueGreen"] = ConfigManager::deviceParamsConfig.swapBlueGreen;
+    response["swapBlueRed"] = ConfigManager::deviceParamsConfig.swapBlueRed;
+    response["clkphase"] = ConfigManager::deviceParamsConfig.clkphase;
+    response["driver"] = ConfigManager::deviceParamsConfig.driver;
+    response["i2cSpeed"] = ConfigManager::deviceParamsConfig.i2cSpeed;
+    response["E_pin"] = ConfigManager::deviceParamsConfig.E_pin;
+    response["nightStart"] = ConfigManager::deviceParamsConfig.nightStart;
+    response["nightEnd"] = ConfigManager::deviceParamsConfig.nightEnd;
+    response["ntpServer"] = ConfigManager::deviceParamsConfig.ntpServer;
+    response["wifiSsid"] = WiFiManager::getConnectedSSID();
+    response["uptime"] = millis() / 1000;
     response["mode"] = currentMode;
     if (DisplayManager::nativeEffectType == NATIVE_EFFECT_BREATH) {
       response["effectMode"] = "breath_effect";
     } else if (DisplayManager::nativeEffectType == NATIVE_EFFECT_RHYTHM) {
       response["effectMode"] = "rhythm_effect";
+    } else if (DisplayManager::currentBusinessModeTag == "game_screensaver" &&
+               GameScreensaverEffect::isActive()) {
+      response["effectMode"] = "game_screensaver";
+      const GameScreensaverConfig& config = GameScreensaverEffect::getConfig();
+      if (config.game == GAME_SCREENSAVER_MAZE) {
+        response["game"] = "maze";
+      } else if (config.game == GAME_SCREENSAVER_SNAKE) {
+        response["game"] = "snake";
+        response["snakeWidth"] = config.snakeWidth;
+      } else if (config.game == GAME_SCREENSAVER_PING_PONG) {
+        response["game"] = "ping_pong";
+      } else if (config.game == GAME_SCREENSAVER_TETRIS_GAME) {
+        response["game"] = "tetris_game";
+        response["cellSize"] = config.cellSize;
+        response["showClock"] = config.showClock;
+      }
+      response["speed"] = config.speed;
+      if (config.game == GAME_SCREENSAVER_MAZE) {
+        response["mazeSizeMode"] =
+          config.mazeSizeMode == GAME_SCREENSAVER_MAZE_DENSE ? "dense" : "wide";
+      }
+    } else if (BoardNativeEffect::isActive() &&
+               DisplayManager::currentBusinessModeTag == "text_display") {
+      response["effectMode"] = "text_display";
+      const TextDisplayNativeConfig& config = BoardNativeEffect::getTextDisplayConfig();
+      response["template"] = config.templateName;
+      response["text"] = config.text;
+      response["progress"] = config.progress;
+      response["repeat"] = config.repeat;
+      response["pushIcon"] = config.pushIcon;
+      response["icon"] = config.icon;
+      response["speed"] = config.speed;
+      JsonObject color = response.createNestedObject("color");
+      color["r"] = config.colorR;
+      color["g"] = config.colorG;
+      color["b"] = config.colorB;
+      JsonObject bgColor = response.createNestedObject("bgColor");
+      bgColor["r"] = config.bgColorR;
+      bgColor["g"] = config.bgColorG;
+      bgColor["b"] = config.bgColorB;
+    } else if (BoardNativeEffect::isActive() &&
+               DisplayManager::currentBusinessModeTag == "weather") {
+      response["effectMode"] = "weather";
+      const WeatherBoardNativeConfig& config = BoardNativeEffect::getWeatherConfig();
+      response["weatherType"] = config.weatherType;
+      response["city"] = config.city;
+      response["temperature"] = config.temperature;
+      response["humidity"] = config.humidity;
+      response["unit"] = config.unit;
+    } else if (BoardNativeEffect::isActive() &&
+               DisplayManager::currentBusinessModeTag == "countdown") {
+      response["effectMode"] = "countdown";
+      const CountdownBoardNativeConfig& config = BoardNativeEffect::getCountdownConfig();
+      response["hours"] = config.hours;
+      response["minutes"] = config.minutes;
+      response["seconds"] = config.seconds;
+      response["progress"] = config.progress;
+      response["remainingSeconds"] = BoardNativeEffect::getCountdownRemainingSeconds();
+    } else if (BoardNativeEffect::isActive() &&
+               DisplayManager::currentBusinessModeTag == "stopwatch") {
+      response["effectMode"] = "stopwatch";
+      const StopwatchBoardNativeConfig& config = BoardNativeEffect::getStopwatchConfig();
+      response["previewSeconds"] = config.previewSeconds;
+      response["lapCount"] = config.lapCount;
+      response["showMilliseconds"] = config.showMilliseconds;
+      response["elapsedMs"] = BoardNativeEffect::getStopwatchElapsedMs();
+    } else if (BoardNativeEffect::isActive() &&
+               DisplayManager::currentBusinessModeTag == "notification") {
+      response["effectMode"] = "notification";
+      const NotificationBoardNativeConfig& config = BoardNativeEffect::getNotificationConfig();
+      response["repeatMode"] = config.repeatMode;
+      response["text"] = config.text;
+      response["icon"] = config.icon;
+      response["contentType"] = config.contentType;
+      response["textTemplate"] = config.textTemplate;
+      response["staticTemplate"] = config.staticTemplate;
+      response["animationTemplate"] = config.animationTemplate;
+      response["hour"] = config.hour;
+      response["minute"] = config.minute;
+      JsonObject accentColor = response.createNestedObject("accentColor");
+      accentColor["r"] = config.accentR;
+      accentColor["g"] = config.accentG;
+      accentColor["b"] = config.accentB;
     } else if (TetrisEffect::isActive) {
       response["effectMode"] = "tetris";
     } else if (DisplayManager::nativeEffectType == NATIVE_EFFECT_EYES) {
@@ -207,6 +337,14 @@ bool WebSocketCommandHandlers::handleBasicCommand(
     } else if (DisplayManager::nativeEffectType == NATIVE_EFFECT_AMBIENT) {
       response["effectMode"] = "ambient_effect";
       response["effectPreset"] = ambientPresetToString(DisplayManager::ambientEffectConfig.preset);
+      response["effectSpeed"] = DisplayManager::ambientEffectConfig.speed;
+      response["effectIntensity"] = DisplayManager::ambientEffectConfig.intensity;
+      response["effectDensity"] = DisplayManager::ambientEffectConfig.density;
+      JsonObject effectColor = response.createNestedObject("effectColor");
+      effectColor["r"] = DisplayManager::ambientEffectConfig.colorR;
+      effectColor["g"] = DisplayManager::ambientEffectConfig.colorG;
+      effectColor["b"] = DisplayManager::ambientEffectConfig.colorB;
+      response["effectLoop"] = DisplayManager::ambientEffectConfig.loop;
     } else {
       response["effectMode"] = "none";
     }
@@ -234,7 +372,7 @@ bool WebSocketCommandHandlers::handleBasicCommand(
 bool WebSocketCommandHandlers::handleModeCommand(
   AsyncWebSocketClient* client,
   JsonDocument& doc,
-  StaticJsonDocument<512>& response
+  StaticJsonDocument<768>& response
 ) {
   auto modeToString = [](DeviceMode mode) {
     if (mode == MODE_CLOCK) {
@@ -277,7 +415,14 @@ bool WebSocketCommandHandlers::handleModeCommand(
       DisplayManager::lastBusinessModeTag = modeTag;
       ConfigManager::saveClockConfig();
 
-      if (!playLoadedAnimation()) {
+      bool boardMode = modeTag == "text_display" ||
+                       modeTag == "weather" ||
+                       modeTag == "countdown" ||
+                       modeTag == "stopwatch" ||
+                       modeTag == "notification";
+      if (boardMode && BoardNativeEffect::isActive()) {
+        BoardNativeEffect::render();
+      } else if (!playLoadedAnimation()) {
         if (fallbackToClock) {
           DisplayManager::displayClock(true);
         } else {
@@ -290,7 +435,17 @@ bool WebSocketCommandHandlers::handleModeCommand(
       return true;
     };
 
+    bool keepBoardState = mode == "text_display" ||
+                          mode == "weather" ||
+                          mode == "countdown" ||
+                          mode == "stopwatch" ||
+                          mode == "notification";
+
     TetrisEffect::isActive = false;
+    GameScreensaverEffect::init();
+    if (!keepBoardState) {
+      BoardNativeEffect::deactivate();
+    }
     DisplayManager::setNativeEffectNone();
     if (AnimationManager::currentGIF != nullptr) {
       AnimationManager::currentGIF->isPlaying = false;
@@ -469,6 +624,7 @@ bool WebSocketCommandHandlers::handleModeCommand(
     int value = doc["value"];
     if (value >= 0 && value <= 255) {
       DisplayManager::setBrightness(value);
+      ConfigManager::saveDeviceParamsConfig();
       response["brightness"] = value;
     } else {
       setErrorResponse(response, "brightness must be 0-255");
@@ -575,7 +731,6 @@ namespace {
 
   bool ensureEyesStyleObject(JsonObject style) {
     return style.containsKey("eyeColor") &&
-           style.containsKey("pupilColor") &&
            style.containsKey("timeColor");
   }
 }
@@ -583,7 +738,7 @@ namespace {
 bool WebSocketCommandHandlers::handleEffectCommand(
   AsyncWebSocketClient* client,
   JsonDocument& doc,
-  StaticJsonDocument<512>& response
+  StaticJsonDocument<768>& response
 ) {
   String cmd = doc["cmd"].as<String>();
 
@@ -655,6 +810,8 @@ bool WebSocketCommandHandlers::handleEffectCommand(
     DisplayManager::currentBusinessModeTag = "breath_effect";
     DisplayManager::lastBusinessModeTag = "breath_effect";
     TetrisEffect::isActive = false;
+    BoardNativeEffect::deactivate();
+    GameScreensaverEffect::init();
     if (AnimationManager::currentGIF != nullptr) {
       AnimationManager::currentGIF->isPlaying = false;
     }
@@ -728,6 +885,8 @@ bool WebSocketCommandHandlers::handleEffectCommand(
     DisplayManager::currentBusinessModeTag = "rhythm_effect";
     DisplayManager::lastBusinessModeTag = "rhythm_effect";
     TetrisEffect::isActive = false;
+    BoardNativeEffect::deactivate();
+    GameScreensaverEffect::init();
     if (AnimationManager::currentGIF != nullptr) {
       AnimationManager::currentGIF->isPlaying = false;
     }
@@ -740,7 +899,6 @@ bool WebSocketCommandHandlers::handleEffectCommand(
   if (cmd == "set_ambient_effect") {
     if (!doc.containsKey("preset") ||
         !doc.containsKey("speed") ||
-        !doc.containsKey("intensity") ||
         !doc.containsKey("loop")) {
       setErrorResponse(response, "missing ambient effect fields");
       return true;
@@ -756,12 +914,40 @@ bool WebSocketCommandHandlers::handleEffectCommand(
     AmbientEffectConfig config;
     config.preset = preset;
     config.speed = doc["speed"].as<uint8_t>();
-    config.intensity = doc["intensity"].as<uint8_t>();
     config.loop = doc["loop"].as<bool>();
     if (config.speed < 1) config.speed = 1;
     if (config.speed > 10) config.speed = 10;
-    if (config.intensity < 10) config.intensity = 10;
-    if (config.intensity > 100) config.intensity = 100;
+
+    if (config.preset == AMBIENT_PRESET_SUNSET_BLUSH) {
+      if (!doc.containsKey("density") || !doc.containsKey("color")) {
+        setErrorResponse(response, "missing rain scene fields");
+        return true;
+      }
+      JsonObject color = doc["color"].as<JsonObject>();
+      if (!ensureColorObject(color)) {
+        setErrorResponse(response, "missing rain color fields");
+        return true;
+      }
+      config.intensity = DisplayManager::ambientEffectConfig.intensity;
+      config.density = doc["density"].as<uint8_t>();
+      if (config.density < 10) config.density = 10;
+      if (config.density > 100) config.density = 100;
+      config.colorR = color["r"].as<uint8_t>();
+      config.colorG = color["g"].as<uint8_t>();
+      config.colorB = color["b"].as<uint8_t>();
+    } else {
+      if (!doc.containsKey("intensity")) {
+        setErrorResponse(response, "missing ambient intensity field");
+        return true;
+      }
+      config.intensity = doc["intensity"].as<uint8_t>();
+      if (config.intensity < 10) config.intensity = 10;
+      if (config.intensity > 100) config.intensity = 100;
+      config.density = DisplayManager::ambientEffectConfig.density;
+      config.colorR = DisplayManager::ambientEffectConfig.colorR;
+      config.colorG = DisplayManager::ambientEffectConfig.colorG;
+      config.colorB = DisplayManager::ambientEffectConfig.colorB;
+    }
 
     DisplayManager::ambientEffectConfig = config;
     ConfigManager::saveAmbientEffectConfig();
@@ -771,6 +957,8 @@ bool WebSocketCommandHandlers::handleEffectCommand(
     DisplayManager::lastBusinessModeTag = "ambient_effect";
     ConfigManager::saveClockConfig();
     TetrisEffect::isActive = false;
+    BoardNativeEffect::deactivate();
+    GameScreensaverEffect::init();
     if (AnimationManager::currentGIF != nullptr) {
       AnimationManager::currentGIF->isPlaying = false;
     }
@@ -781,6 +969,312 @@ bool WebSocketCommandHandlers::handleEffectCommand(
     return true;
   }
 
+  if (cmd == "set_text_display") {
+    if (!doc.containsKey("template") ||
+        !doc.containsKey("text") ||
+        !doc.containsKey("progress") ||
+        !doc.containsKey("repeat") ||
+        !doc.containsKey("pushIcon") ||
+        !doc.containsKey("icon") ||
+        !doc.containsKey("speed") ||
+        !doc.containsKey("color") ||
+        !doc.containsKey("bgColor")) {
+      setErrorResponse(response, "missing text display fields");
+      return true;
+    }
+
+    uint8_t colorR = 0;
+    uint8_t colorG = 0;
+    uint8_t colorB = 0;
+    uint8_t bgColorR = 0;
+    uint8_t bgColorG = 0;
+    uint8_t bgColorB = 0;
+    if (!parseRequiredColorObject(doc, "color", colorR, colorG, colorB) ||
+        !parseRequiredColorObject(doc, "bgColor", bgColorR, bgColorG, bgColorB)) {
+      setErrorResponse(response, "invalid text display color");
+      return true;
+    }
+
+    TextDisplayNativeConfig config;
+    config.templateName = doc["template"].as<String>();
+    config.text = doc["text"].as<String>();
+    config.progress = (uint8_t)clampInt(doc["progress"].as<int>(), 0, 100);
+    config.repeat = (uint8_t)clampInt(doc["repeat"].as<int>(), 1, 8);
+    config.pushIcon = doc["pushIcon"].as<bool>();
+    config.icon = doc["icon"].as<String>();
+    config.speed = (uint8_t)clampInt(doc["speed"].as<int>(), 1, 10);
+    config.colorR = colorR;
+    config.colorG = colorG;
+    config.colorB = colorB;
+    config.bgColorR = bgColorR;
+    config.bgColorG = bgColorG;
+    config.bgColorB = bgColorB;
+
+    DisplayManager::currentMode = MODE_ANIMATION;
+    DisplayManager::lastBusinessMode = MODE_ANIMATION;
+    DisplayManager::currentBusinessModeTag = "text_display";
+    DisplayManager::lastBusinessModeTag = "text_display";
+    ConfigManager::saveClockConfig();
+    TetrisEffect::isActive = false;
+    GameScreensaverEffect::init();
+    DisplayManager::setNativeEffectNone();
+    if (AnimationManager::currentGIF != nullptr) {
+      AnimationManager::currentGIF->isPlaying = false;
+    }
+    BoardNativeEffect::applyTextDisplayConfig(config);
+
+    response["message"] = "text display applied";
+    return true;
+  }
+
+  if (cmd == "set_weather_board") {
+    if (!doc.containsKey("weatherType") ||
+        !doc.containsKey("city") ||
+        !doc.containsKey("temperature") ||
+        !doc.containsKey("humidity") ||
+        !doc.containsKey("unit")) {
+      setErrorResponse(response, "missing weather board fields");
+      return true;
+    }
+
+    WeatherBoardNativeConfig config;
+    config.weatherType = doc["weatherType"].as<String>();
+    config.city = doc["city"].as<String>();
+    config.temperature = (int16_t)doc["temperature"].as<int>();
+    config.humidity = (uint8_t)clampInt(doc["humidity"].as<int>(), 0, 100);
+    config.unit = doc["unit"].as<String>();
+    if (config.unit != "c" && config.unit != "f") {
+      setErrorResponse(response, "invalid weather unit");
+      return true;
+    }
+
+    DisplayManager::currentMode = MODE_ANIMATION;
+    DisplayManager::lastBusinessMode = MODE_ANIMATION;
+    DisplayManager::currentBusinessModeTag = "weather";
+    DisplayManager::lastBusinessModeTag = "weather";
+    ConfigManager::saveClockConfig();
+    TetrisEffect::isActive = false;
+    GameScreensaverEffect::init();
+    DisplayManager::setNativeEffectNone();
+    if (AnimationManager::currentGIF != nullptr) {
+      AnimationManager::currentGIF->isPlaying = false;
+    }
+    BoardNativeEffect::applyWeatherConfig(config);
+
+    response["message"] = "weather board applied";
+    return true;
+  }
+
+  if (cmd == "set_countdown_board") {
+    if (!doc.containsKey("hours") ||
+        !doc.containsKey("minutes") ||
+        !doc.containsKey("seconds") ||
+        !doc.containsKey("progress")) {
+      setErrorResponse(response, "missing countdown board fields");
+      return true;
+    }
+
+    CountdownBoardNativeConfig config;
+    config.hours = (uint8_t)clampInt(doc["hours"].as<int>(), 0, 99);
+    config.minutes = (uint8_t)clampInt(doc["minutes"].as<int>(), 0, 59);
+    config.seconds = (uint8_t)clampInt(doc["seconds"].as<int>(), 0, 59);
+    config.progress = (uint8_t)clampInt(doc["progress"].as<int>(), 0, 100);
+
+    DisplayManager::currentMode = MODE_ANIMATION;
+    DisplayManager::lastBusinessMode = MODE_ANIMATION;
+    DisplayManager::currentBusinessModeTag = "countdown";
+    DisplayManager::lastBusinessModeTag = "countdown";
+    ConfigManager::saveClockConfig();
+    TetrisEffect::isActive = false;
+    GameScreensaverEffect::init();
+    DisplayManager::setNativeEffectNone();
+    if (AnimationManager::currentGIF != nullptr) {
+      AnimationManager::currentGIF->isPlaying = false;
+    }
+    BoardNativeEffect::applyCountdownConfig(config);
+
+    response["message"] = "countdown board applied";
+    return true;
+  }
+
+  if (cmd == "set_stopwatch_board") {
+    if (!doc.containsKey("previewSeconds") ||
+        !doc.containsKey("lapCount") ||
+        !doc.containsKey("showMilliseconds")) {
+      setErrorResponse(response, "missing stopwatch board fields");
+      return true;
+    }
+
+    StopwatchBoardNativeConfig config;
+    config.previewSeconds = (uint16_t)clampInt(doc["previewSeconds"].as<int>(), 0, 35999);
+    config.lapCount = (uint8_t)clampInt(doc["lapCount"].as<int>(), 0, 99);
+    config.showMilliseconds = doc["showMilliseconds"].as<bool>();
+
+    DisplayManager::currentMode = MODE_ANIMATION;
+    DisplayManager::lastBusinessMode = MODE_ANIMATION;
+    DisplayManager::currentBusinessModeTag = "stopwatch";
+    DisplayManager::lastBusinessModeTag = "stopwatch";
+    ConfigManager::saveClockConfig();
+    TetrisEffect::isActive = false;
+    GameScreensaverEffect::init();
+    DisplayManager::setNativeEffectNone();
+    if (AnimationManager::currentGIF != nullptr) {
+      AnimationManager::currentGIF->isPlaying = false;
+    }
+    BoardNativeEffect::applyStopwatchConfig(config);
+
+    response["message"] = "stopwatch board applied";
+    return true;
+  }
+
+  if (cmd == "set_notification_board") {
+    if (!doc.containsKey("repeatMode") ||
+        !doc.containsKey("text") ||
+        !doc.containsKey("icon") ||
+        !doc.containsKey("accentColor") ||
+        !doc.containsKey("contentType") ||
+        !doc.containsKey("textTemplate") ||
+        !doc.containsKey("staticTemplate") ||
+        !doc.containsKey("animationTemplate") ||
+        !doc.containsKey("hour") ||
+        !doc.containsKey("minute")) {
+      setErrorResponse(response, "missing notification board fields");
+      return true;
+    }
+
+    uint8_t accentR = 0;
+    uint8_t accentG = 0;
+    uint8_t accentB = 0;
+    if (!parseRequiredColorObject(doc, "accentColor", accentR, accentG, accentB)) {
+      setErrorResponse(response, "invalid notification accent color");
+      return true;
+    }
+
+    NotificationBoardNativeConfig config;
+    config.repeatMode = doc["repeatMode"].as<String>();
+    config.text = doc["text"].as<String>();
+    config.icon = doc["icon"].as<String>();
+    config.accentR = accentR;
+    config.accentG = accentG;
+    config.accentB = accentB;
+    config.contentType = doc["contentType"].as<String>();
+    config.textTemplate = doc["textTemplate"].as<String>();
+    config.staticTemplate = doc["staticTemplate"].as<String>();
+    config.animationTemplate = doc["animationTemplate"].as<String>();
+    config.hour = (uint8_t)clampInt(doc["hour"].as<int>(), 0, 23);
+    config.minute = (uint8_t)clampInt(doc["minute"].as<int>(), 0, 59);
+
+    DisplayManager::currentMode = MODE_ANIMATION;
+    DisplayManager::lastBusinessMode = MODE_ANIMATION;
+    DisplayManager::currentBusinessModeTag = "notification";
+    DisplayManager::lastBusinessModeTag = "notification";
+    ConfigManager::saveClockConfig();
+    TetrisEffect::isActive = false;
+    GameScreensaverEffect::init();
+    DisplayManager::setNativeEffectNone();
+    if (AnimationManager::currentGIF != nullptr) {
+      AnimationManager::currentGIF->isPlaying = false;
+    }
+    BoardNativeEffect::applyNotificationConfig(config);
+
+    response["message"] = "notification board applied";
+    return true;
+  }
+
+  if (cmd == "set_game_screensaver") {
+    if (!doc.containsKey("game") || !doc.containsKey("speed")) {
+      setErrorResponse(response, "missing game screensaver fields");
+      return true;
+    }
+
+    GameScreensaverConfig config = ConfigManager::gameScreensaverConfig;
+    String game = doc["game"].as<String>();
+    if (game == "maze") {
+      config.game = GAME_SCREENSAVER_MAZE;
+      if (!doc.containsKey("mazeSizeMode")) {
+        setErrorResponse(response, "missing mazeSizeMode");
+        return true;
+      }
+      String mazeSizeMode = doc["mazeSizeMode"].as<String>();
+      if (mazeSizeMode == "wide") {
+        config.mazeSizeMode = GAME_SCREENSAVER_MAZE_WIDE;
+      } else if (mazeSizeMode == "dense") {
+        config.mazeSizeMode = GAME_SCREENSAVER_MAZE_DENSE;
+      } else {
+        setErrorResponse(response, "invalid mazeSizeMode");
+        return true;
+      }
+    } else if (game == "snake") {
+      config.game = GAME_SCREENSAVER_SNAKE;
+      if (!doc.containsKey("snakeWidth")) {
+        setErrorResponse(response, "missing snakeWidth");
+        return true;
+      }
+      int snakeWidth = doc["snakeWidth"].as<int>();
+      if (snakeWidth < 1 || snakeWidth > 4) {
+        setErrorResponse(response, "invalid snakeWidth");
+        return true;
+      }
+      config.snakeWidth = (uint8_t)snakeWidth;
+    } else if (game == "ping_pong") {
+      config.game = GAME_SCREENSAVER_PING_PONG;
+    } else if (game == "tetris_game") {
+      config.game = GAME_SCREENSAVER_TETRIS_GAME;
+      if (!doc.containsKey("cellSize") || !doc.containsKey("showClock")) {
+        setErrorResponse(response, "missing tetris game fields");
+        return true;
+      }
+      int cellSize = doc["cellSize"].as<int>();
+      if (cellSize < 1 || cellSize > 3) {
+        setErrorResponse(response, "invalid cellSize");
+        return true;
+      }
+      config.cellSize = (uint8_t)cellSize;
+      config.showClock = doc["showClock"].as<bool>();
+    } else {
+      setErrorResponse(response, "invalid game");
+      return true;
+    }
+
+    int speed = doc["speed"].as<int>();
+    if (speed < 1 || speed > 10) {
+      setErrorResponse(response, "invalid speed");
+      return true;
+    }
+    config.speed = (uint8_t)speed;
+
+    ConfigManager::gameScreensaverConfig = config;
+    ConfigManager::saveGameScreensaverConfig();
+    DisplayManager::currentMode = MODE_ANIMATION;
+    DisplayManager::lastBusinessMode = MODE_ANIMATION;
+    DisplayManager::currentBusinessModeTag = "game_screensaver";
+    DisplayManager::lastBusinessModeTag = "game_screensaver";
+    ConfigManager::saveClockConfig();
+    TetrisEffect::isActive = false;
+    BoardNativeEffect::deactivate();
+    if (AnimationManager::currentGIF != nullptr) {
+      AnimationManager::currentGIF->isPlaying = false;
+    }
+    DisplayManager::setNativeEffectNone();
+    GameScreensaverEffect::applyConfig(config);
+
+    response["message"] = "game screensaver applied";
+    response["speed"] = config.speed;
+    response["game"] = game;
+    if (config.game == GAME_SCREENSAVER_SNAKE) {
+      response["snakeWidth"] = config.snakeWidth;
+    }
+    if (config.game == GAME_SCREENSAVER_MAZE) {
+      response["mazeSizeMode"] =
+        config.mazeSizeMode == GAME_SCREENSAVER_MAZE_DENSE ? "dense" : "wide";
+    }
+    if (config.game == GAME_SCREENSAVER_TETRIS_GAME) {
+      response["cellSize"] = config.cellSize;
+      response["showClock"] = config.showClock;
+    }
+    return true;
+  }
+
   (void)client;
   return false;
 }
@@ -788,7 +1282,7 @@ bool WebSocketCommandHandlers::handleEffectCommand(
 bool WebSocketCommandHandlers::handleEyesCommand(
   AsyncWebSocketClient* client,
   JsonDocument& doc,
-  StaticJsonDocument<512>& response
+  StaticJsonDocument<768>& response
 ) {
   String cmd = doc["cmd"].as<String>();
 
@@ -824,13 +1318,11 @@ bool WebSocketCommandHandlers::handleEyesCommand(
     }
 
     const char* eyeColor = style["eyeColor"];
-    const char* pupilColor = style["pupilColor"];
     const char* timeColor = style["timeColor"];
     const char* timeFont = time["font"];
     uint8_t timeFontId = 0;
     int timeFontSize = time["fontSize"].as<int>();
     if (!isHexColorText(eyeColor) ||
-        !isHexColorText(pupilColor) ||
         !isHexColorText(timeColor)) {
       setErrorResponse(response, "invalid eyes color");
       return true;
@@ -867,7 +1359,6 @@ bool WebSocketCommandHandlers::handleEyesCommand(
     nextConfig.time.fontSize = static_cast<uint8_t>(timeFontSize);
 
     memcpy(nextConfig.style.eyeColor, eyeColor, sizeof(nextConfig.style.eyeColor));
-    memcpy(nextConfig.style.pupilColor, pupilColor, sizeof(nextConfig.style.pupilColor));
     memcpy(nextConfig.style.timeColor, timeColor, sizeof(nextConfig.style.timeColor));
 
     ConfigManager::eyesConfig = nextConfig;
@@ -909,7 +1400,7 @@ bool WebSocketCommandHandlers::handleEyesCommand(
 bool WebSocketCommandHandlers::handleClockCommand(
   AsyncWebSocketClient* client,
   JsonDocument& doc,
-  StaticJsonDocument<512>& response
+  StaticJsonDocument<768>& response
 ) {
   String cmd = doc["cmd"].as<String>();
   if (cmd != "set_clock_config") {
@@ -1048,7 +1539,7 @@ bool WebSocketCommandHandlers::handleClockCommand(
 bool WebSocketCommandHandlers::handleThemeCommand(
   AsyncWebSocketClient* client,
   JsonDocument& doc,
-  StaticJsonDocument<512>& response
+  StaticJsonDocument<768>& response
 ) {
   (void)client;
 
@@ -1089,7 +1580,7 @@ bool WebSocketCommandHandlers::handleThemeCommand(
 bool WebSocketCommandHandlers::handleAnimationCommand(
   AsyncWebSocketClient* client,
   JsonDocument& doc,
-  StaticJsonDocument<512>& response,
+  StaticJsonDocument<768>& response,
   bool& responseSent
 ) {
   String cmd = doc["cmd"].as<String>();
@@ -1249,7 +1740,7 @@ bool WebSocketCommandHandlers::handleAnimationCommand(
 bool WebSocketCommandHandlers::handleCanvasCommand(
   AsyncWebSocketClient* client,
   JsonDocument& doc,
-  StaticJsonDocument<512>& response
+  StaticJsonDocument<768>& response
 ) {
   String cmd = doc["cmd"].as<String>();
 
@@ -1438,7 +1929,7 @@ bool WebSocketCommandHandlers::handleCanvasCommand(
 bool WebSocketCommandHandlers::handleOtaCommand(
   AsyncWebSocketClient* client,
   JsonDocument& doc,
-  StaticJsonDocument<512>& response,
+  StaticJsonDocument<768>& response,
   bool& responseSent
 ) {
   String cmd = doc["cmd"].as<String>();

@@ -17,7 +17,7 @@
     </view>
 
     <view class="canvas-section">
-      <view class="preview-canvas-container">
+      <view class="preview-canvas-container" :style="previewCanvasBoxStyle">
         <PixelCanvas
           v-if="previewCanvasReady"
           :width="64"
@@ -44,7 +44,7 @@
             :class="{ disabled: isSending }"
             @click="saveAndApply"
           >
-            <Icon name="link" :size="36" color="#000000" />
+            <Icon name="link" :size="36" color="var(--nb-ink)" />
             <text>{{ isSending ? "发送中" : "发送" }}</text>
           </view>
         </view>
@@ -53,90 +53,78 @@
 
     <scroll-view scroll-y class="content glx-scroll-region glx-page-shell__content" :style="{ height: contentHeight }">
       <view class="content-wrapper glx-scroll-stack">
-        <view v-show="currentTab === 0" class="tab-panel glx-tab-panel">
-          <view class="card glx-panel-card">
-            <view class="card-title-section glx-panel-head">
-              <text class="card-title glx-panel-title">屏保选择</text>
-            </view>
-            <view class="scene-grid">
-              <view
-                v-for="preset in presets"
-                :key="preset.value"
-                class="scene-option glx-feature-option"
-                :class="{ active: config.preset === preset.value }"
-                @click="applyPreset(preset)"
-              >
-                <text class="scene-option-name">{{ preset.label }}</text>
-              </view>
-            </view>
+        <view class="card glx-panel-card glx-editor-card">
+          <view class="card-title-section glx-panel-head">
+            <text class="card-title glx-panel-title">屏保选择</text>
           </view>
-
-          <view class="card glx-panel-card">
-            <view class="card-title-section glx-panel-head">
-              <text class="card-title glx-panel-title">当前场景</text>
-              <text class="card-subtitle glx-panel-subtitle">{{ currentPresetTag }}</text>
+          <view class="scene-grid">
+            <view
+              v-for="preset in presets"
+              :key="preset.value"
+              class="glx-feature-option glx-feature-option--scene"
+              :class="{ active: config.preset === preset.value }"
+              @click="applyPreset(preset)"
+            >
+              <text class="glx-feature-option__label">{{ preset.label }}</text>
             </view>
-            <text class="card-tip-text">{{ currentPresetHint }}</text>
           </view>
         </view>
 
-        <view v-show="currentTab === 1" class="tab-panel glx-tab-panel">
-          <view class="card glx-panel-card">
-            <view class="card-title-section glx-panel-head">
-              <text class="card-title glx-panel-title">场景参数</text>
-            </view>
+        <view class="card glx-panel-card glx-editor-card">
+          <view class="card-title-section glx-panel-head">
+            <text class="card-title glx-panel-title">场景参数</text>
+          </view>
 
-            <view class="form-row">
-              <text class="form-label">速度 {{ config.speed }}</text>
-              <GlxSlider
-                :value="config.speed"
-                :min="1"
-                :max="10"
-                :step="1"
-                @change="handleSpeedChange"
-              />
-            </view>
+          <view class="form-row">
+            <text class="form-label">速度 {{ config.speed }}</text>
+            <GlxStepper
+              :value="config.speed"
+              :min="1"
+              :max="10"
+              :step="1"
+              @change="handleSpeedChange"
+            />
+          </view>
 
-            <view class="form-row">
-              <text class="form-label">强度 {{ config.intensity }}</text>
-              <GlxSlider
-                :value="config.intensity"
-                :min="10"
-                :max="100"
-                :step="1"
-                @change="handleIntensityChange"
-              />
-            </view>
+          <view v-if="!isRainPreset" class="form-row">
+            <text class="form-label">强度 {{ config.intensity }}</text>
+            <GlxSlider
+              :value="config.intensity"
+              :min="10"
+              :max="100"
+              :step="1"
+              @change="handleIntensityChange"
+            />
+          </view>
 
-            <view class="form-row inline-row">
-              <text class="form-label">循环</text>
-              <view class="toggle-switch" @click="config.loop = !config.loop">
-                <view class="glx-switch-shell" :class="{ active: config.loop }">
-                  <view class="glx-switch-thumb"></view>
-                </view>
-              </view>
-            </view>
+          <view v-if="isRainPreset" class="form-row">
+            <text class="form-label">密度 {{ config.density }}</text>
+            <GlxSlider
+              :value="config.density"
+              :min="10"
+              :max="100"
+              :step="1"
+              @change="handleDensityChange"
+            />
+          </view>
+
+          <view v-if="isRainPreset" class="form-row color-picker-row">
+            <text class="form-label">颜色</text>
+            <ColorPanelPicker
+              :value="config.color"
+              label="雨滴颜色"
+              :preset-colors="rainPresetColors"
+              @change="handleRainColorChange"
+            />
+          </view>
+
+          <view class="form-row inline-row">
+            <text class="form-label">循环</text>
+            <GlxSwitch class="glx-row-switch" :checked="config.loop" @change="config.loop = $event.detail.value" />
           </view>
         </view>
       </view>
     </scroll-view>
-
-    <view class="bottom-tabs">
-      <view
-        v-for="(tab, index) in tabs"
-        :key="tab"
-        class="bottom-tab-item"
-        :class="{ active: currentTab === index }"
-        @click="currentTab = index"
-      >
-        <Icon
-          :name="tabIconNames[index]"
-          :size="36"
-          :color="currentTab === index ? '#000000' : '#6b7280'"
-        />
-        <text class="bottom-tab-text">{{ tab }}</text>
-      </view>
-    </view>
 
     <Toast ref="toastRef" />
   </view>
@@ -148,11 +136,96 @@ import Icon from "../../components/Icon.vue";
 import Toast from "../../components/Toast.vue";
 import PixelCanvas from "../../components/PixelCanvas.vue";
 import GlxSlider from "../../components/GlxSlider.vue";
+import GlxStepper from "../../components/GlxStepper.vue";
+import ColorPanelPicker from "../../components/ColorPanelPicker.vue";
+import GlxSwitch from "../../components/GlxSwitch.vue";
 import { useDeviceStore } from "../../store/device.js";
 import { useToast } from "../../composables/useToast.js";
 import { buildAmbientPreviewFrames } from "../../utils/ambientEffectPreview.js";
 
 const AMBIENT_CONFIG_KEY = "ambient_effect_config";
+const SOURCE_AMBIENT_PRESETS = [
+  { value: "clock_scene", label: "场景时钟" },
+  { value: "starfield", label: "星空漂移" },
+  { value: "metablob", label: "流体团块" },
+  { value: "digital_rain", label: "数字雨" },
+  { value: "neon_tunnel", label: "霓虹隧道" },
+  { value: "boids", label: "群游粒子" },
+  { value: "falling_sand", label: "流沙" },
+  { value: "sorting_visualizer", label: "排序柱阵" },
+  { value: "bouncing_logo", label: "弹跳徽标" },
+  { value: "game_of_life", label: "生命游戏" },
+  { value: "julia_set", label: "朱莉亚集" },
+  { value: "wave_pattern", label: "波纹图案" },
+  { value: "watermelon_plasma", label: "西瓜等离子" },
+  { value: "rain_scene", label: "雨幕" },
+  { value: "sparks", label: "火花" },
+];
+
+function createDefaultAmbientConfig() {
+  return {
+    preset: "digital_rain",
+    speed: 6,
+    intensity: 72,
+    density: 72,
+    color: "#64c8ff",
+    loop: true,
+  };
+}
+
+function normalizeAmbientConfig(saved) {
+  const base = createDefaultAmbientConfig();
+  if (!saved || typeof saved !== "object") {
+    return base;
+  }
+
+  const normalized = {
+    preset: base.preset,
+    speed: base.speed,
+    intensity: base.intensity,
+    density: base.density,
+    color: base.color,
+    loop: base.loop,
+  };
+
+  if (
+    typeof saved.preset === "string" &&
+    SOURCE_AMBIENT_PRESETS.some((item) => item.value === saved.preset)
+  ) {
+    normalized.preset = saved.preset;
+  }
+
+  if (Number.isFinite(Number(saved.speed))) {
+    const speed = Math.round(Number(saved.speed));
+    if (speed >= 1 && speed <= 10) {
+      normalized.speed = speed;
+    }
+  }
+
+  if (Number.isFinite(Number(saved.intensity))) {
+    const intensity = Math.round(Number(saved.intensity));
+    if (intensity >= 10 && intensity <= 100) {
+      normalized.intensity = intensity;
+    }
+  }
+
+  if (Number.isFinite(Number(saved.density))) {
+    const density = Math.round(Number(saved.density));
+    if (density >= 10 && density <= 100) {
+      normalized.density = density;
+    }
+  }
+
+  if (typeof saved.color === "string") {
+    normalized.color = saved.color;
+  }
+
+  if (typeof saved.loop === "boolean") {
+    normalized.loop = saved.loop;
+  }
+
+  return normalized;
+}
 
 export default {
   mixins: [statusBarMixin],
@@ -161,13 +234,16 @@ export default {
     Toast,
     PixelCanvas,
     GlxSlider,
+    GlxStepper,
+    ColorPanelPicker,
+    GlxSwitch,
   },
   data() {
     return {
       deviceStore: null,
       toast: null,
       isSending: false,
-      contentHeight: "calc(100vh - 88rpx - 520rpx - 112rpx)",
+      contentHeight: "calc(100vh - 88rpx - 520rpx)",
       previewCanvasReady: false,
       previewZoom: 4,
       previewOffset: { x: 0, y: 0 },
@@ -175,35 +251,16 @@ export default {
       previewFrameMaps: [],
       previewFrameIndex: 0,
       previewTimer: null,
-      currentTab: 0,
-      tabs: ["场景", "参数"],
-      tabIconNames: ["browse", "setting"],
-      presets: [
-        { value: "digital_rain", label: "数字雨", tag: "字符", hint: "科技感最强，适合常亮待机" },
-        { value: "starfield", label: "星空漂移", tag: "夜间", hint: "暗底星点缓慢闪烁，适合夜里展示" },
-        { value: "neon_tunnel", label: "霓虹隧道", tag: "纵深", hint: "中间向里收，画面更有空间感" },
-        { value: "metablob", label: "流体团块", tag: "流体", hint: "像液体一样聚合分离，层次更自然" },
-        { value: "falling_sand", label: "流沙", tag: "颗粒", hint: "细颗粒往下落，适合做静置屏保" },
-        { value: "sparks", label: "火花", tag: "暖色", hint: "从底部往外冒，动态更有生命感" },
-        { value: "wave_pattern", label: "波纹图案", tag: "规律", hint: "图案化流动，适合简洁桌搭风格" },
-        { value: "rain_scene", label: "雨幕", tag: "天气", hint: "偏真实雨幕感，整体更克制" },
-        { value: "watermelon_plasma", label: "西瓜等离子", tag: "高彩", hint: "红绿交错的高彩流动，画面更活" },
-        { value: "boids", label: "群游粒子", tag: "集群", hint: "像小鱼群一样绕场流动，更有生命感" },
-        { value: "bouncing_logo", label: "弹跳徽标", tag: "品牌", hint: "九宫格徽标在屏里弹跳，更适合展示台面" },
-        { value: "sorting_visualizer", label: "排序柱阵", tag: "算法", hint: "柱条不断交换重排，节奏感更强" },
-        { value: "clock_scene", label: "场景时钟", tag: "时钟", hint: "用 led-matrix 场景时钟的方式展示当前时间" },
-        { value: "countdown_scene", label: "倒计时", tag: "读数", hint: "大字倒计时配进度条，适合展示状态" },
-        { value: "weather_scene", label: "天气场景", tag: "信息", hint: "天气图标和温度同屏，更像内容场景" },
-        { value: "game_of_life", label: "生命游戏", tag: "细胞", hint: "经典细胞自动机，适合做算法屏保" },
-        { value: "julia_set", label: "朱莉亚集", tag: "分形", hint: "分形纹理持续变形，细节更多" },
-        { value: "reaction_diffusion", label: "反应扩散", tag: "生长", hint: "像细胞纹路一样蔓延，质感更强" },
+      presets: SOURCE_AMBIENT_PRESETS,
+      config: createDefaultAmbientConfig(),
+      rainPresetColors: [
+        { hex: "#64c8ff" },
+        { hex: "#89dcff" },
+        { hex: "#36cfff" },
+        { hex: "#7fd8ff" },
+        { hex: "#8ee7f2" },
+        { hex: "#4f7fff" },
       ],
-      config: {
-        preset: "digital_rain",
-        speed: 6,
-        intensity: 72,
-        loop: true,
-      },
     };
   },
   computed: {
@@ -216,39 +273,19 @@ export default {
       }
       return this.previewFrameMaps[this.previewFrameIndex];
     },
-    currentPreset() {
-      const current = this.presets.find((item) => item.value === this.config.preset);
-      if (!current) {
-        return this.presets[0];
-      }
-      return current;
-    },
-    currentPresetTag() {
-      return this.currentPreset ? this.currentPreset.tag : "";
-    },
-    currentPresetHint() {
-      return this.currentPreset ? this.currentPreset.hint : "";
-    },
-    previewStatusLabel() {
-      if (this.isSending) {
-        return "发送中";
-      }
-      if (!this.previewCanvasReady) {
-        return "加载中";
-      }
-      return "就绪";
-    },
-    previewStatusClass() {
-      if (this.isSending) {
-        return "is-sending";
-      }
-      if (!this.previewCanvasReady) {
-        return "is-loading";
-      }
-      return "is-preview";
-    },
     previewInterval() {
       return Math.max(70, 164 - Number(this.config.speed) * 10);
+    },
+    previewCanvasBoxStyle() {
+      const size = this.previewContainerSize && this.previewContainerSize.height
+        ? this.previewContainerSize.height
+        : 320;
+      return {
+        height: `${size}px`,
+      };
+    },
+    isRainPreset() {
+      return this.config.preset === "rain_scene";
     },
   },
   watch: {
@@ -263,13 +300,7 @@ export default {
     this.deviceStore = useDeviceStore();
     this.deviceStore.init();
     this.toast = useToast();
-    const saved = uni.getStorageSync(AMBIENT_CONFIG_KEY);
-    if (saved && typeof saved === "object") {
-      this.config = {
-        ...this.config,
-        ...saved,
-      };
-    }
+    this.config = normalizeAmbientConfig(uni.getStorageSync(AMBIENT_CONFIG_KEY));
   },
   onReady() {
     if (this.$refs.toastRef) {
@@ -314,6 +345,12 @@ export default {
     },
     handleIntensityChange(event) {
       this.config.intensity = Number(event.detail.value);
+    },
+    handleDensityChange(event) {
+      this.config.density = Number(event.detail.value);
+    },
+    handleRainColorChange(value) {
+      this.config.color = value;
     },
     refreshPreview() {
       if (!this.previewCanvasReady) {
@@ -379,80 +416,10 @@ export default {
   background-color: #1a1a1a;
 }
 
-.canvas-section {
-  display: flex;
-  flex-direction: column;
-  background: #000000;
-  border-bottom: 2rpx solid var(--nb-ink);
-}
-
-.preview-canvas-container {
-  width: 100%;
-  aspect-ratio: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  background: #000000;
-}
-
-.preview-caption {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12rpx;
-  padding: 10rpx 16rpx 12rpx;
-  background: var(--bg-tertiary);
-}
-
-.preview-caption-info {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-}
-
 .preview-title {
   font-size: 24rpx;
   font-weight: 700;
   color: var(--text-primary);
-}
-
-.preview-actions {
-  display: flex;
-  align-items: center;
-  gap: 12rpx;
-  flex-shrink: 0;
-}
-
-.action-btn-sm {
-  min-width: 118rpx;
-  height: 64rpx;
-  padding: 0 18rpx;
-  border-radius: 0;
-  background: var(--bg-tertiary);
-  border: 2rpx solid var(--nb-ink);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10rpx;
-}
-
-.action-btn-sm.primary {
-  background: var(--nb-yellow);
-}
-
-.action-btn-sm.disabled {
-  opacity: 0.45;
-}
-
-.action-btn-sm text {
-  font-size: 24rpx;
-  color: var(--nb-ink);
-  font-weight: 600;
-}
-
-.action-btn-sm.primary text {
-  color: #000000;
 }
 
 .content {
@@ -461,95 +428,10 @@ export default {
   padding: 16rpx 20rpx 0;
 }
 
-.content-wrapper {
-  padding: 0 0 56rpx;
-  display: flex;
-  flex-direction: column;
-  gap: 20rpx;
-}
-
-.tab-panel {
-  display: flex;
-  flex-direction: column;
-  gap: 20rpx;
-}
-
-.card {
-  background: transparent;
-  border: 0 !important;
-  border-radius: 0;
-  padding-top: 16rpx;
-  box-shadow: none !important;
-}
-
-.card-title-section {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8rpx;
-  margin-bottom: 14rpx;
-}
-
-.card-title {
-  font-size: 22rpx;
-  font-weight: 500;
-  color: var(--text-primary);
-}
-
-.card-subtitle {
-  font-size: 20rpx;
-  color: var(--text-secondary);
-}
-
-.card-tip-text {
-  font-size: 22rpx;
-  line-height: 1.65;
-  color: var(--text-secondary);
-}
-
 .scene-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 14rpx;
-}
-
-.scene-option {
-  width: auto;
-  min-height: 92rpx;
-  padding: 0 10rpx;
-  border-radius: 0;
-  background: #ffffff;
-  border: 2rpx solid #000000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-sizing: border-box;
-}
-
-.scene-option.active {
-  background: var(--nb-yellow);
-  border-color: var(--nb-ink);
-  box-shadow: none;
-}
-
-.scene-option-name {
-  font-size: 22rpx;
-  color: var(--text-secondary);
-  text-align: center;
-  line-height: 1.3;
-}
-
-.scene-option.active .scene-option-name {
-  color: #000000;
-  font-weight: 700;
-  font-size: 23rpx;
-}
-
-.form-row {
-  display: flex;
-  flex-direction: column;
-  gap: 12rpx;
-  margin-bottom: 16rpx;
 }
 
 .form-row:last-child {
@@ -562,53 +444,4 @@ export default {
   justify-content: space-between;
 }
 
-.form-label {
-  font-size: 24rpx;
-  color: var(--nb-ink);
-}
-
-.toggle-switch {
-  display: inline-flex;
-  align-items: center;
-}
-
-.bottom-tabs {
-  display: flex;
-  flex-shrink: 0;
-  padding: 2rpx 10rpx 0;
-  padding-bottom: var(--layout-bottom-offset);
-  background-color: var(--bg-elevated);
-  border-top: 2rpx solid var(--nb-ink);
-  gap: 2rpx;
-}
-
-.bottom-tab-item {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 2rpx;
-  min-height: 68rpx;
-}
-
-.bottom-tab-item.active {
-  background-color: transparent;
-}
-
-.bottom-tab-text {
-  font-size: 20rpx;
-  color: var(--text-secondary);
-}
-
-.bottom-tab-item.active .bottom-tab-text {
-  color: #000000;
-  font-weight: 700;
-  font-size: 22rpx;
-}
-
-.bottom-tab-item.active :deep(.iconfont) {
-  color: #000000 !important;
-  font-size: 40rpx !important;
-}
 </style>

@@ -93,7 +93,7 @@
               v-if="board.progress && board.progress.completion >= 1"
               class="complete-badge"
             >
-              <Icon name="check-item" :size="28" color="#000000" />
+              <Icon name="check-item" :size="28" color="var(--nb-ink)" />
             </view>
 
             <!-- 进度条 -->
@@ -128,24 +128,22 @@
           class="export-button"
           @click="handleBatchExport"
         >
-          <Icon name="download" :size="32" color="#000000" />
+          <Icon name="download" :size="32" color="var(--nb-ink)" />
           <text class="export-text">导出完整图纸</text>
         </view>
         <view class="footer-action-group">
           <view
-            class="footer-mini-btn"
-            style="background: #4f7fff"
+            class="footer-mini-btn footer-mini-btn--edit"
             @click="handleEdit"
           >
-            <Icon name="edit" :size="26" color="#ffffff" />
+            <Icon name="edit" :size="26" color="currentColor" />
             <text class="footer-mini-btn-text">编辑</text>
           </view>
           <view
-            class="footer-mini-btn"
-            style="background: #d92d20"
+            class="footer-mini-btn footer-mini-btn--danger"
             @click="handleDeleteClick"
           >
-            <Icon name="ashbin" :size="26" color="#ffffff" />
+            <Icon name="ashbin" :size="26" color="currentColor" />
             <text class="footer-mini-btn-text">删除</text>
           </view>
         </view>
@@ -198,12 +196,12 @@
 
         <view class="modal-actions">
           <view class="modal-action-btn primary" @click="goToEditor">
-            <Icon name="edit" :size="36" color="#000000" />
+            <Icon name="edit" :size="36" color="var(--nb-ink)" />
             <text class="modal-action-text">编辑 (绘图模式)</text>
           </view>
 
           <view class="modal-action-btn secondary" @click="goToAssist">
-            <Icon name="work" :size="36" color="#000000" />
+            <Icon name="work" :size="36" color="var(--nb-ink)" />
             <text class="modal-action-text">辅助拼豆模式</text>
           </view>
 
@@ -212,7 +210,7 @@
             class="modal-action-btn tertiary"
             @click="exportBoard"
           >
-            <Icon name="download" :size="36" color="#000000" />
+            <Icon name="download" :size="36" color="var(--nb-ink)" />
             <text class="modal-action-text">导出此画布</text>
           </view>
         </view>
@@ -225,16 +223,13 @@
       class="modal-overlay"
       @click="showDeleteConfirm = false"
     >
-      <view class="confirm-modal" @click.stop>
-        <view class="confirm-icon">
+      <view class="confirm-modal confirm-modal--danger" @click.stop>
+        <view class="confirm-icon confirm-icon--danger">
           <Icon name="ashbin" :size="96" />
         </view>
         <text class="confirm-title">删除画布？</text>
-        <text class="confirm-desc"
-          >您确定要删除 "{{ project?.name }}" 吗？<text class="confirm-warning"
-            >此操作无法撤销，所有设计数据将永久丢失。</text
-          ></text
-        >
+        <text class="confirm-desc">您确定要删除 "{{ project?.name }}" 吗？</text>
+        <text class="confirm-warning">此操作无法撤销，所有设计数据将永久丢失。</text>
 
         <view class="confirm-actions">
           <view class="confirm-btn cancel" @click="showDeleteConfirm = false">
@@ -295,9 +290,9 @@
       class="modal-overlay"
       @click="showExportConfirm = false"
     >
-      <view class="confirm-modal" @click.stop>
-        <view class="confirm-icon">
-          <Icon name="download" :size="96" color="#00f3ff" />
+      <view class="confirm-modal confirm-modal--primary" @click.stop>
+        <view class="confirm-icon confirm-icon--primary">
+          <Icon name="download" :size="96" color="var(--nb-blue)" />
         </view>
         <text class="confirm-title">{{
           exportType === "batch" ? "导出完整图纸？" : "导出此画布？"
@@ -718,10 +713,6 @@ export default {
   transform: translateY(-50%);
 }
 
-.back-btn:active {
-  transform: translate(2rpx, calc(-50% + 2rpx));
-}
-
 .back-icon {
   font-size: 64rpx;
   color: var(--text-primary);
@@ -750,36 +741,25 @@ export default {
 }
 
 .search-section {
-  background-color: var(--bg-elevated);
+  background-color: var(--nb-paper);
   border-bottom: 2rpx solid var(--nb-ink);
   z-index: 25;
+  padding: 12rpx 24rpx 14rpx;
 }
 
-.search-bar {
-  padding: 20rpx 32rpx 24rpx;
+.search-bar.glx-search-shell {
+  min-height: 0 !important;
+  padding: 0 !important;
 }
 
 .search-input-wrapper {
-  display: flex;
-  align-items: center;
-  gap: 16rpx;
-  min-height: 84rpx;
-  background-color: #ffffff;
-  border: 4rpx solid #000000;
-  border-radius: 0;
-  padding: 0 24rpx;
-  transition: var(--transition-base);
-  box-shadow: none;
-}
-
-.search-input-wrapper:focus-within {
-  border-color: #000000;
-  box-shadow: none;
+  width: 100%;
+  min-height: 80rpx !important;
 }
 
 .search-input {
   flex: 1;
-  min-height: 84rpx;
+  min-height: 80rpx;
   font-size: 28rpx;
   color: var(--text-primary);
   background-color: transparent;
@@ -792,8 +772,8 @@ export default {
 }
 
 .clear-btn {
-  width: 48rpx;
-  height: 48rpx;
+  width: 44rpx;
+  height: 44rpx;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -804,7 +784,6 @@ export default {
 
 .clear-btn:active {
   background-color: var(--nb-yellow);
-  transform: translate(2rpx, 2rpx);
 }
 
 .sidebar-index {
@@ -850,7 +829,6 @@ export default {
 
 .index-item:active {
   background-color: var(--nb-yellow);
-  transform: scale(1.1);
 }
 
 .index-text {
@@ -877,7 +855,7 @@ export default {
 
 .board-grid-wrapper {
   display: inline-block;
-  padding: 64rpx 48rpx 360rpx;
+  padding: 44rpx 40rpx 332rpx;
   min-height: 100%;
 }
 
@@ -904,7 +882,6 @@ export default {
 }
 
 .board-card:active {
-  transform: scale(0.98);
   border-color: #000000;
   box-shadow: none;
 }
@@ -1027,29 +1004,30 @@ export default {
   bottom: 0;
   left: 0;
   right: 0;
-  padding: 20rpx 32rpx 32rpx;
+  padding: 16rpx 24rpx 24rpx;
   background-color: #ffffff;
   border-top: 3rpx solid #000000;
   z-index: 30;
   display: flex;
   flex-direction: column;
-  gap: 16rpx;
+  gap: 12rpx;
 }
 
 .footer-actions {
   display: flex;
   align-items: stretch;
-  gap: 16rpx;
+  gap: 12rpx;
 }
 
 .export-button {
   flex: 1;
+  min-height: 84rpx;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 16rpx;
-  padding: 20rpx 24rpx;
-  background-color: #ffd23f;
+  padding: 0 24rpx;
+  background-color: var(--nb-yellow);
   border: 3rpx solid #000000;
   border-radius: 0;
   box-shadow: 2rpx 2rpx 0 #000000;
@@ -1059,7 +1037,6 @@ export default {
 
 .export-button:active {
   opacity: 0.9;
-  transform: translate(2rpx, 2rpx);
   box-shadow: none;
 }
 
@@ -1075,9 +1052,9 @@ export default {
 }
 
 .footer-mini-btn {
-  min-width: 132rpx;
+  min-width: 128rpx;
   min-height: 84rpx;
-  padding: 0 20rpx;
+  padding: 0 24rpx;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1086,17 +1063,27 @@ export default {
   border-radius: 0;
   box-shadow: 2rpx 2rpx 0 #000000;
   box-sizing: border-box;
+  color: #ffffff;
+}
+
+.footer-mini-btn--edit {
+  background: var(--nb-blue);
+  color: #ffffff;
+}
+
+.footer-mini-btn--danger {
+  background: var(--nb-coral);
+  color: #ffffff;
 }
 
 .footer-mini-btn:active {
-  transform: translate(2rpx, 2rpx);
   box-shadow: none;
 }
 
 .footer-mini-btn-text {
   font-size: 26rpx;
   font-weight: 900;
-  color: #ffffff;
+  color: currentColor;
 }
 
 .export-button .iconfont,
@@ -1115,7 +1102,7 @@ export default {
 
 .stat-label {
   font-size: 24rpx;
-  color: #4a4a4a;
+  color: var(--text-secondary);
   font-family: monospace;
 }
 
@@ -1178,12 +1165,12 @@ export default {
 .action-modal {
   width: 100%;
   max-width: 600rpx;
-  background-color: var(--bg-tertiary);
-  border: 2rpx solid var(--nb-yellow);
-  border-radius: 32rpx;
+  background-color: var(--nb-surface);
+  border: 2rpx solid var(--nb-ink);
+  border-radius: 0;
   padding: 64rpx 32rpx;
   position: relative;
-  box-shadow: var(--nb-shadow-strong);
+  box-shadow: var(--shadow-modal);
   animation: scaleIn var(--transition-base);
   box-sizing: border-box;
 }
@@ -1204,11 +1191,14 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
+  background: var(--tone-paper-soft);
+  border: 2rpx solid var(--nb-ink);
+  box-shadow: var(--nb-shadow-soft);
 }
 
 .close-icon {
   font-size: 40rpx;
-  color: var(--text-secondary);
+  color: var(--nb-ink);
 }
 
 .modal-board-id {
@@ -1223,7 +1213,7 @@ export default {
 
 .modal-subtitle {
   font-size: 24rpx;
-  color: var(--text-secondary);
+  color: var(--text-tertiary);
   text-align: center;
   display: block;
   margin-bottom: 64rpx;
@@ -1245,10 +1235,6 @@ export default {
   transition: var(--transition-base);
 }
 
-.modal-action-btn:active {
-  transform: scale(0.98);
-}
-
 /* 主操作按钮：黄底黑字黑图标 */
 .modal-action-btn.primary {
   background-color: var(--nb-yellow);
@@ -1267,15 +1253,17 @@ export default {
 
 /* 次级按钮：白底黑字，黄边强调 */
 .modal-action-btn.secondary {
-  background-color: #ffffff;
-  border: 2rpx solid var(--nb-yellow);
+  background-color: var(--tone-blue-soft);
+  border: 2rpx solid var(--nb-ink);
   color: #000000;
+  box-shadow: var(--nb-shadow-soft);
 }
 
 .modal-action-btn.tertiary {
-  background-color: #ffffff;
-  border: 2rpx solid var(--nb-yellow);
+  background-color: var(--tone-green-soft);
+  border: 2rpx solid var(--nb-ink);
   color: #000000;
+  box-shadow: var(--nb-shadow-soft);
 }
 
 .modal-action-icon {
@@ -1294,15 +1282,15 @@ export default {
 
 .confirm-modal {
   width: 100%;
-  max-width: 600rpx;
-  background-color: var(--bg-tertiary);
-  border: 2rpx solid rgba(255, 51, 51, 0.5);
-  border-radius: 32rpx;
-  padding: 64rpx 32rpx;
+  max-width: 620rpx;
+  background-color: var(--nb-surface);
+  border: 2rpx solid var(--nb-ink);
+  border-radius: 0;
+  padding: 52rpx 32rpx 32rpx;
   display: flex;
   flex-direction: column;
   align-items: center;
-  box-shadow: var(--nb-shadow-strong);
+  box-shadow: var(--shadow-modal);
   animation: scaleIn var(--transition-base);
   box-sizing: border-box;
 }
@@ -1310,20 +1298,36 @@ export default {
 /* 小程序减小padding */
 /* #ifdef MP-WEIXIN */
 .confirm-modal {
-  padding: 48rpx 24rpx;
+  padding: 44rpx 24rpx 24rpx;
 }
 /* #endif */
 
 .confirm-icon {
   font-size: 96rpx;
-  margin-bottom: 32rpx;
+  margin-bottom: 28rpx;
+  width: 120rpx;
+  height: 120rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2rpx solid var(--nb-ink);
+  box-shadow: var(--nb-shadow-soft);
+}
+
+.confirm-icon--danger {
+  background: var(--nb-coral);
+  color: #ffffff;
+}
+
+.confirm-icon--primary {
+  background: var(--tone-yellow-soft);
 }
 
 .confirm-title {
-  font-size: 40rpx;
+  font-size: 38rpx;
   font-weight: bold;
   color: var(--text-primary);
-  margin-bottom: 16rpx;
+  margin-bottom: 14rpx;
   text-align: center;
 }
 
@@ -1331,26 +1335,29 @@ export default {
   font-size: 28rpx;
   color: var(--text-secondary);
   text-align: center;
-  margin-bottom: 64rpx;
+  margin-bottom: 14rpx;
   line-height: 1.6;
 }
 
 .confirm-warning {
   display: block;
-  color: var(--error-color);
+  color: var(--nb-coral);
   font-size: 24rpx;
-  margin-top: 16rpx;
+  line-height: 1.5;
+  font-weight: 700;
+  text-align: center;
+  margin-bottom: 28rpx;
 }
 
 .confirm-actions {
   width: 100%;
   display: flex;
-  gap: 24rpx;
+  gap: 16rpx;
 }
 
 .confirm-btn {
   flex: 1;
-  min-height: 88rpx;
+  min-height: 84rpx;
   padding: 0 24rpx;
   border-radius: 0;
   text-align: center;
@@ -1362,8 +1369,12 @@ export default {
   box-shadow: 2rpx 2rpx 0 var(--nb-ink);
 }
 
+.confirm-btn:active {
+  box-shadow: none;
+}
+
 .confirm-btn.cancel {
-  background-color: var(--bg-tertiary);
+  background-color: var(--tone-paper-soft);
 }
 
 .confirm-btn.primary {
@@ -1371,7 +1382,7 @@ export default {
 }
 
 .confirm-btn.danger {
-  background-color: #d92d20;
+  background-color: var(--nb-coral);
 }
 
 .confirm-btn-text {

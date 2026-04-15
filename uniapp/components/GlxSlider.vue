@@ -12,8 +12,8 @@
       :activeColor="nativeActiveColor"
       :backgroundColor="nativeBackgroundColor"
       :block-size="1"
-      @change="$emit('change', $event)"
-      @changing="$emit('changing', $event)"
+      @change="handleChange"
+      @changing="handleChanging"
     />
   </view>
 </template>
@@ -47,13 +47,52 @@ export default {
       default: "rgba(0,0,0,0)",
     },
   },
+  data() {
+    return {
+      displayValue: 0,
+    };
+  },
+  watch: {
+    value: {
+      immediate: true,
+      handler(newValue) {
+        this.displayValue = this.normalizeValue(newValue);
+      },
+    },
+  },
   computed: {
     percent() {
       const range = this.max - this.min;
       if (range <= 0) {
         return 0;
       }
-      return ((this.value - this.min) / range) * 100;
+      return ((this.displayValue - this.min) / range) * 100;
+    },
+  },
+  methods: {
+    normalizeValue(value) {
+      if (typeof value !== "number" || Number.isNaN(value)) {
+        return this.min;
+      }
+      if (value < this.min) {
+        return this.min;
+      }
+      if (value > this.max) {
+        return this.max;
+      }
+      return value;
+    },
+    handleChanging(event) {
+      const nextValue =
+        event && event.detail ? this.normalizeValue(event.detail.value) : this.min;
+      this.displayValue = nextValue;
+      this.$emit("changing", event);
+    },
+    handleChange(event) {
+      const nextValue =
+        event && event.detail ? this.normalizeValue(event.detail.value) : this.min;
+      this.displayValue = nextValue;
+      this.$emit("change", event);
     },
   },
 };
@@ -62,7 +101,9 @@ export default {
 <style scoped>
 .glx-slider {
   position: relative;
-  height: 52rpx;
+  height: 60rpx;
+  padding: 0 18rpx;
+  box-sizing: border-box;
 }
 
 .glx-slider__track,
@@ -70,38 +111,45 @@ export default {
   position: absolute;
   top: 50%;
   transform: translateY(-50%);
-  height: 10rpx;
+  height: 14rpx;
   box-sizing: border-box;
 }
 
 .glx-slider__track {
-  left: 0;
-  right: 0;
+  left: 18rpx;
+  right: 18rpx;
   background: #ffffff;
   border: 2rpx solid #000000;
+  box-shadow: 3rpx 3rpx 0 #000000;
 }
 
 .glx-slider__fill {
-  left: 0;
+  left: 18rpx;
   background: #ffd23f;
   border: 2rpx solid #000000;
   border-right: 0;
+  transition: width 0.06s linear;
 }
 
 .glx-slider__thumb {
   position: absolute;
   top: 50%;
-  width: 36rpx;
-  height: 36rpx;
+  width: 44rpx;
+  height: 44rpx;
   transform: translateY(-50%);
   background: #ffd23f;
   border: 2rpx solid #000000;
+  box-shadow: 3rpx 3rpx 0 #000000;
   box-sizing: border-box;
+  transition: left 0.06s linear;
 }
 
 .glx-slider__native {
   position: absolute;
-  inset: 0;
+  top: 0;
+  right: 18rpx;
+  bottom: 0;
+  left: 18rpx;
   opacity: 0;
 }
 </style>

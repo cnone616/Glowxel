@@ -147,44 +147,60 @@ async function handleClear() {
 
 <style scoped>
 .device-page {
-  padding: 36px 0 56px;
+  padding: 28px 0 72px;
 }
 
 .page-header {
-  margin-bottom: 16px;
+  margin-bottom: 20px;
+  padding: 24px 24px 20px;
+  border: 3px solid var(--nb-ink);
+  background: linear-gradient(180deg, var(--nb-paper) 0%, var(--tone-yellow-soft) 100%);
+  box-shadow: var(--nb-shadow-card);
 }
 
 .page-title {
-  font-size: 30px;
-  font-weight: 700;
-  color: var(--color-text-primary);
+  font-size: 34px;
+  font-weight: 900;
+  line-height: 1.05;
+  color: var(--nb-ink);
+  letter-spacing: -0.03em;
 }
 
 .page-desc {
-  margin-top: 6px;
-  color: var(--color-text-muted);
-  font-size: 14px;
+  max-width: 640px;
+  margin-top: 10px;
+  color: var(--text-secondary);
+  font-size: 15px;
+  line-height: 1.6;
 }
 
 .card {
-  background: #fff;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  padding: 20px;
-  box-shadow: var(--shadow-sm);
-  margin-bottom: 14px;
+  position: relative;
+  margin-bottom: 16px;
+  padding: 22px;
+  border: 3px solid var(--nb-ink);
+  background: var(--tone-paper-soft);
+  box-shadow: var(--nb-shadow-card);
 }
 
 .card-title {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  margin-bottom: 16px;
+  padding: 6px 14px;
+  border: 3px solid var(--nb-ink);
+  background: var(--nb-blue);
+  color: var(--nb-ink);
   font-size: 18px;
-  font-weight: 600;
-  margin-bottom: 14px;
+  font-weight: 900;
+  letter-spacing: 0.01em;
 }
 
 .connection-form {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 110px auto;
-  gap: 10px;
+  grid-template-columns: minmax(0, 1.4fr) 120px auto;
+  gap: 12px;
   margin-bottom: 14px;
   align-items: end;
 }
@@ -192,20 +208,22 @@ async function handleClear() {
 .field {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
 }
 
 .field span {
   font-size: 12px;
-  color: var(--color-text-muted);
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+  text-transform: uppercase;
 }
 
 .field input {
-  height: 36px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  padding: 0 10px;
+  min-height: 46px;
+  padding: 0 14px;
   font-size: 14px;
+  font-weight: 700;
 }
 
 .field-port input {
@@ -213,92 +231,136 @@ async function handleClear() {
 }
 
 .secure-switch {
-  height: 36px;
+  min-height: 46px;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  color: var(--color-text-secondary);
+  gap: 10px;
+  padding: 0 14px;
+  border: 3px solid var(--nb-ink);
+  background: var(--tone-paper-soft);
+  color: var(--nb-ink);
   font-size: 13px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.secure-switch input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--nb-yellow);
 }
 
 .actions {
   display: flex;
-  gap: 8px;
+  gap: 10px;
   flex-wrap: wrap;
 }
 
 .status {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-top: 12px;
-  color: var(--color-text-secondary);
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 16px;
+  color: var(--text-secondary);
   font-size: 13px;
+  font-weight: 700;
 }
 
 .dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #bbb;
+  width: 14px;
+  height: 14px;
+  border: 3px solid var(--nb-ink);
+  background: var(--text-tertiary);
+  flex: 0 0 auto;
 }
 
 .dot.online {
-  background: #22c55e;
+  background: var(--nb-green);
 }
 
 .mode {
-  padding: 2px 8px;
-  border: 1px solid var(--color-border);
-  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 6px 12px;
+  border: 3px solid var(--nb-ink);
+  background: var(--tone-paper-soft);
+  color: var(--nb-ink);
+  white-space: nowrap;
 }
 
 .msg {
-  margin-top: 10px;
+  margin-top: 14px;
+  padding: 10px 12px;
+  border: 2px solid var(--nb-ink);
+  background: var(--tone-paper-soft);
   font-size: 13px;
-  color: var(--color-text-secondary);
+  font-weight: 700;
+  color: var(--text-secondary);
 }
 
 .msg.error {
-  color: var(--color-danger);
+  background: var(--tone-coral-soft);
+  color: var(--nb-ink);
 }
 
 .grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  gap: 16px;
 }
 
 .mode-group {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
+  gap: 10px;
 }
 
 .mode-btn {
-  height: 36px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--color-border);
-  background: #fff;
+  min-height: 54px;
+  padding: 10px 14px;
+  border: 3px solid var(--nb-ink);
+  background: var(--tone-paper-soft);
   cursor: pointer;
-  font-size: 13px;
+  font-size: 14px;
+  font-weight: 900;
+  line-height: 1.35;
+  color: var(--nb-ink);
+  box-shadow: var(--nb-shadow-soft);
+  transition: background-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+  white-space: nowrap;
+}
+
+.mode-btn:hover:not(:disabled) {
+  background: var(--nb-muted);
 }
 
 .mode-btn.active {
-  border-color: var(--color-primary);
-  color: var(--color-primary);
-  background: rgba(79, 127, 255, 0.08);
+  background: var(--nb-blue);
+  color: var(--nb-ink);
+}
+
+.mode-btn:disabled {
+  cursor: not-allowed;
+  background: var(--nb-muted);
+  color: #7a7a7a;
+  box-shadow: none;
 }
 
 .brightness-row {
-  margin-bottom: 12px;
+  margin-bottom: 14px;
+  padding: 14px;
+  border: 3px solid var(--nb-ink);
+  background: var(--tone-paper-soft);
 }
 
 .brightness-row label {
   display: block;
+  margin-bottom: 10px;
+  color: var(--nb-ink);
   font-size: 13px;
-  color: var(--color-text-secondary);
-  margin-bottom: 8px;
+  font-weight: 800;
 }
 
 .brightness-row input {
@@ -310,8 +372,32 @@ async function handleClear() {
     grid-template-columns: 1fr;
   }
 
+  .mode-group {
+    grid-template-columns: 1fr;
+  }
+
   .connection-form {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .device-page {
+    padding: 20px 0 56px;
+  }
+
+  .page-header,
+  .card {
+    padding: 18px;
+  }
+
+  .page-title {
+    font-size: 28px;
+  }
+
+  .actions .btn,
+  .actions .mode-btn {
+    width: 100%;
   }
 }
 </style>

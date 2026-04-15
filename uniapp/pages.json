@@ -61,6 +61,15 @@
       }
     },
     {
+      "path": "pages/device-params/device-params",
+      "style": {
+        "navigationStyle": "custom",
+        "navigationBarTextStyle": "black",
+        "backgroundColor": "#FFFFFF",
+        "enablePullDownRefresh": false
+      }
+    },
+    {
       "path": "pages/profile/profile",
       "style": {
         "navigationStyle": "custom",
@@ -106,7 +115,16 @@
       }
     },
     {
-      "path": "pages/effect-editor/effect-editor",
+      "path": "pages/clock-editor/animation-clock",
+      "style": {
+        "navigationStyle": "custom",
+        "navigationBarTextStyle": "white",
+        "backgroundColor": "#1a1a1a",
+        "enablePullDownRefresh": false
+      }
+    },
+    {
+      "path": "pages/clock-editor/theme-clock",
       "style": {
         "navigationStyle": "custom",
         "navigationBarTextStyle": "white",
@@ -133,6 +151,42 @@
       }
     },
     {
+      "path": "pages/countdown-board/countdown-board",
+      "style": {
+        "navigationStyle": "custom",
+        "navigationBarTextStyle": "white",
+        "backgroundColor": "#1a1a1a",
+        "enablePullDownRefresh": false
+      }
+    },
+    {
+      "path": "pages/led-matrix/led-matrix",
+      "style": {
+        "navigationStyle": "custom",
+        "navigationBarTextStyle": "white",
+        "backgroundColor": "#1a1a1a",
+        "enablePullDownRefresh": false
+      }
+    },
+    {
+      "path": "pages/gif-player/gif-player",
+      "style": {
+        "navigationStyle": "custom",
+        "navigationBarTextStyle": "white",
+        "backgroundColor": "#1a1a1a",
+        "enablePullDownRefresh": false
+      }
+    },
+    {
+      "path": "pages/game-screensaver/game-screensaver",
+      "style": {
+        "navigationStyle": "custom",
+        "navigationBarTextStyle": "white",
+        "backgroundColor": "#1a1a1a",
+        "enablePullDownRefresh": false
+      }
+    },
+    {
       "path": "pages/canvas-editor/canvas-editor",
       "style": {
         "navigationStyle": "custom",
@@ -143,24 +197,6 @@
     },
     {
       "path": "pages/tetris-settings/tetris-settings",
-      "style": {
-        "navigationStyle": "custom",
-        "navigationBarTextStyle": "white",
-        "backgroundColor": "#1a1a1a",
-        "enablePullDownRefresh": false
-      }
-    },
-    {
-      "path": "pages/notification-list/notification-list",
-      "style": {
-        "navigationStyle": "custom",
-        "navigationBarTextStyle": "white",
-        "backgroundColor": "#1a1a1a",
-        "enablePullDownRefresh": false
-      }
-    },
-    {
-      "path": "pages/notification-editor/notification-editor",
       "style": {
         "navigationStyle": "custom",
         "navigationBarTextStyle": "white",
@@ -232,24 +268,6 @@
       }
     },
     {
-      "path": "pages/followers/followers",
-      "style": {
-        "navigationStyle": "custom",
-        "navigationBarTextStyle": "black",
-        "backgroundColor": "#FFFFFF",
-        "enablePullDownRefresh": false
-      }
-    },
-    {
-      "path": "pages/following/following",
-      "style": {
-        "navigationStyle": "custom",
-        "navigationBarTextStyle": "black",
-        "backgroundColor": "#FFFFFF",
-        "enablePullDownRefresh": false
-      }
-    },
-    {
       "path": "pages/achievements/achievements",
       "style": {
         "navigationStyle": "custom",
@@ -304,25 +322,7 @@
       }
     },
     {
-      "path": "pages/design-preview/control",
-      "style": {
-        "navigationStyle": "custom",
-        "navigationBarTextStyle": "black",
-        "backgroundColor": "#FFFFFF",
-        "enablePullDownRefresh": false
-      }
-    },
-    {
-      "path": "pages/design-preview/ecosystem",
-      "style": {
-        "navigationStyle": "custom",
-        "navigationBarTextStyle": "black",
-        "backgroundColor": "#FFFFFF",
-        "enablePullDownRefresh": false
-      }
-    },
-    {
-      "path": "pages/design-preview/controls",
+      "path": "pages/design-compare/index",
       "style": {
         "navigationStyle": "custom",
         "navigationBarTextStyle": "black",

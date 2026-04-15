@@ -10,7 +10,7 @@
       />
       <!-- 图片加载失败占位 -->
       <view v-if="imageError" class="image-placeholder">
-        <Icon name="picture" :size="48" color="#AAAAAA" />
+        <Icon name="picture" :size="48" color="var(--text-tertiary)" />
       </view>
       
       <!-- 难度标签 -->
@@ -27,19 +27,19 @@
       <!-- 模板详情 -->
       <view class="template-details">
         <view class="detail-item">
-          <Icon name="adjust" :size="24" color="#666666" />
+          <Icon name="adjust" :size="24" color="currentColor" />
           <text class="detail-text">{{ template.size }}</text>
         </view>
         
         <view class="detail-item">
-          <Icon name="picture" :size="24" color="#666666" />
+          <Icon name="picture" :size="24" color="currentColor" />
           <text class="detail-text">{{ template.color_count }}色</text>
         </view>
       </view>
       
       <!-- 使用统计 -->
       <view class="template-stats">
-        <Icon name="user" :size="24" color="#4F7FFF" />
+        <Icon name="user" :size="24" color="currentColor" />
         <text class="usage-count">{{ formatUsageCount(template.usage_count) }}人使用</text>
       </view>
     </view>
@@ -108,10 +108,6 @@ export default {
   transition: all 0.2s ease;
 }
 
-.template-card:active {
-  transform: translate(4rpx, 4rpx);
-  box-shadow: 2rpx 2rpx 0 var(--nb-ink);
-}
 
 .template-image-container {
   position: relative;
@@ -192,22 +188,24 @@ export default {
   display: flex;
   align-items: center;
   gap: 6rpx;
+  color: #4a4a4a;
 }
 
 .detail-text {
   font-size: 22rpx;
-  color: #4a4a4a;
+  color: currentColor;
 }
 
 .template-stats {
   display: flex;
   align-items: center;
   gap: 8rpx;
+  color: var(--nb-ink);
 }
 
 .usage-count {
   font-size: 22rpx;
-  color: var(--nb-ink);
+  color: currentColor;
   font-weight: 800;
 }
 </style>

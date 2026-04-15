@@ -15,7 +15,7 @@
           @error="handleImageError"
         />
         <view v-else class="thumbnail-placeholder">
-          <Icon name="picture" :size="48" color="rgba(255,255,255,0.3)" />
+          <Icon name="picture" :size="48" color="currentColor" />
         </view>
       </view>
       
@@ -161,11 +161,6 @@ export default {
   height: 100%;
 }
 
-.project-card:active {
-  transform: translate(4rpx, 4rpx);
-  border-color: var(--nb-ink);
-  box-shadow: 2rpx 2rpx 0 var(--nb-ink);
-}
 
 /* 缩略图区域 */
 .thumbnail-area {
@@ -213,6 +208,7 @@ export default {
   align-items: center;
   justify-content: center;
   background-color: rgba(0, 0, 0, 0.06);
+  color: var(--text-secondary);
 }
 
 .regenerate-btn {
@@ -233,11 +229,6 @@ export default {
   z-index: 10;
 }
 
-.regenerate-btn:active {
-  opacity: 1;
-  transform: scale(0.95);
-  background-color: var(--nb-yellow);
-}
 
 .progress-bar {
   position: absolute;

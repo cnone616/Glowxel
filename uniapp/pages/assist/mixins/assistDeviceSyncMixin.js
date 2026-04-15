@@ -3,6 +3,13 @@ import { ARTKAL_COLORS_FULL } from "../../../data/artkal-colors-full.js";
 const DEVICE_MODE_KEY = "device_mode";
 const DEVICE_LAST_BUSINESS_MODE_KEY = "device_last_business_mode";
 const PREVIOUS_MODE_BEFORE_CANVAS_KEY = "previous_mode_before_canvas";
+const TETRIS_CLOCK_MODE_PAYLOAD = Object.freeze({
+  clearMode: true,
+  cellSize: 2,
+  speed: 150,
+  showClock: true,
+  pieces: [0, 1, 2, 3, 4, 5, 6],
+});
 
 function hexToRgb(hex) {
   const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
@@ -115,33 +122,15 @@ export default {
         }
 
         if (restoreMode === "tetris") {
-          const savedConfig = uni.getStorageSync("tetris_config");
-          const speedMap = { slow: 300, normal: 150, fast: 80 };
-
-          if (
-            savedConfig &&
-            savedConfig.clearMode !== undefined &&
-            savedConfig.cellSize !== undefined &&
-            savedConfig.speed !== undefined &&
-            savedConfig.showClock !== undefined &&
-            savedConfig.pieces !== undefined &&
-            speedMap[savedConfig.speed] !== undefined
-          ) {
-            await ws.send({
-              cmd: "set_mode",
-              mode: "tetris",
-              clearMode: savedConfig.clearMode,
-              cellSize: savedConfig.cellSize,
-              speed: speedMap[savedConfig.speed],
-              showClock: savedConfig.showClock,
-              pieces: savedConfig.pieces,
-            });
-          } else {
-            await ws.send({
-              cmd: "set_mode",
-              mode: "tetris",
-            });
-          }
+          await ws.send({
+            cmd: "set_mode",
+            mode: "tetris",
+            clearMode: TETRIS_CLOCK_MODE_PAYLOAD.clearMode,
+            cellSize: TETRIS_CLOCK_MODE_PAYLOAD.cellSize,
+            speed: TETRIS_CLOCK_MODE_PAYLOAD.speed,
+            showClock: TETRIS_CLOCK_MODE_PAYLOAD.showClock,
+            pieces: TETRIS_CLOCK_MODE_PAYLOAD.pieces.slice(),
+          });
           return;
         }
 

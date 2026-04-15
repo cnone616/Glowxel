@@ -86,7 +86,7 @@
           class="empty-state glx-panel-card"
         >
           <view class="empty-icon">
-            <Icon name="picture" :size="80" color="#AAAAAA" />
+            <Icon name="picture" :size="80" color="var(--text-tertiary)" />
           </view>
           <text class="empty-title">{{
             searchTerm ? "未找到相关作品" : "暂无作品"
@@ -113,7 +113,7 @@
           <Icon
             name="loading"
             :size="48"
-            color="#4F7FFF"
+            color="currentColor"
             class="loading-icon"
           />
           <text class="loading-text">加载中...</text>
@@ -504,7 +504,6 @@ export default {
 }
 
 .search-btn:active {
-  transform: none;
   background-color: var(--nb-yellow);
 }
 
@@ -534,10 +533,6 @@ export default {
 .tab-item.active {
   background-color: var(--nb-yellow);
   border-color: var(--nb-ink);
-}
-
-.tab-item:active {
-  transform: scale(0.95);
 }
 
 .tab-text {
@@ -572,22 +567,6 @@ export default {
   border-bottom: 1rpx solid var(--nb-ink);
 }
 
-.search-input-wrapper {
-  display: flex;
-  align-items: center;
-  gap: 16rpx;
-  background-color: var(--nb-paper);
-  border-radius: 0;
-  padding: 20rpx 24rpx;
-  border: 2rpx solid var(--nb-ink);
-  transition: all 0.2s ease;
-}
-
-.search-input-wrapper:focus-within {
-  border-color: var(--nb-ink);
-  box-shadow: none;
-}
-
 .search-input {
   flex: 1;
   font-size: 28rpx;
@@ -611,10 +590,6 @@ export default {
   background-color: var(--nb-paper);
   border: 2rpx solid var(--nb-ink);
   transition: all 0.2s ease;
-}
-
-.clear-btn:active {
-  transform: translate(2rpx, 2rpx);
 }
 
 /* 主要内容 */
@@ -642,11 +617,6 @@ export default {
   align-items: center;
   justify-content: center;
   transition: all 0.2s ease;
-}
-
-.more-btn:active {
-  background-color: var(--nb-yellow);
-  transform: translate(2rpx, 2rpx);
 }
 
 .more-text {
@@ -688,7 +658,6 @@ export default {
 }
 
 .user-card:active {
-  transform: scale(0.95);
   box-shadow: 2rpx 2rpx 0 var(--nb-ink);
 }
 
@@ -722,10 +691,6 @@ export default {
   background-color: #111111;
 }
 
-.follow-btn:active {
-  transform: translate(2rpx, 2rpx);
-}
-
 .follow-text {
   font-size: 24rpx;
   font-weight: 500;
@@ -749,13 +714,6 @@ export default {
 }
 
 /* 空状态 */
-.empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 96rpx 32rpx;
-  text-align: center;
-}
 
 .empty-icon {
   width: 160rpx;
@@ -788,6 +746,7 @@ export default {
   align-items: center;
   padding: 48rpx;
   gap: 16rpx;
+  color: var(--nb-blue);
 }
 
 .loading-icon {
@@ -805,7 +764,7 @@ export default {
 
 .loading-text {
   font-size: 26rpx;
-  color: #4a4a4a;
+  color: currentColor;
 }
 
 .load-more-btn {
@@ -821,7 +780,6 @@ export default {
 }
 
 .load-more-btn:active {
-  transform: scale(0.98);
   background-color: var(--nb-paper);
 }
 

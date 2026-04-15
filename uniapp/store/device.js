@@ -83,12 +83,14 @@ export const useDeviceStore = defineStore('device', {
 
       if (data.mode === 'animation' && typeof data.effectMode === 'string') {
         if (
-          data.effectMode === 'text_display' ||
-          data.effectMode === 'breath_effect' ||
-          data.effectMode === 'rhythm_effect' ||
           data.effectMode === 'tetris' ||
           data.effectMode === 'ambient_effect' ||
-          data.effectMode === 'eyes'
+          data.effectMode === 'eyes' ||
+          data.effectMode === 'game_screensaver' ||
+          data.effectMode === 'weather' ||
+          data.effectMode === 'countdown' ||
+          data.effectMode === 'stopwatch' ||
+          data.effectMode === 'notification'
         ) {
           return data.effectMode
         }
@@ -99,6 +101,9 @@ export const useDeviceStore = defineStore('device', {
         data.mode === 'animation' ||
         data.mode === 'theme' ||
         data.mode === 'canvas' ||
+        data.mode === 'eyes' ||
+        data.mode === 'ambient_effect' ||
+        data.mode === 'game_screensaver' ||
         data.mode === 'tetris' ||
         data.mode === 'weather' ||
         data.mode === 'countdown' ||

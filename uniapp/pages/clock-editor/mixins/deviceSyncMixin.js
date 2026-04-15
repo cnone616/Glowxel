@@ -41,6 +41,7 @@ export default {
     },
 
     saveConfig() {
+      const isThemeMode = this.clockMode === "theme";
       const configToSave = {
         font: this.config.font,
         showSeconds: this.config.showSeconds,
@@ -69,11 +70,11 @@ export default {
           align: this.config.week.align,
         },
         image: {
-          show: this.config.image.show,
-          x: this.config.image.x,
-          y: this.config.image.y,
-          width: this.config.image.width,
-          height: this.config.image.height,
+          show: isThemeMode ? false : this.config.image.show,
+          x: isThemeMode ? 0 : this.config.image.x,
+          y: isThemeMode ? 0 : this.config.image.y,
+          width: isThemeMode ? 64 : this.config.image.width,
+          height: isThemeMode ? 64 : this.config.image.height,
           data: null,
         },
       };
@@ -81,12 +82,17 @@ export default {
       const saveData = {
         config: configToSave,
         clockMode: this.clockMode,
-        themeId: this.lastAppliedClockThemeId,
         hasGif: !!(this.gifAnimationData && this._gifParser),
-        imagePixels: this.imagePixels
-          ? Array.from(this.imagePixels.entries())
-          : null,
+        imagePixels: isThemeMode
+          ? null
+          : this.imagePixels
+            ? Array.from(this.imagePixels.entries())
+            : null,
       };
+
+      if (this.clockMode === "theme") {
+        saveData.themeId = this.lastAppliedClockThemeId;
+      }
 
       console.log("保存配置:", {
         模式: this.clockMode,
@@ -133,30 +139,32 @@ export default {
               ...this.config.week,
               ...savedData.config.week,
             };
-            this.config.image = {
-              ...this.config.image,
-              ...savedData.config.image,
-            };
+            if (this.clockMode !== "theme") {
+              this.config.image = {
+                ...this.config.image,
+                ...savedData.config.image,
+              };
+            }
           }
 
-          if (typeof savedData.themeId === "string") {
+          if (
+            this.clockMode === "theme" &&
+            typeof savedData.themeId === "string"
+          ) {
             this.lastAppliedClockThemeId = savedData.themeId;
           }
 
           this.imagePixels =
-            savedData.imagePixels && Array.isArray(savedData.imagePixels)
-              ? new Map(savedData.imagePixels)
-              : null;
+            this.clockMode === "theme"
+              ? null
+              : savedData.imagePixels && Array.isArray(savedData.imagePixels)
+                ? new Map(savedData.imagePixels)
+                : null;
 
           if (this.clockMode === "animation" && savedData.hasGif) {
-            const waitForCanvas = () => {
-              if (this.canvasCtx) {
-                this._restoreGifFromLocal();
-              } else {
-                setTimeout(waitForCanvas, 50);
-              }
-            };
-            this.$nextTick(waitForCanvas);
+            this.$nextTick(() => {
+              this._restoreGifFromLocal();
+            });
           } else {
             this.gifAnimationData = null;
             this.gifRenderedFrameMaps = null;
@@ -174,9 +182,7 @@ export default {
             savedData.hasGif,
           );
 
-          if (this.canvasCtx) {
-            this.drawCanvas();
-          }
+          this.drawCanvas();
         } catch (e) {
           console.error("加载配置失败:", e);
         }
@@ -221,48 +227,13 @@ export default {
           if (!this.lastAppliedClockThemeId) {
             throw new Error("请先选择主题");
           }
-          if (
-            this.displayClockThemePreset &&
-            this.displayClockThemePreset.requiresImage &&
-            !this.imagePixels
-          ) {
-            throw new Error("当前主题需要先上传图片");
-          }
 
           await sendCommand({ cmd: "set_mode", mode: "theme" });
           await sendCommand({
             cmd: "set_theme_config",
             themeId: this.lastAppliedClockThemeId,
           });
-
-          const allPixels = new Map();
-          if (this.imagePixels) {
-            const offsetX = this.config.image.x || 0;
-            const offsetY = this.config.image.y || 0;
-            this.imagePixels.forEach((color, key) => {
-              const [rx, ry] = key.split(",").map(Number);
-              const finalX = rx + offsetX;
-              const finalY = ry + offsetY;
-              if (finalX >= 0 && finalX < 64 && finalY >= 0 && finalY < 64) {
-                allPixels.set(`${finalX},${finalY}`, color);
-              }
-            });
-          }
-
-          if (allPixels.size > 0) {
-            const pixelArray = [];
-            allPixels.forEach((color, key) => {
-              const [x, y] = key.split(",").map(Number);
-              const rgb = this.hexToRgb(color);
-              pixelArray.push({ x, y, r: rgb.r, g: rgb.g, b: rgb.b });
-            });
-            await this.sendImagePixelsBinary(pixelArray);
-            this.toast.showSuccess(
-              `主题已发送到设备并保存，包含 ${pixelArray.length} 个像素点`,
-            );
-          } else {
-            this.toast.showSuccess("主题已发送到设备并保存");
-          }
+          this.toast.showSuccess("主题已发送到设备并保存");
 
           this.deviceStore.setDeviceMode("theme", { businessMode: true });
           this.deviceThemeId = this.lastAppliedClockThemeId;
@@ -393,20 +364,7 @@ export default {
           this.stopLoading();
           this.toast.showSuccess(`GIF 动画已发送！${frameCount} 帧`);
         } else {
-          const allPixels = new Map();
-
-          if (this.imagePixels) {
-            const offsetX = this.config.image.x || 0;
-            const offsetY = this.config.image.y || 0;
-            this.imagePixels.forEach((color, key) => {
-              const [rx, ry] = key.split(",").map(Number);
-              const finalX = rx + offsetX;
-              const finalY = ry + offsetY;
-              if (finalX >= 0 && finalX < 64 && finalY >= 0 && finalY < 64) {
-                allPixels.set(`${finalX},${finalY}`, color);
-              }
-            });
-          }
+          const allPixels = this.buildImageLayerPixels();
 
           if (allPixels.size > 0) {
             console.log("准备发送像素数据，总数:", allPixels.size);

@@ -1,5 +1,5 @@
 <template>
-  <div id="app">
+  <div id="app" :class="{ 'app-admin': isAdmin }">
     <NavBar v-if="!isAdmin" />
     <main class="main-content">
       <router-view v-slot="{ Component }">
@@ -23,18 +23,6 @@ const isAdmin = computed(() => route.path.startsWith('/admin'))
 </script>
 
 <style>
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
-
-body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-  background: #ffffff;
-  color: #1a1a1a;
-}
-
 #app {
   min-height: 100vh;
   display: flex;
@@ -43,6 +31,8 @@ body {
 
 .main-content {
   flex: 1;
+  position: relative;
+  z-index: 1;
 }
 
 .fade-enter-active,
@@ -53,5 +43,9 @@ body {
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;
+}
+
+#app:not(.app-admin) .main-content {
+  padding-bottom: 24px;
 }
 </style>

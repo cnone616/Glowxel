@@ -29,7 +29,7 @@
             mode="aspectFill"
           />
           <view v-else class="avatar-placeholder">
-            <Icon name="user" :size="80" color="#AAAAAA" />
+            <Icon name="user" :size="80" color="var(--text-tertiary)" />
           </view>
         </view>
         <text class="avatar-tip">点击更换头像</text>
@@ -105,10 +105,9 @@
             <text class="form-label">公开作品</text>
             <text class="form-desc">允许其他用户查看我的作品</text>
           </view>
-          <switch
+          <GlxSwitch
             :checked="form.publicWorks"
             @change="form.publicWorks = $event.detail.value"
-            color="#4F7FFF"
           />
         </view>
 
@@ -117,10 +116,9 @@
             <text class="form-label">接收关注通知</text>
             <text class="form-desc">有新粉丝时通知我</text>
           </view>
-          <switch
+          <GlxSwitch
             :checked="form.followNotify"
             @change="form.followNotify = $event.detail.value"
-            color="#4F7FFF"
           />
         </view>
       </view>
@@ -145,12 +143,14 @@ import { getUploadUrl } from "../../config/api.js";
 import statusBarMixin from "../../mixins/statusBar.js";
 import Icon from "../../components/Icon.vue";
 import Toast from "../../components/Toast.vue";
+import GlxSwitch from "../../components/GlxSwitch.vue";
 
 export default {
   mixins: [statusBarMixin],
   components: {
     Icon,
     Toast,
+    GlxSwitch,
   },
 
   data() {
@@ -388,14 +388,6 @@ export default {
   margin-bottom: 0;
 }
 
-.form-label {
-  display: block;
-  font-size: 28rpx;
-  color: var(--nb-ink);
-  margin-bottom: 16rpx;
-  font-weight: 500;
-}
-
 .form-input {
   width: 100%;
   padding: 24rpx;
@@ -546,7 +538,6 @@ export default {
 }
 
 .save-button:active {
-  transform: translate(2rpx, 2rpx);
   box-shadow: none;
 }
 

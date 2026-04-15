@@ -1,44 +1,50 @@
 <template>
   <view v-if="isOpen" class="modal-overlay" @click="handleClose">
-    <view class="modal-container" @click.stop>
+    <view class="help-modal" @click.stop>
       <!-- HelpModal -->
-      <view class="modal-header">
-        <view class="header-icon">
+      <view class="help-modal__header">
+        <view class="help-modal__header-icon">
           <Icon name="help" :size="32" />
         </view>
-        <text class="modal-title">{{ title }}</text>
-        <view class="close-btn" @click="handleClose">
+        <text class="help-modal__title">{{ title }}</text>
+        <view class="help-modal__close" @click="handleClose">
           <Icon name="close" :size="32" />
         </view>
       </view>
 
       <!-- Content -->
-      <scroll-view scroll-y class="modal-content">
-        <view class="help-items">
-          <view v-for="(item, index) in items" :key="index" class="help-item">
-            <view class="item-icon">
+      <scroll-view scroll-y class="help-modal__content">
+        <view class="help-modal__items">
+          <view
+            v-for="(item, index) in items"
+            :key="index"
+            class="help-modal__item"
+          >
+            <view class="help-modal__item-icon">
               <Icon
                 v-if="item.iconName"
                 :name="item.iconName"
                 :size="32"
-                color="var(--accent-color)"
+                color="var(--nb-ink)"
               />
-              <text v-else class="item-icon-text">{{
+              <text v-else class="help-modal__item-icon-text">{{
                 item.iconText || "•"
               }}</text>
             </view>
-            <view class="item-content">
-              <text class="item-title">{{ item.title }}</text>
-              <text class="item-description">{{ item.description }}</text>
+            <view class="help-modal__item-content">
+              <text class="help-modal__item-title">{{ item.title }}</text>
+              <text class="help-modal__item-description">{{
+                item.description
+              }}</text>
             </view>
           </view>
         </view>
       </scroll-view>
 
       <!-- Footer -->
-      <view class="modal-footer">
-        <view class="confirm-btn" @click="handleClose">
-          <text class="confirm-btn-text">明白了</text>
+      <view class="help-modal__footer">
+        <view class="help-modal__confirm" @click="handleClose">
+          <text class="help-modal__confirm-text">明白了</text>
         </view>
       </view>
     </view>
@@ -77,23 +83,9 @@ export default {
 </script>
 
 <style scoped>
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(0, 0, 0, 0.45);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-  padding: 32rpx;
-}
-
-.modal-container {
+.help-modal {
   width: 100%;
-  max-width: 600rpx;
+  max-width: 640rpx;
   max-height: 80vh;
   background-color: var(--nb-surface);
   border: var(--nb-border-width-panel) solid var(--nb-ink);
@@ -104,29 +96,28 @@ export default {
   flex-direction: column;
 }
 
-.modal-header {
+.help-modal__header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 32rpx;
+  padding: 24rpx;
   border-bottom: var(--nb-border-width-panel) solid var(--nb-ink);
   background-color: var(--nb-surface);
 }
 
-.header-icon {
-  width: 40rpx;
-  height: 40rpx;
+.help-modal__header-icon {
+  width: 52rpx;
+  height: 52rpx;
   display: flex;
   align-items: center;
   justify-content: center;
+  border: var(--nb-border-width-control) solid var(--nb-ink);
+  background: #f2cf4a;
+  box-shadow: var(--nb-shadow-soft);
+  box-sizing: border-box;
 }
 
-.icon-text {
-  font-size: 32rpx;
-  color: var(--accent-color);
-}
-
-.modal-title {
+.help-modal__title {
   flex: 1;
   font-size: 32rpx;
   font-weight: 900;
@@ -134,88 +125,96 @@ export default {
   margin-left: 16rpx;
 }
 
-.close-btn {
-  width: 40rpx;
-  height: 40rpx;
+.help-modal__close {
+  width: 52rpx;
+  height: 52rpx;
   display: flex;
   align-items: center;
   justify-content: center;
+  border: var(--nb-border-width-control) solid var(--nb-ink);
+  background: var(--nb-surface);
+  box-shadow: var(--nb-shadow-soft);
+  box-sizing: border-box;
 }
 
-.close-icon {
-  font-size: 32rpx;
-  color: var(--text-secondary);
-}
-
-.modal-content {
+.help-modal__content {
   flex: 1;
-  padding: 32rpx;
+  padding: 24rpx;
   overflow-y: auto;
   box-sizing: border-box;
+  background: transparent;
+  border: none;
+  box-shadow: none;
 }
 
 /* 小程序减小padding */
 /* #ifdef MP-WEIXIN */
-.modal-content {
+.help-modal__content {
   padding: 24rpx;
 }
 /* #endif */
 
-.help-items {
+.help-modal__items {
   display: flex;
   flex-direction: column;
-  gap: 32rpx;
+  gap: 0;
+  background: transparent;
+  border: none;
+  box-shadow: none;
 }
 
-.help-item {
+.help-modal__item {
   display: flex;
-  gap: 32rpx;
-  padding: 24rpx;
+  gap: 20rpx;
+  padding: 24rpx 4rpx;
   border-radius: 0;
-  background-color: #ffffff;
-  border: var(--nb-border-width-control) solid var(--nb-ink);
-  box-shadow: var(--nb-shadow-soft);
+  background-color: transparent;
+  border: none;
+  box-shadow: none;
 }
 
-.item-icon {
+.help-modal__item + .help-modal__item {
+  border-top: var(--nb-border-width-control) solid var(--nb-ink);
+}
+
+.help-modal__item-icon {
   width: 80rpx;
   height: 80rpx;
   flex-shrink: 0;
   border-radius: 0;
-  background-color: var(--nb-yellow);
+  background-color: #f2cf4a;
   border: var(--nb-border-width-control) solid var(--nb-ink);
-  box-shadow: var(--nb-shadow-soft);
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-.item-icon-text {
+.help-modal__item-icon-text {
   font-size: 32rpx;
-  color: var(--accent-color);
+  color: var(--nb-ink);
 }
 
-.item-content {
+.help-modal__item-content {
   flex: 1;
   display: flex;
   flex-direction: column;
   gap: 8rpx;
 }
 
-.item-title {
+.help-modal__item-title {
   font-size: 28rpx;
   font-weight: 900;
   color: var(--nb-ink);
 }
 
-.item-description {
+.help-modal__item-description {
   font-size: 24rpx;
   color: #4a4a4a;
   line-height: 1.6;
 }
 
-.modal-footer {
-  padding: 32rpx;
+.help-modal__footer {
+  padding: 20rpx 24rpx 24rpx;
   border-top: var(--nb-border-width-panel) solid var(--nb-ink);
   background-color: var(--nb-surface);
   box-sizing: border-box;
@@ -223,24 +222,26 @@ export default {
 
 /* 小程序减小padding并添加底部安全区域 */
 /* #ifdef MP-WEIXIN */
-.modal-footer {
+.help-modal__footer {
   padding: 24rpx;
   padding-bottom: 48rpx;
 }
 /* #endif */
 
-.confirm-btn {
-  padding: 24rpx;
-  background-color: var(--nb-yellow);
+.help-modal__confirm {
+  min-height: 84rpx;
+  padding: 0 24rpx;
+  background-color: #f2cf4a;
   border: var(--nb-border-width-control) solid var(--nb-ink);
   border-radius: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   box-shadow: var(--nb-shadow-soft);
+  box-sizing: border-box;
 }
 
-.confirm-btn-text {
+.help-modal__confirm-text {
   font-size: 28rpx;
   font-weight: 900;
   color: var(--nb-ink);

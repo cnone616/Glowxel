@@ -94,7 +94,7 @@
             @click="applyRecommendedSize"
           >
             <text class="recommend-text"
-              ><Icon name="prompt" :size="24" color="#000000" />
+              ><Icon name="prompt" :size="24" color="var(--nb-ink)" />
               检测到内容尺寸，推荐 {{ recommendedSize.width }}×{{
                 recommendedSize.height
               }}</text
@@ -1666,9 +1666,6 @@ export default {
   transition: var(--transition-base);
 }
 
-.next-btn:active {
-  transform: scale(0.98);
-}
 
 .next-btn.disabled {
   background: #ffe49a;

@@ -21,7 +21,7 @@
     <!-- 搜索和筛选 -->
     <view class="search-section">
       <view class="search-bar glx-search-shell">
-        <Icon name="search" :size="28" color="#777777" />
+        <Icon name="search" :size="28" color="var(--text-tertiary)" />
         <input
           v-model="searchQuery"
           class="search-input"
@@ -49,7 +49,7 @@
     <!-- 作品网格 -->
     <scroll-view scroll-y class="content glx-scroll-region glx-page-shell__content" @scrolltolower="loadMore">
       <view v-if="filteredWorks.length === 0" class="empty-state glx-panel-card">
-        <Icon name="picture" :size="120" color="#777777" />
+        <Icon name="picture" :size="120" color="var(--text-tertiary)" />
         <text class="empty-title">暂无作品</text>
         <text class="empty-desc">快去创建你的第一个作品吧</text>
         <button class="create-btn glx-cta-button" @click="goToCreate">
@@ -562,15 +562,6 @@ export default {
 .content {
   flex: 1;
   padding: 32rpx;
-}
-
-.empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  height: 60vh;
-  gap: 24rpx;
 }
 
 .empty-title {

@@ -6,7 +6,7 @@
         <slot name="header">
           <text class="modal-title">{{ title }}</text>
           <view v-if="closable" class="close-btn" @click="handleClose">
-            <Icon name="close" :size="40" color="#666666" />
+            <Icon name="close" :size="32" color="var(--nb-ink)" />
           </view>
         </slot>
       </view>
@@ -126,21 +126,6 @@ export default {
 </script>
 
 <style scoped>
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(0, 0, 0, 0.45);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-  padding: 32rpx;
-  box-sizing: border-box;
-}
-
 .modal-container {
   background-color: var(--nb-surface);
   border: var(--nb-border-width-panel) solid var(--nb-ink);
@@ -150,7 +135,7 @@ export default {
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  animation: modalSlideIn 0.3s ease-out;
+  animation: modalSlideIn 0.18s ease-out;
 }
 
 @keyframes modalSlideIn {
@@ -192,8 +177,10 @@ export default {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 28rpx 28rpx 0;
+  padding: 24rpx;
   flex-shrink: 0;
+  border-bottom: var(--nb-border-width-panel) solid var(--nb-ink);
+  gap: 16rpx;
 }
 
 .modal-title {
@@ -204,8 +191,8 @@ export default {
 }
 
 .close-btn {
-  width: 80rpx;
-  height: 80rpx;
+  width: 56rpx;
+  height: 56rpx;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -213,29 +200,26 @@ export default {
   background: var(--nb-surface);
   box-shadow: var(--nb-shadow-soft);
   border-radius: 0;
-  transition: all 0.2s ease;
   margin-left: 16rpx;
+  box-sizing: border-box;
 }
 
-.close-btn:active {
-  transform: translate(2rpx, 2rpx);
-  background-color: var(--nb-paper);
-}
 
 /* 内容 */
 .modal-body {
-  padding: 28rpx;
+  padding: 24rpx;
   flex: 1;
   overflow-y: auto;
 }
 
 /* 底部 */
 .modal-footer {
-  padding: 0 28rpx 28rpx;
+  padding: 18rpx 24rpx 24rpx;
   flex-shrink: 0;
   display: flex;
   gap: 16rpx;
   justify-content: flex-end;
+  border-top: var(--nb-border-width-panel) solid var(--nb-ink);
 }
 
 /* 响应式适配 */

@@ -72,10 +72,13 @@
       <!-- 功能菜单 -->
       <view class="menu-section glx-scroll-stack">
         <!-- 我的作品 -->
-        <view class="menu-item glx-list-card" @click="goToMyWorks">
+        <view
+          class="menu-item menu-item--works glx-list-card"
+          @click="goToMyWorks"
+        >
           <view class="menu-left">
-            <view class="menu-icon">
-              <Icon name="picture" :size="40" color="#4F7FFF" />
+            <view class="menu-icon menu-icon--works">
+              <Icon name="picture" :size="40" color="var(--nb-ink)" />
             </view>
             <text class="menu-label">我的作品</text>
           </view>
@@ -86,10 +89,13 @@
         </view>
 
         <!-- 我的收藏 -->
-        <view class="menu-item glx-list-card" @click="goToMyFavorites">
+        <view
+          class="menu-item menu-item--favorites glx-list-card"
+          @click="goToMyFavorites"
+        >
           <view class="menu-left">
-            <view class="menu-icon">
-              <Icon name="favorite" :size="40" color="#4F7FFF" />
+            <view class="menu-icon menu-icon--favorites">
+              <Icon name="favorite" :size="40" color="var(--nb-ink)" />
             </view>
             <text class="menu-label">我的收藏</text>
           </view>
@@ -100,10 +106,13 @@
         </view>
 
         <!-- 成就 -->
-        <view class="menu-item glx-list-card" @click="goToAchievements">
+        <view
+          class="menu-item menu-item--achievements glx-list-card"
+          @click="goToAchievements"
+        >
           <view class="menu-left">
-            <view class="menu-icon">
-              <Icon name="task" :size="40" color="#4F7FFF" />
+            <view class="menu-icon menu-icon--achievements">
+              <Icon name="task" :size="40" color="var(--nb-ink)" />
             </view>
             <text class="menu-label">成就</text>
           </view>
@@ -116,12 +125,12 @@
         <!-- 云同步设置 -->
         <view
           v-if="userStore.hasLogin"
-          class="menu-item glx-list-card"
+          class="menu-item menu-item--sync glx-list-card"
           @click="goToCloudSync"
         >
           <view class="menu-left">
-            <view class="menu-icon">
-              <Icon name="switch" :size="40" color="#4F7FFF" />
+            <view class="menu-icon menu-icon--sync">
+              <Icon name="switch" :size="40" color="var(--nb-ink)" />
             </view>
             <view class="menu-info">
               <text class="menu-label">自动同步</text>
@@ -129,19 +138,21 @@
             </view>
           </view>
           <view class="menu-right">
-            <switch
+            <GlxSwitch
               :checked="userStore.syncEnabled"
               @change="handleSyncChange"
-              color="#4F7FFF"
             />
           </view>
         </view>
 
         <!-- 设置 -->
-        <view class="menu-item glx-list-card" @click="goToSettings">
+        <view
+          class="menu-item menu-item--settings glx-list-card"
+          @click="goToSettings"
+        >
           <view class="menu-left">
-            <view class="menu-icon">
-              <Icon name="setting" :size="40" color="#4F7FFF" />
+            <view class="menu-icon menu-icon--settings">
+              <Icon name="setting" :size="40" color="var(--nb-ink)" />
             </view>
             <text class="menu-label">设置</text>
           </view>
@@ -172,6 +183,7 @@ import { useToast } from "../../composables/useToast.js";
 import statusBarMixin from "../../mixins/statusBar.js";
 import Icon from "../../components/Icon.vue";
 import Toast from "../../components/Toast.vue";
+import GlxSwitch from "../../components/GlxSwitch.vue";
 import { userAPI, artworkAPI, collectionAPI } from "../../api/index.js";
 
 export default {
@@ -179,6 +191,7 @@ export default {
   components: {
     Icon,
     Toast,
+    GlxSwitch,
   },
 
   data() {
@@ -365,16 +378,16 @@ export default {
   width: 120rpx;
   height: 120rpx;
   border-radius: 60rpx;
-  background-color: var(--nb-paper);
+  background-color: #edf4ff;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #4a4a4a;
+  color: var(--nb-blue);
 }
 
 .prompt-text {
   font-size: 28rpx;
-  color: #4a4a4a;
+  color: var(--text-secondary);
   text-align: center;
 }
 
@@ -424,6 +437,13 @@ export default {
   padding: 0 24rpx;
   font-size: 24rpx;
   font-weight: 900;
+  background-color: var(--nb-blue);
+  color: #ffffff;
+}
+
+.edit-btn text,
+.edit-btn .iconfont {
+  color: inherit !important;
 }
 
 .edit-btn::after {
@@ -432,7 +452,7 @@ export default {
 
 .user-id {
   font-size: 24rpx;
-  color: #4a4a4a;
+  color: var(--text-secondary);
   font-family: monospace;
 }
 
@@ -453,10 +473,6 @@ export default {
   transition: all 0.2s ease;
 }
 
-.stat-item:active {
-  transform: scale(0.95);
-}
-
 .stat-number {
   font-size: 32rpx;
   font-weight: 700;
@@ -465,19 +481,21 @@ export default {
 
 .stat-label {
   font-size: 24rpx;
-  color: #4a4a4a;
+  color: var(--text-secondary);
 }
 
 /* 功能菜单 */
 .menu-section {
   margin: 32rpx 20rpx;
+  padding: 0;
+  background-color: transparent;
 }
 
 .menu-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 32rpx;
+  padding: 32rpx;
   transition: all 0.2s ease;
   min-height: 100rpx;
   box-shadow: var(--nb-shadow-strong);
@@ -485,11 +503,6 @@ export default {
 
 .menu-item:last-child {
   margin-bottom: 0;
-}
-
-.menu-item:active {
-  transform: translate(2rpx, 2rpx);
-  box-shadow: 4rpx 4rpx 0 var(--nb-ink);
 }
 
 .menu-left {
@@ -505,7 +518,29 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: rgba(79, 127, 255, 0.1);
+  background-color: #f5f6f8 !important;
+  border: 2rpx solid var(--nb-ink);
+  box-shadow: var(--nb-shadow-soft);
+}
+
+.menu-icon--works {
+  background-color: #fff1b8 !important;
+}
+
+.menu-icon--favorites {
+  background-color: #ffe1db !important;
+}
+
+.menu-icon--achievements {
+  background-color: #e3f0ff !important;
+}
+
+.menu-icon--sync {
+  background-color: #e2f8ee !important;
+}
+
+.menu-icon--settings {
+  background-color: #eee8ff !important;
 }
 
 .menu-info {
@@ -522,7 +557,7 @@ export default {
 
 .menu-desc {
   font-size: 22rpx;
-  color: #4a4a4a;
+  color: var(--text-secondary);
 }
 
 .menu-right {
@@ -554,13 +589,14 @@ export default {
   justify-content: center;
   gap: 16rpx;
   padding: 32rpx;
-  background-color: var(--nb-surface);
-  border: 2rpx solid rgba(239, 68, 68, 0.3);
+  background-color: var(--nb-coral);
+  border: 2rpx solid var(--nb-ink);
   border-radius: 0;
-  color: #ef4444;
+  color: #ffffff;
   font-size: 28rpx;
   font-weight: 600;
-  transition: all 0.2s ease;
+  transition: background-color 0.2s ease;
+  box-shadow: var(--nb-shadow-soft);
 }
 
 .logout-btn::after {
@@ -568,7 +604,11 @@ export default {
 }
 
 .logout-btn:active {
-  background-color: rgba(239, 68, 68, 0.05);
-  transform: scale(0.98);
+  background-color: #ef6258;
+}
+
+.logout-btn text,
+.logout-btn .iconfont {
+  color: inherit !important;
 }
 </style>

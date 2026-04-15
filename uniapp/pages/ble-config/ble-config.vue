@@ -1,5 +1,5 @@
 <template>
-  <view class="ble-page glx-page-shell">
+  <view class="wifi-config-page glx-page-shell">
     <!-- #ifdef MP-WEIXIN -->
     <view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
     <!-- #endif -->
@@ -12,127 +12,92 @@
           color="var(--nb-ink)"
         />
       </view>
-      <text class="nav-title glx-topbar__title">蓝牙配网</text>
+      <text class="nav-title glx-topbar__title">热点配网</text>
     </view>
 
-    <scroll-view scroll-y class="content glx-scroll-region glx-page-shell__content">
-      <!-- 步骤指示 -->
-      <view class="step-indicator">
-        <view class="step" :class="{ active: step >= 1, done: step > 1 }">
-          <text class="step-num">1</text>
-          <text class="step-text">搜索设备</text>
+    <scroll-view
+      scroll-y
+      class="content glx-scroll-region glx-page-shell__content"
+    >
+      <view class="hero-card glx-panel-card">
+        <view class="card-title-section glx-panel-head">
+          <text class="card-title glx-panel-title">首次使用先连接设备热点</text>
+          <text class="card-subtitle glx-panel-subtitle">
+            Glowxel 不再走蓝牙配网。请先连接设备热点，再在浏览器中打开设备门户完成
+            WiFi 配置。
+          </text>
         </view>
-        <view class="step-line" :class="{ active: step > 1 }"></view>
-        <view class="step" :class="{ active: step >= 2, done: step > 2 }">
-          <text class="step-num">2</text>
-          <text class="step-text">配置网络</text>
-        </view>
-        <view class="step-line" :class="{ active: step > 2 }"></view>
-        <view class="step" :class="{ active: step >= 3 }">
-          <text class="step-num">3</text>
-          <text class="step-text">完成</text>
+
+        <view class="tip-box">
+          <text class="tip-title">仅支持 2.4GHz WiFi</text>
+          <text class="tip-text">
+            请不要使用 5GHz 网络。如果你的路由器开启了双频同名，请先确认当前选择的是
+            2.4GHz 频段。
+          </text>
         </view>
       </view>
 
-      <!-- Step 1: 扫描设备 -->
-      <view v-if="step === 1" class="card glx-panel-card">
-        <view class="card-title-section glx-panel-head">
-          <text class="card-title glx-panel-title">搜索 RenLight 设备</text>
-          <text class="card-subtitle glx-panel-subtitle">请确保设备已开机且处于配网模式</text>
-        </view>
-
-        <view v-if="scanning" class="scan-status">
-          <view class="loading-spinner"></view>
-          <text class="scan-text">正在搜索蓝牙设备...</text>
-        </view>
-
-        <view v-if="devices.length > 0" class="device-list">
-          <view
-            v-for="(device, index) in devices"
-            :key="index"
-            class="device-item"
-            @click="connectDevice(device)"
-          >
-            <view class="device-icon">
-              <Icon name="link" :size="32" />
-            </view>
-            <view class="device-info">
-              <text class="device-name">{{ device.name || "未知设备" }}</text>
-              <text class="device-id">{{ device.deviceId }}</text>
-            </view>
-            <text class="device-rssi">{{ device.RSSI }}dBm</text>
+      <view class="step-list">
+        <view class="step-card glx-panel-card">
+          <view class="step-badge">1</view>
+          <view class="step-body">
+            <text class="step-title">连接设备热点</text>
+            <text class="step-desc">
+              打开系统 WiFi 列表，找到以
+              <text class="inline-strong">Glowxel-</text>
+              开头的设备热点。热点名会带设备序列号后缀，用来区分多台设备。
+            </text>
           </view>
         </view>
 
-        <view v-if="!scanning && devices.length === 0" class="empty-state">
-          <text class="empty-text">未找到设备</text>
-          <text class="empty-hint"
-            >请确保 RenLight 处于配网模式（WiFi 未配置状态）</text
-          >
+        <view class="step-card glx-panel-card">
+          <view class="step-badge">2</view>
+          <view class="step-body">
+            <text class="step-title">打开设备配网页</text>
+            <text class="step-desc">
+              连接热点后，如果系统没有自动弹出门户，请手动在浏览器里输入
+              <text class="inline-strong">192.168.4.1</text>。
+            </text>
+          </view>
         </view>
 
-        <view class="action-btn glx-cta-button" @click="startScan">
-          <text class="btn-text">{{
-            scanning ? "搜索中..." : "开始搜索"
-          }}</text>
+        <view class="step-card glx-panel-card">
+          <view class="step-badge">3</view>
+          <view class="step-body">
+            <text class="step-title">选择 2.4GHz WiFi 并保存</text>
+            <text class="step-desc">
+              在设备门户中点击附近热点名称或手动输入 SSID，填写密码后保存。设备会自动重启并尝试连接。
+            </text>
+          </view>
         </view>
       </view>
 
-      <!-- Step 2: 配置 WiFi -->
-      <view v-if="step === 2" class="card glx-panel-card">
+      <view class="info-card glx-panel-card">
+        <view class="info-row">
+          <text class="info-label">热点名称</text>
+          <text class="info-value">Glowxel-设备序列号</text>
+        </view>
+        <view class="info-row">
+          <text class="info-label">门户地址</text>
+          <text class="info-value">192.168.4.1</text>
+        </view>
+      </view>
+
+      <view class="guide-card glx-panel-card">
         <view class="card-title-section glx-panel-head">
-          <text class="card-title glx-panel-title">配置 WiFi 网络</text>
-          <text class="card-subtitle glx-panel-subtitle"
-            >已连接到 {{ connectedDevice?.name }}</text
-          >
-        </view>
-
-        <view class="form-group">
-          <text class="form-label">WiFi 名称 (SSID)</text>
-          <input
-            class="form-input"
-            v-model="wifiSSID"
-            placeholder="请输入 WiFi 名称"
-          />
-        </view>
-        <view class="tip-box">
-          <text class="tip-text"
-            >⚠️ 设备仅支持 2.4GHz 频段，请勿使用 5GHz WiFi</text
-          >
-        </view>
-
-        <view class="form-group">
-          <text class="form-label">WiFi 密码</text>
-          <input
-            class="form-input"
-            v-model="wifiPassword"
-            type="password"
-            placeholder="请输入 WiFi 密码"
-          />
-        </view>
-
-        <view v-if="sending" class="scan-status">
-          <view class="loading-spinner"></view>
-          <text class="scan-text">正在发送配置...</text>
-        </view>
-
-        <view
-          class="action-btn glx-cta-button"
-          :class="{ disabled: sending }"
-          @click="sendWifiConfig"
-        >
-          <text class="btn-text">{{ sending ? "发送中..." : "发送配置" }}</text>
+          <text class="card-title glx-panel-title">配网完成后</text>
+          <text class="card-subtitle glx-panel-subtitle">
+            设备重启并连接成功后，会在屏幕上显示新的 IP 地址。回到设备控制页，输入这个
+            IP 即可连接设备。
+          </text>
         </view>
       </view>
 
-      <!-- Step 3: 完成 -->
-      <view v-if="step === 3" class="card success-card">
-        <view class="success-icon">✓</view>
-        <text class="success-title">配网成功</text>
-        <text class="success-desc">WiFi 配置已发送，设备正在重启连接网络</text>
-        <text class="success-hint">请稍等几秒，然后在设备控制页面连接设备</text>
-
-        <view class="action-btn" @click="goToControl">
+      <view class="actions">
+        <view class="secondary-btn" @click="handleBack">
+          <text class="secondary-btn-text">返回上一级</text>
+        </view>
+        <view class="action-btn glx-cta-button" @click="goToControl">
           <text class="btn-text">返回设备控制</text>
         </view>
       </view>
@@ -144,217 +109,15 @@
 import statusBarMixin from "../../mixins/statusBar.js";
 import Icon from "../../components/Icon.vue";
 
-const BLE_SERVICE_UUID = "4FAFC201-1FB5-459E-8FCC-C5C9C331914B";
-const BLE_WIFI_CHAR_UUID = "BEB5483E-36E1-4688-B7F5-EA07361B26A8";
-const BLE_STATUS_CHAR_UUID = "BEB5483E-36E1-4688-B7F5-EA07361B26A9";
-
 export default {
   mixins: [statusBarMixin],
   components: { Icon },
-  data() {
-    return {
-      step: 1,
-      scanning: false,
-      devices: [],
-      connectedDevice: null,
-      connectedDeviceId: "",
-      wifiSSID: "",
-      wifiPassword: "",
-      sending: false,
-    };
-  },
-
-  onLoad() {
-    this.autoFillWifi();
-  },
-
-  onUnload() {
-    this.cleanup();
-  },
-
   methods: {
-    autoFillWifi() {
-      uni.startWifi({
-        success: () => {
-          uni.getConnectedWifi({
-            success: (res) => {
-              if (res.wifi && res.wifi.SSID) {
-                this.wifiSSID = res.wifi.SSID;
-              }
-            },
-          });
-        },
-      });
-    },
-    startScan() {
-      if (this.scanning) return;
-      this.devices = [];
-      this.scanning = true;
-
-      uni.openBluetoothAdapter({
-        success: () => {
-          uni.startBluetoothDevicesDiscovery({
-            allowDuplicatesKey: false,
-            success: () => {
-              uni.onBluetoothDeviceFound((res) => {
-                res.devices.forEach((device) => {
-                  if (device.name && device.name.includes("RenLight")) {
-                    const exists = this.devices.find(
-                      (d) => d.deviceId === device.deviceId,
-                    );
-                    if (!exists) {
-                      this.devices.push(device);
-                    }
-                  }
-                });
-              });
-
-              // 10秒后停止扫描
-              setTimeout(() => {
-                this.stopScan();
-              }, 10000);
-            },
-            fail: () => {
-              this.scanning = false;
-              uni.showToast({ title: "扫描失败", icon: "none" });
-            },
-          });
-        },
-        fail: (err) => {
-          this.scanning = false;
-          if (err.errCode === 10001) {
-            uni.showToast({ title: "请打开手机蓝牙", icon: "none" });
-          } else {
-            uni.showToast({ title: "蓝牙初始化失败", icon: "none" });
-          }
-        },
-      });
-    },
-
-    stopScan() {
-      this.scanning = false;
-      uni.stopBluetoothDevicesDiscovery({ success: () => {} });
-    },
-
-    connectDevice(device) {
-      this.stopScan();
-      uni.showLoading({ title: "连接中..." });
-
-      uni.createBLEConnection({
-        deviceId: device.deviceId,
-        success: () => {
-          this.connectedDevice = device;
-          this.connectedDeviceId = device.deviceId;
-
-          // 延迟获取服务，部分安卓需要
-          setTimeout(() => {
-            uni.getBLEDeviceServices({
-              deviceId: device.deviceId,
-              success: (res) => {
-                const found = res.services.find((s) =>
-                  s.uuid.toUpperCase().includes("4FAFC201"),
-                );
-                if (found) {
-                  this.step = 2;
-                  uni.hideLoading();
-
-                  // 监听状态通知
-                  this.listenNotify();
-                } else {
-                  uni.hideLoading();
-                  uni.showToast({ title: "设备服务不匹配", icon: "none" });
-                }
-              },
-              fail: () => {
-                uni.hideLoading();
-                uni.showToast({ title: "获取服务失败", icon: "none" });
-              },
-            });
-          }, 1000);
-        },
-        fail: () => {
-          uni.hideLoading();
-          uni.showToast({ title: "连接失败，请重试", icon: "none" });
-        },
-      });
-    },
-
-    listenNotify() {
-      uni.notifyBLECharacteristicValueChange({
-        deviceId: this.connectedDeviceId,
-        serviceId: BLE_SERVICE_UUID,
-        characteristicId: BLE_STATUS_CHAR_UUID,
-        state: true,
-        success: () => {
-          uni.onBLECharacteristicValueChange((res) => {
-            const value = String.fromCharCode.apply(
-              null,
-              new Uint8Array(res.value),
-            );
-            console.log("状态通知:", value);
-            if (value === "saved") {
-              this.sending = false;
-              this.step = 3;
-            } else if (value.startsWith("error")) {
-              this.sending = false;
-              uni.showToast({ title: "配置失败: " + value, icon: "none" });
-            }
-          });
-        },
-      });
-    },
-
-    sendWifiConfig() {
-      if (!this.wifiSSID || !this.wifiPassword) {
-        uni.showToast({ title: "请填写完整的 WiFi 信息", icon: "none" });
-        return;
-      }
-      if (this.sending) return;
-      this.sending = true;
-
-      const data = this.wifiSSID + "\n" + this.wifiPassword;
-      const buffer = new ArrayBuffer(data.length);
-      const view = new Uint8Array(buffer);
-      for (let i = 0; i < data.length; i++) {
-        view[i] = data.charCodeAt(i);
-      }
-
-      uni.writeBLECharacteristicValue({
-        deviceId: this.connectedDeviceId,
-        serviceId: BLE_SERVICE_UUID,
-        characteristicId: BLE_WIFI_CHAR_UUID,
-        value: buffer,
-        success: () => {
-          console.log("WiFi 配置已发送");
-          // 等待设备通知 saved，如果 3 秒没收到就直接跳转
-          setTimeout(() => {
-            if (this.step !== 3) {
-              this.sending = false;
-              this.step = 3;
-            }
-          }, 3000);
-        },
-        fail: () => {
-          this.sending = false;
-          uni.showToast({ title: "发送失败，请重试", icon: "none" });
-        },
-      });
-    },
-
-    cleanup() {
-      if (this.connectedDeviceId) {
-        uni.closeBLEConnection({ deviceId: this.connectedDeviceId });
-      }
-      uni.closeBluetoothAdapter({ success: () => {} });
-    },
-
     goToControl() {
-      this.cleanup();
       uni.switchTab({ url: "/pages/control/control" });
     },
 
     handleBack() {
-      this.cleanup();
       uni.navigateBack();
     },
   },
@@ -362,11 +125,11 @@ export default {
 </script>
 
 <style scoped>
-.ble-page {
+.wifi-config-page {
   height: 100vh;
   display: flex;
   flex-direction: column;
-  background-color: var(--bg-secondary);
+  background: var(--nb-paper);
 }
 
 .navbar {
@@ -375,7 +138,7 @@ export default {
   align-items: center;
   justify-content: center;
   padding: 0 32rpx;
-  background-color: var(--nb-surface);
+  background: var(--nb-surface);
   border-bottom: 2rpx solid var(--nb-ink);
   position: relative;
 }
@@ -389,15 +152,6 @@ export default {
   justify-content: flex-start;
 }
 
-.nav-right {
-  position: absolute;
-  right: 32rpx;
-  width: 80rpx;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-}
-
 .nav-title {
   font-size: 32rpx;
   font-weight: 600;
@@ -407,252 +161,147 @@ export default {
 .content {
   flex: 1;
   padding: 32rpx;
-}
-
-.step-indicator {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 40rpx;
-  padding: 0 40rpx;
-}
-
-.step {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 8rpx;
+  gap: 24rpx;
 }
 
-.step-num {
-  width: 48rpx;
-  height: 48rpx;
-  border-radius: 50%;
-  background-color: var(--bg-tertiary);
-  border: 2rpx solid var(--nb-ink);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 24rpx;
-  color: var(--text-secondary);
-  text-align: center;
-  line-height: 48rpx;
-}
-
-.step.active .step-num {
-  background-color: rgba(79, 127, 255, 0.15);
-  border-color: #4f7fff;
-  color: #4f7fff;
-}
-
-.step.done .step-num {
-  background-color: #4f7fff;
-  color: #fff;
-}
-.step-text {
-  font-size: 20rpx;
-  color: var(--text-secondary);
-}
-.step.active .step-text {
-  color: #4f7fff;
-}
-
-.step-line {
-  width: 80rpx;
-  height: 4rpx;
-  background-color: var(--nb-ink);
-  margin: 0 16rpx;
-  margin-bottom: 28rpx;
-}
-.step-line.active {
-  background-color: #4f7fff;
-}
-
-.card {
-  background-color: var(--bg-tertiary);
-  border: 2rpx solid var(--nb-ink);
-  border-radius: 32rpx;
-  padding: 48rpx;
-  box-shadow: var(--nb-shadow-strong);
+.hero-card,
+.guide-card,
+.info-card,
+.step-card {
+  background: var(--nb-surface);
 }
 
 .card-title-section {
-  margin-bottom: 32rpx;
-}
-.card-title {
-  font-size: 28rpx;
-  font-weight: 500;
-  color: var(--text-primary);
-  display: block;
-}
-.card-subtitle {
-  font-size: 22rpx;
-  color: var(--text-secondary);
-  margin-top: 8rpx;
-  display: block;
+  gap: 10rpx;
 }
 
-.scan-status {
+.tip-box {
+  margin-top: 24rpx;
+  padding: 24rpx;
+  border: 2rpx solid var(--nb-ink);
+  background: #fff4d3;
+  box-shadow: 6rpx 6rpx 0 var(--nb-ink);
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+}
+
+.tip-title {
+  font-size: 26rpx;
+  font-weight: 700;
+  color: var(--nb-ink);
+}
+
+.tip-text {
+  font-size: 24rpx;
+  line-height: 1.7;
+  color: #444444;
+}
+
+.step-list {
+  display: flex;
+  flex-direction: column;
+  gap: 20rpx;
+}
+
+.step-card {
+  display: flex;
+  gap: 20rpx;
+  align-items: flex-start;
+}
+
+.step-badge {
+  width: 56rpx;
+  height: 56rpx;
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 16rpx;
-  padding: 32rpx 0;
-}
-.scan-text {
-  font-size: 24rpx;
-  color: var(--text-secondary);
-}
-
-.loading-spinner {
-  width: 32rpx;
-  height: 32rpx;
-  border: 4rpx solid var(--nb-ink);
-  border-top-color: #4f7fff;
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-}
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-.device-list {
-  margin-bottom: 24rpx;
-}
-.device-item {
-  display: flex;
-  align-items: center;
-  gap: 20rpx;
-  padding: 24rpx;
-  background-color: var(--bg-secondary);
   border: 2rpx solid var(--nb-ink);
-  border-radius: 16rpx;
-  margin-bottom: 16rpx;
+  background: #74b9ff;
+  color: var(--nb-ink);
+  font-size: 28rpx;
+  font-weight: 700;
+  box-shadow: 4rpx 4rpx 0 var(--nb-ink);
 }
-.device-item:active {
-  border-color: #4f7fff;
-}
-.device-icon {
-  flex-shrink: 0;
-}
-.device-info {
+
+.step-body {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 4rpx;
-}
-.device-name {
-  font-size: 26rpx;
-  color: var(--text-primary);
-  font-weight: 500;
-}
-.device-id {
-  font-size: 18rpx;
-  color: var(--text-secondary);
-  font-family: monospace;
-}
-.device-rssi {
-  font-size: 22rpx;
-  color: var(--text-secondary);
-  flex-shrink: 0;
+  gap: 8rpx;
 }
 
-.empty-state {
-  text-align: center;
-  padding: 48rpx 0;
-}
-.empty-text {
+.step-title {
   font-size: 28rpx;
-  color: var(--text-secondary);
-  display: block;
-}
-.empty-hint {
-  font-size: 22rpx;
-  color: var(--text-tertiary);
-  margin-top: 12rpx;
-  display: block;
+  font-weight: 700;
+  color: var(--nb-ink);
 }
 
-.form-group {
-  margin-bottom: 24rpx;
-}
-.tip-box {
-  background-color: #fff7e6;
-  border: 1rpx solid #ffd591;
-  border-radius: 8rpx;
-  padding: 16rpx 20rpx;
-  margin-bottom: 24rpx;
-}
-.tip-text {
-  font-size: 22rpx;
-  color: #d46b08;
-  line-height: 1.5;
-}
-.form-label {
+.step-desc {
   font-size: 24rpx;
-  color: var(--text-secondary);
-  margin-bottom: 12rpx;
-  display: block;
-}
-.form-input {
-  width: 100%;
-  padding: 24rpx;
-  height: 88rpx;
-  line-height: 40rpx;
-  background-color: var(--bg-secondary);
-  border: 2rpx solid var(--nb-ink);
-  border-radius: 16rpx;
-  font-size: 28rpx;
-  color: var(--text-primary);
-  box-sizing: border-box;
+  line-height: 1.7;
+  color: #444444;
 }
 
-.action-btn {
-  margin-top: 24rpx;
-  padding: 28rpx;
-  background: linear-gradient(135deg, #4f7fff, #6c5ce7);
-  border-radius: 16rpx;
-  text-align: center;
+.inline-strong {
+  font-weight: 700;
+  color: var(--nb-ink);
 }
-.action-btn:active {
-  opacity: 0.85;
-  transform: scale(0.98);
+
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 24rpx;
+  padding: 20rpx 0;
+  border-bottom: 2rpx solid rgba(0, 0, 0, 0.12);
 }
-.action-btn.disabled {
-  opacity: 0.5;
+
+.info-row:first-child {
+  padding-top: 0;
 }
+
+.info-row:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.info-label {
+  font-size: 24rpx;
+  color: #444444;
+}
+
+.info-value {
+  flex: 1;
+  text-align: right;
+  font-size: 24rpx;
+  font-weight: 700;
+  color: var(--nb-ink);
+}
+
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
+  padding-bottom: 40rpx;
+}
+
+.secondary-btn {
+  min-height: 96rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2rpx solid var(--nb-ink);
+  background: #ffffff;
+  box-shadow: 6rpx 6rpx 0 var(--nb-ink);
+}
+
+.secondary-btn-text,
 .btn-text {
   font-size: 28rpx;
-  color: #fff;
-  font-weight: 600;
-}
-
-.success-card {
-  text-align: center;
-}
-.success-icon {
-  font-size: 96rpx;
-  color: #00c853;
-  margin-bottom: 24rpx;
-}
-.success-title {
-  font-size: 36rpx;
   font-weight: 700;
-  color: var(--text-primary);
-  display: block;
-}
-.success-desc {
-  font-size: 26rpx;
-  color: var(--text-secondary);
-  margin-top: 16rpx;
-  display: block;
-}
-.success-hint {
-  font-size: 22rpx;
-  color: var(--text-tertiary);
-  margin-top: 12rpx;
-  display: block;
+  color: var(--nb-ink);
 }
 </style>

@@ -520,7 +520,7 @@ export default {
   display: flex;
   flex-direction: column;
   gap: 16rpx;
-  padding: 0;
+  padding: 10rpx 0 4rpx;
   background: transparent;
   border: 0;
   border-radius: 0;
@@ -536,6 +536,7 @@ export default {
   display: flex;
   align-items: center;
   gap: 16rpx;
+  padding: 0 2rpx;
 }
 
 .preview-swatch {
@@ -568,6 +569,7 @@ export default {
   display: flex;
   flex-wrap: wrap;
   gap: 10rpx;
+  padding: 0 2rpx;
 }
 
 .preset-swatch {
@@ -588,7 +590,7 @@ export default {
   height: 240rpx;
   border-radius: 0;
   overflow: hidden;
-  border: 2rpx solid #000000;
+  border: 0;
 }
 
 .sv-panel-white {
@@ -617,6 +619,7 @@ export default {
   display: flex;
   align-items: center;
   gap: 16rpx;
+  padding: 0 2rpx;
 }
 
 .channel-label {
@@ -640,7 +643,7 @@ export default {
     #ff00ff 83%,
     #ff0000 100%
   );
-  border: 2rpx solid #000000;
+  border: 0;
 }
 
 .hue-thumb {

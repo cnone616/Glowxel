@@ -1,5 +1,5 @@
 <template>
-  <view v-if="visible" class="glx-toast-overlay">
+  <view v-if="visible" class="glx-toast-overlay" :style="overlayStyle">
     <view :class="['glx-toast-container', `glx-toast--${type}`]">
       <view class="glx-toast-main">
         <view class="glx-toast-icon-wrapper">
@@ -22,7 +22,8 @@ export default {
       message: '',
       type: 'success',
       timer: null,
-      showTimer: null
+      showTimer: null,
+      overlayTopPx: 0
     }
   },
   
@@ -35,10 +36,29 @@ export default {
         info: 'i'
       }
       return icons[this.type] || icons.success
+    },
+    overlayStyle() {
+      return {
+        paddingTop: `${this.overlayTopPx}px`
+      }
     }
+  },
+
+  created() {
+    this.syncOverlayTop()
   },
   
   methods: {
+    syncOverlayTop() {
+      const systemInfo = uni.getSystemInfoSync()
+      const safeTop =
+        (systemInfo.safeAreaInsets && systemInfo.safeAreaInsets.top) ||
+        systemInfo.statusBarHeight ||
+        0
+      const windowWidth = systemInfo.windowWidth || systemInfo.screenWidth || 375
+      const baseTopPx = (120 * windowWidth) / 750
+      this.overlayTopPx = Math.max(Math.round(baseTopPx), Math.round(safeTop + 20))
+    },
     show(message, type = 'success', duration = 2000) {
       if (this.timer) {
         clearTimeout(this.timer)
@@ -50,6 +70,7 @@ export default {
       
       this.message = message
       this.type = type
+      this.syncOverlayTop()
       
       // 通知父组件显示toast（用于隐藏canvas）
       this.$emit('show')
@@ -102,27 +123,33 @@ export default {
   right: 0;
   bottom: 0;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
   z-index: 10000;
   background-color: transparent;
   pointer-events: none;
+  padding-top: 120rpx;
+  padding-left: 24rpx;
+  padding-right: 24rpx;
+  box-sizing: border-box;
 }
 
 .glx-toast-container {
-  min-width: 460rpx;
+  width: 100%;
+  min-width: 0;
   max-width: 620rpx;
   min-height: 104rpx;
-  padding: 0 22rpx 0 28rpx;
+  padding: 0 18rpx 0 24rpx;
   border: 4rpx solid #000000;
   border-radius: 0;
-  box-shadow: 5rpx 5rpx 0 #000000;
+  box-shadow: 7rpx 7rpx 0 #000000;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 20rpx;
+  gap: 16rpx;
   animation: toastFadeIn 0.18s ease-out;
   pointer-events: auto;
+  box-sizing: border-box;
 }
 
 @keyframes toastFadeIn {
@@ -141,12 +168,12 @@ export default {
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: 20rpx;
-  padding: 24rpx 0;
+  gap: 18rpx;
+  padding: 22rpx 0;
 }
 
 .glx-toast--success {
-  background: #8ed89f;
+  background: #b9dc96;
 }
 
 .glx-toast--error {
@@ -154,19 +181,22 @@ export default {
 }
 
 .glx-toast--info {
-  background: #74b9ff;
+  background: #bcd6ff;
 }
 
 .glx-toast--warning {
-  background: #ffd23f;
+  background: #f2cf4a;
 }
 
 .glx-toast-icon-wrapper {
-  width: 48rpx;
-  height: 48rpx;
+  width: 56rpx;
+  height: 56rpx;
   display: flex;
   align-items: center;
   justify-content: center;
+  border: 3rpx solid #000000;
+  background: rgba(255, 255, 255, 0.34);
+  box-sizing: border-box;
 }
 
 .glx-toast-icon-glyph {
@@ -179,7 +209,7 @@ export default {
 .glx-toast-message {
   flex: 1;
   min-width: 0;
-  font-size: 28rpx;
+  font-size: 26rpx;
   font-weight: 900;
   color: #000000;
   text-align: left;
@@ -187,14 +217,15 @@ export default {
 }
 
 .glx-toast-close {
-  width: 56rpx;
-  height: 56rpx;
+  width: 60rpx;
+  height: 60rpx;
   display: flex;
   align-items: center;
   justify-content: center;
   border: 3rpx solid #000000;
-  background: rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.34);
   flex-shrink: 0;
+  box-sizing: border-box;
 }
 
 .glx-toast-close-glyph {

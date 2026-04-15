@@ -10,7 +10,7 @@
       />
       <!-- 图片加载失败占位 -->
       <view v-if="imageError" class="image-placeholder">
-        <Icon name="picture" :size="64" color="#FFFFFF" />
+        <Icon name="picture" :size="64" color="currentColor" />
       </view>
       
       <!-- 渐变遮罩 -->
@@ -18,7 +18,7 @@
       
       <!-- 挑战图标 -->
       <view class="challenge-icon">
-        <Icon name="work" :size="48" color="#FFFFFF" />
+        <Icon name="work" :size="48" color="currentColor" />
       </view>
       
       <!-- 状态标签 -->
@@ -38,19 +38,19 @@
       <!-- 挑战统计 -->
       <view class="challenge-stats">
         <view class="stat-item">
-          <Icon name="user" :size="24" color="#4F7FFF" />
+          <Icon name="user" :size="24" color="currentColor" />
           <text class="stat-text">{{ formatNumber(challenge.participants) }}人参与</text>
         </view>
         
         <view class="stat-item">
-          <Icon name="time" :size="24" color="#666666" />
+          <Icon name="time" :size="24" color="currentColor" />
           <text class="stat-text">{{ timeText }}</text>
         </view>
       </view>
       
       <!-- 奖励信息 -->
       <view v-if="challenge.prize" class="reward-info">
-        <Icon name="work" :size="24" color="#FF7A45" />
+        <Icon name="work" :size="24" color="currentColor" />
         <text class="reward-text">奖励: {{ challenge.prize }}</text>
       </view>
     </view>
@@ -220,10 +220,6 @@ export default {
   transition: all 0.2s ease;
 }
 
-.challenge-card:active {
-  transform: translate(4rpx, 4rpx);
-  box-shadow: 2rpx 2rpx 0 var(--nb-ink);
-}
 
 .challenge-banner {
   position: relative;
@@ -247,6 +243,7 @@ export default {
   align-items: center;
   justify-content: center;
   background: #ffe49a;
+  color: var(--nb-ink);
 }
 
 .banner-overlay {
@@ -271,6 +268,7 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
+  color: var(--nb-ink);
 }
 
 .status-badge {
@@ -342,11 +340,12 @@ export default {
   display: flex;
   align-items: center;
   gap: 8rpx;
+  color: #4a4a4a;
 }
 
 .stat-text {
   font-size: 24rpx;
-  color: #4a4a4a;
+  color: currentColor;
   font-weight: 500;
 }
 
@@ -358,11 +357,12 @@ export default {
   background-color: rgba(255, 122, 69, 0.1);
   border-radius: 0;
   margin-bottom: 20rpx;
+  color: var(--nb-coral);
 }
 
 .reward-text {
   font-size: 24rpx;
-  color: var(--nb-blue);
+  color: currentColor;
   font-weight: 500;
 }
 
@@ -396,9 +396,6 @@ export default {
   background-color: var(--nb-green);
 }
 
-.join-button:active {
-  transform: scale(0.95);
-}
 
 .button-text {
   font-size: 28rpx;
@@ -407,13 +404,4 @@ export default {
 }
 
 /* 参与动画 */
-.button-joined {
-  animation: joinSuccess 0.5s ease;
-}
-
-@keyframes joinSuccess {
-  0% { transform: scale(1); }
-  50% { transform: scale(1.05); }
-  100% { transform: scale(1); }
-}
 </style>
