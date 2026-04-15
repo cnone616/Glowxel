@@ -43,20 +43,22 @@
         <view v-if="!isDeviceConnected" class="connect-entry-grid">
           <view class="connect-entry-card" @click="handleConnect">
             <view class="connect-entry-icon">
-              <Icon name="scanning" :size="36" color="#4F7FFF" />
+              <Icon name="scanning" :size="36" color="var(--nb-ink)" />
             </view>
             <view class="connect-entry-text">
               <text class="connect-entry-label">WiFi 连接</text>
               <text class="connect-entry-desc">输入设备 IP 地址连接</text>
             </view>
           </view>
-          <view class="connect-entry-card" @click="goToBleConfig">
+          <view class="connect-entry-card" @click="goToWifiConfig">
             <view class="connect-entry-icon mint">
-              <Icon name="mobile-phone" :size="36" color="#00D9D9" />
+              <Icon name="mobile-phone" :size="36" color="var(--nb-ink)" />
             </view>
             <view class="connect-entry-text">
-              <text class="connect-entry-label">蓝牙配网</text>
-              <text class="connect-entry-desc">首次使用请先配置 WiFi</text>
+              <text class="connect-entry-label">热点配网</text>
+              <text class="connect-entry-desc"
+                >首次使用请连接设备热点完成配网</text
+              >
             </view>
           </view>
         </view>
@@ -65,16 +67,14 @@
       <view class="section-block">
         <view class="section-header glx-section-head">
           <text class="section-title glx-section-title">模式入口</text>
-          <text class="section-meta"
-            >{{ modeEntries.length }} 个设备模式</text
-          >
+          <text class="section-meta">{{ modeCatalog.length }} 个入口</text>
         </view>
         <view class="mode-badge-grid">
           <view
-            v-for="entry in modeEntries"
+            v-for="entry in modeCatalog"
             :key="entry.key"
             class="mode-badge"
-            :class="[entry.variant, { active: isModeActive(entry) }]"
+            :class="entry.variant"
             @click="handleModeSelect(entry)"
           >
             <view class="mode-badge-icon-shell">
@@ -89,7 +89,12 @@
                     class="mode-pixel-cell"
                   ></view>
                 </view>
-                <Icon v-else :name="entry.icon" :size="42" color="#FFFFFF" />
+                <Icon
+                  v-else
+                  :name="entry.icon"
+                  :size="42"
+                  color="currentColor"
+                />
               </view>
             </view>
             <text class="mode-badge-name">{{ entry.name }}</text>
@@ -97,47 +102,22 @@
         </view>
       </view>
 
-      <view class="section-block" id="brightness-section">
-        <view class="section-header">
-          <text class="section-title">亮度调节</text>
-          <text class="section-meta">当前 {{ brightness }}%</text>
-        </view>
-        <view class="panel-card brightness-card glx-panel-card">
-          <view class="brightness-topline">
-            <view class="panel-action-icon warm">
-              <Icon name="prompt" :size="32" color="#FBBF24" />
-            </view>
-            <view class="panel-action-text">
-              <text class="panel-action-label">屏幕亮度</text>
-              <text class="panel-action-desc">调整设备显示强度</text>
-            </view>
-            <text class="brightness-value">{{ brightness }}%</text>
-          </view>
-          <GlxSlider
-            :value="brightness"
-            @change="handleBrightnessChange"
-            :min="0"
-            :max="100"
-            class="brightness-slider"
-          />
-        </view>
-      </view>
-
       <view class="section-block">
         <view class="section-header glx-section-head">
-          <text class="section-title glx-section-title">高级</text>
-          <text class="section-meta">危险操作请谨慎</text>
+          <text class="section-title glx-section-title">设备参数</text>
         </view>
         <view class="panel-card glx-panel-card">
-          <view class="panel-action danger" @click="handleResetWifi">
-            <view class="panel-action-icon danger">
-              <Icon name="close" :size="32" color="#FF7A45" />
+          <view class="panel-action" @click="openDeviceParams">
+            <view class="panel-action-icon">
+              <Icon name="setting" :size="32" color="var(--nb-ink)" />
             </view>
             <view class="panel-action-text">
-              <text class="panel-action-label danger-text">重置网络</text>
-              <text class="panel-action-desc">清除 WiFi 配置并重启设备</text>
+              <text class="panel-action-label">设备参数</text>
+              <text class="panel-action-desc"
+                >调整亮度、方向、颜色、重置网络</text
+              >
             </view>
-            <Icon name="direction-right" :size="28" color="#94A3B8" />
+            <Icon name="direction-right" :size="28" color="var(--nb-ink)" />
           </view>
         </view>
       </view>
@@ -179,7 +159,6 @@ import Icon from "../../components/Icon.vue";
 import Toast from "../../components/Toast.vue";
 import ConnectModal from "../../components/ConnectModal.vue";
 import JsonImportModal from "../../components/JsonImportModal.vue";
-import GlxSlider from "../../components/GlxSlider.vue";
 
 export default {
   mixins: [statusBarMixin],
@@ -188,7 +167,6 @@ export default {
     Toast,
     ConnectModal,
     JsonImportModal,
-    GlxSlider,
   },
   data() {
     return {
@@ -199,9 +177,6 @@ export default {
 
       // 设备模式
       deviceMode: "clock", // clock, animation, canvas
-
-      // 设置
-      brightness: 50,
 
       // 连接弹窗
       showConnectModal: false,
@@ -239,11 +214,11 @@ export default {
         businessMode: false,
       });
     }
+  },
 
-    // 从缓存读取亮度
-    const savedBrightness = uni.getStorageSync("device_brightness");
-    if (savedBrightness !== undefined && savedBrightness !== null) {
-      this.brightness = savedBrightness;
+  onReady() {
+    if (this.$refs.toastRef) {
+      this.toast.setToastInstance(this.$refs.toastRef);
     }
   },
 
@@ -251,9 +226,6 @@ export default {
     this.deviceIp = this.deviceStore?.deviceIp || this.deviceIp;
     this.deviceMode = this.deviceStore?.deviceMode || this.deviceMode;
     const status = this.deviceStore?.deviceInfo;
-    if (status && typeof status.brightness === "number") {
-      this.brightness = Math.round((status.brightness / 178) * 100);
-    }
     if (status && typeof status.mode === "string") {
       this.deviceMode =
         this.deviceStore.resolveDeviceModeFromStatus(status) ||
@@ -266,7 +238,7 @@ export default {
     isDeviceConnected() {
       return this.deviceStore?.connected || false;
     },
-    modeEntries() {
+    modeCatalog() {
       return [
         {
           key: "eyes",
@@ -274,6 +246,7 @@ export default {
           icon: "browse",
           variant: "pink",
           type: "mode",
+          bucket: "stable",
         },
         {
           key: "clock",
@@ -281,6 +254,7 @@ export default {
           icon: "time",
           variant: "cyan",
           type: "mode",
+          bucket: "stable",
         },
         {
           key: "animation",
@@ -288,6 +262,7 @@ export default {
           icon: "play",
           variant: "teal",
           type: "mode",
+          bucket: "stable",
         },
         {
           key: "theme",
@@ -295,48 +270,55 @@ export default {
           icon: "picture",
           variant: "purple",
           type: "mode",
+          bucket: "stable",
         },
         {
           key: "canvas",
           name: "画板模式",
-          iconType: "canvas",
+          icon: "edit",
           variant: "blue",
           type: "mode",
+          bucket: "stable",
         },
         {
           key: "tetris",
-          name: "俄罗斯方块时钟",
-          icon: "a-Grid-ninejiugongge",
+          name: "俄罗斯方块屏保",
+          icon: "modular",
           variant: "indigo",
           type: "mode",
+          bucket: "secondary",
         },
         {
-          key: "ambient_effect",
-          name: "像素屏保",
-          icon: "picture",
-          variant: "purple",
+          key: "game_screensaver",
+          name: "游戏屏保",
+          icon: "pad",
+          variant: "indigo",
           type: "mode",
+          bucket: "secondary",
         },
         {
-          key: "text_display",
-          name: "像素信息屏",
-          icon: "text",
-          variant: "green",
+          key: "led_matrix_showcase",
+          name: "像素场景集",
+          icon: "layers",
+          variant: "indigo",
           type: "mode",
+          bucket: "secondary",
         },
         {
-          key: "breath_effect",
-          name: "矩阵流光",
-          icon: "prompt",
-          variant: "gold",
+          key: "gif_player",
+          name: "GIF播放器",
+          icon: "film",
+          variant: "teal",
           type: "mode",
+          bucket: "migration",
         },
         {
-          key: "rhythm_effect",
-          name: "音频频谱",
-          icon: "task",
-          variant: "orange",
+          key: "countdown",
+          name: "沙漏倒计时",
+          icon: "history",
+          variant: "red",
           type: "mode",
+          bucket: "migration",
         },
       ];
     },
@@ -399,25 +381,6 @@ export default {
       this.toast.showError("连接超时，请重试");
     },
 
-    async handleBrightnessChange(e) {
-      this.brightness = e.detail.value;
-
-      // 保存到缓存
-      uni.setStorageSync("device_brightness", this.brightness);
-
-      // 如果已连接，发送亮度控制命令
-      if (this.isDeviceConnected) {
-        try {
-          // 将 0-100 的值映射到 0-178 (70% of 255)，限制最大亮度为70%
-          const maxBrightness = 178; // 255 * 0.7
-          const value = Math.round((this.brightness * maxBrightness) / 100);
-          await this.deviceStore.setBrightness(value);
-        } catch (err) {
-          console.error("设置亮度失败:", err);
-        }
-      }
-    },
-
     async switchMode(mode) {
       this.deviceMode = mode;
       this.deviceStore.setDeviceMode(mode, {
@@ -428,26 +391,30 @@ export default {
         this.openSpiritScreen();
       } else if (mode === "clock" || mode === "animation" || mode === "theme") {
         this.editClockWithMode(mode);
-      } else if (mode === "text_display") {
-        this.editEffectWithMode("text_display");
-      } else if (mode === "breath_effect") {
-        this.editEffectWithMode("breath_effect");
-      } else if (mode === "rhythm_effect") {
-        this.editEffectWithMode("rhythm_effect");
-      } else if (mode === "ambient_effect") {
-        this.openAmbientEditor();
+      } else if (mode === "countdown") {
+        this.openCountdownBoard();
+      } else if (mode === "ambient_effect" || mode === "led_matrix_showcase") {
+        this.openLedMatrixShowcase();
       } else if (mode === "tetris") {
         this.openTetrisSettings();
+      } else if (mode === "game_screensaver") {
+        this.openGameScreensaver();
+      } else if (mode === "gif_player") {
+        this.openGifPlayer();
       } else if (mode === "canvas") {
         this.openCanvasEditor();
       }
     },
 
     editClockWithMode(mode) {
-      const targetMode =
-        mode === "animation" || mode === "theme" ? mode : "clock";
+      let url = "/pages/clock-editor/clock-editor";
+      if (mode === "animation") {
+        url = "/pages/clock-editor/animation-clock";
+      } else if (mode === "theme") {
+        url = "/pages/clock-editor/theme-clock";
+      }
       uni.navigateTo({
-        url: `/pages/clock-editor/clock-editor?mode=${targetMode}`,
+        url,
       });
     },
 
@@ -463,9 +430,27 @@ export default {
       });
     },
 
-    openAmbientEditor() {
+    openLedMatrixShowcase() {
       uni.navigateTo({
-        url: "/pages/ambient-editor/ambient-editor",
+        url: "/pages/led-matrix/led-matrix",
+      });
+    },
+
+    openCountdownBoard() {
+      uni.navigateTo({
+        url: "/pages/countdown-board/countdown-board",
+      });
+    },
+
+    openGifPlayer() {
+      uni.navigateTo({
+        url: "/pages/gif-player/gif-player",
+      });
+    },
+
+    openGameScreensaver() {
+      uni.navigateTo({
+        url: "/pages/game-screensaver/game-screensaver",
       });
     },
 
@@ -475,20 +460,14 @@ export default {
       });
     },
 
-    editEffectWithMode(mode) {
-      uni.navigateTo({
-        url: `/pages/effect-editor/effect-editor?mode=${mode}`,
-      });
-    },
-
-    editEffect() {
-      if (
-        this.deviceMode === "text_display" ||
-        this.deviceMode === "breath_effect" ||
-        this.deviceMode === "rhythm_effect"
-      ) {
-        this.editEffectWithMode(this.deviceMode);
+    openDeviceParams() {
+      if (!this.isDeviceConnected) {
+        this.toast.showInfo("请先连接设备");
+        return;
       }
+      uni.navigateTo({
+        url: "/pages/device-params/device-params",
+      });
     },
 
     importJSON() {
@@ -781,40 +760,6 @@ export default {
       });
     },
 
-    handleResetWifi() {
-      if (!this.isDeviceConnected || !this.deviceIp) {
-        this.toast.showInfo("未连接设备时仅支持查看样式");
-        return;
-      }
-      uni.showModal({
-        title: "重置网络",
-        content: "确定要清除 WiFi 配置吗？设备将重启并进入配网模式。",
-        confirmText: "确定重置",
-        confirmColor: "#ff4d4f",
-        success: async (res) => {
-          if (!res.confirm) return;
-          try {
-            // 先断开，防止 ESP32 重启后触发自动重连
-            this.deviceStore.disconnect();
-
-            const url = `http://${this.deviceIp}/clear-wifi`;
-            uni.request({
-              url,
-              method: "GET",
-              success: () => {
-                this.toast.showSuccess("网络已重置，设备重启中...");
-              },
-              fail: () => {
-                this.toast.showError("重置失败，请检查设备连接");
-              },
-            });
-          } catch (err) {
-            this.toast.showError("重置失败：" + err.message);
-          }
-        },
-      });
-    },
-
     handleJsonImportError(message) {
       this.toast.showError(message);
       // 错误时不关闭弹窗，让用户可以修改
@@ -831,12 +776,8 @@ export default {
         : { r: 255, g: 255, b: 255 };
     },
 
-    goToBleConfig() {
+    goToWifiConfig() {
       uni.navigateTo({ url: "/pages/ble-config/ble-config" });
-    },
-
-    openDesignPreview(url) {
-      uni.navigateTo({ url });
     },
   },
 };
@@ -960,8 +901,9 @@ export default {
   width: 92rpx;
   height: 92rpx;
   border-radius: 0;
-  background: linear-gradient(180deg, #f8fafc 0%, #f2f5f9 100%);
-  border: 2rpx solid #e8edf3;
+  background: var(--nb-surface);
+  border: 2rpx solid var(--nb-ink);
+  box-shadow: var(--nb-shadow-soft);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -970,9 +912,10 @@ export default {
 .device-logo-core {
   width: 42rpx;
   height: 42rpx;
-  border-radius: 12rpx;
-  background: linear-gradient(135deg, #00d9d9 0%, #4f7fff 100%);
-  box-shadow: 0 10rpx 22rpx rgba(79, 127, 255, 0.2);
+  border-radius: 0;
+  background: var(--nb-blue);
+  border: 2rpx solid var(--nb-ink);
+  box-shadow: var(--nb-shadow-soft);
 }
 
 .device-summary-text {
@@ -998,23 +941,23 @@ export default {
   width: 14rpx;
   height: 14rpx;
   border-radius: 999rpx;
-  background: #cbd5e1;
+  background: var(--text-tertiary);
 }
 
 .device-status-dot.online {
-  background: #22c55e;
-  box-shadow: 0 0 12rpx rgba(34, 197, 94, 0.28);
+  background: var(--nb-green);
+  box-shadow: none;
 }
 
 .device-status-label,
 .device-status-ip {
   font-size: 22rpx;
-  color: #667085;
+  color: var(--text-tertiary);
 }
 
 .device-status-ip {
   font-family: monospace;
-  color: #344054;
+  color: var(--nb-ink);
 }
 
 .connect-entry-grid {
@@ -1025,8 +968,9 @@ export default {
 
 .connect-entry-card {
   border-radius: 0;
-  background: #ffffff;
-  border: 2rpx solid #000000;
+  background: var(--nb-surface);
+  border: 2rpx solid var(--nb-ink);
+  box-shadow: var(--nb-shadow-soft);
   padding: 20rpx;
   display: flex;
   align-items: center;
@@ -1038,8 +982,9 @@ export default {
   width: 72rpx;
   height: 72rpx;
   border-radius: 0;
-  background: #ffffff;
-  border: 2rpx solid #000000;
+  background: var(--nb-surface);
+  border: 2rpx solid var(--nb-ink);
+  box-shadow: var(--nb-shadow-soft);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1051,16 +996,16 @@ export default {
 }
 
 .panel-action-icon.danger {
-  background: #d92d20;
+  background: var(--nb-coral);
 }
 
 .connect-entry-icon.mint,
 .panel-action-icon.mint {
-  background: #ffffff;
+  background: var(--nb-green);
 }
 
 .panel-action-icon.blue {
-  background: #ffffff;
+  background: var(--nb-blue);
 }
 
 .connect-entry-text,
@@ -1086,13 +1031,7 @@ export default {
 .panel-action-desc,
 .section-meta {
   font-size: 22rpx;
-  color: #667085;
-}
-
-.connect-entry-desc,
-.panel-action-desc,
-.section-meta {
-  color: #64748b;
+  color: var(--text-tertiary);
 }
 
 .section-block {
@@ -1122,35 +1061,25 @@ export default {
 .mode-badge {
   border-radius: 0;
   padding: 16rpx 8rpx 14rpx;
-  border: 2rpx solid #000000;
-  background: #ffffff;
+  border: 2rpx solid var(--nb-ink);
+  background: var(--nb-surface);
+  box-shadow: var(--nb-shadow-soft);
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 10rpx;
 }
 
-.mode-badge.active {
-  border-color: #000000;
-  background: var(--nb-yellow);
-  box-shadow: none;
-}
-
-.mode-badge.active .mode-badge-name {
-  font-size: 24rpx;
-  font-weight: 900;
-}
-
 .mode-badge-icon-shell {
   width: 96rpx;
   height: 96rpx;
-  padding: 6rpx;
+  padding: 10rpx;
   border-radius: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 0;
-  background: transparent;
+  border: 2rpx solid var(--nb-ink);
+  background: var(--nb-surface);
 }
 
 .mode-badge-icon-core {
@@ -1161,15 +1090,17 @@ export default {
   align-items: center;
   justify-content: center;
   box-shadow: none;
-  border: 2rpx solid #000000;
+  border: 0;
+  color: var(--nb-ink);
 }
 
 .mode-badge-name {
   font-size: 21rpx;
   font-weight: 600;
-  color: #0f172a;
+  color: var(--nb-ink);
   text-align: center;
   line-height: 1.25;
+  white-space: nowrap;
 }
 
 .mode-pixel-icon {
@@ -1181,116 +1112,104 @@ export default {
 }
 
 .mode-pixel-cell {
-  border-radius: 6rpx;
-  background: rgba(255, 255, 255, 0.72);
+  border-radius: 0;
+  background: currentColor;
 }
 
 .mode-badge.pink {
-  background: #ffffff;
-  border-color: #000000;
+  background: #fff1f6;
 }
 
 .mode-badge.pink .mode-badge-icon-core {
-  background: linear-gradient(135deg, #ec4899 0%, #f472b6 100%);
+  background: #f472b6;
 }
 
 .mode-badge.cyan {
-  background: #ffffff;
-  border-color: #000000;
+  background: #ecfbfd;
 }
 
 .mode-badge.cyan .mode-badge-icon-core {
-  background: linear-gradient(135deg, #00d9d9 0%, #1ae4e4 100%);
+  background: #00c9d8;
 }
 
 .mode-badge.teal {
-  background: #ffffff;
-  border-color: #000000;
+  background: #e9faf6;
 }
 
 .mode-badge.teal .mode-badge-icon-core {
-  background: linear-gradient(135deg, #06b6d4 0%, #22d3ee 100%);
+  background: #14b8a6;
 }
 
 .mode-badge.purple {
-  background: #ffffff;
-  border-color: #000000;
+  background: #f1ecff;
 }
 
 .mode-badge.purple .mode-badge-icon-core {
-  background: linear-gradient(135deg, #8b5cf6 0%, #9b6ff7 100%);
+  background: #8b5cf6;
 }
 
 .mode-badge.blue {
-  background: #ffffff;
-  border-color: #000000;
+  background: var(--nb-surface);
 }
 
 .mode-badge.blue .mode-badge-icon-core {
-  background: linear-gradient(135deg, #4f7fff 0%, #6b8fff 100%);
+  background: var(--nb-blue);
 }
 
 .mode-badge.indigo {
-  background: #ffffff;
-  border-color: #000000;
+  background: #eef0ff;
 }
 
 .mode-badge.indigo .mode-badge-icon-core {
-  background: linear-gradient(135deg, #7c3aed 0%, #8b5cf6 100%);
+  background: #6f68ff;
 }
 
 .mode-badge.green {
-  background: #ffffff;
-  border-color: #000000;
+  background: var(--nb-surface);
 }
 
 .mode-badge.green .mode-badge-icon-core {
-  background: linear-gradient(135deg, #10b981 0%, #20c997 100%);
+  background: var(--nb-green);
 }
 
 .mode-badge.gold {
-  background: #ffffff;
-  border-color: #000000;
+  background: var(--nb-surface);
 }
 
 .mode-badge.gold .mode-badge-icon-core {
-  background: linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%);
+  background: var(--nb-yellow);
 }
 
 .mode-badge.orange {
-  background: #ffffff;
-  border-color: #000000;
+  background: var(--nb-surface);
 }
 
 .mode-badge.orange .mode-badge-icon-core {
-  background: linear-gradient(135deg, #ff7a45 0%, #ff8b5c 100%);
+  background: #f59e0b;
 }
 
 .mode-badge.red {
-  background: #ffffff;
-  border-color: #000000;
+  background: var(--nb-surface);
 }
 
 .mode-badge.red .mode-badge-icon-core {
-  background: linear-gradient(135deg, #ef4444 0%, #f87171 100%);
+  background: var(--nb-coral);
 }
 
 .mode-badge.mint {
-  background: #ffffff;
-  border-color: #000000;
+  background: #e8faf2;
 }
 
 .mode-badge.mint .mode-badge-icon-core {
-  background: linear-gradient(135deg, #14b8a6 0%, #2dd4bf 100%);
+  background: #42c7a0;
 }
 
 .mode-badge.azure {
-  background: #ffffff;
-  border-color: #000000;
+  background: #e8f2ff;
 }
 
 .mode-badge.azure .mode-badge-icon-core {
-  background: linear-gradient(135deg, #3b82f6 0%, #60a5fa 100%);
+  background: #5a90ff;
 }
 
 .panel-card {
@@ -1310,43 +1229,10 @@ export default {
   background: #ffffff;
 }
 
-.panel-action.danger {
-  background: #ffffff;
-}
-
-.danger-text {
-  color: #d92d20;
-}
-
 .panel-divider {
   height: 2rpx;
-  background: rgba(148, 163, 184, 0.12);
+  background: rgba(0, 0, 0, 0.12);
   margin: 0 24rpx;
-}
-
-.brightness-card {
-  padding: 24rpx;
-  border: 2rpx solid #000000;
-  background: #ffffff;
-}
-
-.brightness-topline {
-  display: flex;
-  align-items: center;
-  gap: 18rpx;
-  margin-bottom: 18rpx;
-}
-
-.brightness-value {
-  font-size: 34rpx;
-  font-weight: 700;
-  color: #0f172a;
-  margin-left: auto;
-}
-
-.brightness-slider {
-  width: 100%;
-  margin: 0;
 }
 
 @media (max-width: 720px) {

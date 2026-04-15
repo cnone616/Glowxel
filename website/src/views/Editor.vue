@@ -406,7 +406,3 @@ onMounted(() => {
 })
 onUnmounted(() => window.removeEventListener('keydown', onKeyDown))
 </script>
-
-<style>
-@import '@/assets/styles/editor.css';
-</style>

@@ -13,7 +13,7 @@
         </view>
         <text class="header-title glx-topbar__title">{{ pageTitle }}</text>
         <view class="search-btn" @click="toggleSearch">
-          <Icon name="search" :size="40" color="#4F7FFF" />
+          <Icon name="search" :size="40" color="var(--nb-blue)" />
         </view>
       </view>
     </view>
@@ -44,7 +44,7 @@
       <view class="user-section">
         <view v-if="filteredUsers.length === 0 && !isLoading" class="empty-state glx-panel-card">
           <view class="empty-icon">
-            <Icon name="user" :size="80" color="#AAAAAA" />
+            <Icon name="user" :size="80" color="var(--text-tertiary)" />
           </view>
           <text class="empty-title">{{ getEmptyTitle() }}</text>
           <text class="empty-subtitle">{{ getEmptySubtitle() }}</text>
@@ -80,7 +80,7 @@
         
         <!-- 加载更多 -->
         <view v-if="isLoading" class="loading-more">
-          <Icon name="loading" :size="48" color="#4F7FFF" class="loading-icon" />
+          <Icon name="loading" :size="48" color="currentColor" class="loading-icon" />
           <text class="loading-text">加载中...</text>
         </view>
         
@@ -370,17 +370,11 @@ export default {
   transition: all 0.2s ease;
 }
 
-.back-btn:active {
-  transform: translate(2rpx, 2rpx);
-  background-color: var(--nb-yellow);
-}
-
 .search-btn {
   background-color: var(--nb-paper);
 }
 
 .search-btn:active {
-  transform: translate(2rpx, 2rpx);
   background-color: var(--nb-yellow);
 }
 
@@ -430,7 +424,6 @@ export default {
 }
 
 .user-item:active {
-  transform: scale(0.98);
   background-color: var(--nb-paper);
 }
 
@@ -481,10 +474,6 @@ export default {
   border: 2rpx solid var(--nb-ink);
 }
 
-.follow-btn:active {
-  transform: scale(0.95);
-}
-
 .follow-text {
   font-size: 26rpx;
   font-weight: 500;
@@ -496,13 +485,6 @@ export default {
 }
 
 /* 空状态 */
-.empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 96rpx 32rpx;
-  text-align: center;
-}
 
 .empty-icon {
   width: 160rpx;
@@ -511,7 +493,9 @@ export default {
   align-items: center;
   justify-content: center;
   background-color: var(--nb-paper);
-  border-radius: 50%;
+  border-radius: 0;
+  border: 2rpx solid var(--nb-ink);
+  box-shadow: var(--nb-shadow-soft);
   margin-bottom: 32rpx;
 }
 
@@ -535,6 +519,7 @@ export default {
   align-items: center;
   padding: 48rpx;
   gap: 16rpx;
+  color: var(--nb-blue);
 }
 
 .loading-icon {
@@ -548,7 +533,7 @@ export default {
 
 .loading-text {
   font-size: 26rpx;
-  color: #4a4a4a;
+  color: currentColor;
 }
 
 .load-more-btn {
@@ -564,7 +549,6 @@ export default {
 }
 
 .load-more-btn:active {
-  transform: scale(0.98);
   background-color: var(--nb-paper);
 }
 

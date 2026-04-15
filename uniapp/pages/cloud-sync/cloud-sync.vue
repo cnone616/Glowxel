@@ -26,9 +26,7 @@
             <Icon
               :name="syncStatus.enabled ? 'cloud-check' : 'cloud-off'"
               :size="80"
-              :color="
-                syncStatus.enabled ? '#FFFFFF' : '#777777'
-              "
+              color="currentColor"
             />
           </view>
           <view class="status-info">
@@ -40,10 +38,9 @@
         </view>
 
         <view class="sync-toggle">
-          <switch
+          <GlxSwitch
             :checked="syncStatus.enabled"
             @change="toggleSync"
-            color="var(--nb-yellow)"
           />
         </view>
       </view>
@@ -60,7 +57,7 @@
             <Icon
               name="picture"
               :size="40"
-              color="var(--nb-yellow)"
+              color="currentColor"
             />
             <text class="stat-number">{{ syncStats.projects }}</text>
             <text class="stat-label">作品</text>
@@ -70,7 +67,7 @@
             <Icon
               name="favorite"
               :size="40"
-              color="var(--nb-yellow)"
+              color="currentColor"
             />
             <text class="stat-number">{{ syncStats.favorites }}</text>
             <text class="stat-label">收藏</text>
@@ -80,7 +77,7 @@
             <Icon
               name="setting"
               :size="40"
-              color="var(--nb-yellow)"
+              color="currentColor"
             />
             <text class="stat-number">{{ syncStats.settings }}</text>
             <text class="stat-label">设置</text>
@@ -90,7 +87,7 @@
             <Icon
               name="database"
               :size="40"
-              color="var(--nb-yellow)"
+              color="currentColor"
             />
             <text class="stat-number">{{
               formatDataSize(syncStats.dataSize)
@@ -110,7 +107,7 @@
               <Icon
                 name="refresh"
                 :size="40"
-                color="var(--nb-yellow)"
+                color="currentColor"
               />
             </view>
             <view class="setting-info">
@@ -119,10 +116,9 @@
             </view>
           </view>
           <view class="setting-right">
-            <switch
+            <GlxSwitch
               :checked="settings.autoSync"
               @change="toggleAutoSync"
-              color="var(--nb-yellow)"
               :disabled="!syncStatus.enabled"
             />
           </view>
@@ -131,7 +127,7 @@
         <view class="setting-item">
           <view class="setting-left">
             <view class="setting-icon">
-              <Icon name="wifi" :size="40" color="var(--nb-yellow)" />
+              <Icon name="wifi" :size="40" color="currentColor" />
             </view>
             <view class="setting-info">
               <text class="setting-label">仅WiFi同步</text>
@@ -139,10 +135,9 @@
             </view>
           </view>
           <view class="setting-right">
-            <switch
+            <GlxSwitch
               :checked="settings.wifiOnly"
               @change="toggleWifiOnly"
-              color="var(--nb-yellow)"
               :disabled="!syncStatus.enabled"
             />
           </view>
@@ -154,7 +149,7 @@
               <Icon
                 name="image"
                 :size="40"
-                color="var(--nb-yellow)"
+                color="currentColor"
               />
             </view>
             <view class="setting-info">
@@ -163,10 +158,9 @@
             </view>
           </view>
           <view class="setting-right">
-            <switch
+            <GlxSwitch
               :checked="settings.syncThumbnails"
               @change="toggleSyncThumbnails"
-              color="var(--nb-yellow)"
               :disabled="!syncStatus.enabled"
             />
           </view>
@@ -183,7 +177,7 @@
               <Icon
                 name="refresh"
                 :size="40"
-                color="var(--nb-yellow)"
+                color="currentColor"
               />
             </view>
             <view class="action-info">
@@ -202,7 +196,7 @@
               <Icon
                 name="download"
                 :size="40"
-                color="var(--nb-yellow)"
+                color="currentColor"
               />
             </view>
             <view class="action-info">
@@ -221,7 +215,7 @@
               <Icon
                 name="upload"
                 :size="40"
-                color="var(--nb-yellow)"
+                color="currentColor"
               />
             </view>
             <view class="action-info">
@@ -237,7 +231,7 @@
         <view class="action-item danger" @click="clearCloudData">
           <view class="action-left">
             <view class="action-icon">
-              <Icon name="trash" :size="40" color="var(--nb-coral)" />
+              <Icon name="trash" :size="40" color="currentColor" />
             </view>
             <view class="action-info">
               <text class="action-label">清除云端数据</text>
@@ -313,6 +307,7 @@ import { useToast } from "../../composables/useToast.js";
 import statusBarMixin from "../../mixins/statusBar.js";
 import Icon from "../../components/Icon.vue";
 import Toast from "../../components/Toast.vue";
+import GlxSwitch from "../../components/GlxSwitch.vue";
 import {
   getSyncStatus,
   syncProject,
@@ -323,7 +318,7 @@ import {
 
 export default {
   mixins: [statusBarMixin],
-  components: { Icon, Toast },
+  components: { Icon, Toast, GlxSwitch },
 
   data() {
     return {
@@ -712,11 +707,13 @@ export default {
   background-color: var(--nb-paper);
   transition: all 0.3s ease;
   border: 2rpx solid #000000;
+  color: #777777;
 }
 
 .status-icon.active {
   background: var(--nb-yellow);
   box-shadow: none;
+  color: var(--nb-ink);
 }
 
 .status-info {
@@ -778,17 +775,18 @@ export default {
   background-color: var(--nb-paper);
   border-radius: 0;
   border: 2rpx solid #000000;
+  color: var(--nb-ink);
 }
 
 .stat-number {
   font-size: 28rpx;
   font-weight: 700;
-  color: var(--nb-ink);
+  color: currentColor;
 }
 
 .stat-label {
   font-size: 22rpx;
-  color: #4a4a4a;
+  color: currentColor;
 }
 
 .sync-settings,
@@ -817,6 +815,7 @@ export default {
   padding: 24rpx 0;
   border-bottom: 2rpx solid var(--nb-ink);
   transition: all 0.2s ease;
+  color: var(--nb-ink);
 }
 
 .setting-item:last-child,
@@ -826,8 +825,6 @@ export default {
 
 .action-item:active {
   background-color: var(--nb-paper);
-  margin: 0 -32rpx;
-  padding: 24rpx 32rpx;
   border-radius: 0;
 }
 
@@ -860,7 +857,7 @@ export default {
 .action-label {
   font-size: 28rpx;
   font-weight: 500;
-  color: var(--nb-ink);
+  color: currentColor;
   margin-bottom: 4rpx;
   display: block;
 }
@@ -868,10 +865,10 @@ export default {
 .setting-desc,
 .action-desc {
   font-size: 24rpx;
-  color: #4a4a4a;
+  color: currentColor;
 }
 
-.action-item.danger .action-label {
+.action-item.danger {
   color: var(--nb-coral);
 }
 

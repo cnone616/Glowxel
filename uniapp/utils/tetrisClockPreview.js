@@ -55,18 +55,189 @@ const PIECE_SHAPES = {
   ],
 };
 
-const DIGIT_PATTERNS = [
-  ["111", "101", "101", "101", "111"],
-  ["010", "110", "010", "010", "111"],
-  ["111", "001", "111", "100", "111"],
-  ["111", "001", "011", "001", "111"],
-  ["101", "101", "111", "001", "001"],
-  ["111", "100", "111", "001", "111"],
-  ["111", "100", "111", "101", "111"],
-  ["111", "001", "010", "010", "010"],
-  ["111", "101", "111", "101", "111"],
-  ["111", "101", "111", "001", "111"],
+const SEGMENT_MAP = [
+  ["a", "b", "c", "d", "e", "f"],
+  ["b", "c"],
+  ["a", "b", "g", "e", "d"],
+  ["a", "b", "g", "c", "d"],
+  ["f", "g", "b", "c"],
+  ["a", "f", "g", "c", "d"],
+  ["a", "f", "g", "e", "c", "d"],
+  ["a", "b", "c"],
+  ["a", "b", "c", "d", "e", "f", "g"],
+  ["a", "b", "c", "d", "f", "g"],
 ];
+
+const ORIGINAL_TETRIS_COLORS = {
+  myRED: { r: 255, g: 0, b: 0 },
+  myGREEN: { r: 0, g: 255, b: 0 },
+  myBLUE: { r: 48, g: 73, b: 255 },
+  myWHITE: { r: 255, g: 255, b: 255 },
+  myYELLOW: { r: 255, g: 255, b: 0 },
+  myCYAN: { r: 0, g: 255, b: 255 },
+  myMAGENTA: { r: 255, g: 0, b: 255 },
+  myORANGE: { r: 255, g: 96, b: 0 },
+};
+
+const ORIGINAL_TETRIS_COLOR_SEQUENCE = [
+  "myRED",
+  "myGREEN",
+  "myBLUE",
+  "myWHITE",
+  "myYELLOW",
+  "myCYAN",
+  "myMAGENTA",
+  "myORANGE",
+];
+
+const ORIGINAL_DIGIT_X_SHIFTS = [1, 8, 18, 25];
+const ORIGINAL_PREVIEW_SCALE = 2;
+const ORIGINAL_PREVIEW_OFFSET_X = 0;
+const ORIGINAL_PREVIEW_OFFSET_Y = 12;
+const ORIGINAL_FALL_START_Y = -5;
+function buildOriginalColonFalls(digits) {
+  const topDigit = Number(digits[1]);
+  const bottomDigit = Number(digits[2]);
+  const topColor =
+    ORIGINAL_TETRIS_COLOR_SEQUENCE[
+      (topDigit + 2) % ORIGINAL_TETRIS_COLOR_SEQUENCE.length
+    ];
+  const bottomColor =
+    ORIGINAL_TETRIS_COLOR_SEQUENCE[
+      (bottomDigit + 5) % ORIGINAL_TETRIS_COLOR_SEQUENCE.length
+    ];
+
+  return [
+    { block: 0, color: bottomColor, x: 15, y: 12, rot: 0 },
+    { block: 0, color: topColor, x: 15, y: 8, rot: 0 },
+  ];
+}
+
+const ORIGINAL_DIGIT_FALLS = {
+  0: [
+    { block: 2, color: "myCYAN", x: 4, y: 16, rot: 0 },
+    { block: 4, color: "myORANGE", x: 2, y: 16, rot: 1 },
+    { block: 3, color: "myYELLOW", x: 0, y: 16, rot: 1 },
+    { block: 6, color: "myMAGENTA", x: 1, y: 16, rot: 1 },
+    { block: 5, color: "myGREEN", x: 4, y: 14, rot: 0 },
+    { block: 6, color: "myMAGENTA", x: 0, y: 13, rot: 3 },
+    { block: 5, color: "myGREEN", x: 4, y: 12, rot: 0 },
+    { block: 5, color: "myGREEN", x: 0, y: 11, rot: 0 },
+    { block: 6, color: "myMAGENTA", x: 4, y: 10, rot: 1 },
+    { block: 6, color: "myMAGENTA", x: 0, y: 9, rot: 1 },
+    { block: 5, color: "myGREEN", x: 1, y: 8, rot: 1 },
+    { block: 2, color: "myCYAN", x: 3, y: 8, rot: 3 },
+  ],
+  1: [
+    { block: 2, color: "myCYAN", x: 4, y: 16, rot: 0 },
+    { block: 3, color: "myYELLOW", x: 4, y: 15, rot: 1 },
+    { block: 3, color: "myYELLOW", x: 5, y: 13, rot: 3 },
+    { block: 2, color: "myCYAN", x: 4, y: 11, rot: 2 },
+    { block: 0, color: "myRED", x: 4, y: 8, rot: 0 },
+  ],
+  2: [
+    { block: 0, color: "myRED", x: 4, y: 16, rot: 0 },
+    { block: 3, color: "myYELLOW", x: 0, y: 16, rot: 1 },
+    { block: 1, color: "myBLUE", x: 1, y: 16, rot: 3 },
+    { block: 1, color: "myBLUE", x: 1, y: 15, rot: 0 },
+    { block: 3, color: "myYELLOW", x: 1, y: 12, rot: 2 },
+    { block: 1, color: "myBLUE", x: 0, y: 12, rot: 1 },
+    { block: 2, color: "myCYAN", x: 3, y: 12, rot: 3 },
+    { block: 0, color: "myRED", x: 4, y: 10, rot: 0 },
+    { block: 3, color: "myYELLOW", x: 1, y: 8, rot: 0 },
+    { block: 2, color: "myCYAN", x: 3, y: 8, rot: 3 },
+    { block: 1, color: "myBLUE", x: 0, y: 8, rot: 1 },
+  ],
+  3: [
+    { block: 1, color: "myBLUE", x: 3, y: 16, rot: 3 },
+    { block: 2, color: "myCYAN", x: 0, y: 16, rot: 1 },
+    { block: 3, color: "myYELLOW", x: 1, y: 15, rot: 2 },
+    { block: 0, color: "myRED", x: 4, y: 14, rot: 0 },
+    { block: 3, color: "myYELLOW", x: 1, y: 12, rot: 2 },
+    { block: 1, color: "myBLUE", x: 0, y: 12, rot: 1 },
+    { block: 3, color: "myYELLOW", x: 5, y: 12, rot: 3 },
+    { block: 2, color: "myCYAN", x: 3, y: 11, rot: 0 },
+    { block: 3, color: "myYELLOW", x: 1, y: 8, rot: 0 },
+    { block: 1, color: "myBLUE", x: 0, y: 8, rot: 1 },
+    { block: 2, color: "myCYAN", x: 3, y: 8, rot: 3 },
+  ],
+  4: [
+    { block: 0, color: "myRED", x: 4, y: 16, rot: 0 },
+    { block: 0, color: "myRED", x: 4, y: 14, rot: 0 },
+    { block: 3, color: "myYELLOW", x: 1, y: 12, rot: 0 },
+    { block: 1, color: "myBLUE", x: 0, y: 12, rot: 1 },
+    { block: 2, color: "myCYAN", x: 0, y: 10, rot: 0 },
+    { block: 2, color: "myCYAN", x: 3, y: 12, rot: 3 },
+    { block: 3, color: "myYELLOW", x: 4, y: 10, rot: 3 },
+    { block: 2, color: "myCYAN", x: 0, y: 9, rot: 2 },
+    { block: 3, color: "myYELLOW", x: 5, y: 10, rot: 1 },
+  ],
+  5: [
+    { block: 0, color: "myRED", x: 0, y: 16, rot: 0 },
+    { block: 2, color: "myCYAN", x: 2, y: 16, rot: 1 },
+    { block: 2, color: "myCYAN", x: 3, y: 15, rot: 0 },
+    { block: 3, color: "myYELLOW", x: 5, y: 16, rot: 1 },
+    { block: 3, color: "myYELLOW", x: 1, y: 12, rot: 0 },
+    { block: 1, color: "myBLUE", x: 0, y: 12, rot: 1 },
+    { block: 2, color: "myCYAN", x: 3, y: 12, rot: 3 },
+    { block: 0, color: "myRED", x: 0, y: 10, rot: 0 },
+    { block: 3, color: "myYELLOW", x: 1, y: 8, rot: 2 },
+    { block: 1, color: "myBLUE", x: 0, y: 8, rot: 1 },
+    { block: 2, color: "myCYAN", x: 3, y: 8, rot: 3 },
+  ],
+  6: [
+    { block: 2, color: "myCYAN", x: 0, y: 16, rot: 1 },
+    { block: 5, color: "myGREEN", x: 2, y: 16, rot: 1 },
+    { block: 6, color: "myMAGENTA", x: 0, y: 15, rot: 3 },
+    { block: 6, color: "myMAGENTA", x: 4, y: 16, rot: 3 },
+    { block: 5, color: "myGREEN", x: 4, y: 14, rot: 0 },
+    { block: 3, color: "myYELLOW", x: 1, y: 12, rot: 2 },
+    { block: 2, color: "myCYAN", x: 0, y: 13, rot: 2 },
+    { block: 3, color: "myYELLOW", x: 2, y: 11, rot: 0 },
+    { block: 0, color: "myRED", x: 0, y: 10, rot: 0 },
+    { block: 3, color: "myYELLOW", x: 1, y: 8, rot: 0 },
+    { block: 1, color: "myBLUE", x: 0, y: 8, rot: 1 },
+    { block: 2, color: "myCYAN", x: 3, y: 8, rot: 3 },
+  ],
+  7: [
+    { block: 0, color: "myRED", x: 4, y: 16, rot: 0 },
+    { block: 1, color: "myBLUE", x: 4, y: 14, rot: 0 },
+    { block: 3, color: "myYELLOW", x: 5, y: 13, rot: 1 },
+    { block: 2, color: "myCYAN", x: 4, y: 11, rot: 2 },
+    { block: 3, color: "myYELLOW", x: 1, y: 8, rot: 2 },
+    { block: 2, color: "myCYAN", x: 3, y: 8, rot: 3 },
+    { block: 1, color: "myBLUE", x: 0, y: 8, rot: 1 },
+  ],
+  8: [
+    { block: 3, color: "myYELLOW", x: 1, y: 16, rot: 0 },
+    { block: 6, color: "myMAGENTA", x: 0, y: 16, rot: 1 },
+    { block: 3, color: "myYELLOW", x: 5, y: 16, rot: 1 },
+    { block: 1, color: "myBLUE", x: 2, y: 15, rot: 3 },
+    { block: 4, color: "myORANGE", x: 0, y: 14, rot: 0 },
+    { block: 1, color: "myBLUE", x: 1, y: 12, rot: 3 },
+    { block: 6, color: "myMAGENTA", x: 4, y: 13, rot: 1 },
+    { block: 2, color: "myCYAN", x: 0, y: 11, rot: 1 },
+    { block: 4, color: "myORANGE", x: 0, y: 10, rot: 0 },
+    { block: 4, color: "myORANGE", x: 4, y: 11, rot: 0 },
+    { block: 5, color: "myGREEN", x: 0, y: 8, rot: 1 },
+    { block: 5, color: "myGREEN", x: 2, y: 8, rot: 1 },
+    { block: 1, color: "myBLUE", x: 4, y: 9, rot: 2 },
+  ],
+  9: [
+    { block: 0, color: "myRED", x: 0, y: 16, rot: 0 },
+    { block: 3, color: "myYELLOW", x: 2, y: 16, rot: 0 },
+    { block: 1, color: "myBLUE", x: 2, y: 15, rot: 3 },
+    { block: 1, color: "myBLUE", x: 4, y: 15, rot: 2 },
+    { block: 3, color: "myYELLOW", x: 1, y: 12, rot: 2 },
+    { block: 3, color: "myYELLOW", x: 5, y: 12, rot: 3 },
+    { block: 5, color: "myGREEN", x: 0, y: 12, rot: 0 },
+    { block: 1, color: "myBLUE", x: 2, y: 11, rot: 3 },
+    { block: 5, color: "myGREEN", x: 4, y: 9, rot: 0 },
+    { block: 6, color: "myMAGENTA", x: 0, y: 10, rot: 1 },
+    { block: 5, color: "myGREEN", x: 0, y: 8, rot: 1 },
+    { block: 6, color: "myMAGENTA", x: 2, y: 8, rot: 2 },
+  ],
+};
 
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
@@ -95,10 +266,7 @@ function getPieceRotations(pieceType) {
   let current = normalizeShape(base);
 
   for (let index = 0; index < 4; index += 1) {
-    const key = JSON.stringify(current);
-    if (!rotations.some((item) => JSON.stringify(item) === key)) {
-      rotations.push(current);
-    }
+    rotations.push(current);
     current = rotateShape(current);
   }
 
@@ -128,9 +296,12 @@ function fillRect(pixels, x, y, width, height, color) {
   }
 }
 
-function rgbToHex(color) {
-  const toHex = (value) => clamp(Math.round(value), 0, 255).toString(16).padStart(2, "0");
-  return `#${toHex(color.r)}${toHex(color.g)}${toHex(color.b)}`;
+function rgbToText(color) {
+  return `rgb(${clamp(Math.round(color.r), 0, 255)}, ${clamp(
+    Math.round(color.g),
+    0,
+    255,
+  )}, ${clamp(Math.round(color.b), 0, 255)})`;
 }
 
 function brighten(color, amount) {
@@ -150,25 +321,38 @@ function darkenHalf(color) {
 }
 
 function drawGridBackground(pixels, cellSize) {
-  fillRect(pixels, 0, 0, PANEL_SIZE, PANEL_SIZE, "#000000");
+  fillRect(pixels, 0, 0, PANEL_SIZE, PANEL_SIZE, "rgb(17, 24, 38)");
   for (let pos = 0; pos < PANEL_SIZE; pos += cellSize) {
     for (let cursor = 0; cursor < PANEL_SIZE; cursor += 1) {
-      setPixel(pixels, pos, cursor, "#0d1520");
-      setPixel(pixels, cursor, pos, "#0d1520");
+      setPixel(pixels, pos, cursor, "rgb(36, 50, 72)");
+      setPixel(pixels, cursor, pos, "rgb(36, 50, 72)");
     }
   }
 }
 
-function drawGhostCell(pixels, cellX, cellY, cellSize) {
+function drawGhostCell(pixels, cellX, cellY, cellSize, pulseBright) {
   const px = cellX * cellSize;
   const py = cellY * cellSize;
+  const baseColor = pulseBright
+    ? { r: 126, g: 190, b: 255 }
+    : { r: 98, g: 156, b: 228 };
+  const highlightColor = pulseBright
+    ? { r: 208, g: 236, b: 255 }
+    : { r: 170, g: 214, b: 255 };
+  const shadowColor = pulseBright
+    ? { r: 54, g: 88, b: 138 }
+    : { r: 42, g: 70, b: 114 };
   for (let dy = 0; dy < cellSize; dy += 1) {
     for (let dx = 0; dx < cellSize; dx += 1) {
-      let color = { r: 16, g: 32, b: 56 };
-      if (cellSize >= 2 && (dy === 0 || dx === 0)) {
-        color = { r: 28, g: 58, b: 92 };
+      let color = baseColor;
+      if (cellSize >= 2) {
+        if (dy === 0 || dx === 0) {
+          color = highlightColor;
+        } else if (dy === cellSize - 1 || dx === cellSize - 1) {
+          color = shadowColor;
+        }
       }
-      setPixel(pixels, px + dx, py + dy, rgbToHex(color));
+      setPixel(pixels, px + dx, py + dy, rgbToText(color));
     }
   }
 }
@@ -193,7 +377,7 @@ function drawPieceCell(pixels, cellX, cellY, cellSize, pieceType, pulseBright) {
           color = shadowColor;
         }
       }
-      setPixel(pixels, px + dx, py + dy, rgbToHex(color));
+      setPixel(pixels, px + dx, py + dy, rgbToText(color));
     }
   }
 }
@@ -216,65 +400,107 @@ function getClockSnapshot() {
   };
 }
 
+function selectClockGlyphMetrics(cols, rows) {
+  if (cols >= 48 && rows >= 16) {
+    return { thickness: 4, horizontal: 4, vertical: 4 };
+  }
+  if (cols >= 30 && rows >= 8) {
+    return { thickness: 2, horizontal: 2, vertical: 2 };
+  }
+  return { thickness: 1, horizontal: 1, vertical: 1 };
+}
+
+function paintTargetRect(targetMap, startX, startY, width, height, cols, rows) {
+  for (let row = 0; row < height; row += 1) {
+    for (let col = 0; col < width; col += 1) {
+      const x = startX + col;
+      const y = startY + row;
+      if (x >= 0 && x < cols && y >= 0 && y < rows) {
+        targetMap[y][x] = true;
+      }
+    }
+  }
+}
+
+function paintDigitSegments(targetMap, digit, originX, originY, metrics, cols, rows) {
+  const { thickness, horizontal, vertical } = metrics;
+  const digitWidth = horizontal + thickness * 2;
+  const segmentRects = {
+    a: { x: originX + thickness, y: originY, width: horizontal, height: thickness },
+    b: {
+      x: originX + digitWidth - thickness,
+      y: originY + thickness,
+      width: thickness,
+      height: vertical,
+    },
+    c: {
+      x: originX + digitWidth - thickness,
+      y: originY + vertical + thickness * 2,
+      width: thickness,
+      height: vertical,
+    },
+    d: {
+      x: originX + thickness,
+      y: originY + vertical * 2 + thickness * 2,
+      width: horizontal,
+      height: thickness,
+    },
+    e: {
+      x: originX,
+      y: originY + vertical + thickness * 2,
+      width: thickness,
+      height: vertical,
+    },
+    f: {
+      x: originX,
+      y: originY + thickness,
+      width: thickness,
+      height: vertical,
+    },
+    g: {
+      x: originX + thickness,
+      y: originY + vertical + thickness,
+      width: horizontal,
+      height: thickness,
+    },
+  };
+
+  const segments = SEGMENT_MAP[digit];
+  for (let index = 0; index < segments.length; index += 1) {
+    const rect = segmentRects[segments[index]];
+    paintTargetRect(targetMap, rect.x, rect.y, rect.width, rect.height, cols, rows);
+  }
+}
+
 function buildTargetMap(cols, rows, showClock, clock) {
   const targetMap = createMatrix(rows, cols, false);
   if (!showClock) {
     return targetMap;
   }
 
+  const metrics = selectClockGlyphMetrics(cols, rows);
+  const { thickness, horizontal, vertical } = metrics;
+  const digitWidth = horizontal + thickness * 2;
+  const digitHeight = vertical * 2 + thickness * 3;
+  const colonWidth = thickness;
+  const gap = thickness;
   const digits = `${String(clock.hours).padStart(2, "0")}${String(clock.minutes).padStart(2, "0")}`;
-  const glyphUnits = 17;
-  let scale = 1;
-  for (let tryScale = 1; tryScale <= 6; tryScale += 1) {
-    if (glyphUnits * tryScale <= cols - 2 && 5 * tryScale <= rows - 2) {
-      scale = tryScale;
-    }
-  }
-
-  const totalWidth = glyphUnits * scale;
-  const totalHeight = 5 * scale;
+  const totalWidth = digitWidth * 4 + gap * 3 + colonWidth + gap * 2;
+  const totalHeight = digitHeight;
   const startX = Math.floor((cols - totalWidth) / 2);
-  const startY = Math.floor((rows - totalHeight) / 2);
+  const startY = Math.max(0, rows - totalHeight);
   let cursorX = startX;
 
   for (let digitIndex = 0; digitIndex < 4; digitIndex += 1) {
     const digit = Number(digits[digitIndex]);
-    const pattern = DIGIT_PATTERNS[digit];
-    for (let row = 0; row < 5; row += 1) {
-      for (let col = 0; col < 3; col += 1) {
-        if (pattern[row][col] !== "1") {
-          continue;
-        }
-        for (let sy = 0; sy < scale; sy += 1) {
-          for (let sx = 0; sx < scale; sx += 1) {
-            const x = cursorX + col * scale + sx;
-            const y = startY + row * scale + sy;
-            if (x >= 0 && x < cols && y >= 0 && y < rows) {
-              targetMap[y][x] = true;
-            }
-          }
-        }
-      }
-    }
-
-    cursorX += 3 * scale + scale;
+    paintDigitSegments(targetMap, digit, cursorX, startY, metrics, cols, rows);
+    cursorX += digitWidth + gap;
     if (digitIndex === 1) {
-      for (let sy = 0; sy < scale; sy += 1) {
-        for (let sx = 0; sx < scale; sx += 1) {
-          const topY = startY + scale + sy;
-          const bottomY = startY + scale * 3 + sy;
-          const x = cursorX + sx;
-          if (x >= 0 && x < cols) {
-            if (topY >= 0 && topY < rows) {
-              targetMap[topY][x] = true;
-            }
-            if (bottomY >= 0 && bottomY < rows) {
-              targetMap[bottomY][x] = true;
-            }
-          }
-        }
-      }
-      cursorX += scale + scale;
+      const topDotY = startY + vertical;
+      const bottomDotY = startY + vertical + thickness * 2;
+      paintTargetRect(targetMap, cursorX, topDotY, colonWidth, thickness, cols, rows);
+      paintTargetRect(targetMap, cursorX, bottomDotY, colonWidth, thickness, cols, rows);
+      cursorX += colonWidth + gap * 2;
     }
   }
 
@@ -396,18 +622,21 @@ function buildClockPlacement(state, pieceType) {
           break;
         }
         score += 2000;
+        score += ny * 24;
         if (
           ny + 1 >= state.rows ||
           state.board[ny + 1][nx] !== 0 ||
           !state.targetMap[ny + 1][nx]
         ) {
-          score += 40;
+          score += 120;
+        } else {
+          score -= 140;
         }
         if (nx > 0 && state.board[ny][nx - 1] !== 0) {
-          score += 18;
+          score += 26;
         }
         if (nx + 1 < state.cols && state.board[ny][nx + 1] !== 0) {
-          score += 18;
+          score += 26;
         }
       }
       if (!valid) {
@@ -456,7 +685,8 @@ function buildClockPlacement(state, pieceType) {
         state.board[ny][nx] = 0;
       }
 
-      score += y * 4;
+      score += y * 24;
+      score -= x;
       if (score > bestScore) {
         bestScore = score;
         bestRot = rotation;
@@ -631,11 +861,16 @@ function spawnPiece(state) {
   const pieceIndex =
     (seed + state.spawnCounter * 73 + state.spawnCounter * state.spawnCounter * 11) %
     enabled.length;
-  state.curType = enabled[pieceIndex];
 
   if (state.showClock) {
-    const placement = buildClockPlacement(state, state.curType);
-    if (placement) {
+    for (let offset = 0; offset < enabled.length; offset += 1) {
+      const candidateType = enabled[(pieceIndex + offset) % enabled.length];
+      const placement = buildClockPlacement(state, candidateType);
+      if (!placement) {
+        continue;
+      }
+
+      state.curType = candidateType;
       state.holdClockFrame = false;
       state.curRot = placement.rotation;
       state.targetX = placement.x;
@@ -647,6 +882,7 @@ function spawnPiece(state) {
       state.spawnCounter += 1;
       return;
     }
+
     state.holdClockFrame = true;
     state.curRot = 0;
     state.curX = 0;
@@ -654,6 +890,7 @@ function spawnPiece(state) {
     return;
   }
 
+  state.curType = enabled[pieceIndex];
   const placement = buildFreeFallPlacement(state, state.curType);
   state.curRot = placement.rotation;
   state.targetX = placement.x;
@@ -724,7 +961,7 @@ function buildFrameMap(state, pulseBright) {
       }
 
       if (cell === 0 && state.showClock && state.targetMap[y][x]) {
-        drawGhostCell(pixels, x, y, state.cellSize);
+        drawGhostCell(pixels, x, y, state.cellSize, pulseBright);
         continue;
       }
 
@@ -774,34 +1011,276 @@ function createSimulationState(config) {
   return state;
 }
 
-export function buildTetrisPreviewFrames(config) {
-  const state = createSimulationState(config || {});
+function getOriginalClockDigits() {
+  const clock = getClockSnapshot();
+  return `${String(clock.hours).padStart(2, "0")}${String(clock.minutes).padStart(2, "0")}`;
+}
+
+function createOriginalDigitStates(digits) {
+  const states = [];
+  for (let index = 0; index < 4; index += 1) {
+    states.push({
+      digit: Number(digits[index]),
+      blockIndex: 0,
+      fallIndex: 0,
+      xShift: ORIGINAL_DIGIT_X_SHIFTS[index],
+    });
+  }
+  return states;
+}
+
+function createOriginalColonStates(colonFalls) {
+  const states = [];
+  for (let index = 0; index < colonFalls.length; index += 1) {
+    states.push({
+      blockIndex: 0,
+      fallIndex: 0,
+      started: index === 0,
+    });
+  }
+  return states;
+}
+
+function getOriginalShapeCells(blockType, rotation) {
+  if (blockType === 0) {
+    return [[0, 0], [1, 0], [0, -1], [1, -1]];
+  }
+  if (blockType === 1) {
+    if (rotation === 0) return [[0, 0], [1, 0], [0, -1], [0, -2]];
+    if (rotation === 1) return [[0, 0], [0, -1], [1, -1], [2, -1]];
+    if (rotation === 2) return [[1, 0], [1, -1], [1, -2], [0, -2]];
+    return [[0, 0], [1, 0], [2, 0], [2, -1]];
+  }
+  if (blockType === 2) {
+    if (rotation === 0) return [[0, 0], [1, 0], [1, -1], [1, -2]];
+    if (rotation === 1) return [[0, 0], [1, 0], [2, 0], [0, -1]];
+    if (rotation === 2) return [[0, 0], [0, -1], [0, -2], [1, -2]];
+    return [[0, -1], [1, -1], [2, -1], [2, 0]];
+  }
+  if (blockType === 3) {
+    if (rotation === 1 || rotation === 3) {
+      return [[0, 0], [0, -1], [0, -2], [0, -3]];
+    }
+    return [[0, 0], [1, 0], [2, 0], [3, 0]];
+  }
+  if (blockType === 4) {
+    if (rotation === 1 || rotation === 3) {
+      return [[0, 0], [1, 0], [1, -1], [2, -1]];
+    }
+    return [[1, 0], [0, -1], [1, -1], [0, -2]];
+  }
+  if (blockType === 5) {
+    if (rotation === 1 || rotation === 3) {
+      return [[1, 0], [2, 0], [0, -1], [1, -1]];
+    }
+    return [[0, 0], [0, -1], [1, -1], [1, -2]];
+  }
+  if (rotation === 0) return [[0, 0], [1, 0], [2, 0], [1, -1]];
+  if (rotation === 1) return [[0, 0], [0, -1], [0, -2], [1, -1]];
+  if (rotation === 2) return [[1, 0], [0, -1], [1, -1], [2, -1]];
+  return [[1, 0], [0, -1], [1, -1], [1, -2]];
+}
+
+function resolveOriginalFallingRotation(targetRotation, fallIndex, stopY) {
+  const travelDistance = Math.max(1, stopY - ORIGINAL_FALL_START_Y);
+  let rotations = targetRotation;
+  if (rotations === 1) {
+    if (fallIndex < Math.floor(travelDistance / 2)) {
+      rotations = 0;
+    }
+  } else if (rotations === 2) {
+    if (fallIndex < Math.floor(travelDistance / 3)) {
+      rotations = 0;
+    } else if (fallIndex < Math.floor((travelDistance / 3) * 2)) {
+      rotations = 1;
+    }
+  } else if (rotations === 3) {
+    if (fallIndex < Math.floor(travelDistance / 4)) {
+      rotations = 0;
+    } else if (fallIndex < Math.floor((travelDistance / 4) * 2)) {
+      rotations = 1;
+    } else if (fallIndex < Math.floor((travelDistance / 4) * 3)) {
+      rotations = 2;
+    }
+  }
+  return rotations;
+}
+
+function drawOriginalBlockShape(pixels, block, colorName, xPos, yPos, rotation, scale, offsetX, offsetY) {
+  const color = ORIGINAL_TETRIS_COLORS[colorName] || ORIGINAL_TETRIS_COLORS.myWHITE;
+  const fillColor = rgbToText(color);
+  const cells = getOriginalShapeCells(block, rotation);
+  for (let index = 0; index < cells.length; index += 1) {
+    const px = offsetX + (xPos + cells[index][0]) * scale;
+    const py = offsetY + (yPos + cells[index][1]) * scale;
+    fillRect(pixels, px, py, scale, scale, fillColor);
+  }
+}
+
+function getOriginalCurrentFallY(fallIndex) {
+  return ORIGINAL_FALL_START_Y + fallIndex - 1;
+}
+
+function buildOriginalTetrisFrame(states, colonFalls, colonStates) {
+  const pixels = new Map();
+  const scale = ORIGINAL_PREVIEW_SCALE;
+  const offsetX = ORIGINAL_PREVIEW_OFFSET_X;
+  const offsetY = ORIGINAL_PREVIEW_OFFSET_Y;
+
+  for (let stateIndex = 0; stateIndex < states.length; stateIndex += 1) {
+    const state = states[stateIndex];
+    const instructions = ORIGINAL_DIGIT_FALLS[state.digit] || [];
+    for (let index = 0; index < state.blockIndex; index += 1) {
+      const item = instructions[index];
+      drawOriginalBlockShape(
+        pixels,
+        item.block,
+        item.color,
+        item.x + state.xShift,
+        item.y - 1,
+        item.rot,
+        scale,
+        offsetX,
+        offsetY,
+      );
+    }
+
+    if (state.blockIndex < instructions.length) {
+      const current = instructions[state.blockIndex];
+      const rotation = resolveOriginalFallingRotation(
+        current.rot,
+        state.fallIndex,
+        current.y,
+      );
+      drawOriginalBlockShape(
+        pixels,
+        current.block,
+        current.color,
+        current.x + state.xShift,
+        getOriginalCurrentFallY(state.fallIndex),
+        rotation,
+        scale,
+        offsetX,
+        offsetY,
+      );
+    }
+  }
+
+  for (let stateIndex = 0; stateIndex < colonStates.length; stateIndex += 1) {
+    const state = colonStates[stateIndex];
+    const item = colonFalls[stateIndex];
+    if (!state.started) {
+      continue;
+    }
+    if (state.blockIndex > 0) {
+      drawOriginalBlockShape(
+        pixels,
+        item.block,
+        item.color,
+        item.x,
+        item.y - 1,
+        item.rot,
+        scale,
+        offsetX,
+        offsetY,
+      );
+      continue;
+    }
+    drawOriginalBlockShape(
+      pixels,
+      item.block,
+      item.color,
+      item.x,
+      getOriginalCurrentFallY(state.fallIndex),
+      item.rot,
+      scale,
+      offsetX,
+      offsetY,
+    );
+  }
+
+  return pixels;
+}
+
+function stepOriginalDigitStates(states) {
+  for (let index = 0; index < states.length; index += 1) {
+    const state = states[index];
+    const instructions = ORIGINAL_DIGIT_FALLS[state.digit] || [];
+    if (state.blockIndex >= instructions.length) {
+      continue;
+    }
+    const current = instructions[state.blockIndex];
+    state.fallIndex += 1;
+    const travelDistance = current.y - ORIGINAL_FALL_START_Y;
+    if (state.fallIndex > travelDistance) {
+      state.fallIndex = 0;
+      state.blockIndex += 1;
+    }
+  }
+  for (let index = 0; index < states.length; index += 1) {
+    const state = states[index];
+    const instructions = ORIGINAL_DIGIT_FALLS[state.digit] || [];
+    if (state.blockIndex < instructions.length) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function stepOriginalColonStates(colonFalls, colonStates) {
+  for (let index = 0; index < colonStates.length; index += 1) {
+    const state = colonStates[index];
+    const item = colonFalls[index];
+    if (!state.started) {
+      continue;
+    }
+    if (state.blockIndex > 0) {
+      continue;
+    }
+    state.fallIndex += 1;
+    const travelDistance = item.y - ORIGINAL_FALL_START_Y;
+    if (state.fallIndex > travelDistance) {
+      state.fallIndex = 0;
+      state.blockIndex = 1;
+      if (index + 1 < colonStates.length) {
+        colonStates[index + 1].started = true;
+      }
+    }
+    return false;
+  }
+
+  return true;
+}
+
+function buildOriginalTetrisPreviewFrames(config) {
+  const digits = getOriginalClockDigits();
+  const states = createOriginalDigitStates(digits);
+  const colonFalls = buildOriginalColonFalls(digits);
+  const colonStates = createOriginalColonStates(colonFalls);
   const frames = [];
-  const frameMs = state.dropSpeed;
-  let holdElapsed = 0;
-  let holdPulseBright = false;
-  const activeFrameLimit = state.showClock ? 64 : 40;
+  const speed = getDropSpeed(config);
+  const holdFrames = speed <= 90 ? 40 : speed <= 170 ? 56 : 68;
 
-  frames.push(buildFrameMap(state, false));
+  frames.push(buildOriginalTetrisFrame(states, colonFalls, colonStates));
 
-  for (let index = 0; index < activeFrameLimit; index += 1) {
-    stepState(state);
-    frames.push(buildFrameMap(state, false));
-    if (state.showClock && state.holdClockFrame) {
+  for (let frameIndex = 0; frameIndex < 320; frameIndex += 1) {
+    const digitsDone = stepOriginalDigitStates(states);
+    const colonDone = stepOriginalColonStates(colonFalls, colonStates);
+    frames.push(buildOriginalTetrisFrame(states, colonFalls, colonStates));
+    if (digitsDone && colonDone) {
       break;
     }
   }
 
-  if (state.showClock && state.holdClockFrame) {
-    for (let index = 0; index < 10; index += 1) {
-      holdElapsed += frameMs;
-      if (holdElapsed >= 220) {
-        holdElapsed = 0;
-        holdPulseBright = !holdPulseBright;
-      }
-      frames.push(buildFrameMap(state, holdPulseBright));
-    }
+  for (let holdIndex = 0; holdIndex < holdFrames; holdIndex += 1) {
+    frames.push(buildOriginalTetrisFrame(states, colonFalls, colonStates));
   }
 
   return frames;
+}
+
+export function buildTetrisPreviewFrames(config) {
+  const safeConfig =
+    config && typeof config === "object" ? config : {};
+  return buildOriginalTetrisPreviewFrames(safeConfig);
 }

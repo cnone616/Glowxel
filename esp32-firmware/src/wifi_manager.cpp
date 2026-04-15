@@ -1,24 +1,25 @@
 #include "wifi_manager.h"
 #include "config_manager.h"
 #include "display_manager.h"
-#include "ble_config.h"
 #include <time.h>
 #include <math.h>
 
 namespace {
-const char* kNtpServerPrimary = "ntp.aliyun.com";
 const char* kNtpServerSecondary = "ntp.tencent.com";
 const char* kNtpServerFallback = "pool.ntp.org";
 const long kGmtOffsetSec = 8 * 3600;
 const int kDaylightOffsetSec = 0;
 const unsigned long kNtpRetryIntervalMs = 15000;
 const time_t kUnixTimeSyncedThreshold = 1700000000;
+const IPAddress kConfigPortalIp(192, 168, 4, 1);
+const IPAddress kConfigPortalGateway(192, 168, 4, 1);
+const IPAddress kConfigPortalSubnet(255, 255, 255, 0);
 
 void requestTimeSync() {
   configTime(
     kGmtOffsetSec,
     kDaylightOffsetSec,
-    kNtpServerPrimary,
+    ConfigManager::deviceParamsConfig.ntpServer,
     kNtpServerSecondary,
     kNtpServerFallback
   );
@@ -27,6 +28,20 @@ void requestTimeSync() {
 bool hasValidSystemTime() {
   time_t now = time(nullptr);
   return now >= kUnixTimeSyncedThreshold;
+}
+
+String buildConfigPortalSSID() {
+  uint64_t chipId = ESP.getEfuseMac();
+  char suffix[7];
+  snprintf(suffix, sizeof(suffix), "%06llX", static_cast<unsigned long long>(chipId & 0xFFFFFFULL));
+  return "Glowxel-" + String(suffix);
+}
+
+void copyScanItem(WiFiScanResultItem& item, const String& ssid, int32_t rssi, bool secure) {
+  memset(item.ssid, 0, sizeof(item.ssid));
+  ssid.toCharArray(item.ssid, sizeof(item.ssid));
+  item.rssi = rssi;
+  item.secure = secure;
 }
 }
 
@@ -114,15 +129,23 @@ static void drawStatusBadge(int cx, int cy, bool success) {
   }
 }
 
+DNSServer WiFiManager::dns_server;
+WiFiScanResultItem WiFiManager::scanned_networks[12] = {};
+size_t WiFiManager::scanned_network_count = 0;
 bool WiFiManager::config_mode = false;
 String WiFiManager::saved_ssid = "";
 String WiFiManager::saved_password = "";
+String WiFiManager::config_portal_ssid = "";
 unsigned long WiFiManager::last_ntp_retry_at = 0;
+unsigned long WiFiManager::portal_restart_at = 0;
 bool WiFiManager::ntp_sync_logged = false;
 bool WiFiManager::time_synced_once = false;
+bool WiFiManager::scan_requested = false;
+bool WiFiManager::scan_in_progress = false;
 
 void WiFiManager::init() {
   Serial.println("3. 连接WiFi...");
+  WiFi.persistent(false);
   setupWiFi();
 }
 
@@ -174,31 +197,181 @@ void WiFiManager::setupWiFi() {
       return;
     }
     
-    Serial.println("\n连接失败，进入配置模式");
+    Serial.println("\n连接失败，进入热点配网模式");
   } else {
-    Serial.println("未找到WiFi配置，进入配置模式");
+    Serial.println("未找到WiFi配置，进入热点配网模式");
   }
-  
-  config_mode = true;
 
-  // 只用 BLE 配网，不开 WiFi AP（内存不够同时开）
-  BLEConfig::init();
+  startConfigPortal();
+}
+
+void WiFiManager::startConfigPortal() {
+  config_mode = true;
+  portal_restart_at = 0;
+  ntp_sync_logged = false;
+  time_synced_once = false;
+  config_portal_ssid = buildConfigPortalSSID();
+  scanned_network_count = 0;
+  scan_requested = false;
+  scan_in_progress = false;
+
+  WiFi.disconnect();
+  WiFi.mode(WIFI_AP_STA);
+  WiFi.softAPdisconnect(true);
+  WiFi.softAPConfig(kConfigPortalIp, kConfigPortalGateway, kConfigPortalSubnet);
+  bool started = WiFi.softAP(config_portal_ssid.c_str());
+  if (!started) {
+    Serial.println("[WiFi] 热点启动失败");
+  }
+
+  dns_server.stop();
+  dns_server.start(53, "*", kConfigPortalIp);
+  WiFi.scanDelete();
 
   Serial.println("\n=================================");
-  Serial.println("BLE 配网模式已启动");
-  Serial.println("设备名称: RenLight-Setup");
-  Serial.println("请使用小程序蓝牙配网");
+  Serial.println("WiFi 热点配网模式已启动");
+  Serial.print("热点名称: ");
+  Serial.println(config_portal_ssid);
+  Serial.print("配网页地址: http://");
+  Serial.println(getConfigPortalIP());
+  Serial.println("仅支持 2.4GHz WiFi");
   Serial.println("=================================");
 
+  if (DisplayManager::dma_display != nullptr) {
+    DisplayManager::dma_display->clearScreen();
+    drawWifiIcon(32, 24, 18, DisplayManager::dma_display->color565(59, 130, 246));
+    drawStatusBadge(32, 24, false);
+    DisplayManager::drawTinyTextCentered("WIFI SETUP", 42, DisplayManager::dma_display->color565(220, 220, 220));
+    DisplayManager::drawTinyTextCentered(config_portal_ssid.c_str(), 50, DisplayManager::dma_display->color565(150, 210, 255));
+    DisplayManager::drawTinyTextCentered("192.168.4.1", 58, DisplayManager::dma_display->color565(150, 150, 150));
+  }
+}
+
+void WiFiManager::stopConfigPortal() {
+  dns_server.stop();
+  scan_requested = false;
+  scan_in_progress = false;
+  WiFi.scanDelete();
+  WiFi.softAPdisconnect(true);
+}
+
+void WiFiManager::scanNearbyNetworks() {
+  if (!config_mode) {
+    return;
+  }
+
+  if (scan_requested || scan_in_progress) {
+    Serial.println("[WiFi] 扫描正在进行中，忽略重复请求");
+    return;
+  }
+
+  scanned_network_count = 0;
+  scan_requested = true;
+  Serial.println("[WiFi] 已收到扫描请求，等待主循环启动异步扫描");
+}
+
+void WiFiManager::finalizeNetworkScan(int networkCount) {
+  scanned_network_count = 0;
+
+  if (networkCount < 0) {
+    Serial.printf("[WiFi] 扫描失败，结果码=%d\n", networkCount);
+    WiFi.scanDelete();
+    return;
+  }
+
+  Serial.printf("[WiFi] 扫描完成，共发现 %d 个热点\n", networkCount);
+
+  for (int i = 0; i < networkCount; i++) {
+    String ssid = WiFi.SSID(i);
+    if (ssid.length() == 0) {
+      continue;
+    }
+
+    int32_t rssi = WiFi.RSSI(i);
+    bool secure = WiFi.encryptionType(i) != WIFI_AUTH_OPEN;
+    int targetIndex = -1;
+
+    for (size_t j = 0; j < scanned_network_count; j++) {
+      if (ssid == String(scanned_networks[j].ssid)) {
+        targetIndex = static_cast<int>(j);
+        break;
+      }
+    }
+
+    if (targetIndex >= 0) {
+      if (rssi > scanned_networks[targetIndex].rssi) {
+        copyScanItem(scanned_networks[targetIndex], ssid, rssi, secure);
+      }
+      continue;
+    }
+
+    if (scanned_network_count < 12) {
+      copyScanItem(scanned_networks[scanned_network_count], ssid, rssi, secure);
+      scanned_network_count++;
+      continue;
+    }
+
+    size_t weakestIndex = 0;
+    for (size_t j = 1; j < scanned_network_count; j++) {
+      if (scanned_networks[j].rssi < scanned_networks[weakestIndex].rssi) {
+        weakestIndex = j;
+      }
+    }
+
+    if (rssi > scanned_networks[weakestIndex].rssi) {
+      copyScanItem(scanned_networks[weakestIndex], ssid, rssi, secure);
+    }
+  }
+
+  for (size_t i = 0; i < scanned_network_count; i++) {
+    for (size_t j = i + 1; j < scanned_network_count; j++) {
+      if (scanned_networks[j].rssi > scanned_networks[i].rssi) {
+        WiFiScanResultItem temp = scanned_networks[i];
+        scanned_networks[i] = scanned_networks[j];
+        scanned_networks[j] = temp;
+      }
+    }
+  }
+
+  WiFi.scanDelete();
+  Serial.printf("[WiFi] 热点列表已整理，当前可用堆内存: %u bytes\n", ESP.getFreeHeap());
+}
+
+void WiFiManager::saveConfigPortalCredentials(const String& ssid, const String& password) {
+  ConfigManager::preferences.begin("wifi", false);
+  ConfigManager::preferences.putString("ssid", ssid);
+  ConfigManager::preferences.putString("password", password);
+  ConfigManager::preferences.end();
+
+  saved_ssid = ssid;
+  saved_password = password;
+  Serial.println("WiFi 配置已保存");
+}
+
+void WiFiManager::schedulePortalRestart(unsigned long delayMs) {
+  portal_restart_at = millis() + delayMs;
+
+  if (DisplayManager::dma_display == nullptr) {
+    return;
+  }
+
   DisplayManager::dma_display->clearScreen();
+  DisplayManager::drawTinyTextCentered("WIFI SAVED", 24, DisplayManager::dma_display->color565(100, 255, 100));
+  DisplayManager::drawTinyTextCentered("REBOOTING..", 34, DisplayManager::dma_display->color565(150, 150, 150));
+  DisplayManager::drawTinyTextCentered(saved_ssid.c_str(), 46, DisplayManager::dma_display->color565(150, 210, 255));
+  DisplayManager::drawTinyTextCentered("2.4GHz ONLY", 56, DisplayManager::dma_display->color565(255, 210, 120));
+}
 
-  // 蓝色WiFi大图标 + 右下角红色X徽章
-  drawWifiIcon(32, 32, 23, DisplayManager::dma_display->color565(59, 130, 246));
-  drawStatusBadge(32, 32, false);
+void WiFiManager::refreshTimeSync() {
+  if (config_mode || WiFi.status() != WL_CONNECTED) {
+    return;
+  }
 
-  // 提示文字
-  DisplayManager::drawTinyTextCentered("NO WIFI", 46, DisplayManager::dma_display->color565(200, 200, 200));
-  DisplayManager::drawTinyTextCentered("BLE SETUP", 53, DisplayManager::dma_display->color565(150, 150, 150));
+  requestTimeSync();
+  last_ntp_retry_at = millis();
+  ntp_sync_logged = false;
+  time_synced_once = false;
+  Serial.printf("已更新 NTP 服务器并重新发起同步: %s\n", ConfigManager::deviceParamsConfig.ntpServer);
 }
 
 bool WiFiManager::isConfigMode() {
@@ -207,6 +380,37 @@ bool WiFiManager::isConfigMode() {
 
 String WiFiManager::getDeviceIP() {
   return WiFi.localIP().toString();
+}
+
+String WiFiManager::getConnectedSSID() {
+  if (WiFi.status() == WL_CONNECTED) {
+    return WiFi.SSID();
+  }
+  return "";
+}
+
+String WiFiManager::getConfigPortalSSID() {
+  return config_portal_ssid;
+}
+
+String WiFiManager::getConfigPortalIP() {
+  return kConfigPortalIp.toString();
+}
+
+size_t WiFiManager::getScannedNetworkCount() {
+  return scanned_network_count;
+}
+
+WiFiScanResultItem WiFiManager::getScannedNetwork(size_t index) {
+  WiFiScanResultItem emptyItem = {};
+  if (index >= scanned_network_count) {
+    return emptyItem;
+  }
+  return scanned_networks[index];
+}
+
+bool WiFiManager::isNetworkScanRunning() {
+  return scan_requested || scan_in_progress;
 }
 
 bool WiFiManager::isTimeSynced() {
@@ -234,7 +438,43 @@ void WiFiManager::showTimeSyncScreen() {
 }
 
 void WiFiManager::tick() {
-  if (config_mode || WiFi.status() != WL_CONNECTED) {
+  if (config_mode) {
+    dns_server.processNextRequest();
+    ntp_sync_logged = false;
+    time_synced_once = false;
+
+    if (scan_requested && !scan_in_progress) {
+      scan_requested = false;
+      scan_in_progress = true;
+      scanned_network_count = 0;
+      WiFi.scanDelete();
+      Serial.printf("[WiFi] 开始异步扫描附近热点，当前可用堆内存: %u bytes\n", ESP.getFreeHeap());
+      int result = WiFi.scanNetworks(true);
+      if (result == WIFI_SCAN_FAILED) {
+        scan_in_progress = false;
+        Serial.println("[WiFi] 异步扫描启动失败");
+      } else if (result >= 0 && result != WIFI_SCAN_RUNNING) {
+        scan_in_progress = false;
+        finalizeNetworkScan(result);
+      }
+    }
+
+    if (scan_in_progress) {
+      int result = WiFi.scanComplete();
+      if (result != WIFI_SCAN_RUNNING) {
+        scan_in_progress = false;
+        finalizeNetworkScan(result);
+      }
+    }
+
+    if (portal_restart_at != 0 && millis() >= portal_restart_at) {
+      stopConfigPortal();
+      ESP.restart();
+    }
+    return;
+  }
+
+  if (WiFi.status() != WL_CONNECTED) {
     ntp_sync_logged = false;
     time_synced_once = false;
     return;

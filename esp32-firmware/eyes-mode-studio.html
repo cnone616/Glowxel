@@ -375,11 +375,6 @@
             <input id="style-eyeColor" type="color" value="#9bdcff">
           </label>
           <label>
-            <span class="field-name">保留字段（当前板载不使用）</span>
-            <span class="field-code">style.pupilColor</span>
-            <input id="style-pupilColor" type="color" value="#1b6dff">
-          </label>
-          <label>
             <span class="field-name">时间颜色</span>
             <span class="field-code">style.timeColor</span>
             <input id="style-timeColor" type="color" value="#d8f3ff">
@@ -587,7 +582,6 @@
         },
         style: {
           eyeColor: document.getElementById("style-eyeColor").value,
-          pupilColor: document.getElementById("style-pupilColor").value,
           timeColor: document.getElementById("style-timeColor").value
         }
       };
@@ -608,7 +602,6 @@
       document.getElementById("time-show").checked = config.time.show;
       document.getElementById("time-showSeconds").checked = config.time.showSeconds;
       document.getElementById("style-eyeColor").value = config.style.eyeColor;
-      document.getElementById("style-pupilColor").value = config.style.pupilColor;
       document.getElementById("style-timeColor").value = config.style.timeColor;
     }
 

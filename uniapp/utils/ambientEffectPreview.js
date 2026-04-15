@@ -1,3 +1,32 @@
+import { buildRainAmbientFrame } from "./ambient-scenes/rainScene.js";
+import { buildStarfieldAmbientFrame } from "./ambient-scenes/starfieldScene.js";
+import { buildDigitalRainAmbientFrames } from "./ambient-scenes/digitalRainScene.js";
+import { buildMetaBlobAmbientFrame } from "./ambient-scenes/metaBlobScene.js";
+import { buildNeonTunnelAmbientFrame } from "./ambient-scenes/neonTunnelScene.js";
+import { buildBoidsAmbientFrame } from "./ambient-scenes/boidsScene.js";
+import { buildSortingVisualizerAmbientFrame } from "./ambient-scenes/sortingVisualizerScene.js";
+import { buildClockSceneAmbientFrame } from "./ambient-scenes/clockScene.js";
+
+const LOCAL_ONLY_AMBIENT_PRESETS = new Set([
+  "clock_scene",
+  "starfield",
+  "metablob",
+  "digital_rain",
+  "neon_tunnel",
+  "boids",
+  "falling_sand",
+  "sorting_visualizer",
+  "bouncing_logo",
+  "game_of_life",
+  "julia_set",
+  "wave_pattern",
+  "watermelon_plasma",
+  "rain_scene",
+  "sparks",
+  "countdown_scene",
+  "reaction_diffusion",
+]);
+
 const DIGIT_GLYPHS = {
   "0": ["111", "101", "101", "101", "111"],
   "1": ["010", "110", "010", "010", "111"],
@@ -10,6 +39,21 @@ const DIGIT_GLYPHS = {
   "8": ["111", "101", "111", "101", "111"],
   "9": ["111", "101", "111", "001", "111"],
   ":": ["000", "010", "000", "010", "000"],
+  "-": ["000", "000", "111", "000", "000"],
+  "A": ["010", "101", "111", "101", "101"],
+  "C": ["111", "100", "100", "100", "111"],
+  "D": ["110", "101", "101", "101", "110"],
+  "E": ["111", "100", "110", "100", "111"],
+  "I": ["111", "010", "010", "010", "111"],
+  "M": ["101", "111", "111", "101", "101"],
+  "N": ["101", "111", "111", "111", "101"],
+  "O": ["111", "101", "101", "101", "111"],
+  "R": ["110", "101", "110", "101", "101"],
+  "S": ["111", "100", "111", "001", "111"],
+  "T": ["111", "010", "010", "010", "010"],
+  "U": ["101", "101", "101", "101", "111"],
+  "W": ["101", "101", "111", "111", "101"],
+  "Y": ["101", "101", "010", "010", "010"],
 };
 
 function clampUnit(value) {
@@ -42,6 +86,29 @@ function clampByte(value) {
     return 255;
   }
   return Math.round(value);
+}
+
+function normalizeHexColor(value) {
+  if (typeof value !== "string") {
+    return "";
+  }
+  const body = value.trim().replace(/^#/, "");
+  if (!/^[0-9a-fA-F]{6}$/.test(body)) {
+    return "";
+  }
+  return `#${body.toLowerCase()}`;
+}
+
+function hexToRgbColor(value) {
+  const normalized = normalizeHexColor(value);
+  if (normalized.length === 0) {
+    return { r: 100, g: 200, b: 255 };
+  }
+  return {
+    r: parseInt(normalized.slice(1, 3), 16),
+    g: parseInt(normalized.slice(3, 5), 16),
+    b: parseInt(normalized.slice(5, 7), 16),
+  };
 }
 
 function setPixel(frameMap, x, y, r, g, b) {
@@ -118,10 +185,6 @@ function glowPulse(timeValue, offset) {
   return 0.5 + 0.5 * Math.sin(timeValue + offset);
 }
 
-function angleUnit(nx, ny) {
-  return Math.atan2(ny, nx) / (Math.PI * 2);
-}
-
 function sparkSeed(index, shift) {
   return fract(Math.sin((index + 1) * 17.371 + shift * 3.147) * 24634.6345);
 }
@@ -153,17 +216,129 @@ function drawGlyphText(frameMap, text, x, y, scale, rgb) {
   }
 }
 
-function drawBrandLogo(frameMap, originX, originY, size) {
-  const colors = [
-    [{ r: 249, g: 115, b: 22 }, { r: 249, g: 115, b: 22 }, { r: 239, g: 68, b: 68 }],
-    [{ r: 249, g: 115, b: 22 }, { r: 251, g: 191, b: 36 }, { r: 251, g: 191, b: 36 }],
-    [{ r: 249, g: 115, b: 22 }, { r: 59, g: 130, b: 246 }, { r: 59, g: 130, b: 246 }],
-  ];
+function measureGlyphTextWidth(text, scale) {
+  if (!text || text.length === 0) {
+    return 0;
+  }
+  return text.length * 4 * scale - scale;
+}
+
+function drawGlyphTextCentered(frameMap, text, y, scale, rgb) {
+  const width = measureGlyphTextWidth(text, scale);
+  const x = Math.max(0, Math.floor((64 - width) / 2));
+  drawGlyphText(frameMap, text, x, y, scale, rgb);
+}
+
+function strokeRect(frameMap, x, y, width, height, rgb) {
+  for (let col = 0; col < width; col += 1) {
+    setPixel(frameMap, x + col, y, rgb.r, rgb.g, rgb.b);
+    setPixel(frameMap, x + col, y + height - 1, rgb.r, rgb.g, rgb.b);
+  }
+  for (let row = 0; row < height; row += 1) {
+    setPixel(frameMap, x, y + row, rgb.r, rgb.g, rgb.b);
+    setPixel(frameMap, x + width - 1, y + row, rgb.r, rgb.g, rgb.b);
+  }
+}
+
+function drawChip(frameMap, x, y, width, rgb) {
+  fillRect(frameMap, x, y, width, 2, rgb);
+}
+
+function drawPanelFrame(frameMap, x, y, width, height, background, border, accent) {
+  fillRect(frameMap, x, y, width, height, background);
+  strokeRect(frameMap, x, y, width, height, border);
+  fillRect(frameMap, x + 2, y + 2, width - 4, 1, accent);
+  fillRect(frameMap, x + 2, y + height - 3, width - 4, 1, accent);
+}
+
+const BRAND_LOGO_MAIN_PALETTE = {
+  bg: { r: 10, g: 10, b: 14 },
+  border: { r: 54, g: 64, b: 84 },
+  cells: [
+    [
+      { r: 249, g: 115, b: 22 },
+      { r: 249, g: 115, b: 22 },
+      { r: 239, g: 68, b: 68 },
+    ],
+    [
+      { r: 249, g: 115, b: 22 },
+      { r: 251, g: 191, b: 36 },
+      { r: 251, g: 191, b: 36 },
+    ],
+    [
+      { r: 249, g: 115, b: 22 },
+      { r: 59, g: 130, b: 246 },
+      { r: 59, g: 130, b: 246 },
+    ],
+  ],
+};
+
+function resolveBouncingLogoScale(value) {
+  const parsed = Number(value);
+  if (parsed === 1 || parsed === 2 || parsed === 3) {
+    return parsed;
+  }
+  return 2;
+}
+
+function measureBrandLogo(scale) {
+  const pixelScale = resolveBouncingLogoScale(scale);
+  const padding = 0;
+  const gap = 1;
+  const blockSize = pixelScale;
+  const iconSize = padding * 2 + blockSize * 3 + gap * 2;
+  return {
+    pixelScale,
+    padding,
+    gap,
+    blockSize,
+    iconSize,
+  };
+}
+
+function drawBrandLogo(frameMap, originX, originY, scale, palette) {
+  const metrics = measureBrandLogo(scale);
+  const cells = palette.cells;
+  const startX = originX + metrics.padding;
+  const startY = originY + metrics.padding;
 
   for (let row = 0; row < 3; row += 1) {
     for (let col = 0; col < 3; col += 1) {
-      fillRect(frameMap, originX + col * size, originY + row * size, size - 1, size - 1, colors[row][col]);
+      const x = startX + col * (metrics.blockSize + metrics.gap);
+      const y = startY + row * (metrics.blockSize + metrics.gap);
+      const color = cells[row][col];
+      fillRect(frameMap, x, y, metrics.blockSize, metrics.blockSize, color);
     }
+  }
+}
+
+function drawImpactBurst(frameMap, side, anchorX, anchorY, color) {
+  if (side === "left") {
+    setPixel(frameMap, anchorX, anchorY, color.r, color.g, color.b);
+    setPixel(frameMap, anchorX + 1, anchorY - 1, color.r, color.g, color.b);
+    setPixel(frameMap, anchorX + 1, anchorY + 1, color.r, color.g, color.b);
+    setPixel(frameMap, anchorX + 2, anchorY, color.r, color.g, color.b);
+    return;
+  }
+  if (side === "right") {
+    setPixel(frameMap, anchorX, anchorY, color.r, color.g, color.b);
+    setPixel(frameMap, anchorX - 1, anchorY - 1, color.r, color.g, color.b);
+    setPixel(frameMap, anchorX - 1, anchorY + 1, color.r, color.g, color.b);
+    setPixel(frameMap, anchorX - 2, anchorY, color.r, color.g, color.b);
+    return;
+  }
+  if (side === "top") {
+    setPixel(frameMap, anchorX, anchorY, color.r, color.g, color.b);
+    setPixel(frameMap, anchorX - 1, anchorY + 1, color.r, color.g, color.b);
+    setPixel(frameMap, anchorX + 1, anchorY + 1, color.r, color.g, color.b);
+    setPixel(frameMap, anchorX, anchorY + 2, color.r, color.g, color.b);
+    return;
+  }
+  if (side === "bottom") {
+    setPixel(frameMap, anchorX, anchorY, color.r, color.g, color.b);
+    setPixel(frameMap, anchorX - 1, anchorY - 1, color.r, color.g, color.b);
+    setPixel(frameMap, anchorX + 1, anchorY - 1, color.r, color.g, color.b);
+    setPixel(frameMap, anchorX, anchorY - 2, color.r, color.g, color.b);
   }
 }
 
@@ -251,81 +426,6 @@ function renderDigitalRain(x, y, timeBase, speedUnit, intensityUnit, elapsed) {
   }
 
   return rgb;
-}
-
-function renderStarfield(nx, ny, x, y, timeBase, intensityUnit) {
-  const nebulaA = 0.5 + 0.5 * Math.sin(nx * 5 + timeBase * 0.45 + ny * 4);
-  const nebulaB = 0.5 + 0.5 * Math.sin((nx - ny) * 7.2 - timeBase * 0.62);
-  const backdrop = clampUnit(0.03 + nebulaA * 0.08 + nebulaB * 0.06);
-  let rgb = {
-    r: 4 + 16 * nebulaB * backdrop,
-    g: 6 + 22 * nebulaA * backdrop,
-    b: 12 + 46 * (nebulaA * 0.55 + nebulaB * 0.45) * backdrop,
-  };
-
-  const starIndex = (x * 31 + y * 17) % 97;
-  if (starIndex < 3) {
-    const twinkle = glowPulse(timeBase * (1.1 + starIndex * 0.35), (x + y) * 0.21);
-    const shine = 0.28 + twinkle * (0.42 + intensityUnit * 0.18);
-    rgb.r += 140 * shine;
-    rgb.g += 150 * shine;
-    rgb.b += 185 * shine;
-  }
-
-  return rgb;
-}
-
-function renderNeonTunnel(nx, ny, dist, timeBase, speedUnit, intensityUnit) {
-  const angle = angleUnit(nx, ny);
-  const tunnelDepth = fract(dist * 4.4 - timeBase * (1.8 + speedUnit * 1.1));
-  const ringGlow = clampUnit(1 - Math.abs(tunnelDepth - 0.5) * 6.5);
-  const laneGlow = clampUnit(
-    1 - Math.abs(fract(angle * 6 + timeBase * 0.22) - 0.5) * 4.6,
-  );
-  const rimGlow = clampUnit(1 - Math.abs(dist - 0.88) * 8.5);
-  const centerFade = clampUnit(1 - dist * 0.92);
-  const pulse = 0.5 + 0.5 * Math.sin(timeBase * 3.2 + angle * 8);
-  const glow = clampUnit(
-    0.04 +
-      ringGlow * (0.46 + intensityUnit * 0.2) +
-      laneGlow * 0.24 +
-      rimGlow * 0.18 +
-      centerFade * 0.08,
-  );
-
-  return {
-    r: (20 + 180 * laneGlow + 45 * pulse) * glow,
-    g: (10 + 70 * pulse + 30 * rimGlow) * glow,
-    b: (40 + 210 * ringGlow + 80 * laneGlow) * glow,
-  };
-}
-
-function renderMetablob(nx, ny, timeBase, intensityUnit) {
-  let field = 0;
-  for (let index = 0; index < 4; index += 1) {
-    const seedA = sparkSeed(index, 0.3);
-    const seedB = sparkSeed(index, 1.6);
-    const blobX =
-      Math.sin(timeBase * (0.72 + seedA * 0.65) + seedB * Math.PI * 2) *
-      (0.24 + seedA * 0.38);
-    const blobY =
-      Math.cos(timeBase * (0.94 + seedB * 0.52) + seedA * Math.PI * 2) *
-      (0.22 + seedB * 0.36);
-    const dx = nx - blobX;
-    const dy = ny - blobY;
-    field += (0.065 + intensityUnit * 0.032) / (dx * dx + dy * dy + 0.026);
-  }
-
-  const iso = clampUnit((field - 0.82) / (1.9 + intensityUnit * 0.4));
-  const edge = smoothstep(1.8, 2.45 + intensityUnit * 0.3, field);
-  const shimmer = 0.5 + 0.5 * Math.sin(field * 4.2 - timeBase * 2.1);
-  const glow = clampUnit(iso * 0.78 + edge * 0.22);
-
-  return {
-    r: (8 + 46 * shimmer + 22 * edge) * glow,
-    g: (24 + 150 * iso + 55 * shimmer) * glow,
-    b: (42 + 150 * edge + 48 * (1 - shimmer)) * glow,
-  };
 }
 
 function renderFallingSand(nx, y, x, timeBase, speedUnit, intensityUnit) {
@@ -469,95 +569,112 @@ function renderWatermelonPlasma(nx, ny, dist, timeBase, intensityUnit) {
   return addHighlight(rgb, field * 0.08);
 }
 
-function buildBoidsFrame(frameMap, elapsed, speedUnit, intensityUnit) {
-  fillRect(frameMap, 0, 0, 64, 64, { r: 4, g: 10, b: 18 });
-  for (let y = 8; y < 64; y += 9) {
-    for (let x = 0; x < 64; x += 1) {
-      setPixel(frameMap, x, y, 10, 18, 28);
+function buildBouncingLogoStates(scale) {
+  const logoScale = resolveBouncingLogoScale(scale);
+  const logoMetrics = measureBrandLogo(logoScale);
+  const logoSize = logoMetrics.iconSize;
+  const minX = 2;
+  const minY = 2;
+  const maxX = 64 - logoSize - 2;
+  const maxY = 64 - logoSize - 2;
+  let x = 7;
+  let y = 9;
+  let vx = 1;
+  let vy = 1;
+  let hitLeft = false;
+  let hitRight = false;
+  let hitTop = false;
+  let hitBottom = false;
+  const states = [];
+  const seen = new Set();
+
+  while (true) {
+    const key = `${x},${y},${vx},${vy}`;
+    if (seen.has(key)) {
+      break;
+    }
+    seen.add(key);
+    states.push({
+      x,
+      y,
+      hitLeft,
+      hitRight,
+      hitTop,
+      hitBottom,
+    });
+
+    hitLeft = false;
+    hitRight = false;
+    hitTop = false;
+    hitBottom = false;
+    x += vx;
+    y += vy;
+
+    if (x <= minX) {
+      x = minX;
+      vx = Math.abs(vx);
+      hitLeft = true;
+    } else if (x >= maxX) {
+      x = maxX;
+      vx = -Math.abs(vx);
+      hitRight = true;
+    }
+
+    if (y <= minY) {
+      y = minY;
+      vy = Math.abs(vy);
+      hitTop = true;
+    } else if (y >= maxY) {
+      y = maxY;
+      vy = -Math.abs(vy);
+      hitBottom = true;
     }
   }
 
-  const timeBase = elapsed * (0.0012 + speedUnit * 0.0016);
-  for (let index = 0; index < 11; index += 1) {
-    const seedA = sparkSeed(index, 0.8);
-    const seedB = sparkSeed(index, 2.4);
-    const px =
-      32 +
-      Math.sin(timeBase * (0.9 + seedA * 0.8) + seedB * Math.PI * 2) * (10 + seedA * 18) +
-      Math.cos(timeBase * (0.5 + seedB * 0.7) + index) * 6;
-    const py =
-      32 +
-      Math.cos(timeBase * (0.7 + seedB * 0.9) + seedA * Math.PI * 2) * (8 + seedB * 16) +
-      Math.sin(timeBase * (0.8 + seedA * 0.4) + index * 0.6) * 5;
-    const tailX = px - Math.cos(timeBase + index) * 4;
-    const tailY = py - Math.sin(timeBase * 1.1 + index) * 4;
-    const body = addHighlight(
-      mixRgb({ r: 44, g: 164, b: 255 }, { r: 80, g: 255, b: 196 }, seedA),
-      0.12 + intensityUnit * 0.16,
+  return states;
+}
+
+function buildBouncingLogoFrame(frameMap, frameIndex, scale) {
+  const logoScale = resolveBouncingLogoScale(scale);
+  const logoMetrics = measureBrandLogo(logoScale);
+  const logoSize = logoMetrics.iconSize;
+  const states = buildBouncingLogoStates(logoScale);
+  const current = states[frameIndex % states.length];
+
+  fillRect(frameMap, 0, 0, 64, 64, { r: 5, g: 6, b: 10 });
+
+  if (current.hitLeft) {
+    drawImpactBurst(frameMap, "left", 1, current.y + Math.floor(logoSize / 2), {
+      r: 249,
+      g: 115,
+      b: 22,
+    });
+  }
+  if (current.hitRight) {
+    drawImpactBurst(frameMap, "right", 62, current.y + Math.floor(logoSize / 2), {
+      r: 59,
+      g: 130,
+      b: 246,
+    });
+  }
+  if (current.hitTop) {
+    drawImpactBurst(frameMap, "top", current.x + Math.floor(logoSize / 2), 1, {
+      r: 239,
+      g: 68,
+      b: 68,
+    });
+  }
+  if (current.hitBottom) {
+    drawImpactBurst(
+      frameMap,
+      "bottom",
+      current.x + Math.floor(logoSize / 2),
+      62,
+      { r: 251, g: 191, b: 36 },
     );
-    drawGlow(frameMap, Math.round(px), Math.round(py), body, 0.9, 1);
-    drawGlow(frameMap, Math.round((px + tailX) / 2), Math.round((py + tailY) / 2), scaleRgb(body, 0.45), 0.7, 1);
-  }
-}
-
-function buildBouncingLogoFrame(frameMap, elapsed, speedUnit) {
-  fillRect(frameMap, 0, 0, 64, 64, { r: 8, g: 11, b: 18 });
-  const travelX = 8 + Math.abs(((elapsed * (0.02 + speedUnit * 0.02)) % 96) - 48);
-  const travelY = 8 + Math.abs(((elapsed * (0.016 + speedUnit * 0.018) + 12) % 84) - 42);
-  const x = Math.round(Math.min(64 - 18, travelX));
-  const y = Math.round(Math.min(64 - 18, travelY));
-  drawBrandLogo(frameMap, x, y, 6);
-  drawGlow(frameMap, x + 8, y + 8, { r: 110, g: 180, b: 255 }, 0.32, 4);
-}
-
-function buildSortingVisualizerFrame(frameMap, frameIndex, intensityUnit) {
-  fillRect(frameMap, 0, 0, 64, 64, { r: 6, g: 9, b: 16 });
-  const heights = [13, 9, 5, 15, 7, 12, 3, 10, 16, 8, 14, 6, 11, 4, 2, 1];
-  const compareCount = frameIndex * 3;
-  let activeLeft = 0;
-  let activeRight = 1;
-
-  for (let step = 0; step < compareCount; step += 1) {
-    const index = step % (heights.length - 1);
-    activeLeft = index;
-    activeRight = index + 1;
-    if (heights[index] > heights[index + 1]) {
-      const temp = heights[index];
-      heights[index] = heights[index + 1];
-      heights[index + 1] = temp;
-    }
   }
 
-  for (let index = 0; index < heights.length; index += 1) {
-    const barHeight = heights[index];
-    const x = index * 4;
-    const base = index === activeLeft || index === activeRight
-      ? { r: 255, g: 180, b: 68 }
-      : mixRgb({ r: 78, g: 162, b: 255 }, { r: 96, g: 255, b: 188 }, index / 15);
-    const color = addHighlight(base, intensityUnit * 0.14);
-    for (let row = 0; row < barHeight; row += 1) {
-      fillRect(frameMap, x + 1, 63 - row * 3, 3, 2, color);
-    }
-  }
-}
-
-function buildClockSceneFrame(frameMap, elapsed, intensityUnit) {
-  for (let y = 0; y < 64; y += 1) {
-    for (let x = 0; x < 64; x += 1) {
-      const nx = (x - 31.5) / 31.5;
-      const ny = (y - 31.5) / 31.5;
-      const rgb = renderStarfield(nx, ny, x, y, elapsed * 0.0012, intensityUnit);
-      setPixel(frameMap, x, y, rgb.r, rgb.g, rgb.b);
-    }
-  }
-
-  const now = new Date();
-  const text = `${String(now.getHours()).padStart(2, "0")}:${String(
-    now.getMinutes(),
-  ).padStart(2, "0")}`;
-  fillRect(frameMap, 8, 18, 48, 28, { r: 6, g: 12, b: 20 });
-  fillRect(frameMap, 8, 47, 48, 1, { r: 24, g: 60, b: 88 });
-  drawGlyphText(frameMap, text, 10, 22, 3, { r: 142, g: 214, b: 255 });
+  drawBrandLogo(frameMap, current.x, current.y, logoScale, BRAND_LOGO_MAIN_PALETTE);
 }
 
 function buildCountdownSceneFrame(frameMap, elapsed, speedUnit) {
@@ -569,35 +686,23 @@ function buildCountdownSceneFrame(frameMap, elapsed, speedUnit) {
   const seconds = remaining % 60;
   const text = `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
   const progress = remaining / totalSeconds;
-  fillRect(frameMap, 7, 16, 50, 34, { r: 10, g: 16, b: 28 });
-  fillRect(frameMap, 8, 50, Math.max(1, Math.round(progress * 48)), 2, { r: 255, g: 112, b: 64 });
-  drawGlyphText(frameMap, text, 10, 23, 3, { r: 255, g: 212, b: 82 });
-}
-
-function buildWeatherSceneFrame(frameMap, elapsed, speedUnit) {
-  fillRect(frameMap, 0, 0, 64, 64, { r: 6, g: 10, b: 18 });
-  const phase = Math.floor((elapsed / 1000) * (0.28 + speedUnit * 0.2)) % 3;
-  const temp = phase === 0 ? 26 : phase === 1 ? 18 : 8;
-  const text = `${String(temp).padStart(2, "0")}`;
-  fillRect(frameMap, 6, 10, 52, 40, { r: 10, g: 16, b: 28 });
-
-  if (phase === 0) {
-    drawGlow(frameMap, 18, 24, { r: 255, g: 206, b: 84 }, 0.95, 4);
-  } else if (phase === 1) {
-    drawGlow(frameMap, 16, 22, { r: 188, g: 212, b: 255 }, 0.8, 4);
-    for (let row = 0; row < 5; row += 1) {
-      fillRect(frameMap, 14 + row * 3, 30 + row, 1, 4, { r: 88, g: 176, b: 255 });
-    }
-  } else {
-    drawGlow(frameMap, 18, 24, { r: 208, g: 232, b: 255 }, 0.72, 4);
-    for (let index = 0; index < 6; index += 1) {
-      setPixel(frameMap, 12 + index * 3, 32 + (index % 2), 240, 248, 255);
-      setPixel(frameMap, 13 + index * 3, 33 + (index % 2), 240, 248, 255);
-    }
-  }
-
-  drawGlyphText(frameMap, text, 32, 22, 3, { r: 224, g: 244, b: 255 });
-  fillRect(frameMap, 48, 22, 2, 2, { r: 120, g: 196, b: 255 });
+  const warning = progress < 0.25;
+  const accent = warning ? { r: 255, g: 108, b: 82 } : { r: 255, g: 212, b: 82 };
+  const border = warning ? { r: 124, g: 48, b: 44 } : { r: 108, g: 84, b: 40 };
+  drawPanelFrame(frameMap, 5, 13, 54, 38, { r: 10, g: 16, b: 28 }, border, scaleRgb(accent, 0.55));
+  drawGlyphText(frameMap, "TIMER", 10, 17, 1, scaleRgb(accent, 0.86));
+  drawChip(frameMap, 42, 17, 10, scaleRgb(accent, 0.7));
+  drawGlyphTextCentered(frameMap, text, 26, 2, accent);
+  strokeRect(frameMap, 10, 43, 44, 5, border);
+  fillRect(
+    frameMap,
+    11,
+    44,
+    Math.max(2, Math.round(progress * 42)),
+    3,
+    accent,
+  );
+  drawGlow(frameMap, 11 + Math.round(progress * 42), 45, accent, 0.28, 1);
 }
 
 function buildGameOfLifeFrame(frameMap, frameIndex, intensityUnit) {
@@ -666,29 +771,69 @@ function buildReactionDiffusionFrame(frameMap, elapsed, speedUnit, intensityUnit
   }
 }
 
-function buildSpecialSceneFrame(preset, frameMap, frameIndex, elapsed, speedUnit, intensityUnit) {
+function buildSpecialSceneFrame(
+  preset,
+  frameMap,
+  frameIndex,
+  elapsed,
+  speedUnit,
+  intensityUnit,
+  specialConfig,
+) {
+  if (preset === "starfield") {
+    buildStarfieldAmbientFrame(frameMap, elapsed, speedUnit, intensityUnit);
+    return true;
+  }
+  if (preset === "digital_rain") {
+    const frames = buildDigitalRainAmbientFrames(frameIndex + 1, speedUnit);
+    const target = frames[frameIndex];
+    if (target instanceof Map) {
+      target.forEach((value, key) => {
+        frameMap.set(key, value);
+      });
+    }
+    return true;
+  }
+  if (preset === "metablob") {
+    buildMetaBlobAmbientFrame(frameMap, elapsed, speedUnit, intensityUnit);
+    return true;
+  }
+  if (preset === "neon_tunnel") {
+    buildNeonTunnelAmbientFrame(frameMap, elapsed, speedUnit, intensityUnit);
+    return true;
+  }
+  if (preset === "rain_scene") {
+    buildRainAmbientFrame(
+      frameMap,
+      elapsed,
+      speedUnit,
+      specialConfig.rainDensity,
+      specialConfig.rainColor,
+    );
+    return true;
+  }
   if (preset === "boids") {
-    buildBoidsFrame(frameMap, elapsed, speedUnit, intensityUnit);
+    buildBoidsAmbientFrame(frameMap, elapsed, speedUnit, intensityUnit);
     return true;
   }
   if (preset === "bouncing_logo") {
-    buildBouncingLogoFrame(frameMap, elapsed, speedUnit);
+    buildBouncingLogoFrame(
+      frameMap,
+      frameIndex,
+      specialConfig.bouncingLogoScale,
+    );
     return true;
   }
   if (preset === "sorting_visualizer") {
-    buildSortingVisualizerFrame(frameMap, frameIndex, intensityUnit);
+    buildSortingVisualizerAmbientFrame(frameMap, frameIndex, intensityUnit);
     return true;
   }
   if (preset === "clock_scene") {
-    buildClockSceneFrame(frameMap, elapsed, intensityUnit);
+    buildClockSceneAmbientFrame(frameMap, elapsed, intensityUnit);
     return true;
   }
   if (preset === "countdown_scene") {
     buildCountdownSceneFrame(frameMap, elapsed, speedUnit);
-    return true;
-  }
-  if (preset === "weather_scene") {
-    buildWeatherSceneFrame(frameMap, elapsed, speedUnit);
     return true;
   }
   if (preset === "game_of_life") {
@@ -714,15 +859,6 @@ function renderPresetPixel(preset, x, y, timeBase, speedUnit, intensityUnit, ela
   if (preset === "digital_rain") {
     return renderDigitalRain(x, y, timeBase, speedUnit, intensityUnit, elapsed);
   }
-  if (preset === "starfield") {
-    return renderStarfield(nx, ny, x, y, timeBase, intensityUnit);
-  }
-  if (preset === "neon_tunnel") {
-    return renderNeonTunnel(nx, ny, dist, timeBase, speedUnit, intensityUnit);
-  }
-  if (preset === "metablob") {
-    return renderMetablob(nx, ny, timeBase, intensityUnit);
-  }
   if (preset === "falling_sand") {
     return renderFallingSand(nx, y, x, timeBase, speedUnit, intensityUnit);
   }
@@ -732,30 +868,91 @@ function renderPresetPixel(preset, x, y, timeBase, speedUnit, intensityUnit, ela
   if (preset === "wave_pattern") {
     return renderWavePattern(nx, ny, timeBase, intensityUnit);
   }
-  if (preset === "rain_scene") {
-    return renderRainScene(nx, ny, x, y, timeBase, speedUnit, intensityUnit);
-  }
   return renderWatermelonPlasma(nx, ny, dist, timeBase, intensityUnit);
+}
+
+function resolveAmbientPreviewFramePlan(preset, loop, bouncingLogoScale) {
+  if (preset === "bouncing_logo") {
+    const bouncingStates = buildBouncingLogoStates(bouncingLogoScale);
+    return {
+      frameCount: loop === false ? Math.min(36, bouncingStates.length) : bouncingStates.length,
+      elapsedStep: 120,
+    };
+  }
+
+  if (loop === false) {
+    return {
+      frameCount: 24,
+      elapsedStep: 120,
+    };
+  }
+
+  const plans = {
+    starfield: { frameCount: 96, elapsedStep: 90 },
+    digital_rain: { frameCount: 108, elapsedStep: 80 },
+    metablob: { frameCount: 96, elapsedStep: 100 },
+    neon_tunnel: { frameCount: 96, elapsedStep: 90 },
+    rain_scene: { frameCount: 108, elapsedStep: 85 },
+    boids: { frameCount: 120, elapsedStep: 85 },
+    clock_scene: { frameCount: 120, elapsedStep: 100 },
+    countdown_scene: { frameCount: 90, elapsedStep: 100 },
+    falling_sand: { frameCount: 108, elapsedStep: 85 },
+    sparks: { frameCount: 96, elapsedStep: 80 },
+    game_of_life: { frameCount: 84, elapsedStep: 95 },
+    julia_set: { frameCount: 84, elapsedStep: 95 },
+    reaction_diffusion: { frameCount: 96, elapsedStep: 90 },
+    wave_pattern: { frameCount: 84, elapsedStep: 95 },
+    watermelon_plasma: { frameCount: 84, elapsedStep: 95 },
+  };
+
+  return plans[preset] || { frameCount: 72, elapsedStep: 90 };
 }
 
 export function buildAmbientPreviewFrames(config) {
   const safeConfig = config || {};
-  const preset = typeof safeConfig.preset === "string" ? safeConfig.preset : "digital_rain";
+  const requestedPreset =
+    typeof safeConfig.preset === "string" ? safeConfig.preset : "digital_rain";
+  const preset = LOCAL_ONLY_AMBIENT_PRESETS.has(requestedPreset)
+    ? requestedPreset
+    : "digital_rain";
   const parsedSpeed = Number(safeConfig.speed);
   const parsedIntensity = Number(safeConfig.intensity);
+  const parsedDensity = Number(safeConfig.density);
   const speed = Number.isFinite(parsedSpeed) ? Math.max(1, Math.min(10, Math.round(parsedSpeed))) : 6;
   const intensity = Number.isFinite(parsedIntensity) ? Math.max(10, Math.min(100, Math.round(parsedIntensity))) : 72;
-  const frameCount = safeConfig.loop === false ? 10 : 20;
+  const density = Number.isFinite(parsedDensity) ? Math.max(10, Math.min(100, Math.round(parsedDensity))) : 72;
+  const rainColor = hexToRgbColor(safeConfig.color);
+  const bouncingLogoScale = resolveBouncingLogoScale(safeConfig.bouncingLogoScale);
+  const framePlan = resolveAmbientPreviewFramePlan(
+    preset,
+    safeConfig.loop === false ? false : true,
+    bouncingLogoScale,
+  );
+  const frameCount = framePlan.frameCount;
   const frames = [];
 
   for (let frameIndex = 0; frameIndex < frameCount; frameIndex += 1) {
     const frameMap = new Map();
-    const elapsed = frameIndex * 120;
+    const elapsed = frameIndex * framePlan.elapsedStep;
     const speedUnit = speed / 10;
     const intensityUnit = intensity / 100;
     const timeBase = elapsed * (0.00045 + speedUnit * 0.00135);
 
-    if (buildSpecialSceneFrame(preset, frameMap, frameIndex, elapsed, speedUnit, intensityUnit)) {
+    if (
+      buildSpecialSceneFrame(
+        preset,
+        frameMap,
+        frameIndex,
+        elapsed,
+        speedUnit,
+        intensityUnit,
+        {
+          bouncingLogoScale,
+          rainDensity: density,
+          rainColor,
+        },
+      )
+    ) {
       frames.push(frameMap);
       continue;
     }

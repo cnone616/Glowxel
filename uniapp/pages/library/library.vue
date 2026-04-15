@@ -8,7 +8,7 @@
     <!-- 顶部导航 -->
     <view class="header glx-topbar glx-page-shell__fixed">
       <view class="header-content">
-        <Logo :size="80" :show-text="true" />
+        <Logo :size="88" :show-text="true" />
         <view class="header-actions">
         </view>
       </view>
@@ -390,7 +390,6 @@ export default {
 }
 
 .search-btn:active {
-  transform: none;
   background-color: var(--nb-yellow);
 }
 
@@ -399,22 +398,6 @@ export default {
   background-color: var(--nb-surface);
   padding: 0 32rpx 24rpx;
   border-bottom: 1rpx solid var(--nb-ink);
-}
-
-.search-input-wrapper {
-  display: flex;
-  align-items: center;
-  gap: 16rpx;
-  background-color: var(--nb-paper);
-  border-radius: 0;
-  padding: 20rpx 24rpx;
-  border: 2rpx solid var(--nb-ink);
-  transition: all 0.2s ease;
-}
-
-.search-input-wrapper:focus-within {
-  border-color: var(--nb-yellow);
-  box-shadow: none;
 }
 
 .search-input {
@@ -436,13 +419,11 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 50%;
+  border-radius: 0;
   background-color: var(--nb-paper);
+  border: 2rpx solid var(--nb-ink);
+  box-shadow: var(--nb-shadow-soft);
   transition: all 0.2s ease;
-}
-
-.clear-btn:active {
-  transform: scale(0.9);
 }
 
 /* 主要内容 */
@@ -504,7 +485,6 @@ export default {
 }
 
 .banner-btn:active {
-  transform: scale(0.95);
   background-color: rgba(255, 255, 255, 0.3);
 }
 
@@ -551,11 +531,6 @@ export default {
   transition: all 0.2s ease;
 }
 
-.more-btn:active {
-  background-color: rgba(79, 127, 255, 0.1);
-  transform: scale(0.95);
-}
-
 .more-text {
   font-size: 26rpx;
   color: var(--nb-ink);
@@ -574,13 +549,6 @@ export default {
 }
 
 /* 空状态 */
-.empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 64rpx 32rpx;
-  text-align: center;
-}
 
 .empty-icon {
   width: 160rpx;
@@ -589,7 +557,9 @@ export default {
   align-items: center;
   justify-content: center;
   background-color: var(--nb-paper);
-  border-radius: 50%;
+  border-radius: 0;
+  border: 2rpx solid var(--nb-ink);
+  box-shadow: var(--nb-shadow-soft);
   margin-bottom: 32rpx;
 }
 
@@ -613,10 +583,6 @@ export default {
   border-radius: 0;
   border: 3rpx solid #000000;
   transition: all 0.2s ease;
-}
-
-.empty-btn:active {
-  transform: translate(2rpx, 2rpx);
 }
 
 .empty-btn-text {

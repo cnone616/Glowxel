@@ -47,7 +47,7 @@
         class="glx-input-clear"
         @click="handleClear"
       >
-        <Icon name="close" :size="28" color="#AAAAAA" />
+        <Icon name="close" :size="28" color="var(--text-tertiary)" />
       </view>
       
       <!-- 后置图标 -->
@@ -267,11 +267,11 @@ export default {
 .glx-input-shell {
   display: flex;
   align-items: center;
-  background: #ffffff;
+  background: var(--tone-paper-soft);
   border: 3rpx solid #000000;
   border-radius: 0;
-  box-shadow: 2rpx 2rpx 0 #000000;
-  transition: all 0.2s ease;
+  box-shadow: var(--nb-shadow-soft);
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
   position: relative;
   overflow: hidden;
   box-sizing: border-box;
@@ -307,7 +307,7 @@ export default {
 }
 
 .glx-input--readonly {
-  background-color: var(--nb-paper);
+  background-color: #f3f1ee;
   cursor: not-allowed;
 }
 
@@ -385,14 +385,11 @@ export default {
   align-items: center;
   justify-content: center;
   border: 3rpx solid #000000;
-  background-color: #ffffff;
-  transition: all 0.2s ease;
+  background-color: var(--tone-paper-soft);
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
   box-sizing: border-box;
 }
 
-.glx-input-clear:active {
-  transform: translate(2rpx, 2rpx);
-}
 
 .glx-input-suffix-icon {
   display: flex;

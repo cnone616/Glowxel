@@ -4,12 +4,13 @@
 #include "wifi_manager.h"
 #include "display_manager.h"
 #include "animation_manager.h"
+#include "board_native_effect.h"
 #include "websocket_handler.h"
 #include "web_server.h"
 #include "ota_manager.h"
 #include "tetris_effect.h"
-#include "ble_config.h"
 #include "eyes_effect.h"
+#include "game_screensaver_effect.h"
 #include "theme_renderer.h"
 
 namespace {
@@ -63,6 +64,25 @@ void renderStartupRestoredFrame() {
   if (DisplayManager::currentMode == MODE_CANVAS) {
     DisplayManager::renderCanvas();
     return;
+  }
+
+  if (DisplayManager::currentMode == MODE_ANIMATION &&
+      DisplayManager::currentBusinessModeTag == "game_screensaver") {
+    GameScreensaverEffect::applyConfig(ConfigManager::gameScreensaverConfig);
+    GameScreensaverEffect::render();
+    return;
+  }
+
+  if (DisplayManager::currentMode == MODE_ANIMATION &&
+      (DisplayManager::currentBusinessModeTag == "text_display" ||
+       DisplayManager::currentBusinessModeTag == "weather" ||
+       DisplayManager::currentBusinessModeTag == "countdown" ||
+       DisplayManager::currentBusinessModeTag == "stopwatch" ||
+       DisplayManager::currentBusinessModeTag == "notification")) {
+    if (BoardNativeEffect::isActive()) {
+      BoardNativeEffect::render();
+      return;
+    }
   }
 
   if (DisplayManager::currentMode == MODE_ANIMATION &&
@@ -124,15 +144,21 @@ void setup() {
   Serial.println("=================================");
   
   // 初始化各个模块
+  ConfigManager::preloadDeviceParamsConfig();
   DisplayManager::init();
   ConfigManager::init();
   WiFiManager::init();
 
-  AnimationManager::init();
-  EyesEffect::init();
+  WebSocketHandler::init();
+  WebServer::init();
 
-  // 只有 WiFi 连接成功才启动 HTTP/WebSocket 服务
+  // 联网成功后恢复业务显示与 OTA；热点配网模式仅保留 AP 门户
   if (!WiFiManager::isConfigMode()) {
+    AnimationManager::init();
+    EyesEffect::init();
+    GameScreensaverEffect::init();
+    BoardNativeEffect::init();
+
     if (WiFiManager::isTimeSynced()) {
       if (!DisplayManager::doubleBufferEnabled) {
         DisplayManager::enableDoubleBuffer();
@@ -150,9 +176,6 @@ void setup() {
       Serial.println("[BOOT] 时间尚未同步，保持 WiFi 成功页，等待同步后再进入恢复模式");
     }
 
-    WebSocketHandler::init();
-    WebServer::init();
-
     // OTA 检查更新
     OTAManager::init();
     OTAManager::checkUpdate();
@@ -161,7 +184,11 @@ void setup() {
   Serial.println("\n=================================");
   Serial.println("系统就绪！");
   if (WiFiManager::isConfigMode()) {
-    Serial.println("BLE 配网模式，等待蓝牙配置...");
+    Serial.println("WiFi 热点配网模式已启动");
+    Serial.print("热点名称: ");
+    Serial.println(WiFiManager::getConfigPortalSSID());
+    Serial.print("配网页地址: http://");
+    Serial.println(WiFiManager::getConfigPortalIP());
   } else {
     Serial.print("STA模式访问地址: http://");
     Serial.println(WiFiManager::getDeviceIP());
@@ -171,18 +198,15 @@ void setup() {
 }
 
 void loop() {
-  // 配网模式下只等待 BLE 配网，不做其他事
+  // 配网模式下维护 AP 门户与 DNS，不进入业务显示循环
   if (WiFiManager::isConfigMode()) {
-    // WiFi 配置已收到，延迟后重启
-    if (BLEConfig::wifiConfigReceived) {
-      delay(2000);
-      ESP.restart();
-    }
-    delay(100);
+    WiFiManager::tick();
+    delay(10);
     return;
   }
 
   WiFiManager::tick();
+  DisplayManager::refreshScheduledBrightness();
   finishStartupRestoreIfReady();
 
   if (gStartupRestorePending && !gStartupRestoreDone) {
@@ -280,7 +304,19 @@ void loop() {
     }
   } else if (DisplayManager::currentMode == MODE_ANIMATION) {
     // 动画模式
-    if (TetrisEffect::isActive) {
+    if (DisplayManager::currentBusinessModeTag == "game_screensaver" &&
+               GameScreensaverEffect::isActive()) {
+      GameScreensaverEffect::update();
+      GameScreensaverEffect::render();
+    } else if ((DisplayManager::currentBusinessModeTag == "text_display" ||
+                DisplayManager::currentBusinessModeTag == "weather" ||
+                DisplayManager::currentBusinessModeTag == "countdown" ||
+                DisplayManager::currentBusinessModeTag == "stopwatch" ||
+                DisplayManager::currentBusinessModeTag == "notification") &&
+               BoardNativeEffect::isActive()) {
+      BoardNativeEffect::update();
+      BoardNativeEffect::render();
+    } else if (TetrisEffect::isActive) {
       // 俄罗斯方块屏保
       TetrisEffect::update();
       TetrisEffect::render(DisplayManager::dma_display);

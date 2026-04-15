@@ -1,7 +1,7 @@
 import jsPDF from 'jspdf'
 import html2canvas from 'html2canvas'
 import { getColorByCode } from '@/data/artkal-colors.js'
-import logoUrl from '@/assets/images/glowxel-logo.png'
+import logoUrl from '@/assets/images/glowxel-icon.svg'
 
 /**
  * 导出拼豆图纸为 PDF

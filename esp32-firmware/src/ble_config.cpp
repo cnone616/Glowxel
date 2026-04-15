@@ -73,12 +73,7 @@ class WiFiConfigCallbacks : public BLECharacteristicCallbacks {
 
     BLEConfig::wifiConfigReceived = true;
 
-    // 显示提示（3x5小字体）
-    auto* d = DisplayManager::dma_display;
-    d->clearScreen();
-    DisplayManager::drawTinyTextCentered("WIFI SAVED", 26, d->color565(100, 255, 100));
-    DisplayManager::drawTinyTextCentered("REBOOTING..", 36, d->color565(150, 150, 150));
-    // 重启由 main loop 处理，避免在 BLE 回调里 delay/restart 导致 watchdog
+    // 后续提示与重启由 main loop 统一处理，避免在 BLE 回调线程里直接操作显示和重启。
   }
 };
 
@@ -124,6 +119,9 @@ void BLEConfig::stop() {
   if (pServer) {
     BLEDevice::deinit(true);
     pServer = nullptr;
+    pWifiChar = nullptr;
+    pStatusChar = nullptr;
+    deviceConnected = false;
     Serial.println("蓝牙服务已关闭");
   }
 }
@@ -131,4 +129,3 @@ void BLEConfig::stop() {
 bool BLEConfig::isActive() {
   return pServer != nullptr;
 }
-

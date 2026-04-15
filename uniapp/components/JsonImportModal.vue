@@ -64,7 +64,7 @@ export default {
   data() {
     return {
       inputValue: '',
-      placeholderStyle: 'color: rgba(255, 255, 255, 0.3); font-size: 24rpx;'
+      placeholderStyle: 'color: #8a8a8a; font-size: 24rpx;'
     }
   },
   
@@ -124,23 +124,9 @@ export default {
   opacity: 0.6;
 }
 
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(0, 0, 0, 0.45);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 9999;
-  padding: 48rpx;
-}
-
 .modal-container {
   width: 100%;
-  max-width: 600rpx;
+  max-width: 680rpx;
   background-color: var(--nb-surface);
   border: var(--nb-border-width-panel) solid var(--nb-ink);
   border-radius: 0;
@@ -152,7 +138,7 @@ export default {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 32rpx 40rpx;
+  padding: 24rpx;
   border-bottom: var(--nb-border-width-panel) solid var(--nb-ink);
 }
 
@@ -163,8 +149,8 @@ export default {
 }
 
 .close-btn {
-  width: 56rpx;
-  height: 56rpx;
+  width: 60rpx;
+  height: 60rpx;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -172,22 +158,19 @@ export default {
   border-radius: 0;
   background: var(--nb-surface);
   box-shadow: var(--nb-shadow-soft);
-  transition: var(--transition-base);
+  box-sizing: border-box;
 }
 
-.close-btn:active {
-  background-color: var(--nb-paper);
-  transform: translate(2rpx, 2rpx);
-}
 
 .close-icon {
-  font-size: 64rpx;
+  font-size: 40rpx;
   color: var(--nb-ink);
   line-height: 1;
+  font-weight: 900;
 }
 
 .modal-body {
-  padding: 32rpx 40rpx;
+  padding: 24rpx;
 }
 
 .modal-description {
@@ -201,8 +184,7 @@ export default {
   background-color: #ffffff;
   border: var(--nb-border-width-control) solid var(--nb-ink);
   border-radius: 0;
-  padding: 24rpx;
-  transition: var(--transition-base);
+  padding: 18rpx;
 }
 
 .input-wrapper:focus-within {
@@ -212,7 +194,7 @@ export default {
 
 .json-input {
   width: 100%;
-  min-height: 300rpx;
+  min-height: 280rpx;
   max-height: 600rpx;
   font-size: 24rpx;
   color: var(--nb-ink);
@@ -224,43 +206,33 @@ export default {
 .modal-footer {
   display: flex;
   gap: 16rpx;
-  padding: 24rpx 40rpx 32rpx;
+  padding: 18rpx 24rpx 24rpx;
   border-top: var(--nb-border-width-panel) solid var(--nb-ink);
 }
 
 .modal-btn {
   flex: 1;
-  min-height: 88rpx;
+  min-height: 84rpx;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: 0;
-  transition: var(--transition-base);
   border: var(--nb-border-width-control) solid var(--nb-ink);
   box-shadow: var(--nb-shadow-soft);
+  box-sizing: border-box;
 }
 
-.modal-btn:active {
-  transform: translate(2rpx, 2rpx);
-  box-shadow: none;
-}
 
 .cancel-btn {
   background-color: var(--nb-surface);
 }
 
-.cancel-btn:active {
-  background-color: var(--nb-paper);
-}
 
 .confirm-btn {
-  background-color: var(--nb-yellow);
+  background-color: #f2cf4a;
   border-color: var(--nb-ink);
 }
 
-.confirm-btn:active {
-  box-shadow: 1rpx 1rpx 0 var(--nb-ink);
-}
 
 .btn-text {
   font-size: 28rpx;

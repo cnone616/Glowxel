@@ -39,24 +39,28 @@
       
       <!-- 评论操作 -->
       <view class="comment-actions">
-        <view class="action-item" @click="handleLike">
+        <view
+          class="action-item"
+          :class="{ 'action-item--active': isLiked }"
+          @click="handleLike"
+        >
           <Icon 
             :name="isLiked ? 'favorite-filling' : 'favorite'" 
             :size="28" 
-            :color="isLiked ? '#E74C3C' : '#666666'" 
+            color="currentColor"
           />
-          <text class="action-text" :class="{ 'action-active': isLiked }">
+          <text class="action-text">
             {{ (comment.likes || 0) > 0 ? comment.likes : '点赞' }}
           </text>
         </view>
         
         <view class="action-item" @click="handleReply">
-          <Icon name="comment" :size="28" color="#666666" />
+          <Icon name="comment" :size="28" color="currentColor" />
           <text class="action-text">回复</text>
         </view>
         
         <view v-if="showMore" class="action-item" @click="handleMore">
-          <Icon name="more" :size="28" color="#666666" />
+          <Icon name="more" :size="28" color="currentColor" />
         </view>
       </view>
       
@@ -81,7 +85,7 @@
           <text class="expand-text">
             展开更多回复 ({{ comment.replies.length - visibleRepliesCount }})
           </text>
-          <Icon name="arrow-down" :size="24" color="#4F7FFF" />
+          <Icon name="arrow-down" :size="24" color="currentColor" />
         </view>
       </view>
     </view>
@@ -306,21 +310,17 @@ export default {
   padding: 8rpx 12rpx;
   border-radius: 0;
   transition: all 0.2s ease;
+  color: var(--text-secondary);
 }
 
-.action-item:active {
-  background-color: var(--nb-paper);
-  transform: scale(0.95);
+.action-item--active {
+  color: var(--nb-coral);
 }
 
 .action-text {
   font-size: 24rpx;
-  color: #4a4a4a;
+  color: currentColor;
   font-weight: 500;
-}
-
-.action-active {
-  color: var(--nb-coral);
 }
 
 .sub-comments {
@@ -335,15 +335,13 @@ export default {
   gap: 8rpx;
   padding: 16rpx 0;
   cursor: pointer;
+  color: var(--nb-yellow);
 }
 
-.expand-replies:active {
-  opacity: 0.7;
-}
 
 .expand-text {
   font-size: 24rpx;
-  color: var(--nb-yellow);
+  color: currentColor;
   font-weight: 500;
 }
 
@@ -365,13 +363,4 @@ export default {
 }
 
 /* 点赞动画 */
-.action-item:first-child:active {
-  animation: likeAnimation 0.3s ease;
-}
-
-@keyframes likeAnimation {
-  0% { transform: scale(0.95); }
-  50% { transform: scale(1.1); }
-  100% { transform: scale(0.95); }
-}
 </style>

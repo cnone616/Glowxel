@@ -14,49 +14,22 @@
 
     <!-- Canvas 预览区域 -->
     <view class="canvas-section">
-      <view v-if="!canvasHidden" class="canvas-container" ref="canvasContainer">
-        <template v-if="useThemeImagePreview">
-          <view class="theme-canvas-stage">
-            <image
-              :src="themeCanvasPreviewImage"
-              class="theme-canvas-preview"
-              mode="aspectFit"
-            />
-            <view class="theme-canvas-grid"></view>
-            <view class="theme-preview-badge">
-              <view class="theme-preview-badge-text">官方参考图</view>
-            </view>
-          </view>
-        </template>
-        <PixelCanvas
-          v-else-if="canvasReady"
+      <view class="preview-canvas-container" :style="previewCanvasBoxStyle">
+        <PixelPreviewBoard
           :width="64"
           :height="64"
           :pixels="allPixelsForPreview"
+          :refresh-token="previewTick"
           :zoom="zoom"
           :offset-x="pan.x"
           :offset-y="pan.y"
-          :canvas-width="containerSize.width"
-          :canvas-height="containerSize.height"
           :grid-visible="true"
           :is-dark-mode="true"
-          :touch-enabled="false"
-          canvas-id="clockCanvas"
         />
       </view>
-      <view v-else class="canvas-placeholder"></view>
       <view class="preview-caption glx-preview-panel">
         <view class="preview-caption-info glx-preview-panel__info">
           <text class="preview-caption-title">{{ previewPanelTitle }}</text>
-          <view
-            v-if="clockMode === 'theme' && displayClockThemePreset"
-            class="preview-theme-chip"
-          >
-            <text class="preview-theme-chip-text">
-              {{ displayClockThemePreset.name }}
-              {{ isClockThemeModified ? " · 已微调" : "" }}
-            </text>
-          </view>
         </view>
         <view class="preview-actions">
           <view
@@ -78,17 +51,6 @@
       :style="{ height: contentHeight }"
     >
       <view class="content-wrapper glx-scroll-stack">
-        <ClockThemePanel
-          v-if="clockMode === 'theme'"
-          :presets="clockThemePresets"
-          :selected-theme-id="displayClockThemeId"
-          :current-theme-id="currentDeviceThemeId"
-          :active-preset="displayClockThemePreset"
-          :has-image="!!config.image.data || !!imagePixels"
-          :is-modified="isClockThemeModified"
-          @apply-theme="applyClockTheme"
-        />
-
         <!-- 时间设置 -->
         <ClockTextSettingsCard
           v-show="currentTab === 1"
@@ -166,20 +128,8 @@
               @click="chooseImage"
             >
               <Icon name="add" :size="64" />
-              <text class="upload-text">{{
-                clockMode === "animation"
-                  ? "点击上传图片/GIF"
-                  : clockMode === "theme"
-                    ? "点击上传主题图片"
-                    : "点击上传背景图片"
-              }}</text>
-              <text class="upload-hint">{{
-                clockMode === "animation"
-                  ? "支持静态图片和 GIF 动画，建议 64x64 以内"
-                  : clockMode === "theme"
-                    ? "将自动适配到主题预设区域"
-                    : "支持静态图片，建议 64x64 以内"
-              }}</text>
+              <text class="upload-text">点击上传背景图片</text>
+              <text class="upload-hint">支持静态图片，建议 64x64 以内</text>
             </view>
             <view v-else class="image-preview">
               <image
@@ -194,11 +144,11 @@
               </view>
               <view class="image-actions">
                 <view class="image-action-btn" @click="chooseImage">
-                  <Icon name="refresh" :size="28" color="#FFFFFF" />
+                  <Icon name="refresh" :size="28" color="currentColor" />
                   <text>更换</text>
                 </view>
                 <view class="image-action-btn danger" @click="removeImage">
-                  <Icon name="ashbin" :size="28" color="#FFFFFF" />
+                  <Icon name="ashbin" :size="28" color="currentColor" />
                   <text>删除</text>
                 </view>
               </view>
@@ -206,10 +156,7 @@
           </view>
 
           <!-- 图片尺寸和位置控制 -->
-          <view
-            v-if="config.image.data && clockMode !== 'theme'"
-            class="setting-group"
-          >
+          <view v-if="config.image.data" class="setting-group">
             <view class="setting-item">
               <view class="setting-header-row">
                 <text class="setting-label">尺寸设置</text>
@@ -341,9 +288,9 @@
     </scroll-view>
 
     <!-- 底部 Tab 切换 -->
-    <view v-if="clockMode !== 'theme'" class="bottom-tabs">
+    <view class="bottom-tabs">
       <view
-        v-for="tab in visibleTabDefinitions"
+        v-for="tab in tabDefinitions"
         :key="tab.index"
         class="bottom-tab-item"
         :class="{ active: currentTab === tab.index }"
@@ -393,28 +340,18 @@ import imageGifMixin from "./mixins/imageGifMixin.js";
 import deviceSyncMixin from "./mixins/deviceSyncMixin.js";
 import Icon from "../../components/Icon.vue";
 import Toast from "../../components/Toast.vue";
-import PixelCanvas from "../../components/PixelCanvas.vue";
+import PixelPreviewBoard from "../../components/PixelPreviewBoard.vue";
 import ClockFontPanel from "../../components/clock-editor/ClockFontPanel.vue";
-import ClockThemePanel from "../../components/clock-editor/ClockThemePanel.vue";
 import ClockTextSettingsCard from "../../components/clock-editor/ClockTextSettingsCard.vue";
 import { getClockFontOptions } from "../../utils/clockCanvas.js";
-import {
-  applyClockThemePreset,
-  findClockThemePreset,
-  getClockThemePresets,
-  getMatchingClockThemeId,
-} from "../../utils/clockThemePresets.js";
-
-const CLOCK_DEVICE_THEME_ID_KEY = "clock_device_theme_id";
 
 export default {
   mixins: [statusBarMixin, clockPreviewMixin, imageGifMixin, deviceSyncMixin],
   components: {
     Icon,
     Toast,
-    PixelCanvas,
+    PixelPreviewBoard,
     ClockFontPanel,
-    ClockThemePanel,
     ClockTextSettingsCard,
   },
   data() {
@@ -429,8 +366,6 @@ export default {
       gifTimer: null, // GIF 动画定时器
       gifIsPlaying: false, // 是否正在播放
       gifPlaySpeed: 1.0, // 播放速度倍率
-      lastAppliedClockThemeId: "",
-      deviceThemeId: "",
       isSending: false, // 传输锁，防止传输过程中操作
       _gifParser: null, // GIF 解析器实例，改宽高时重新生成数据
       _imageConvertToken: 0,
@@ -439,8 +374,6 @@ export default {
 
       // Canvas 相关
       canvasHidden: false,
-      canvasNode: null,
-      canvasCtx: null,
       imagePixels: null,
       showPreview: true,
 
@@ -449,17 +382,17 @@ export default {
       pan: { x: 0, y: 0 },
       containerSize: { width: 320, height: 320 },
       canvasReady: false,
+      previewTick: 0,
+      previewClockTimer: null,
 
       // loading 动画定时器（实例变量，方便清理）
       loadingTimer: null,
       loadingActive: false,
 
       fontOptions: getClockFontOptions(),
-      clockThemePresets: getClockThemePresets(),
 
       currentTab: 1,
       tabDefinitions: [
-        { index: 0, label: "主题", icon: "picture" },
         { index: 1, label: "时间", icon: "time" },
         { index: 2, label: "字体", icon: "text" },
         { index: 3, label: "图片", icon: "picture" },
@@ -520,33 +453,18 @@ export default {
 
   watch: {
     canvasHidden(newVal) {
-      if (!newVal && this.canvasCtx) {
+      if (!newVal) {
         this.$nextTick(() => {
           this.drawCanvas();
         });
       }
     },
-
-    clockMode(newMode) {
-      if (newMode === "animation" && !this._gifParser) {
-        this._restoreGifFromLocal();
-      } else if (newMode === "clock" || newMode === "theme") {
-        this.stopGifAnimation();
+    canvasReady(newVal) {
+      if (newVal) {
+        this.$nextTick(() => {
+          this.drawCanvas();
+        });
       }
-      this.ensureValidCurrentTab();
-    },
-    visibleTabDefinitions: {
-      handler(nextTabs) {
-        const validTabIndexes = nextTabs.map((tab) => tab.index);
-        if (
-          !validTabIndexes.includes(this.currentTab) &&
-          validTabIndexes.length > 0
-        ) {
-          this.currentTab = validTabIndexes[0];
-        }
-      },
-      deep: true,
-      immediate: true,
     },
   },
 
@@ -555,83 +473,23 @@ export default {
       return "#4F7FFF";
     },
     pageHeaderTitle() {
-      if (this.clockMode === "theme") {
-        return "主题模式";
-      }
-      if (this.clockMode === "animation") {
-        return "动态时钟";
-      }
       return "静态时钟";
-    },
-    displayClockThemeId() {
-      if (this.clockMode === "theme") {
-        return this.lastAppliedClockThemeId;
-      }
-      return this.activeClockThemeId || this.lastAppliedClockThemeId;
-    },
-    displayClockThemePreset() {
-      if (!this.displayClockThemeId) {
-        return null;
-      }
-      return findClockThemePreset(this.displayClockThemeId);
-    },
-    currentDeviceThemeId() {
-      if (!this.deviceStore || !this.deviceStore.connected) {
-        return "";
-      }
-      if (this.deviceStore.deviceMode !== "theme") {
-        return "";
-      }
-      return this.deviceThemeId;
-    },
-    isClockThemeModified() {
-      if (this.clockMode === "theme") {
-        return false;
-      }
-      return (
-        !!this.lastAppliedClockThemeId &&
-        this.activeClockThemeId !== this.lastAppliedClockThemeId
-      );
-    },
-    visibleTabDefinitions() {
-      if (this.clockMode === "theme") {
-        return [];
-      }
-      return this.tabDefinitions.filter((tab) => tab.index !== 0);
-    },
-    activeClockThemeId() {
-      return getMatchingClockThemeId(this.config);
-    },
-    useThemeImagePreview() {
-      return (
-        this.clockMode === "theme" &&
-        !!this.displayClockThemePreset &&
-        !!this.displayClockThemePreset.previewImage
-      );
-    },
-    themeCanvasPreviewImage() {
-      if (!this.displayClockThemePreset) {
-        return "";
-      }
-      return this.displayClockThemePreset.previewImage;
     },
     previewPanelTitle() {
       return "模拟预览";
     },
+    previewCanvasBoxStyle() {
+      const size =
+        this.containerSize && this.containerSize.height
+          ? this.containerSize.height
+          : 320;
+      return {
+        height: `${size}px`,
+      };
+    },
     allPixelsForPreview() {
-      const pixels = new Map();
-      if (this.imagePixels) {
-        const offsetX = this.config.image.x || 0;
-        const offsetY = this.config.image.y || 0;
-        this.imagePixels.forEach((color, key) => {
-          const [rx, ry] = key.split(",").map(Number);
-          const fx = rx + offsetX;
-          const fy = ry + offsetY;
-          if (fx >= 0 && fx < 64 && fy >= 0 && fy < 64) {
-            pixels.set(`${fx},${fy}`, color);
-          }
-        });
-      }
+      const tick = this.previewTick;
+      const pixels = this.buildImageLayerPixels();
 
       if (this.showPreview) {
         this.getPreviewPixels().forEach((color, key) => pixels.set(key, color));
@@ -649,32 +507,12 @@ export default {
     this.cleanupTransientState();
   },
 
-  onLoad(options) {
-    const savedMode = uni.getStorageSync("device_mode");
-    const defaultMode =
-      savedMode === "animation" || savedMode === "theme" ? savedMode : "clock";
-    this.clockMode = options.mode || defaultMode;
-    this._clockModeFromOptions = !!options.mode;
+  onLoad() {
+    this.clockMode = "clock";
     this.ensureValidCurrentTab();
 
     this.loadConfig();
-    const savedDeviceThemeId = uni.getStorageSync(CLOCK_DEVICE_THEME_ID_KEY);
-    if (typeof savedDeviceThemeId === "string") {
-      this.deviceThemeId = savedDeviceThemeId;
-    }
-    if (!this.lastAppliedClockThemeId && this.clockMode !== "theme") {
-      this.lastAppliedClockThemeId = getMatchingClockThemeId(this.config);
-    }
-    if (this.clockMode === "theme") {
-      this.ensureValidThemeSelection();
-    }
-    if (this.lastAppliedClockThemeId) {
-      const preset = findClockThemePreset(this.lastAppliedClockThemeId);
-      if (preset && preset.config.image.data) {
-        this.config.image.data = preset.config.image.data;
-        this.config.image.show = true;
-      }
-    }
+    this.ensureVisiblePreviewBaseline();
 
     this.deviceStore = useDeviceStore();
     this.deviceStore.init();
@@ -684,58 +522,85 @@ export default {
     const statusBarHeight = systemInfo.statusBarHeight || 0;
     const headerHeight = 56;
     this.contentHeight = `${systemInfo.windowHeight - statusBarHeight - headerHeight - 360}px`;
+  },
 
+  onReady() {
     this.$nextTick(() => {
       if (this.$refs.toastRef) {
         this.toast.setToastInstance(this.$refs.toastRef);
       }
-      setTimeout(() => {
-        const query = uni.createSelectorQuery().in(this);
-        query
-          .select(".canvas-container")
-          .boundingClientRect((data) => {
-            if (data && data.width > 0) {
-              this.containerSize = { width: data.width, height: data.width };
-              const fitZoom = Math.floor((data.width * 0.96) / 64);
-              this.zoom = Math.max(2, fitZoom);
-              this.pan = {
-                x: (data.width - 64 * this.zoom) / 2,
-                y: (data.width - 64 * this.zoom) / 2,
-              };
-            } else {
-              this.zoom = 4;
-              this.pan = { x: 16, y: 16 };
-            }
-            this.canvasReady = true;
-            this.isReady = true;
-          })
-          .exec();
-      }, 150);
+      this.initPreviewCanvas();
     });
   },
 
   onShow() {
-    if (
-      this.clockMode === "animation" &&
-      this.gifRenderedFrameMaps &&
-      this.gifRenderedFrameMaps.length > 1 &&
-      !this.gifIsPlaying
-    ) {
-      this.startGifAnimation();
-    }
+    this.startPreviewClockTimer();
     if (!this.isSending) {
       this.canvasHidden = false;
     }
   },
 
   methods: {
-    ensureValidCurrentTab() {
-      if (this.clockMode === "theme") {
-        this.currentTab = 0;
+    startPreviewClockTimer() {
+      if (this.previewClockTimer) {
         return;
       }
+      const refreshPreview = () => {
+        this.drawCanvas();
+      };
+      refreshPreview();
+      this.previewClockTimer = setInterval(refreshPreview, 1000);
+    },
+    stopPreviewClockTimer() {
+      if (this.previewClockTimer) {
+        clearInterval(this.previewClockTimer);
+        this.previewClockTimer = null;
+      }
+    },
+    initPreviewCanvas() {
+      const systemInfo = uni.getSystemInfoSync();
+      const statusBarHeight = systemInfo.statusBarHeight || 0;
 
-      const validTabs = this.visibleTabDefinitions.map((tab) => tab.index);
+      this.$nextTick(() => {
+        setTimeout(() => {
+          const query = uni.createSelectorQuery().in(this);
+          query.select(".canvas-section").boundingClientRect((sectionRect) => {
+            if (!sectionRect || !sectionRect.height) {
+              return;
+            }
+
+            const nextHeight =
+              systemInfo.windowHeight - statusBarHeight - 88 - sectionRect.height;
+            this.contentHeight = `${Math.max(120, nextHeight)}px`;
+          });
+          query
+            .select(".preview-canvas-container")
+            .boundingClientRect((data) => {
+              if (data && data.width > 0) {
+                this.containerSize = { width: data.width, height: data.width };
+                const fitZoom = Math.max(2, Math.floor((data.width * 0.96) / 64));
+                this.zoom = fitZoom;
+                this.pan = {
+                  x: (data.width - 64 * fitZoom) / 2,
+                  y: (data.width - 64 * fitZoom) / 2,
+                };
+              } else {
+                this.zoom = 4;
+                this.pan = { x: 16, y: 16 };
+              }
+              this.canvasReady = true;
+              this.isReady = true;
+              this.startPreviewClockTimer();
+              this.$nextTick(() => {
+                this.drawCanvas();
+              });
+            })
+            .exec();
+        }, 80);
+      });
+    },
+    ensureValidCurrentTab() {
+      const validTabs = this.tabDefinitions.map((tab) => tab.index);
       if (!validTabs.includes(this.currentTab) && validTabs.length > 0) {
         this.currentTab = validTabs[0];
       }
@@ -747,6 +612,7 @@ export default {
       }
     },
     cleanupTransientState() {
+      this.stopPreviewClockTimer();
       this.stopGifAnimation();
       this.stopLoading();
       if (this._resizeDebounceTimer) {
@@ -767,51 +633,6 @@ export default {
     },
     handleBack() {
       uni.navigateBack();
-    },
-    ensureValidThemeSelection() {
-      if (this.clockThemePresets.length === 0) {
-        this.lastAppliedClockThemeId = "";
-        return;
-      }
-
-      const hasMatchedPreset = this.clockThemePresets.some(
-        (preset) => preset.id === this.lastAppliedClockThemeId,
-      );
-      if (hasMatchedPreset) {
-        return;
-      }
-
-      this.applyClockTheme(this.clockThemePresets[0].id);
-    },
-    applyClockTheme(themeId) {
-      const preset = findClockThemePreset(themeId);
-      this._imageConvertToken += 1;
-      this.config = applyClockThemePreset(this.config, themeId);
-      this.lastAppliedClockThemeId = themeId;
-      this.stopGifAnimation();
-      this.gifAnimationData = null;
-      this.gifRenderedFrameMaps = null;
-      this.gifFrameIndex = 0;
-      this._gifParser = null;
-      this.imagePixels = null;
-
-      if (preset && preset.config.image.data) {
-        this.config.image.show = true;
-        this.convertImageToPixels(preset.config.image.data);
-      } else if (preset && !preset.requiresImage) {
-        this.config.image.data = null;
-        this.config.image.show = false;
-        this.imagePixels = null;
-        this.drawCanvas();
-      } else {
-        this.drawCanvas();
-      }
-
-      if (preset && preset.requiresImage) {
-        this.currentTab = 3;
-      } else {
-        this.currentTab = 0;
-      }
     },
   },
 };
@@ -866,9 +687,8 @@ export default {
   background: #000;
 }
 
-.canvas-container {
+.preview-canvas-container {
   width: 100%;
-  aspect-ratio: 1;
   position: relative;
   display: flex;
   align-items: center;
@@ -879,60 +699,7 @@ export default {
 
 .canvas-placeholder {
   width: 100%;
-  aspect-ratio: 1;
   background: #000000;
-}
-
-.theme-canvas-stage {
-  position: relative;
-  width: calc(100% - 32rpx);
-  height: calc(100% - 32rpx);
-  margin: 16rpx;
-  background: #000000;
-}
-
-.theme-canvas-preview {
-  width: 100%;
-  height: 100%;
-  display: block;
-  background: #000000;
-  image-rendering: pixelated;
-}
-
-.theme-canvas-grid {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background-image:
-    linear-gradient(rgba(255, 255, 255, 0.24) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.24) 1px, transparent 1px);
-  background-size: calc(100% / 64) calc(100% / 64);
-  box-shadow: inset 0 0 0 2rpx rgba(255, 255, 255, 0.32);
-}
-
-.theme-preview-badge {
-  position: absolute;
-  top: 14rpx;
-  right: 14rpx;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 42rpx;
-  padding: 8rpx 14rpx;
-  border-radius: 0;
-  background: var(--nb-yellow);
-  border: 2rpx solid #000000;
-  backdrop-filter: none;
-}
-
-.theme-preview-badge-text {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 18rpx;
-  font-weight: 600;
-  line-height: 1;
-  color: #000000;
 }
 
 .preview-caption {

@@ -49,7 +49,7 @@
             :class="{ disabled: isSending }"
             @click="publishCanvas"
           >
-            <Icon name="link" :size="36" color="#000000" />
+            <Icon name="link" :size="36" color="var(--nb-ink)" />
             <text>{{ isSending ? "发送中" : "发送" }}</text>
           </view>
         </view>
@@ -92,7 +92,7 @@
             <text>清空</text>
           </view>
         </view>
-        <view class="card glx-panel-card">
+        <view class="card glx-panel-card glx-editor-card canvas-section-card">
           <view class="card-title-section glx-panel-head">
             <text class="card-title glx-panel-title">绘制工具</text>
           </view>
@@ -124,10 +124,9 @@
             </view>
           </view>
         </view>
-        <view v-if="currentTool !== 'move'" class="card glx-panel-card">
+        <view v-if="currentTool !== 'move'" class="card glx-panel-card glx-editor-card canvas-section-card">
           <view class="card-title-section glx-panel-head">
             <text class="card-title glx-panel-title">笔触大小</text>
-            <text class="card-subtitle glx-panel-subtitle">{{ brushSize }} x {{ brushSize }}</text>
           </view>
           <view class="option-row">
             <view
@@ -137,12 +136,12 @@
               :class="{ active: brushSize === size }"
               @click="brushSize = size"
             >
-              <text>{{ size }}x{{ size }}</text>
+              <text class="glx-feature-option__label">{{ size }}x{{ size }}</text>
             </view>
           </view>
         </view>
 
-        <view v-if="currentTool !== 'move'" class="card glx-panel-card">
+        <view v-if="currentTool !== 'move'" class="card glx-panel-card glx-editor-card canvas-section-card">
           <view class="card-title-section glx-panel-head">
             <text class="card-title glx-panel-title">画笔颜色</text>
           </view>
@@ -266,9 +265,9 @@ export default {
           }
 
           this.containerSize = { width: data.width, height: data.height };
-          const fitZoomW = (data.width * 0.9) / 64;
-          const fitZoomH = (data.height * 0.9) / 64;
-          const fitZoom = Math.min(fitZoomW, fitZoomH, 20);
+          const fitZoomW = (data.width * 0.96) / 64;
+          const fitZoomH = (data.height * 0.96) / 64;
+          const fitZoom = Math.floor(Math.min(fitZoomW, fitZoomH, 20));
 
           this.zoom = Math.max(2, fitZoom);
           this.pan = {
@@ -408,9 +407,9 @@ export default {
     },
 
     handleFit() {
-      const fitZoomW = (this.containerSize.width * 0.9) / 64;
-      const fitZoomH = (this.containerSize.height * 0.9) / 64;
-      const fitZoom = Math.min(fitZoomW, fitZoomH, 20);
+      const fitZoomW = (this.containerSize.width * 0.96) / 64;
+      const fitZoomH = (this.containerSize.height * 0.96) / 64;
+      const fitZoom = Math.floor(Math.min(fitZoomW, fitZoomH, 20));
       this.zoom = Math.max(2, fitZoom);
       this.pan = {
         x: (this.containerSize.width - 64 * this.zoom) / 2,
@@ -654,14 +653,6 @@ export default {
   background-color: #1a1a1a;
 }
 
-.canvas-section {
-  display: flex;
-  flex-direction: column;
-  background: #000000;
-  border-bottom: 2rpx solid var(--nb-ink);
-  flex-shrink: 0;
-}
-
 .canvas-container {
   width: 100%;
   aspect-ratio: 1;
@@ -675,81 +666,9 @@ export default {
   background-color: #000000;
 }
 
-.preview-caption {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12rpx;
-  padding: 10rpx 16rpx 12rpx;
-  background: var(--bg-tertiary);
-}
-
-.preview-caption-info {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-}
-
-.preview-caption-title {
-  font-size: 24rpx;
-  font-weight: 700;
-  color: var(--text-primary);
-}
-
-.preview-actions {
-  display: flex;
-  align-items: center;
-  gap: 12rpx;
-  flex-shrink: 0;
-}
-
-.action-btn-sm {
-  width: 56rpx;
-  height: 56rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 0;
-  border: 2rpx solid var(--nb-ink);
-  background-color: var(--bg-tertiary);
-  transition: var(--transition-base);
-}
-
-.action-btn-sm.disabled {
-  opacity: 0.5;
-  pointer-events: none;
-}
-
-.action-btn-sm.primary {
-  background-color: var(--nb-yellow);
-  border-color: var(--nb-ink);
-}
-
 .action-btn-sm.disabled,
 .panel-btn.disabled {
   opacity: 0.4;
-}
-
-.preview-actions .action-btn-sm {
-  width: auto;
-  min-width: 118rpx;
-  height: 64rpx;
-  padding: 0 18rpx;
-  gap: 10rpx;
-  border-radius: 0;
-}
-
-.preview-actions .action-btn-sm text {
-  font-size: 24rpx;
-  font-weight: 600;
-  color: var(--text-primary);
-  line-height: 1;
-}
-
-.preview-actions .action-btn-sm.primary text {
-  color: #000000;
 }
 
 .sending-overlay {
@@ -806,34 +725,21 @@ export default {
   padding: 16rpx 20rpx 0;
 }
 
-.content-wrapper {
-  padding: 0 0 56rpx;
-}
-
-.card {
-  padding-top: 16rpx;
+.canvas-section-card {
+  background: transparent !important;
   border: 0 !important;
   box-shadow: none !important;
-  background: transparent !important;
 }
 
-.card-title-section {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8rpx;
-  margin-bottom: 14rpx;
+.option-btn.glx-feature-option.active {
+  background: var(--nb-yellow) !important;
+  border-color: var(--nb-ink) !important;
+  color: var(--nb-ink) !important;
 }
 
-.card-title {
-  font-size: 22rpx;
-  font-weight: 500;
-  color: var(--text-primary);
-}
-
-.card-subtitle {
-  font-size: 20rpx;
-  color: var(--text-secondary);
+.option-btn.glx-feature-option.active .glx-feature-option__label {
+  color: var(--nb-ink) !important;
+  font-weight: 900 !important;
 }
 
 .tool-grid {
@@ -874,26 +780,6 @@ export default {
   font-size: 22rpx;
   font-weight: 600;
   color: currentColor;
-}
-
-.option-row {
-  display: flex;
-  align-items: center;
-  gap: 10rpx;
-}
-
-.option-btn {
-  flex: 1;
-  min-width: 0;
-  height: 62rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.option-btn text {
-  font-size: 23rpx;
-  font-size: 24rpx;
 }
 
 .action-grid {

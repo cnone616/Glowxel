@@ -629,51 +629,6 @@ const CLOCK_THEME_PRESETS = [
       },
     },
   },
-  {
-    id: "clockwise_canvas",
-    name: "画布主题",
-    description: "画布驱动的主题引擎，适合承载上传图片和后续扩展内容。",
-    accentColor: "#64c8ff",
-    styleTag: "Canvas 引擎",
-    previewImage: "/static/clockwise-themes/cw-cf-0x07-thumb.jpg",
-    requiresImage: true,
-    config: {
-      font: "rounded_4x6",
-      showSeconds: false,
-      hourFormat: 24,
-      time: {
-        show: true,
-        fontSize: 1,
-        x: 58,
-        y: 8,
-        color: "#ffffff",
-        align: "right",
-      },
-      date: {
-        show: true,
-        fontSize: 1,
-        x: 58,
-        y: 19,
-        color: "#c8d7ff",
-        align: "right",
-      },
-      week: {
-        show: true,
-        x: 58,
-        y: 29,
-        color: "#64c8ff",
-        align: "right",
-      },
-      image: {
-        show: true,
-        x: 5,
-        y: 13,
-        width: 23,
-        height: 23,
-        data: null,
-      },
-    },
-  },
 ];
 
 function isSameSection(currentSection, presetSection) {

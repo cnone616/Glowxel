@@ -24,8 +24,7 @@ const ThemePageItem kThemePageItems[] = {
   {"clockwise_worldmap", "地图时钟"},
   {"clockwise_castlevania", "针塔时钟"},
   {"clockwise_pacman", "吃豆人"},
-  {"clockwise_pokedex", "图鉴"},
-  {"clockwise_canvas", "画布主题"}
+  {"clockwise_pokedex", "图鉴"}
 };
 
 const AmbientPageItem kAmbientPageItems[] = {
@@ -105,6 +104,520 @@ const char* ambientPresetToString(uint8_t preset) {
     return "reaction_diffusion";
   }
   return "digital_rain";
+}
+
+bool parseUnsignedValue(const String& text, uint32_t minValue, uint32_t maxValue, uint32_t& outValue) {
+  if (text.length() == 0) {
+    return false;
+  }
+
+  for (size_t i = 0; i < text.length(); i++) {
+    char ch = text[i];
+    if (ch < '0' || ch > '9') {
+      return false;
+    }
+  }
+
+  unsigned long parsed = strtoul(text.c_str(), nullptr, 10);
+  if (parsed < minValue || parsed > maxValue) {
+    return false;
+  }
+
+  outValue = static_cast<uint32_t>(parsed);
+  return true;
+}
+
+bool parseBooleanSwitch(const String& text, bool& outValue) {
+  if (text == "0") {
+    outValue = false;
+    return true;
+  }
+  if (text == "1") {
+    outValue = true;
+    return true;
+  }
+  return false;
+}
+
+bool isValidHourMinuteText(const String& text) {
+  if (text.length() != 5 || text[2] != ':') {
+    return false;
+  }
+  if (text[0] < '0' || text[0] > '9' ||
+      text[1] < '0' || text[1] > '9' ||
+      text[3] < '0' || text[3] > '9' ||
+      text[4] < '0' || text[4] > '9') {
+    return false;
+  }
+
+  int hour = (text[0] - '0') * 10 + (text[1] - '0');
+  int minute = (text[3] - '0') * 10 + (text[4] - '0');
+  if (hour < 0 || hour > 23 || minute < 0 || minute > 59) {
+    return false;
+  }
+  return true;
+}
+
+const AsyncWebParameter* findDeviceParam(AsyncWebServerRequest* request, const char* key) {
+  if (request->hasParam(key)) {
+    return request->getParam(key);
+  }
+  if (request->hasParam(key, true)) {
+    return request->getParam(key, true);
+  }
+  return nullptr;
+}
+
+void sendDeviceParamsResponse(AsyncWebServerRequest* request) {
+  StaticJsonDocument<640> doc;
+  doc["displayBright"] = ConfigManager::deviceParamsConfig.displayBright;
+  doc["brightnessDay"] = ConfigManager::deviceParamsConfig.brightnessDay;
+  doc["brightnessNight"] = ConfigManager::deviceParamsConfig.brightnessNight;
+  doc["displayRotation"] = ConfigManager::deviceParamsConfig.displayRotation;
+  doc["swapBlueGreen"] = ConfigManager::deviceParamsConfig.swapBlueGreen;
+  doc["swapBlueRed"] = ConfigManager::deviceParamsConfig.swapBlueRed;
+  doc["clkphase"] = ConfigManager::deviceParamsConfig.clkphase;
+  doc["driver"] = ConfigManager::deviceParamsConfig.driver;
+  doc["i2cSpeed"] = ConfigManager::deviceParamsConfig.i2cSpeed;
+  doc["E_pin"] = ConfigManager::deviceParamsConfig.E_pin;
+  doc["nightStart"] = ConfigManager::deviceParamsConfig.nightStart;
+  doc["nightEnd"] = ConfigManager::deviceParamsConfig.nightEnd;
+  doc["ntpServer"] = ConfigManager::deviceParamsConfig.ntpServer;
+  doc["wifiSsid"] = WiFiManager::getConnectedSSID();
+  doc["uptime"] = millis() / 1000;
+  doc["firmwareVersion"] = FIRMWARE_VERSION;
+
+  String response;
+  serializeJson(doc, response);
+  request->send(200, "application/json", response);
+}
+
+bool applyDeviceParamValue(const String& key, const String& value, String& errorMessage) {
+  bool requiresDisplayRebuild = false;
+  uint32_t parsedNumber = 0;
+  bool parsedBool = false;
+
+  if (key == "displayBright") {
+    if (!parseUnsignedValue(value, 0, 255, parsedNumber)) {
+      errorMessage = "displayBright must be 0-255";
+      return false;
+    }
+    DisplayManager::setBrightness(static_cast<int>(parsedNumber));
+  } else if (key == "brightnessDay") {
+    if (!parseUnsignedValue(value, 0, 255, parsedNumber)) {
+      errorMessage = "brightnessDay must be 0-255";
+      return false;
+    }
+    ConfigManager::deviceParamsConfig.brightnessDay = static_cast<uint8_t>(parsedNumber);
+  } else if (key == "brightnessNight") {
+    if (!parseUnsignedValue(value, 0, 255, parsedNumber)) {
+      errorMessage = "brightnessNight must be 0-255";
+      return false;
+    }
+    ConfigManager::deviceParamsConfig.brightnessNight = static_cast<uint8_t>(parsedNumber);
+  } else if (key == "displayRotation") {
+    if (!parseUnsignedValue(value, 0, 3, parsedNumber)) {
+      errorMessage = "displayRotation must be 0-3";
+      return false;
+    }
+    ConfigManager::deviceParamsConfig.displayRotation = static_cast<uint8_t>(parsedNumber);
+    requiresDisplayRebuild = true;
+  } else if (key == "swapBlueGreen") {
+    if (!parseBooleanSwitch(value, parsedBool)) {
+      errorMessage = "swapBlueGreen must be 0 or 1";
+      return false;
+    }
+    ConfigManager::deviceParamsConfig.swapBlueGreen = parsedBool;
+    requiresDisplayRebuild = true;
+  } else if (key == "swapBlueRed") {
+    if (!parseBooleanSwitch(value, parsedBool)) {
+      errorMessage = "swapBlueRed must be 0 or 1";
+      return false;
+    }
+    ConfigManager::deviceParamsConfig.swapBlueRed = parsedBool;
+    requiresDisplayRebuild = true;
+  } else if (key == "clkphase") {
+    if (!parseBooleanSwitch(value, parsedBool)) {
+      errorMessage = "clkphase must be 0 or 1";
+      return false;
+    }
+    ConfigManager::deviceParamsConfig.clkphase = parsedBool;
+    requiresDisplayRebuild = true;
+  } else if (key == "driver") {
+    if (!parseUnsignedValue(value, 0, 5, parsedNumber)) {
+      errorMessage = "driver must be 0-5";
+      return false;
+    }
+    ConfigManager::deviceParamsConfig.driver = static_cast<uint8_t>(parsedNumber);
+    requiresDisplayRebuild = true;
+  } else if (key == "i2cSpeed") {
+    if (!parseUnsignedValue(value, 8000000, 20000000, parsedNumber) ||
+        (parsedNumber != 8000000 && parsedNumber != 16000000 && parsedNumber != 20000000)) {
+      errorMessage = "i2cSpeed must be 8000000, 16000000 or 20000000";
+      return false;
+    }
+    ConfigManager::deviceParamsConfig.i2cSpeed = parsedNumber;
+    requiresDisplayRebuild = true;
+  } else if (key == "E_pin") {
+    if (!parseUnsignedValue(value, 0, 32, parsedNumber)) {
+      errorMessage = "E_pin must be 0-32";
+      return false;
+    }
+    ConfigManager::deviceParamsConfig.E_pin = static_cast<uint8_t>(parsedNumber);
+    requiresDisplayRebuild = true;
+  } else if (key == "nightStart") {
+    if (!isValidHourMinuteText(value)) {
+      errorMessage = "nightStart must be HH:MM";
+      return false;
+    }
+    memset(ConfigManager::deviceParamsConfig.nightStart, 0, sizeof(ConfigManager::deviceParamsConfig.nightStart));
+    value.toCharArray(ConfigManager::deviceParamsConfig.nightStart, sizeof(ConfigManager::deviceParamsConfig.nightStart));
+  } else if (key == "nightEnd") {
+    if (!isValidHourMinuteText(value)) {
+      errorMessage = "nightEnd must be HH:MM";
+      return false;
+    }
+    memset(ConfigManager::deviceParamsConfig.nightEnd, 0, sizeof(ConfigManager::deviceParamsConfig.nightEnd));
+    value.toCharArray(ConfigManager::deviceParamsConfig.nightEnd, sizeof(ConfigManager::deviceParamsConfig.nightEnd));
+  } else if (key == "ntpServer") {
+    if (value.length() == 0 || value.length() >= (int)sizeof(ConfigManager::deviceParamsConfig.ntpServer)) {
+      errorMessage = "ntpServer length is invalid";
+      return false;
+    }
+    memset(ConfigManager::deviceParamsConfig.ntpServer, 0, sizeof(ConfigManager::deviceParamsConfig.ntpServer));
+    value.toCharArray(ConfigManager::deviceParamsConfig.ntpServer, sizeof(ConfigManager::deviceParamsConfig.ntpServer));
+  } else {
+    errorMessage = "unsupported device param key";
+    return false;
+  }
+
+  ConfigManager::saveDeviceParamsConfig();
+
+  if (requiresDisplayRebuild) {
+    DisplayManager::applyDeviceParams(false);
+    WebSocketHandler::restoreDisplayForCurrentMode();
+  }
+
+  if (key == "ntpServer") {
+    WiFiManager::refreshTimeSync();
+  }
+  DisplayManager::refreshScheduledBrightness();
+
+  return true;
+}
+
+String escapeHtml(const String& text) {
+  String escaped;
+  escaped.reserve(text.length() + 16);
+
+  for (size_t i = 0; i < text.length(); i++) {
+    char ch = text[i];
+    if (ch == '&') {
+      escaped += "&amp;";
+    } else if (ch == '<') {
+      escaped += "&lt;";
+    } else if (ch == '>') {
+      escaped += "&gt;";
+    } else if (ch == '"') {
+      escaped += "&quot;";
+    } else if (ch == '\'') {
+      escaped += "&#39;";
+    } else {
+      escaped += ch;
+    }
+  }
+
+  return escaped;
+}
+
+int wifiSignalPercentFromRssi(int32_t rssi) {
+  if (rssi <= -100) {
+    return 0;
+  }
+  if (rssi >= -50) {
+    return 100;
+  }
+  return (rssi + 100) * 2;
+}
+
+String buildWifiNetworkListHtml() {
+  String listHtml;
+  size_t count = WiFiManager::getScannedNetworkCount();
+
+  if (count == 0) {
+    if (WiFiManager::isNetworkScanRunning()) {
+      listHtml += R"HTML(
+        <div class="empty-state">
+          <strong>正在扫描附近 WiFi</strong>
+          <span>设备正在后台扫描热点，页面会自动刷新。请稍候 1-3 秒。</span>
+        </div>
+      )HTML";
+      return listHtml;
+    }
+
+    listHtml += R"HTML(
+      <div class="empty-state">
+        <strong>页面已经打开成功</strong>
+        <span>为避免热点门户卡死，设备不会在热点刚启动时立刻扫描。请点一次“开始扫描 WiFi”，也可以直接手动输入 SSID。</span>
+      </div>
+    )HTML";
+    return listHtml;
+  }
+
+  for (size_t i = 0; i < count; i++) {
+    WiFiScanResultItem item = WiFiManager::getScannedNetwork(i);
+    String ssid = item.ssid;
+    if (ssid.length() == 0) {
+      continue;
+    }
+
+    listHtml += "<button type=\"button\" class=\"wifi-item\" data-ssid=\"";
+    listHtml += escapeHtml(ssid);
+    listHtml += "\">";
+    listHtml += "<span class=\"wifi-name\">";
+    listHtml += escapeHtml(ssid);
+    listHtml += "</span>";
+    listHtml += "<span class=\"wifi-meta\">";
+    listHtml += item.secure ? "加密网络" : "开放网络";
+    listHtml += " · ";
+    listHtml += String(wifiSignalPercentFromRssi(item.rssi));
+    listHtml += "%";
+    listHtml += "</span>";
+    listHtml += "</button>";
+  }
+
+  return listHtml;
+}
+
+String buildWifiConfigPortalPage() {
+  String portalSsid = WiFiManager::getConfigPortalSSID();
+  String portalIp = WiFiManager::getConfigPortalIP();
+  String networkListHtml = buildWifiNetworkListHtml();
+  bool scanRunning = WiFiManager::isNetworkScanRunning();
+  String scanButtonText = scanRunning
+    ? "正在扫描..."
+    : (WiFiManager::getScannedNetworkCount() > 0
+    ? "重新扫描 WiFi"
+    : "开始扫描 WiFi");
+
+  String html;
+  html.reserve(9000);
+  html += R"HTML(<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Glowxel WiFi 配网</title>
+)HTML";
+  if (scanRunning) {
+    html += R"HTML(<meta http-equiv="refresh" content="2">)HTML";
+  }
+  html += R"HTML(
+  <style>
+    body { margin: 0; padding: 18px; background: #f4f7fb; color: #142033; font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif; }
+    .wrap { max-width: 420px; margin: 0 auto; }
+    .card { background: #fff; border: 1px solid #d7e3f2; border-radius: 16px; padding: 20px; box-shadow: 0 10px 24px rgba(20, 32, 51, 0.08); }
+    h1 { margin: 0 0 10px; font-size: 24px; text-align: center; }
+    .sub { margin: 0 0 16px; color: #5c6c84; font-size: 14px; text-align: center; line-height: 1.6; }
+    .meta { margin-bottom: 16px; padding: 12px 14px; border-radius: 12px; background: #f8fbff; border: 1px solid #dce7f5; font-size: 13px; color: #50627d; }
+    .meta strong { color: #142033; word-break: break-all; }
+    .notice { margin-bottom: 16px; padding: 12px 14px; border-radius: 12px; background: #fff7e8; border: 1px solid #ffd89a; color: #7d5412; font-size: 13px; line-height: 1.6; }
+    .section-title { margin: 18px 0 10px; font-size: 15px; font-weight: 700; }
+    .wifi-list { display: block; margin-bottom: 14px; }
+    .wifi-item { width: 100%; display: block; margin-bottom: 10px; padding: 12px 14px; text-align: left; border: 1px solid #dce7f5; border-radius: 12px; background: #f7fafe; color: #142033; }
+    .wifi-name { display: block; font-size: 14px; font-weight: 700; margin-bottom: 4px; word-break: break-all; }
+    .wifi-meta { display: block; font-size: 12px; color: #5c6c84; }
+    .empty-state { padding: 14px; border-radius: 12px; border: 1px dashed #c6d6ea; background: #f8fbff; color: #5c6c84; font-size: 13px; line-height: 1.6; }
+    .empty-state strong { display: block; color: #142033; margin-bottom: 6px; }
+    label { display: block; margin: 12px 0 8px; color: #50627d; font-size: 13px; font-weight: 600; }
+    input { width: 100%; box-sizing: border-box; padding: 13px 14px; border: 1px solid #cfdced; border-radius: 12px; background: #fff; color: #142033; font-size: 14px; }
+    .actions { margin-top: 14px; }
+    .btn { width: 100%; box-sizing: border-box; display: block; padding: 13px 16px; border-radius: 12px; border: 1px solid #1e5eff; background: #1e5eff; color: #fff; text-align: center; text-decoration: none; font-size: 14px; font-weight: 700; }
+    .btn-secondary { margin-bottom: 10px; background: #eef4ff; color: #1e5eff; }
+    .hint { margin-top: 14px; color: #5c6c84; font-size: 12px; line-height: 1.6; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1>Glowxel WiFi 配网</h1>
+      <p class="sub">连上设备热点后，在这里选择你的 2.4GHz WiFi 并保存。</p>
+      <div class="meta">设备热点：<strong>)HTML";
+  html += escapeHtml(portalSsid);
+  html += R"HTML(</strong><br>配网页地址：<strong>)HTML";
+  html += escapeHtml(portalIp);
+  html += R"HTML(</strong></div>
+      <div class="notice">仅支持 2.4GHz WiFi。为保证系统登录页稳定打开，设备不会在热点刚启动时立刻扫描，请手动点一次扫描。</div>
+      <div class="section-title">附近 WiFi</div>
+      <div class="wifi-list">
+)HTML";
+  html += networkListHtml;
+  html += R"HTML(
+      </div>
+      <form method="post" action="/configure-wifi">
+        <label for="ssid-input">WiFi 名称 (SSID)</label>
+        <input id="ssid-input" name="ssid" maxlength="32" autocomplete="off" required placeholder="输入 2.4GHz WiFi 名称">
+        <label for="password-input">WiFi 密码</label>
+        <input id="password-input" name="password" maxlength="64" type="password" autocomplete="off" placeholder="输入 WiFi 密码，开放网络可留空">
+        <div class="actions">
+          <a class="btn btn-secondary" href="/scan-wifi">)HTML";
+  html += scanButtonText;
+  html += R"HTML(</a>
+          <button class="btn" type="submit">保存并连接</button>
+        </div>
+      </form>
+      <p class="hint">保存后设备会自动重启。如果密码错误，设备会重新回到热点配网模式，你可以再次连接 <code>)HTML";
+  html += escapeHtml(portalSsid);
+  html += R"HTML(</code> 重新配置。</p>
+    </div>
+  </div>
+  <script>
+    (function () {
+      var items = document.querySelectorAll(".wifi-item[data-ssid]");
+      for (var i = 0; i < items.length; i++) {
+        items[i].addEventListener("click", function () {
+          var ssid = this.getAttribute("data-ssid") || "";
+          var ssidInput = document.getElementById("ssid-input");
+          if (ssidInput) {
+            ssidInput.value = ssid;
+            ssidInput.focus();
+          }
+        });
+      }
+    })();
+  </script>
+</body>
+</html>)HTML";
+
+  return html;
+}
+
+String buildWifiConfigSuccessPage(const String& ssid) {
+  String html;
+  html.reserve(5200);
+  html += R"HTML(<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <title>Glowxel WiFi 配置已保存</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 18px;
+      font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: #eef4fb;
+      color: #142033;
+    }
+    .card {
+      width: min(100%, 420px);
+      padding: 24px 22px;
+      border-radius: 20px;
+      background: #ffffff;
+      border: 1px solid #d7e3f2;
+      box-shadow: 0 16px 40px rgba(25, 45, 76, 0.10);
+      text-align: center;
+    }
+    .badge {
+      width: 62px;
+      height: 62px;
+      border-radius: 18px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 16px;
+      background: #e9fbef;
+      color: #1f9f4a;
+      font-size: 28px;
+      font-weight: 700;
+    }
+    h1 {
+      margin: 0 0 10px;
+      font-size: 22px;
+    }
+    p {
+      margin: 0;
+      color: #50627d;
+      font-size: 14px;
+      line-height: 1.7;
+    }
+    .meta {
+      margin-top: 16px;
+      padding: 14px;
+      border-radius: 16px;
+      border: 1px solid #dce7f5;
+      background: #f6f9fd;
+      color: #50627d;
+      line-height: 1.8;
+      font-size: 14px;
+    }
+    .meta strong {
+      color: #142033;
+      word-break: break-all;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="badge">✓</div>
+    <h1>WiFi 配置已保存</h1>
+    <p>设备正在重启并连接你刚才填写的网络。重启完成后，请回到设备控制页并输入新的设备 IP 地址进行连接。</p>
+    <div class="meta">目标网络：<strong>)HTML";
+  html += escapeHtml(ssid);
+  html += R"HTML(</strong><br>注意：设备只支持 2.4GHz WiFi。如果网络不可用或密码错误，设备会重新回到热点配网模式。</div>
+  </div>
+</body>
+</html>)HTML";
+
+  return html;
+}
+
+String buildConfigPortalRootUrl() {
+  return "http://" + WiFiManager::getConfigPortalIP() + "/";
+}
+
+bool isConfigPortalHostRequest(AsyncWebServerRequest* request) {
+  String requestHost = request->host();
+  String portalHost = WiFiManager::getConfigPortalIP();
+  return requestHost == portalHost || requestHost == (portalHost + ":80");
+}
+
+void addConfigPortalNoCacheHeaders(AsyncWebServerResponse* response) {
+  response->addHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+  response->addHeader("Pragma", "no-cache");
+  response->addHeader("Expires", "-1");
+}
+
+void redirectToConfigPortalRoot(AsyncWebServerRequest* request) {
+  String location = buildConfigPortalRootUrl();
+  Serial.printf("[WiFi Portal] 重定向到根页: %s %s host=%s -> %s\n",
+                request->methodToString(),
+                request->url().c_str(),
+                request->host().c_str(),
+                location.c_str());
+  AsyncWebServerResponse* response = request->beginResponse(
+    302,
+    "text/plain; charset=utf-8",
+    ""
+  );
+  response->addHeader("Location", location);
+  addConfigPortalNoCacheHeaders(response);
+  request->send(response);
+}
+
+void sendConfigPortalPage(AsyncWebServerRequest* request) {
+  AsyncWebServerResponse* response = request->beginResponse(
+    200,
+    "text/html; charset=utf-8",
+    buildWifiConfigPortalPage()
+  );
+  addConfigPortalNoCacheHeaders(response);
+  request->send(response);
 }
 
 String buildThemeBrowserPage() {
@@ -691,9 +1204,17 @@ String buildAmbientEffectsPage() {
           <label><span>速度</span><strong id="speed-value">6</strong></label>
           <input id="speed-input" type="range" min="1" max="10" step="1">
         </div>
-        <div class="control-row">
+        <div id="intensity-row" class="control-row">
           <label><span>强度</span><strong id="intensity-value">72</strong></label>
           <input id="intensity-input" type="range" min="10" max="100" step="1">
+        </div>
+        <div id="density-row" class="control-row">
+          <label><span>密度</span><strong id="density-value">72</strong></label>
+          <input id="density-input" type="range" min="10" max="100" step="1">
+        </div>
+        <div id="color-row" class="control-row">
+          <label><span>颜色</span><strong id="color-value">#64C8FF</strong></label>
+          <input id="color-input" type="color">
         </div>
         <div class="toggle-row">
           <span>持续循环</span>
@@ -738,6 +1259,17 @@ String buildAmbientEffectsPage() {
       intensity: )HTML";
   html += String(DisplayManager::ambientEffectConfig.intensity);
   html += R"HTML(,
+      density: )HTML";
+  html += String(DisplayManager::ambientEffectConfig.density);
+  html += R"HTML(,
+      color: "#)HTML";
+  if (DisplayManager::ambientEffectConfig.colorR < 16) html += "0";
+  html += String(DisplayManager::ambientEffectConfig.colorR, HEX);
+  if (DisplayManager::ambientEffectConfig.colorG < 16) html += "0";
+  html += String(DisplayManager::ambientEffectConfig.colorG, HEX);
+  if (DisplayManager::ambientEffectConfig.colorB < 16) html += "0";
+  html += String(DisplayManager::ambientEffectConfig.colorB, HEX);
+  html += R"HTML(,
       loop: )HTML";
   html += (DisplayManager::ambientEffectConfig.loop ? "true" : "false");
   html += R"HTML(
@@ -751,9 +1283,40 @@ String buildAmbientEffectsPage() {
     const previewCtx = previewCanvas.getContext("2d", { alpha: false });
     const speedInput = document.getElementById("speed-input");
     const intensityInput = document.getElementById("intensity-input");
+    const densityInput = document.getElementById("density-input");
+    const colorInput = document.getElementById("color-input");
     const loopInput = document.getElementById("loop-input");
     const speedValueEl = document.getElementById("speed-value");
     const intensityValueEl = document.getElementById("intensity-value");
+    const densityValueEl = document.getElementById("density-value");
+    const colorValueEl = document.getElementById("color-value");
+    const intensityRow = document.getElementById("intensity-row");
+    const densityRow = document.getElementById("density-row");
+    const colorRow = document.getElementById("color-row");
+
+    function isRainPreset(presetId) {
+      return presetId === "rain_scene";
+    }
+
+    function rgbToHex(color) {
+      const toHex = (value) => {
+        const safe = Math.max(0, Math.min(255, Number(value) || 0));
+        return safe.toString(16).padStart(2, "0");
+      };
+      return "#" + toHex(color.r) + toHex(color.g) + toHex(color.b);
+    }
+
+    function hexToRgb(hex) {
+      const match = /^#?([0-9a-fA-F]{6})$/.exec(hex);
+      if (!match) {
+        return { r: 100, g: 200, b: 255 };
+      }
+      return {
+        r: parseInt(match[1].slice(0, 2), 16),
+        g: parseInt(match[1].slice(2, 4), 16),
+        b: parseInt(match[1].slice(4, 6), 16)
+      };
+    }
 
     function getPresetName(presetId) {
       const found = PRESETS.find((item) => item.id === presetId);
@@ -773,6 +1336,12 @@ String buildAmbientEffectsPage() {
         if (typeof data.effectIntensity === "number") {
           state.intensity = data.effectIntensity;
         }
+        if (typeof data.effectDensity === "number") {
+          state.density = data.effectDensity;
+        }
+        if (data.effectColor && typeof data.effectColor === "object") {
+          state.color = rgbToHex(data.effectColor);
+        }
         if (typeof data.effectLoop === "boolean") {
           state.loop = data.effectLoop;
         }
@@ -786,10 +1355,18 @@ String buildAmbientEffectsPage() {
     function syncControls() {
       speedInput.value = state.speed;
       intensityInput.value = state.intensity;
+      densityInput.value = state.density;
+      colorInput.value = state.color;
       loopInput.checked = !!state.loop;
       speedValueEl.textContent = state.speed;
       intensityValueEl.textContent = state.intensity;
+      densityValueEl.textContent = state.density;
+      colorValueEl.textContent = String(state.color || "").toUpperCase();
       currentNameEl.textContent = getPresetName(activePresetId);
+      const rainPreset = isRainPreset(activePresetId);
+      intensityRow.style.display = rainPreset ? "none" : "";
+      densityRow.style.display = rainPreset ? "" : "none";
+      colorRow.style.display = rainPreset ? "" : "none";
     }
 
     function setStatus(text, connected) {
@@ -842,6 +1419,18 @@ String buildAmbientEffectsPage() {
     }
 
     function applyPreset() {
+      if (isRainPreset(activePresetId)) {
+        sendJson({
+          cmd: "set_ambient_effect",
+          preset: activePresetId,
+          speed: Number(speedInput.value),
+          density: Number(densityInput.value),
+          color: hexToRgb(colorInput.value),
+          loop: !!loopInput.checked
+        });
+        return;
+      }
+
       sendJson({
         cmd: "set_ambient_effect",
         preset: activePresetId,
@@ -890,6 +1479,14 @@ String buildAmbientEffectsPage() {
     });
     intensityInput.addEventListener("input", () => {
       state.intensity = Number(intensityInput.value);
+      syncControls();
+    });
+    densityInput.addEventListener("input", () => {
+      state.density = Number(densityInput.value);
+      syncControls();
+    });
+    colorInput.addEventListener("input", () => {
+      state.color = colorInput.value;
       syncControls();
     });
     loopInput.addEventListener("change", () => {
@@ -1202,8 +1799,7 @@ String buildControlHubPage() {
       { id: "clockwise_worldmap", name: "地图时钟" },
       { id: "clockwise_castlevania", name: "针塔时钟" },
       { id: "clockwise_pacman", name: "吃豆人" },
-      { id: "clockwise_pokedex", name: "图鉴" },
-      { id: "clockwise_canvas", name: "画布主题" }
+      { id: "clockwise_pokedex", name: "图鉴" }
     ];
     const QUICK_EFFECTS = [
       { id: "digital_rain", name: "数字雨" },
@@ -1329,6 +1925,24 @@ String buildControlHubPage() {
     }
 
     function applyEffectQuick(effectId) {
+      if (effectId === "rain_scene") {
+        sendJson({
+          cmd: "set_ambient_effect",
+          preset: effectId,
+          speed: 6,
+          density: 72,
+          color: { r: 100, g: 200, b: 255 },
+          loop: true
+        });
+        currentMode = "ambient_effect";
+        currentEffectId = effectId;
+        setModeButtons(currentMode);
+        renderEffectChips();
+        setStatus("特效已切换", true);
+        window.setTimeout(syncStatus, 220);
+        return;
+      }
+
       sendJson({
         cmd: "set_ambient_effect",
         preset: effectId,
@@ -1479,8 +2093,60 @@ void WebServer::setupRoutes() {
     request->send(200, "text/plain", "ESP32 is working!");
   });
 
-  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
+  server.on("/", HTTP_ANY, [](AsyncWebServerRequest *request){
+    if (WiFiManager::isConfigMode()) {
+      if (!isConfigPortalHostRequest(request)) {
+        redirectToConfigPortalRoot(request);
+        return;
+      }
+      sendConfigPortalPage(request);
+      return;
+    }
     request->send(200, "text/html; charset=utf-8", buildControlHubPage());
+  });
+
+  server.on("/scan-wifi", HTTP_GET, [](AsyncWebServerRequest *request){
+    if (!WiFiManager::isConfigMode()) {
+      request->send(409, "text/plain; charset=utf-8", "device is not in config portal mode");
+      return;
+    }
+
+    WiFiManager::scanNearbyNetworks();
+    redirectToConfigPortalRoot(request);
+  });
+
+  server.on("/configure-wifi", HTTP_POST, [](AsyncWebServerRequest *request){
+    if (!WiFiManager::isConfigMode()) {
+      request->send(409, "text/plain; charset=utf-8", "device is not in config portal mode");
+      return;
+    }
+    if (!request->hasParam("ssid", true) || !request->hasParam("password", true)) {
+      request->send(400, "text/plain; charset=utf-8", "missing ssid or password field");
+      return;
+    }
+
+    String ssid = request->getParam("ssid", true)->value();
+    String password = request->getParam("password", true)->value();
+
+    if (ssid.length() == 0) {
+      request->send(400, "text/plain; charset=utf-8", "ssid cannot be empty");
+      return;
+    }
+    if (ssid.length() > 32 || password.length() > 64) {
+      request->send(400, "text/plain; charset=utf-8", "ssid or password is too long");
+      return;
+    }
+
+    WiFiManager::saveConfigPortalCredentials(ssid, password);
+    WiFiManager::schedulePortalRestart(2500);
+
+    AsyncWebServerResponse* response = request->beginResponse(
+      200,
+      "text/html; charset=utf-8",
+      buildWifiConfigSuccessPage(ssid)
+    );
+    addConfigPortalNoCacheHeaders(response);
+    request->send(response);
   });
 
   server.on("/clear-wifi", HTTP_GET, [](AsyncWebServerRequest *request){
@@ -1495,12 +2161,40 @@ void WebServer::setupRoutes() {
   });
 
   server.on("/themes", HTTP_GET, [](AsyncWebServerRequest *request){
+    if (WiFiManager::isConfigMode()) {
+      sendConfigPortalPage(request);
+      return;
+    }
     request->send(200, "text/html; charset=utf-8", buildThemeBrowserPage());
   });
 
   server.on("/effects", HTTP_GET, [](AsyncWebServerRequest *request){
+    if (WiFiManager::isConfigMode()) {
+      sendConfigPortalPage(request);
+      return;
+    }
     request->send(200, "text/html; charset=utf-8", buildAmbientEffectsPage());
   });
+
+  auto captiveProbeHandler = [](AsyncWebServerRequest *request) {
+    if (WiFiManager::isConfigMode()) {
+      redirectToConfigPortalRoot(request);
+      return;
+    }
+    request->send(204);
+  };
+
+  server.on("/generate_204", HTTP_ANY, captiveProbeHandler);
+  server.on("/gen_204", HTTP_ANY, captiveProbeHandler);
+  server.on("/hotspot-detect.html", HTTP_ANY, captiveProbeHandler);
+  server.on("/library/test/success.html", HTTP_ANY, captiveProbeHandler);
+  server.on("/connecttest.txt", HTTP_ANY, captiveProbeHandler);
+  server.on("/ncsi.txt", HTTP_ANY, captiveProbeHandler);
+  server.on("/success.txt", HTTP_ANY, captiveProbeHandler);
+  server.on("/canonical.html", HTTP_ANY, captiveProbeHandler);
+  server.on("/connectivity-check.html", HTTP_ANY, captiveProbeHandler);
+  server.on("/redirect", HTTP_ANY, captiveProbeHandler);
+  server.on("/fwlink", HTTP_ANY, captiveProbeHandler);
 
   auto sendLiveFrameBinary = [](AsyncWebServerRequest *request) {
     const uint8_t* frameData =
@@ -1560,15 +2254,77 @@ void WebServer::setupRoutes() {
       request->send(204);
       return;
     }
+    if (WiFiManager::isConfigMode()) {
+      redirectToConfigPortalRoot(request);
+      return;
+    }
     Serial.printf("404: %s %s\n", request->methodToString(), request->url().c_str());
     request->send(404, "text/plain", "Not Found");
   });
 }
 
 void WebServer::setupAPIRoutes() {
+  server.on("/get", HTTP_GET, [](AsyncWebServerRequest *request) {
+    sendDeviceParamsResponse(request);
+  });
+
+  server.on("/set", HTTP_POST, [](AsyncWebServerRequest *request) {
+    static const char* kDeviceParamKeys[] = {
+      "displayBright",
+      "brightnessDay",
+      "brightnessNight",
+      "displayRotation",
+      "swapBlueGreen",
+      "swapBlueRed",
+      "clkphase",
+      "driver",
+      "i2cSpeed",
+      "E_pin",
+      "nightStart",
+      "nightEnd",
+      "ntpServer"
+    };
+
+    String selectedKey = "";
+    String selectedValue = "";
+
+    for (size_t i = 0; i < sizeof(kDeviceParamKeys) / sizeof(kDeviceParamKeys[0]); i++) {
+      const AsyncWebParameter* param = findDeviceParam(request, kDeviceParamKeys[i]);
+      if (param == nullptr) {
+        continue;
+      }
+      if (selectedKey.length() > 0) {
+        request->send(400, "application/json", "{\"error\":\"only one device param can be updated per request\"}");
+        return;
+      }
+      selectedKey = kDeviceParamKeys[i];
+      selectedValue = param->value();
+    }
+
+    if (selectedKey.length() == 0) {
+      request->send(400, "application/json", "{\"error\":\"missing device param\"}");
+      return;
+    }
+
+    String errorMessage;
+    if (!applyDeviceParamValue(selectedKey, selectedValue, errorMessage)) {
+      String response = "{\"error\":\"" + errorMessage + "\"}";
+      request->send(400, "application/json", response);
+      return;
+    }
+
+    StaticJsonDocument<128> doc;
+    doc["status"] = "ok";
+    doc["key"] = selectedKey;
+    doc["value"] = selectedValue;
+    String response;
+    serializeJson(doc, response);
+    request->send(200, "application/json", response);
+  });
+
   server.on("/status", HTTP_GET, [](AsyncWebServerRequest *request){
     Serial.println("收到状态查询请求");
-    StaticJsonDocument<300> doc;
+    StaticJsonDocument<640> doc;
     const char* mode = "";
     if (DisplayManager::currentBusinessModeTag.length() > 0) {
       mode = DisplayManager::currentBusinessModeTag.c_str();
@@ -1591,6 +2347,20 @@ void WebServer::setupAPIRoutes() {
     doc["width"] = DisplayManager::PANEL_RES_X;
     doc["height"] = DisplayManager::PANEL_RES_Y;
     doc["brightness"] = DisplayManager::currentBrightness;
+    doc["displayBright"] = ConfigManager::deviceParamsConfig.displayBright;
+    doc["brightnessDay"] = ConfigManager::deviceParamsConfig.brightnessDay;
+    doc["brightnessNight"] = ConfigManager::deviceParamsConfig.brightnessNight;
+    doc["displayRotation"] = ConfigManager::deviceParamsConfig.displayRotation;
+    doc["swapBlueGreen"] = ConfigManager::deviceParamsConfig.swapBlueGreen;
+    doc["swapBlueRed"] = ConfigManager::deviceParamsConfig.swapBlueRed;
+    doc["clkphase"] = ConfigManager::deviceParamsConfig.clkphase;
+    doc["driver"] = ConfigManager::deviceParamsConfig.driver;
+    doc["i2cSpeed"] = ConfigManager::deviceParamsConfig.i2cSpeed;
+    doc["E_pin"] = ConfigManager::deviceParamsConfig.E_pin;
+    doc["nightStart"] = ConfigManager::deviceParamsConfig.nightStart;
+    doc["nightEnd"] = ConfigManager::deviceParamsConfig.nightEnd;
+    doc["ntpServer"] = ConfigManager::deviceParamsConfig.ntpServer;
+    doc["wifiSsid"] = WiFiManager::getConnectedSSID();
     doc["freeHeap"] = ESP.getFreeHeap();
     doc["uptime"] = millis() / 1000;
     doc["mode"] = mode;
@@ -1609,6 +2379,11 @@ void WebServer::setupAPIRoutes() {
     doc["effectPreset"] = ambientPresetToString(DisplayManager::ambientEffectConfig.preset);
     doc["effectSpeed"] = DisplayManager::ambientEffectConfig.speed;
     doc["effectIntensity"] = DisplayManager::ambientEffectConfig.intensity;
+    doc["effectDensity"] = DisplayManager::ambientEffectConfig.density;
+    JsonObject effectColor = doc.createNestedObject("effectColor");
+    effectColor["r"] = DisplayManager::ambientEffectConfig.colorR;
+    effectColor["g"] = DisplayManager::ambientEffectConfig.colorG;
+    effectColor["b"] = DisplayManager::ambientEffectConfig.colorB;
     doc["effectLoop"] = DisplayManager::ambientEffectConfig.loop;
     doc["themeId"] = ConfigManager::themeConfig.themeId;
     
@@ -1660,6 +2435,7 @@ void WebServer::setupAPIRoutes() {
       int brightness = request->getParam("value", true)->value().toInt();
       if (brightness >= 0 && brightness <= 255) {
         DisplayManager::setBrightness(brightness);
+        ConfigManager::saveDeviceParamsConfig();
         request->send(200, "application/json", "{\"status\":\"ok\",\"brightness\":" + String(brightness) + "}");
       } else {
         request->send(400, "application/json", "{\"error\":\"brightness must be 0-255\"}");

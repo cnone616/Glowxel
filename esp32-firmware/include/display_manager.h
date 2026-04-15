@@ -133,6 +133,10 @@ struct AmbientEffectConfig {
   uint8_t preset;
   uint8_t speed;
   uint8_t intensity;
+  uint8_t density;
+  uint8_t colorR;
+  uint8_t colorG;
+  uint8_t colorB;
   bool loop;
 };
 
@@ -140,6 +144,7 @@ class DisplayManager {
 public:
   static void init();
   static void setupMatrix();
+  static void applyDeviceParams(bool showBootLogo = false);
   static bool rebuildMatrix(bool doubleBuffered, bool showBootLogo);
   static bool enableDoubleBuffer();
   static void drawBackground();       // 独立：清屏+画像素背景或Logo
@@ -168,6 +173,7 @@ public:
   static void displayImage(uint8_t* data, size_t len, int width, int height);
   static void clearScreen();
   static void setBrightness(int brightness);
+  static void refreshScheduledBrightness();
 
   // 3x5 微型字体渲染
   static void drawTinyText(const char* text, int x, int y, uint16_t color, int size = 1);

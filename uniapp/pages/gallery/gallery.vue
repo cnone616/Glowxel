@@ -39,7 +39,7 @@
     <!-- 搜索栏（可展开） -->
       <view v-if="showSearch" class="search-section glx-page-shell__fixed">
       <view class="search-input-wrapper glx-search-shell">
-        <Icon name="search" :size="32" color="#666666" />
+        <Icon name="search" :size="32" color="var(--text-tertiary)" />
         <input 
           v-model="searchTerm"
           type="text"
@@ -49,7 +49,7 @@
           :focus="showSearch"
         />
         <view v-if="searchTerm" class="clear-btn" @click="clearSearch">
-          <Icon name="close" :size="28" color="#AAAAAA" />
+          <Icon name="close" :size="28" color="var(--text-tertiary)" />
         </view>
       </view>
     </view>
@@ -67,7 +67,7 @@
       <view class="content-section">
         <view v-if="filteredContent.length === 0 && !isLoading" class="empty-state glx-panel-card">
           <view class="empty-icon">
-            <Icon name="picture" :size="80" color="#AAAAAA" />
+            <Icon name="picture" :size="80" color="var(--text-tertiary)" />
           </view>
           <text class="empty-title">{{ getEmptyTitle() }}</text>
           <text class="empty-subtitle">{{ getEmptySubtitle() }}</text>
@@ -108,7 +108,7 @@
         
         <!-- 加载更多 -->
         <view v-if="isLoading" class="loading-more">
-          <Icon name="loading" :size="48" color="#4F7FFF" class="loading-icon" />
+          <Icon name="loading" :size="48" color="currentColor" class="loading-icon" />
           <text class="loading-text">加载中...</text>
         </view>
         
@@ -549,11 +549,6 @@ export default {
   transition: all 0.2s ease;
 }
 
-.back-btn:active {
-  transform: scale(0.95);
-  background-color: var(--nb-paper);
-}
-
 .header-title {
   font-size: 36rpx;
   font-weight: 700;
@@ -591,7 +586,6 @@ export default {
 }
 
 .search-btn:active {
-  transform: translate(2rpx, 2rpx);
   background-color: var(--nb-yellow);
 }
 
@@ -619,10 +613,6 @@ export default {
   border-color: var(--nb-ink);
 }
 
-.tab-item:active {
-  transform: scale(0.95);
-}
-
 .tab-text {
   font-size: 26rpx;
   font-weight: 500;
@@ -640,23 +630,6 @@ export default {
   background-color: var(--nb-surface);
   padding: 0 32rpx 20rpx;
   border-bottom: 1rpx solid var(--nb-ink);
-}
-
-.search-input-wrapper {
-  display: flex;
-  align-items: center;
-  gap: 16rpx;
-  background-color: var(--nb-paper);
-  border-radius: 0;
-  padding: 20rpx 24rpx;
-  border: 2rpx solid var(--nb-ink);
-  transition: all 0.2s ease;
-  box-sizing: border-box; /* 修复溢出问题 */
-}
-
-.search-input-wrapper:focus-within {
-  border-color: var(--nb-ink);
-  box-shadow: none;
 }
 
 .search-input {
@@ -684,10 +657,6 @@ export default {
   transition: all 0.2s ease;
 }
 
-.clear-btn:active {
-  transform: translate(2rpx, 2rpx);
-}
-
 /* 主要内容 */
 .main-content {
   flex: 1;
@@ -708,13 +677,6 @@ export default {
 }
 
 /* 空状态 */
-.empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 96rpx 32rpx;
-  text-align: center;
-}
 
 .empty-icon {
   width: 160rpx;
@@ -747,6 +709,7 @@ export default {
   align-items: center;
   padding: 48rpx;
   gap: 16rpx;
+  color: var(--nb-blue);
 }
 
 .loading-icon {
@@ -760,7 +723,7 @@ export default {
 
 .loading-text {
   font-size: 26rpx;
-  color: #4a4a4a;
+  color: currentColor;
 }
 
 .load-more-btn {
@@ -776,7 +739,6 @@ export default {
 }
 
 .load-more-btn:active {
-  transform: scale(0.98);
   background-color: var(--nb-paper);
 }
 

@@ -1,5 +1,5 @@
 import { getColorByCode } from "@/data/artkal-colors.js";
-import logoUrl from "@/assets/images/glowxel-logo.png";
+import logoUrl from "@/assets/images/glowxel-icon.svg";
 
 /**
  * 导出图案为图纸

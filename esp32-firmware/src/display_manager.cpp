@@ -27,7 +27,7 @@ BreathEffectConfig DisplayManager::breathEffectConfig = {
   255
 };
 RhythmEffectConfig DisplayManager::rhythmEffectConfig = {120, 5, true, RHYTHM_DIR_LEFT, 70, RHYTHM_MODE_PULSE, 100, 200, 255, 255, 100, 100};
-AmbientEffectConfig DisplayManager::ambientEffectConfig = {AMBIENT_PRESET_AURORA, 6, 72, true};
+AmbientEffectConfig DisplayManager::ambientEffectConfig = {AMBIENT_PRESET_AURORA, 6, 72, 72, 100, 200, 255, true};
 unsigned long DisplayManager::nativeEffectStartTime = 0;
 int DisplayManager::currentBrightness = 50;
 bool DisplayManager::clientConnected = false;
@@ -56,6 +56,111 @@ const int DisplayManager::PANEL_CHAIN = 1;
 const int DisplayManager::MAX_PIXELS = PANEL_RES_X * PANEL_RES_Y;
 
 static BufferMatrixPanel* s_offscreenDisplay = nullptr;
+
+namespace {
+bool isValidDriver(uint8_t driver) {
+  return driver <= 5;
+}
+
+bool isValidI2SSpeed(uint32_t speed) {
+  return speed == 8000000 || speed == 16000000 || speed == 20000000;
+}
+
+bool parseHourMinuteText(const char* text, int& outMinutes) {
+  if (text == nullptr || strlen(text) != 5 || text[2] != ':') {
+    return false;
+  }
+  if (text[0] < '0' || text[0] > '9' ||
+      text[1] < '0' || text[1] > '9' ||
+      text[3] < '0' || text[3] > '9' ||
+      text[4] < '0' || text[4] > '9') {
+    return false;
+  }
+
+  int hour = (text[0] - '0') * 10 + (text[1] - '0');
+  int minute = (text[3] - '0') * 10 + (text[4] - '0');
+  if (hour < 0 || hour > 23 || minute < 0 || minute > 59) {
+    return false;
+  }
+
+  outMinutes = hour * 60 + minute;
+  return true;
+}
+
+bool isNightBrightnessWindowActive() {
+  if (!WiFiManager::isTimeSynced()) {
+    return false;
+  }
+
+  int nightStartMinutes = 0;
+  int nightEndMinutes = 0;
+  if (!parseHourMinuteText(ConfigManager::deviceParamsConfig.nightStart, nightStartMinutes) ||
+      !parseHourMinuteText(ConfigManager::deviceParamsConfig.nightEnd, nightEndMinutes)) {
+    return false;
+  }
+
+  if (nightStartMinutes == nightEndMinutes) {
+    return false;
+  }
+
+  time_t now = time(nullptr);
+  struct tm localTime = {};
+  localtime_r(&now, &localTime);
+  int currentMinutes = localTime.tm_hour * 60 + localTime.tm_min;
+
+  if (nightStartMinutes < nightEndMinutes) {
+    return currentMinutes >= nightStartMinutes && currentMinutes < nightEndMinutes;
+  }
+  return currentMinutes >= nightStartMinutes || currentMinutes < nightEndMinutes;
+}
+
+int resolveScheduledBrightness() {
+  int dayBrightness = ConfigManager::deviceParamsConfig.brightnessDay;
+  int nightBrightness = ConfigManager::deviceParamsConfig.brightnessNight;
+  if (isNightBrightnessWindowActive()) {
+    return nightBrightness;
+  }
+  return dayBrightness;
+}
+
+void applyColorSwapPins(HUB75_I2S_CFG& mxconfig) {
+  if (ConfigManager::deviceParamsConfig.swapBlueGreen) {
+    mxconfig.gpio.b1 = 26;
+    mxconfig.gpio.b2 = 12;
+    mxconfig.gpio.g1 = 27;
+    mxconfig.gpio.g2 = 13;
+  }
+
+  if (ConfigManager::deviceParamsConfig.swapBlueRed) {
+    mxconfig.gpio.b1 = 25;
+    mxconfig.gpio.b2 = 14;
+    mxconfig.gpio.r1 = 27;
+    mxconfig.gpio.r2 = 13;
+  }
+}
+
+void applyHardwareConfig(HUB75_I2S_CFG& mxconfig) {
+  applyColorSwapPins(mxconfig);
+  mxconfig.gpio.e = ConfigManager::deviceParamsConfig.E_pin;
+
+  if (isValidDriver(ConfigManager::deviceParamsConfig.driver)) {
+    mxconfig.driver = static_cast<HUB75_I2S_CFG::shift_driver>(ConfigManager::deviceParamsConfig.driver);
+  }
+
+  mxconfig.clkphase = ConfigManager::deviceParamsConfig.clkphase;
+
+  if (isValidI2SSpeed(ConfigManager::deviceParamsConfig.i2cSpeed)) {
+    mxconfig.i2sspeed = static_cast<HUB75_I2S_CFG::clk_speed>(ConfigManager::deviceParamsConfig.i2cSpeed);
+  }
+}
+
+void destroyOffscreenDisplay() {
+  if (s_offscreenDisplay != nullptr) {
+    delete s_offscreenDisplay;
+    s_offscreenDisplay = nullptr;
+  }
+}
+}
 
 static void presentFrame() {
   if (DisplayManager::dma_display == nullptr) {
@@ -157,8 +262,7 @@ MatrixPanel_I2S_DMA* DisplayManager::beginOffscreenFrame(uint16_t* targetBuffer,
 
   if (s_offscreenDisplay == nullptr) {
     HUB75_I2S_CFG mxconfig(PANEL_RES_X, PANEL_RES_Y, PANEL_CHAIN);
-    mxconfig.gpio.e = 18;
-    mxconfig.clkphase = false;
+    applyHardwareConfig(mxconfig);
     s_offscreenDisplay = new BufferMatrixPanel(mxconfig);
   }
 
@@ -209,15 +313,20 @@ void DisplayManager::setupMatrix() {
   rebuildMatrix(false, true);
 }
 
+void DisplayManager::applyDeviceParams(bool showBootLogo) {
+  rebuildMatrix(doubleBufferEnabled, showBootLogo);
+}
+
 bool DisplayManager::rebuildMatrix(bool doubleBuffered, bool showBootLogo) {
   if (dma_display != nullptr) {
     delete dma_display;
     dma_display = nullptr;
   }
 
+  destroyOffscreenDisplay();
+
   HUB75_I2S_CFG mxconfig(PANEL_RES_X, PANEL_RES_Y, PANEL_CHAIN);
-  mxconfig.gpio.e = 18;
-  mxconfig.clkphase = false;
+  applyHardwareConfig(mxconfig);
   mxconfig.double_buff = doubleBuffered;
 
   CaptureMatrixPanel* nextDisplay = new CaptureMatrixPanel(mxconfig);
@@ -233,9 +342,11 @@ bool DisplayManager::rebuildMatrix(bool doubleBuffered, bool showBootLogo) {
 
   dma_display = nextDisplay;
   doubleBufferEnabled = doubleBuffered;
-  dma_display->setBrightness8(51);
+  dma_display->setBrightness8(ConfigManager::deviceParamsConfig.displayBright);
+  dma_display->setRotation(ConfigManager::deviceParamsConfig.displayRotation);
   dma_display->setLatBlanking(2);
   dma_display->clearScreen();
+  currentBrightness = ConfigManager::deviceParamsConfig.displayBright;
 
   if (!showBootLogo) {
     return true;
@@ -1089,8 +1200,27 @@ void DisplayManager::clearScreen() {
 void DisplayManager::setBrightness(int brightness) {
   if (brightness >= 0 && brightness <= 255) {
     currentBrightness = brightness;
+    ConfigManager::deviceParamsConfig.displayBright = static_cast<uint8_t>(brightness);
     dma_display->setBrightness8(brightness);
   }
+}
+
+void DisplayManager::refreshScheduledBrightness() {
+  if (dma_display == nullptr) {
+    return;
+  }
+
+  int targetBrightness = resolveScheduledBrightness();
+  if (targetBrightness < 0 || targetBrightness > 255) {
+    return;
+  }
+
+  if (currentBrightness == targetBrightness) {
+    return;
+  }
+
+  currentBrightness = targetBrightness;
+  dma_display->setBrightness8(targetBrightness);
 }
 
 void DisplayManager::drawTinyText(const char* text, int x, int y, uint16_t color, int size) {
@@ -1441,6 +1571,16 @@ static void fillAmbientRect(int x, int y, int w, int h, const NativeRgb& color) 
   DisplayManager::dma_display->fillRect(x, y, w, h, DisplayManager::dma_display->color565(color.r, color.g, color.b));
 }
 
+static void drawAmbientRectOutline(int x, int y, int w, int h, const NativeRgb& color) {
+  if (DisplayManager::dma_display == nullptr || w <= 0 || h <= 0) {
+    return;
+  }
+  fillAmbientRect(x, y, w, 1, color);
+  fillAmbientRect(x, y + h - 1, w, 1, color);
+  fillAmbientRect(x, y, 1, h, color);
+  fillAmbientRect(x + w - 1, y, 1, h, color);
+}
+
 static void drawAmbientGlowDot(int centerX, int centerY, const NativeRgb& color, float intensity, int radius) {
   if (DisplayManager::dma_display == nullptr) {
     return;
@@ -1465,35 +1605,880 @@ static void drawAmbientGlowDot(int centerX, int centerY, const NativeRgb& color,
   }
 }
 
-static void renderAmbientBoids(unsigned long elapsed, float speedUnit, float intensityUnit) {
-  DisplayManager::dma_display->fillScreenRGB888(4, 10, 18);
+static int ambientTextWidth(const char* text, int size) {
+  if (text == nullptr || size <= 0) {
+    return 0;
+  }
+  int len = strlen(text);
+  if (len <= 0) {
+    return 0;
+  }
+  return len * 4 * size - size;
+}
 
-  for (int y = 8; y < 64; y += 9) {
-    for (int x = 0; x < 64; x++) {
-      DisplayManager::dma_display->drawPixelRGB888(x, y, 10, 18, 28);
+static void drawAmbientTextCenteredInBox(const char* text, int left, int width, int y, const NativeRgb& color, int size) {
+  if (DisplayManager::dma_display == nullptr || text == nullptr) {
+    return;
+  }
+  int textWidth = ambientTextWidth(text, size);
+  int x = left + (width - textWidth) / 2;
+  if (x < left) {
+    x = left;
+  }
+  DisplayManager::drawTinyText(text, x, y, DisplayManager::dma_display->color565(color.r, color.g, color.b), size);
+}
+
+static void drawAmbientPanelFrame(int x, int y, int w, int h, const NativeRgb& bg, const NativeRgb& border, const NativeRgb& accent) {
+  fillAmbientRect(x, y, w, h, bg);
+  drawAmbientRectOutline(x, y, w, h, border);
+  fillAmbientRect(x + 2, y + 2, w - 4, 1, accent);
+  fillAmbientRect(x + 2, y + h - 3, w - 4, 1, accent);
+}
+
+static void drawAmbientChip(int x, int y, int w, const NativeRgb& color) {
+  fillAmbientRect(x, y, w, 2, color);
+}
+
+static void drawAmbientSunIcon(int centerX, int centerY, const NativeRgb& color) {
+  drawAmbientGlowDot(centerX, centerY, color, 0.95f, 4);
+  NativeRgb core = addHighlightColor(color, 0.12f);
+  fillAmbientRect(centerX - 3, centerY - 3, 7, 7, core);
+  fillAmbientRect(centerX - 1, centerY - 7, 2, 3, color);
+  fillAmbientRect(centerX - 1, centerY + 5, 2, 3, color);
+  fillAmbientRect(centerX - 7, centerY - 1, 3, 2, color);
+  fillAmbientRect(centerX + 5, centerY - 1, 3, 2, color);
+}
+
+static void drawAmbientCloudIcon(int x, int y, const NativeRgb& baseColor, const NativeRgb& glowColor) {
+  drawAmbientGlowDot(x + 10, y + 8, glowColor, 0.45f, 3);
+  fillAmbientRect(x + 3, y + 8, 14, 5, baseColor);
+  fillAmbientRect(x + 1, y + 10, 18, 4, baseColor);
+  fillAmbientRect(x + 5, y + 5, 5, 4, addHighlightColor(baseColor, 0.12f));
+  fillAmbientRect(x + 9, y + 4, 6, 5, addHighlightColor(baseColor, 0.18f));
+}
+
+static void drawAmbientRainDrops(int originX, int originY, const NativeRgb& color) {
+  for (int index = 0; index < 4; index++) {
+    int x = originX + index * 4;
+    fillAmbientRect(x, originY + (index % 2), 1, 4, color);
+    fillAmbientRect(x + 1, originY + 3 + (index % 2), 1, 1, color);
+  }
+}
+
+static void drawAmbientSnowFlakes(int originX, int originY, const NativeRgb& color) {
+  for (int index = 0; index < 3; index++) {
+    int x = originX + index * 5;
+    int y = originY + (index % 2);
+    fillAmbientRect(x, y + 1, 3, 1, color);
+    fillAmbientRect(x + 1, y, 1, 3, color);
+  }
+}
+
+static NativeRgb ambientHsvToRgb(float hue, float saturation, float value) {
+  float h = fmodf(hue, 1.0f);
+  if (h < 0.0f) {
+    h += 1.0f;
+  }
+  float sector = h * 6.0f;
+  int index = (int)floorf(sector);
+  float fraction = sector - (float)index;
+  float p = value * (1.0f - saturation);
+  float q = value * (1.0f - saturation * fraction);
+  float t = value * (1.0f - saturation * (1.0f - fraction));
+
+  float r = value;
+  float g = t;
+  float b = p;
+
+  if (index == 1) {
+    r = q;
+    g = value;
+    b = p;
+  } else if (index == 2) {
+    r = p;
+    g = value;
+    b = t;
+  } else if (index == 3) {
+    r = p;
+    g = q;
+    b = value;
+  } else if (index == 4) {
+    r = t;
+    g = p;
+    b = value;
+  } else if (index >= 5) {
+    r = value;
+    g = p;
+    b = q;
+  }
+
+  return makeRgb(
+    clampByte((int)roundf(r * 255.0f)),
+    clampByte((int)roundf(g * 255.0f)),
+    clampByte((int)roundf(b * 255.0f))
+  );
+}
+
+static NativeRgb ambientHslToRgb(float hueDegrees, float saturation, float lightness) {
+  float hue = fmodf(hueDegrees, 360.0f);
+  if (hue < 0.0f) {
+    hue += 360.0f;
+  }
+  float chroma = (1.0f - fabsf(2.0f * lightness - 1.0f)) * saturation;
+  float huePrime = hue / 60.0f;
+  float x = chroma * (1.0f - fabsf(fmodf(huePrime, 2.0f) - 1.0f));
+  float match = lightness - chroma / 2.0f;
+
+  float r1 = 0.0f;
+  float g1 = 0.0f;
+  float b1 = 0.0f;
+  if (huePrime < 1.0f) {
+    r1 = chroma;
+    g1 = x;
+  } else if (huePrime < 2.0f) {
+    r1 = x;
+    g1 = chroma;
+  } else if (huePrime < 3.0f) {
+    g1 = chroma;
+    b1 = x;
+  } else if (huePrime < 4.0f) {
+    g1 = x;
+    b1 = chroma;
+  } else if (huePrime < 5.0f) {
+    r1 = x;
+    b1 = chroma;
+  } else {
+    r1 = chroma;
+    b1 = x;
+  }
+
+  return makeRgb(
+    clampByte((int)roundf((r1 + match) * 255.0f)),
+    clampByte((int)roundf((g1 + match) * 255.0f)),
+    clampByte((int)roundf((b1 + match) * 255.0f))
+  );
+}
+
+struct AmbientBoidState {
+  float x;
+  float y;
+  float vx;
+  float vy;
+  float ax;
+  float ay;
+  NativeRgb color;
+};
+
+static AmbientBoidState s_ambientBoids[18];
+static bool s_ambientBoidsReady = false;
+static unsigned long s_ambientBoidsElapsed = 0;
+
+static void initAmbientBoids() {
+  for (int index = 0; index < 18; index++) {
+    float hue = fireflySeedf(index, 0.31f) * 360.0f;
+    s_ambientBoids[index].x = fireflySeedf(index, 1.11f) * 63.0f;
+    s_ambientBoids[index].y = fireflySeedf(index, 2.07f) * 63.0f;
+    s_ambientBoids[index].vx = fireflySeedf(index, 3.11f) * 2.0f - 1.0f;
+    s_ambientBoids[index].vy = fireflySeedf(index, 4.23f) * 2.0f - 1.0f;
+    s_ambientBoids[index].ax = 0.0f;
+    s_ambientBoids[index].ay = 0.0f;
+    s_ambientBoids[index].color = ambientHslToRgb(hue, 1.0f, 0.5f);
+  }
+  s_ambientBoidsReady = true;
+  s_ambientBoidsElapsed = 0;
+}
+
+static float ambientVectorLength(float x, float y) {
+  return sqrtf(x * x + y * y);
+}
+
+static void limitAmbientVector(float& x, float& y, float maxLength) {
+  float length = ambientVectorLength(x, y);
+  if (length <= 0.0001f || length <= maxLength) {
+    return;
+  }
+  float scale = maxLength / length;
+  x *= scale;
+  y *= scale;
+}
+
+static void normalizeAmbientVector(float& x, float& y) {
+  float length = ambientVectorLength(x, y);
+  if (length <= 0.0001f) {
+    x = 0.0f;
+    y = 0.0f;
+    return;
+  }
+  x /= length;
+  y /= length;
+}
+
+static void ambientSeparateBoid(
+  int index,
+  float desiredSeparation,
+  float maxSpeed,
+  float maxForce,
+  float& outX,
+  float& outY
+) {
+  outX = 0.0f;
+  outY = 0.0f;
+  int count = 0;
+
+  for (int other = 0; other < 18; other++) {
+    if (other == index) {
+      continue;
+    }
+    float dx = s_ambientBoids[index].x - s_ambientBoids[other].x;
+    float dy = s_ambientBoids[index].y - s_ambientBoids[other].y;
+    float distance = ambientVectorLength(dx, dy);
+    if (distance <= 0.0f || distance >= desiredSeparation) {
+      continue;
+    }
+    normalizeAmbientVector(dx, dy);
+    outX += dx / distance;
+    outY += dy / distance;
+    count++;
+  }
+
+  if (count <= 0) {
+    outX = 0.0f;
+    outY = 0.0f;
+    return;
+  }
+
+  outX /= (float)count;
+  outY /= (float)count;
+  normalizeAmbientVector(outX, outY);
+  outX *= maxSpeed;
+  outY *= maxSpeed;
+  outX -= s_ambientBoids[index].vx;
+  outY -= s_ambientBoids[index].vy;
+  limitAmbientVector(outX, outY, maxForce);
+}
+
+static void ambientAlignBoid(
+  int index,
+  float neighborDistance,
+  float maxSpeed,
+  float maxForce,
+  float& outX,
+  float& outY
+) {
+  outX = 0.0f;
+  outY = 0.0f;
+  int count = 0;
+
+  for (int other = 0; other < 18; other++) {
+    if (other == index) {
+      continue;
+    }
+    float dx = s_ambientBoids[index].x - s_ambientBoids[other].x;
+    float dy = s_ambientBoids[index].y - s_ambientBoids[other].y;
+    float distance = ambientVectorLength(dx, dy);
+    if (distance <= 0.0f || distance >= neighborDistance) {
+      continue;
+    }
+    outX += s_ambientBoids[other].vx;
+    outY += s_ambientBoids[other].vy;
+    count++;
+  }
+
+  if (count <= 0) {
+    outX = 0.0f;
+    outY = 0.0f;
+    return;
+  }
+
+  outX /= (float)count;
+  outY /= (float)count;
+  normalizeAmbientVector(outX, outY);
+  outX *= maxSpeed;
+  outY *= maxSpeed;
+  outX -= s_ambientBoids[index].vx;
+  outY -= s_ambientBoids[index].vy;
+  limitAmbientVector(outX, outY, maxForce);
+}
+
+static void ambientCohesionBoid(
+  int index,
+  float neighborDistance,
+  float maxSpeed,
+  float maxForce,
+  float& outX,
+  float& outY
+) {
+  outX = 0.0f;
+  outY = 0.0f;
+  int count = 0;
+
+  for (int other = 0; other < 18; other++) {
+    if (other == index) {
+      continue;
+    }
+    float dx = s_ambientBoids[index].x - s_ambientBoids[other].x;
+    float dy = s_ambientBoids[index].y - s_ambientBoids[other].y;
+    float distance = ambientVectorLength(dx, dy);
+    if (distance <= 0.0f || distance >= neighborDistance) {
+      continue;
+    }
+    outX += s_ambientBoids[other].x;
+    outY += s_ambientBoids[other].y;
+    count++;
+  }
+
+  if (count <= 0) {
+    outX = 0.0f;
+    outY = 0.0f;
+    return;
+  }
+
+  outX /= (float)count;
+  outY /= (float)count;
+  outX -= s_ambientBoids[index].x;
+  outY -= s_ambientBoids[index].y;
+  normalizeAmbientVector(outX, outY);
+  outX *= maxSpeed;
+  outY *= maxSpeed;
+  outX -= s_ambientBoids[index].vx;
+  outY -= s_ambientBoids[index].vy;
+  limitAmbientVector(outX, outY, maxForce);
+}
+
+static void stepAmbientBoids(float speedUnit, float intensityUnit) {
+  if (!s_ambientBoidsReady) {
+    initAmbientBoids();
+  }
+
+  float maxSpeed = 0.75f + speedUnit * 1.25f;
+  float maxForce = 0.03f + intensityUnit * 0.05f;
+  float separationDistance = 5.0f + intensityUnit * 7.0f;
+  float alignmentDistance = 10.0f + intensityUnit * 12.0f;
+  float cohesionDistance = 12.0f + intensityUnit * 16.0f;
+
+  for (int index = 0; index < 18; index++) {
+    float sepX = 0.0f;
+    float sepY = 0.0f;
+    float aliX = 0.0f;
+    float aliY = 0.0f;
+    float cohX = 0.0f;
+    float cohY = 0.0f;
+    ambientSeparateBoid(index, separationDistance, maxSpeed, maxForce, sepX, sepY);
+    ambientAlignBoid(index, alignmentDistance, maxSpeed, maxForce, aliX, aliY);
+    ambientCohesionBoid(index, cohesionDistance, maxSpeed, maxForce, cohX, cohY);
+    s_ambientBoids[index].ax = sepX * 1.4f + aliX + cohX;
+    s_ambientBoids[index].ay = sepY * 1.4f + aliY + cohY;
+  }
+
+  for (int index = 0; index < 18; index++) {
+    s_ambientBoids[index].vx += s_ambientBoids[index].ax;
+    s_ambientBoids[index].vy += s_ambientBoids[index].ay;
+    limitAmbientVector(s_ambientBoids[index].vx, s_ambientBoids[index].vy, maxSpeed);
+    s_ambientBoids[index].x += s_ambientBoids[index].vx;
+    s_ambientBoids[index].y += s_ambientBoids[index].vy;
+    if (s_ambientBoids[index].x > 64.0f) {
+      s_ambientBoids[index].x = 0.0f;
+    } else if (s_ambientBoids[index].x < 0.0f) {
+      s_ambientBoids[index].x = 64.0f;
+    }
+    if (s_ambientBoids[index].y > 64.0f) {
+      s_ambientBoids[index].y = 0.0f;
+    } else if (s_ambientBoids[index].y < 0.0f) {
+      s_ambientBoids[index].y = 64.0f;
+    }
+  }
+}
+
+static int s_sortValues[64];
+static bool s_sortReady = false;
+static unsigned long s_sortElapsed = 0;
+static uint8_t s_sortAlgorithm = 0;
+static uint8_t s_sortPhase = 1;
+static uint8_t s_sortWait = 0;
+static int s_sortAccessA = -1;
+static int s_sortAccessB = -1;
+static int s_sortI = 0;
+static int s_sortJ = 0;
+static int s_sortMinIndex = 0;
+static int s_sortKey = 0;
+static int s_sortStack[64][2];
+static int s_sortStackSize = 0;
+static bool s_sortPartitioning = false;
+static int s_sortLow = 0;
+static int s_sortHigh = 0;
+static int s_sortPivot = 0;
+static int s_sortPivotI = 0;
+static int s_sortPivotJ = 0;
+
+static void initAmbientSortingValues() {
+  for (int index = 0; index < 64; index++) {
+    s_sortValues[index] = index + 1;
+  }
+  for (int index = 63; index > 0; index--) {
+    int swapIndex = (index * 13 + 17) % (index + 1);
+    int temp = s_sortValues[index];
+    s_sortValues[index] = s_sortValues[swapIndex];
+    s_sortValues[swapIndex] = temp;
+  }
+}
+
+static void resetAmbientSortingForAlgorithm() {
+  initAmbientSortingValues();
+  s_sortPhase = 1;
+  s_sortWait = 0;
+  s_sortAccessA = -1;
+  s_sortAccessB = -1;
+  if (s_sortAlgorithm == 0) {
+    s_sortI = 0;
+    s_sortJ = 0;
+    return;
+  }
+  if (s_sortAlgorithm == 1) {
+    s_sortI = 0;
+    s_sortJ = 1;
+    s_sortMinIndex = 0;
+    return;
+  }
+  if (s_sortAlgorithm == 2) {
+    s_sortI = 1;
+    s_sortKey = s_sortValues[1];
+    s_sortJ = 0;
+    return;
+  }
+  s_sortStackSize = 1;
+  s_sortStack[0][0] = 0;
+  s_sortStack[0][1] = 63;
+  s_sortPartitioning = false;
+}
+
+static void initAmbientSorting() {
+  s_sortAlgorithm = 0;
+  resetAmbientSortingForAlgorithm();
+  s_sortReady = true;
+  s_sortElapsed = 0;
+}
+
+static bool stepAmbientSortBubble() {
+  if (s_sortI >= 63) {
+    return true;
+  }
+  if (s_sortJ < 63 - s_sortI) {
+    s_sortAccessA = s_sortJ;
+    s_sortAccessB = s_sortJ + 1;
+    if (s_sortValues[s_sortJ] > s_sortValues[s_sortJ + 1]) {
+      int temp = s_sortValues[s_sortJ];
+      s_sortValues[s_sortJ] = s_sortValues[s_sortJ + 1];
+      s_sortValues[s_sortJ + 1] = temp;
+    }
+    s_sortJ++;
+    return false;
+  }
+  s_sortJ = 0;
+  s_sortI++;
+  return false;
+}
+
+static bool stepAmbientSortSelection() {
+  if (s_sortI >= 63) {
+    return true;
+  }
+  if (s_sortJ < 64) {
+    s_sortAccessA = s_sortMinIndex;
+    s_sortAccessB = s_sortJ;
+    if (s_sortValues[s_sortJ] < s_sortValues[s_sortMinIndex]) {
+      s_sortMinIndex = s_sortJ;
+    }
+    s_sortJ++;
+    return false;
+  }
+  s_sortAccessA = s_sortI;
+  s_sortAccessB = s_sortMinIndex;
+  int temp = s_sortValues[s_sortMinIndex];
+  s_sortValues[s_sortMinIndex] = s_sortValues[s_sortI];
+  s_sortValues[s_sortI] = temp;
+  s_sortI++;
+  s_sortMinIndex = s_sortI;
+  s_sortJ = s_sortI + 1;
+  return false;
+}
+
+static bool stepAmbientSortInsertion() {
+  if (s_sortI >= 64) {
+    return true;
+  }
+  s_sortAccessA = max(0, s_sortJ);
+  s_sortAccessB = s_sortI;
+  if (s_sortJ >= 0 && s_sortValues[s_sortJ] > s_sortKey) {
+    s_sortValues[s_sortJ + 1] = s_sortValues[s_sortJ];
+    s_sortJ--;
+    return false;
+  }
+  s_sortValues[s_sortJ + 1] = s_sortKey;
+  s_sortI++;
+  if (s_sortI < 64) {
+    s_sortKey = s_sortValues[s_sortI];
+    s_sortJ = s_sortI - 1;
+  }
+  return false;
+}
+
+static bool stepAmbientSortQuick() {
+  if (!s_sortPartitioning) {
+    while (s_sortStackSize > 0) {
+      s_sortStackSize--;
+      s_sortLow = s_sortStack[s_sortStackSize][0];
+      s_sortHigh = s_sortStack[s_sortStackSize][1];
+      if (s_sortLow < s_sortHigh) {
+        s_sortPivot = s_sortValues[s_sortHigh];
+        s_sortPivotI = s_sortLow - 1;
+        s_sortPivotJ = s_sortLow;
+        s_sortPartitioning = true;
+        break;
+      }
+    }
+    if (!s_sortPartitioning) {
+      return true;
     }
   }
 
-  float timeBase = (float)elapsed * (0.0012f + speedUnit * 0.0016f);
-  for (int index = 0; index < 11; index++) {
-    float seedA = fireflySeedf(index, 0.8f);
-    float seedB = fireflySeedf(index, 2.4f);
-    float px =
-      32.0f +
-      sinf(timeBase * (0.9f + seedA * 0.8f) + seedB * 6.2831852f) * (10.0f + seedA * 18.0f) +
-      cosf(timeBase * (0.5f + seedB * 0.7f) + (float)index) * 6.0f;
-    float py =
-      32.0f +
-      cosf(timeBase * (0.7f + seedB * 0.9f) + seedA * 6.2831852f) * (8.0f + seedB * 16.0f) +
-      sinf(timeBase * (0.8f + seedA * 0.4f) + (float)index * 0.6f) * 5.0f;
-    float tailX = px - cosf(timeBase + (float)index) * 4.0f;
-    float tailY = py - sinf(timeBase * 1.1f + (float)index) * 4.0f;
-    NativeRgb body = addHighlightColor(
-      blendRgbColor(makeRgb(44, 164, 255), makeRgb(80, 255, 196), seedA),
-      0.12f + intensityUnit * 0.16f
+  if (s_sortPivotJ <= s_sortHigh - 1) {
+    s_sortAccessA = s_sortPivotJ;
+    s_sortAccessB = s_sortHigh;
+    if (s_sortValues[s_sortPivotJ] < s_sortPivot) {
+      s_sortPivotI++;
+      int temp = s_sortValues[s_sortPivotI];
+      s_sortValues[s_sortPivotI] = s_sortValues[s_sortPivotJ];
+      s_sortValues[s_sortPivotJ] = temp;
+    }
+    s_sortPivotJ++;
+    return false;
+  }
+
+  int pivotIndex = s_sortPivotI + 1;
+  int temp = s_sortValues[pivotIndex];
+  s_sortValues[pivotIndex] = s_sortValues[s_sortHigh];
+  s_sortValues[s_sortHigh] = temp;
+  s_sortPartitioning = false;
+  s_sortAccessA = pivotIndex;
+  s_sortAccessB = s_sortHigh;
+  s_sortStack[s_sortStackSize][0] = s_sortLow;
+  s_sortStack[s_sortStackSize][1] = pivotIndex - 1;
+  s_sortStackSize++;
+  s_sortStack[s_sortStackSize][0] = pivotIndex + 1;
+  s_sortStack[s_sortStackSize][1] = s_sortHigh;
+  s_sortStackSize++;
+  return false;
+}
+
+static void stepAmbientSorting() {
+  if (!s_sortReady) {
+    initAmbientSorting();
+  }
+
+  if (s_sortPhase == 2) {
+    s_sortWait++;
+    if (s_sortWait >= 18) {
+      s_sortAlgorithm = (uint8_t)((s_sortAlgorithm + 1) % 4);
+      resetAmbientSortingForAlgorithm();
+    }
+    return;
+  }
+
+  bool done = false;
+  for (int step = 0; step < 8 && !done; step++) {
+    if (s_sortAlgorithm == 0) {
+      done = stepAmbientSortBubble();
+    } else if (s_sortAlgorithm == 1) {
+      done = stepAmbientSortSelection();
+    } else if (s_sortAlgorithm == 2) {
+      done = stepAmbientSortInsertion();
+    } else {
+      done = stepAmbientSortQuick();
+    }
+  }
+
+  if (done) {
+    s_sortPhase = 2;
+    s_sortAccessA = -1;
+    s_sortAccessB = -1;
+  }
+}
+
+static void drawAmbientDigit3x5(int digit, int x, int y, const NativeRgb& color) {
+  static const char glyphs[10][5][4] = {
+    {"111", "101", "101", "101", "111"},
+    {"010", "110", "010", "010", "111"},
+    {"111", "001", "111", "100", "111"},
+    {"111", "001", "111", "001", "111"},
+    {"101", "101", "111", "001", "001"},
+    {"111", "100", "111", "001", "111"},
+    {"111", "100", "111", "101", "111"},
+    {"111", "001", "001", "001", "001"},
+    {"111", "101", "111", "101", "111"},
+    {"111", "101", "111", "001", "111"}
+  };
+
+  int safeDigit = digit;
+  if (safeDigit < 0 || safeDigit > 9) {
+    safeDigit = 0;
+  }
+
+  for (int row = 0; row < 5; row++) {
+    for (int col = 0; col < 3; col++) {
+      if (glyphs[safeDigit][row][col] != '1') {
+        continue;
+      }
+      fillAmbientRect(x + col, y + row, 1, 1, color);
+    }
+  }
+}
+
+static void drawAmbientLine(int x0, int y0, int x1, int y1, const NativeRgb& color) {
+  int startX = x0;
+  int startY = y0;
+  int endX = x1;
+  int endY = y1;
+  int dx = abs(endX - startX);
+  int sx = startX < endX ? 1 : -1;
+  int dy = -abs(endY - startY);
+  int sy = startY < endY ? 1 : -1;
+  int err = dx + dy;
+
+  while (true) {
+    DisplayManager::dma_display->drawPixelRGB888(startX, startY, color.r, color.g, color.b);
+    if (startX == endX && startY == endY) {
+      break;
+    }
+    int twice = err * 2;
+    if (twice >= dy) {
+      err += dy;
+      startX += sx;
+    }
+    if (twice <= dx) {
+      err += dx;
+      startY += sy;
+    }
+  }
+}
+
+static void renderAmbientDigitalRain(unsigned long elapsed, float speedUnit) {
+  DisplayManager::dma_display->fillScreenRGB888(0, 0, 0);
+
+  const int width = 64;
+  const int height = 64;
+  const int numDrops = 40;
+  const float baseSpeed = 0.5f + speedUnit * 1.5f;
+
+  for (int index = 0; index < numDrops; index++) {
+    int x = (index * 37 + 11) % width;
+    float lengthSeed = fireflySeedf(index, 0.91f);
+    float speedSeed = fireflySeedf(index, 1.61f);
+    float positionSeed = fireflySeedf(index, 2.31f);
+    int length = 5 + (int)roundf(lengthSeed * ((float)height / 2.0f - 4.0f));
+    float speed = baseSpeed * (0.5f + speedSeed);
+    float y = -((float)height) + fractf32(positionSeed + (float)elapsed * 0.00055f * speed) * ((float)height * 2.0f);
+    int headY = (int)floorf(y);
+
+    for (int segment = 0; segment < length; segment++) {
+      int py = headY - segment;
+      if (py < 0 || py >= height) {
+        continue;
+      }
+      float brightness = 1.0f - (float)segment / (float)max(1, length - 1);
+      uint8_t green = clampByte((int)roundf(255.0f * brightness));
+      DisplayManager::dma_display->drawPixelRGB888(x, py, 0, green, 0);
+    }
+
+    if (headY >= 0 && headY < height) {
+      DisplayManager::dma_display->drawPixelRGB888(x, headY, 255, 255, 255);
+    }
+  }
+}
+
+static float metaBlobRandSin(int index) {
+  return sinf((float)index * 1.64f);
+}
+
+static void renderAmbientMetaBlob(unsigned long elapsed) {
+  DisplayManager::dma_display->fillScreenRGB888(0, 0, 0);
+
+  const int numBlobs = 10;
+  const float threshold = 0.0003f;
+  const float timeValue = (float)elapsed / 1000.0f;
+  const float hue = fmodf(timeValue * 0.033f, 1.0f);
+
+  struct MetaBlob {
+    float x;
+    float y;
+    float radius;
+  };
+
+  MetaBlob blobs[numBlobs];
+  for (int index = 0; index < numBlobs; index++) {
+    float x = 0.5f + 0.1f * metaBlobRandSin(index);
+    float y = 0.5f + 0.1f * metaBlobRandSin(index + 42);
+    x += 0.5f * sinf(0.25f * timeValue * metaBlobRandSin(index + 2)) * metaBlobRandSin(index + 56);
+    y += 0.5f * -sinf(0.25f * timeValue) * metaBlobRandSin(index * 9);
+    float radius = 0.1f * fabsf(metaBlobRandSin(index + 3));
+    blobs[index] = {
+      x * 64.0f,
+      y * 64.0f,
+      radius * 64.0f
+    };
+  }
+
+  for (int y = 0; y < 64; y++) {
+    for (int x = 0; x < 64; x++) {
+      float field = 0.0f;
+      for (int index = 0; index < numBlobs; index++) {
+        float dx = (float)x - blobs[index].x;
+        float dy = (float)y - blobs[index].y;
+        float distance = max(sqrtf(dx * dx + dy * dy) + blobs[index].radius / 2.0f, 0.0f);
+        float temp = distance * distance;
+        field += 1.0f / (temp * temp);
+      }
+
+      if (field <= threshold) {
+        continue;
+      }
+
+      float t = min(1.0f, (field - threshold) / threshold);
+      t = t * t * (3.0f - 2.0f * t);
+      NativeRgb center = ambientHsvToRgb(hue, 1.0f, 1.0f);
+      NativeRgb edge = ambientHsvToRgb(hue + 0.25f, 1.0f, 1.0f);
+      NativeRgb color = blendRgbColor(edge, center, t);
+      DisplayManager::dma_display->drawPixelRGB888(x, y, color.r, color.g, color.b);
+    }
+  }
+}
+
+static void renderAmbientStarfield(unsigned long elapsed, float speedUnit) {
+  DisplayManager::dma_display->fillScreenRGB888(0, 0, 0);
+
+  const int centerX = 32;
+  const int centerY = 32;
+  const float maxDepth = 3.0f;
+  const int starCount = 50;
+  const float travelRate = 0.00022f + speedUnit * 0.00022f;
+
+  for (int index = 0; index < starCount; index++) {
+    float seedX = fireflySeedf(index, 0.11f);
+    float seedY = fireflySeedf(index, 1.73f);
+    float seedZ = fireflySeedf(index, 2.91f);
+    float seedT = fireflySeedf(index, 3.71f);
+    float x3d = seedX * 2.0f - 1.0f;
+    float y3d = seedY * 2.0f - 1.0f;
+    float travel = fractf32(seedZ + (float)elapsed * travelRate * (0.65f + seedT * 0.7f));
+    float z = max(0.08f, maxDepth - travel * maxDepth);
+    float perspective = 0.5f / z;
+    int x = (int)roundf(x3d * perspective * (float)centerX + (float)centerX);
+    int y = (int)roundf(y3d * perspective * (float)centerY + (float)centerY);
+
+    if (x < 0 || x >= 64 || y < 0 || y >= 64) {
+      continue;
+    }
+
+    float depthFactor = clampUnit((maxDepth - z) / maxDepth);
+    float twinkle =
+      0.8f +
+      0.2f * (0.5f + 0.5f * sinf((float)elapsed * 0.0014f * (0.7f + seedT) + seedX * 6.2831852f));
+    uint8_t brightness = clampByte((int)roundf(255.0f * sqrtf(depthFactor) * twinkle));
+
+    DisplayManager::dma_display->drawPixelRGB888(x, y, brightness, brightness, brightness);
+
+    if (z < maxDepth * 0.3f) {
+      NativeRgb glow = makeRgb(brightness / 4, brightness / 4, brightness / 4);
+      drawAmbientGlowDot(x, y, glow, 0.5f, 1);
+    }
+  }
+}
+
+static void renderAmbientNeonTunnel(unsigned long elapsed, float speedUnit) {
+  float timeCounter = ((float)elapsed / 120.0f) * 0.05f;
+  float centerX = 32.0f;
+  float centerY = 32.0f;
+  float oscX = centerX + sinf(timeCounter * 0.5f) * 16.0f;
+  float oscY = centerY + cosf(timeCounter * 0.7f) * 16.0f;
+  float distanceFactor = 1.25f + speedUnit * 0.8f;
+  float angleFactor = 2.4f;
+  float hueShiftSpeed = 0.2f + speedUnit * 0.35f;
+
+  for (int y = 0; y < 64; y++) {
+    for (int x = 0; x < 64; x++) {
+      float dx = (float)x - oscX;
+      float dy = (float)y - oscY;
+      float distance = max(0.001f, sqrtf(dx * dx + dy * dy));
+      float angle = atan2f(dy, dx);
+      float uvX = distanceFactor / distance + speedUnit * timeCounter;
+      float uvY = (angle * angleFactor / 3.1415926f) + sinf(timeCounter) * 2.0f;
+      int texX = ((int)roundf(fabsf(uvX * 32.0f))) % 256;
+      int texY = ((int)roundf(fabsf(uvY * 32.0f))) % 256;
+      int pattern = texX ^ texY;
+      float depthShade = clampUnit(1.0f - distance / 96.0f);
+      float hue = fmodf(timeCounter * hueShiftSpeed * 50.0f + distance * 2.0f, 360.0f);
+      float lightness = pattern > 128 ? 0.5f * depthShade : 0.0f;
+      if (lightness <= 0.0f) {
+        DisplayManager::dma_display->drawPixelRGB888(x, y, 0, 0, 0);
+        continue;
+      }
+      NativeRgb color = ambientHslToRgb(hue, 1.0f, lightness);
+      DisplayManager::dma_display->drawPixelRGB888(x, y, color.r, color.g, color.b);
+    }
+  }
+}
+
+static void renderAmbientRainbowRain(unsigned long elapsed, float speedUnit, uint8_t density, const NativeRgb& color) {
+  DisplayManager::dma_display->fillScreenRGB888(0, 0, 0);
+
+  int safeDensity = density;
+  if (safeDensity < 10) safeDensity = 10;
+  if (safeDensity > 100) safeDensity = 100;
+  float densityUnit = (float)safeDensity / 100.0f;
+  int dropletCount = (int)roundf(96.0f + densityUnit * 560.0f);
+  float driftRate = 0.00018f + speedUnit * 0.00042f;
+
+  for (int index = 0; index < dropletCount; index++) {
+    float seedA = fireflySeedf(index, 0.27f);
+    float seedB = fireflySeedf(index, 1.11f);
+    float seedC = fireflySeedf(index, 2.43f);
+    float seedD = fireflySeedf(index, 3.92f);
+    float sway = sinf((float)elapsed * (0.0007f + seedB * 0.0009f) + seedD * 6.2831852f) * 0.35f;
+    int lane = (int)floorf(seedA * 64.0f);
+    int x = max(0, min(63, (int)roundf((float)lane + sway)));
+    float velocity = 0.45f + seedC * 1.65f;
+    float travel = fractf32(seedD + (float)elapsed * driftRate * velocity);
+    int y = (int)floorf(travel * 68.0f) - 2;
+    if (y < 0 || y >= 64) {
+      continue;
+    }
+
+    float brightness = 0.28f + seedB * 0.72f;
+    NativeRgb dropColor = scaleRgbColor(color, brightness);
+    DisplayManager::dma_display->drawPixelRGB888(x, y, dropColor.r, dropColor.g, dropColor.b);
+  }
+}
+
+static void renderAmbientBoids(unsigned long elapsed, float speedUnit, float intensityUnit) {
+  DisplayManager::dma_display->fillScreenRGB888(0, 0, 0);
+  if (!s_ambientBoidsReady || elapsed < s_ambientBoidsElapsed) {
+    initAmbientBoids();
+  }
+  int steps = max(1, (int)((elapsed - s_ambientBoidsElapsed) / 40UL));
+  for (int step = 0; step < steps; step++) {
+    stepAmbientBoids(speedUnit, intensityUnit);
+  }
+  s_ambientBoidsElapsed = elapsed;
+
+  for (int index = 0; index < 18; index++) {
+    int x = (int)roundf(s_ambientBoids[index].x);
+    int y = (int)roundf(s_ambientBoids[index].y);
+    DisplayManager::dma_display->drawPixelRGB888(
+      x,
+      y,
+      s_ambientBoids[index].color.r,
+      s_ambientBoids[index].color.g,
+      s_ambientBoids[index].color.b
     );
-    drawAmbientGlowDot((int)roundf(px), (int)roundf(py), body, 0.9f, 1);
-    drawAmbientGlowDot((int)roundf((px + tailX) * 0.5f), (int)roundf((py + tailY) * 0.5f), scaleRgbColor(body, 0.45f), 0.7f, 1);
   }
 }
 
@@ -1508,71 +2493,99 @@ static void renderAmbientBouncingLogo(unsigned long elapsed, float speedUnit) {
 }
 
 static void renderAmbientSortingVisualizer(unsigned long elapsed, float intensityUnit) {
-  DisplayManager::dma_display->fillScreenRGB888(6, 9, 16);
-  int heights[16] = {13, 9, 5, 15, 7, 12, 3, 10, 16, 8, 14, 6, 11, 4, 2, 1};
-  int compareCount = (int)(elapsed / 120UL) * 3;
-  int activeLeft = 0;
-  int activeRight = 1;
-
-  for (int step = 0; step < compareCount; step++) {
-    int index = step % 15;
-    activeLeft = index;
-    activeRight = index + 1;
-    if (heights[index] > heights[index + 1]) {
-      int temp = heights[index];
-      heights[index] = heights[index + 1];
-      heights[index + 1] = temp;
-    }
+  DisplayManager::dma_display->fillScreenRGB888(0, 0, 0);
+  if (!s_sortReady || elapsed < s_sortElapsed) {
+    initAmbientSorting();
   }
+  int frames = max(1, (int)((elapsed - s_sortElapsed) / 80UL));
+  for (int step = 0; step < frames; step++) {
+    stepAmbientSorting();
+  }
+  s_sortElapsed = elapsed;
 
-  for (int index = 0; index < 16; index++) {
-    int barHeight = heights[index];
-    int x = index * 4;
-    NativeRgb base =
-      index == activeLeft || index == activeRight
-        ? makeRgb(255, 180, 68)
-        : blendRgbColor(makeRgb(78, 162, 255), makeRgb(96, 255, 188), (float)index / 15.0f);
-    NativeRgb color = addHighlightColor(base, intensityUnit * 0.14f);
-    for (int row = 0; row < barHeight; row++) {
-      fillAmbientRect(x + 1, 63 - row * 3, 3, 2, color);
+  for (int index = 0; index < 64; index++) {
+    int barHeight = max(1, (s_sortValues[index] * 64) / 64);
+    NativeRgb color;
+    if (s_sortPhase == 1 && (index == s_sortAccessA || index == s_sortAccessB)) {
+      color = makeRgb(255, 0, 0);
+    } else if (s_sortPhase == 2) {
+      color = makeRgb(0, 255, 0);
+    } else {
+      color = ambientHslToRgb(((float)s_sortValues[index] / 64.0f) * 360.0f, 1.0f, 0.5f);
+    }
+    color = addHighlightColor(color, intensityUnit * 0.08f);
+    for (int y = 63; y >= 64 - barHeight; y--) {
+      DisplayManager::dma_display->drawPixelRGB888(index, y, color.r, color.g, color.b);
     }
   }
 }
 
 static void renderAmbientClockScene(unsigned long elapsed, float intensityUnit) {
-  float timeBase = (float)elapsed * 0.0012f;
-  for (int y = 0; y < 64; y++) {
-    for (int x = 0; x < 64; x++) {
-      float nx = ((float)x - 31.5f) / 31.5f;
-      float ny = ((float)y - 31.5f) / 31.5f;
-      float nebulaA = 0.5f + 0.5f * sinf(nx * 5.0f + timeBase * 0.45f + ny * 4.0f);
-      float nebulaB = 0.5f + 0.5f * sinf((nx - ny) * 7.2f - timeBase * 0.62f);
-      float backdrop = clampUnit(0.03f + nebulaA * 0.08f + nebulaB * 0.06f);
-      uint8_t r = clampByte((int)roundf(4.0f + 16.0f * nebulaB * backdrop));
-      uint8_t g = clampByte((int)roundf(6.0f + 22.0f * nebulaA * backdrop));
-      uint8_t b = clampByte((int)roundf(12.0f + 46.0f * (nebulaA * 0.55f + nebulaB * 0.45f) * backdrop));
-      int starIndex = (x * 31 + y * 17) % 97;
-      if (starIndex < 3) {
-        float twinkle = glowPulsef(timeBase * (1.1f + (float)starIndex * 0.35f), (float)(x + y) * 0.21f);
-        float shine = 0.28f + twinkle * (0.42f + intensityUnit * 0.18f);
-        r = clampByte((int)roundf((float)r + 140.0f * shine));
-        g = clampByte((int)roundf((float)g + 150.0f * shine));
-        b = clampByte((int)roundf((float)b + 185.0f * shine));
-      }
-      DisplayManager::dma_display->drawPixelRGB888(x, y, r, g, b);
+  DisplayManager::dma_display->fillScreenRGB888(0, 0, 0);
+
+  time_t now = time(nullptr);
+  struct tm* timeinfo = localtime(&now);
+  int second = timeinfo != nullptr ? timeinfo->tm_sec : 0;
+  int minuteValue = timeinfo != nullptr ? timeinfo->tm_min : 34;
+  int hourValue = timeinfo != nullptr ? timeinfo->tm_hour : 12;
+
+  float secondProgress = (float)((second + (int)(elapsed / 120UL)) % 60);
+  float minute = (float)minuteValue + secondProgress / 60.0f;
+  float hour = (float)(hourValue % 12) + minute / 60.0f;
+
+  int centerX = 32;
+  int centerY = 21;
+  int radius = 18;
+
+  for (int index = 0; index < 12; index++) {
+    float angle = (float)index * 3.1415926f / 6.0f;
+    int x = centerX + (int)roundf(sinf(angle) * (float)radius);
+    int y = centerY - (int)roundf(cosf(angle) * (float)radius);
+    if (index % 3 == 0) {
+      DisplayManager::dma_display->drawPixelRGB888(x, y, 200, 200, 200);
+      DisplayManager::dma_display->drawPixelRGB888(x - 1, y, 150, 150, 150);
+      DisplayManager::dma_display->drawPixelRGB888(x + 1, y, 150, 150, 150);
+      DisplayManager::dma_display->drawPixelRGB888(x, y - 1, 150, 150, 150);
+      DisplayManager::dma_display->drawPixelRGB888(x, y + 1, 150, 150, 150);
+    } else {
+      DisplayManager::dma_display->drawPixelRGB888(x, y, 100, 100, 100);
     }
   }
 
-  fillAmbientRect(8, 18, 48, 28, makeRgb(6, 12, 20));
-  fillAmbientRect(8, 47, 48, 1, makeRgb(24, 60, 88));
-  struct tm timeinfo;
-  char buffer[8];
-  if (getLocalTime(&timeinfo, 0)) {
-    snprintf(buffer, sizeof(buffer), "%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min);
-  } else {
-    snprintf(buffer, sizeof(buffer), "12:34");
+  float hourAngle = hour / 12.0f * 6.2831852f - 1.5707963f;
+  float minuteAngle = minute / 60.0f * 6.2831852f - 1.5707963f;
+  float secondAngle = secondProgress / 60.0f * 6.2831852f - 1.5707963f;
+  drawAmbientLine(centerX, centerY, centerX + (int)roundf(cosf(hourAngle) * 9.0f), centerY + (int)roundf(sinf(hourAngle) * 9.0f), makeRgb(84, 196, 255));
+  drawAmbientLine(centerX, centerY, centerX + (int)roundf(cosf(minuteAngle) * 13.0f), centerY + (int)roundf(sinf(minuteAngle) * 13.0f), makeRgb(220, 220, 220));
+  drawAmbientLine(centerX, centerY, centerX + (int)roundf(cosf(secondAngle) * 15.0f), centerY + (int)roundf(sinf(secondAngle) * 15.0f), makeRgb(255, 100, 130));
+  fillAmbientRect(centerX - 1, centerY - 1, 3, 3, addHighlightColor(makeRgb(255, 255, 255), intensityUnit * 0.08f));
+
+  int displayHour = hourValue % 12;
+  if (displayHour == 0) {
+    displayHour = 12;
   }
-  DisplayManager::drawTinyText(buffer, 11, 28, DisplayManager::dma_display->color565(142, 214, 255), 3);
+  bool isPm = hourValue >= 12;
+  int xStart = 20;
+  int yStart = 48;
+  NativeRgb hourColor = makeRgb(84, 196, 255);
+  NativeRgb minuteColor = makeRgb(220, 220, 220);
+  drawAmbientDigit3x5(displayHour / 10, xStart, yStart, hourColor);
+  drawAmbientDigit3x5(displayHour % 10, xStart + 5, yStart, hourColor);
+  fillAmbientRect(xStart + 9, yStart + 1, 1, 1, makeRgb(255, 255, 255));
+  fillAmbientRect(xStart + 9, yStart + 3, 1, 1, makeRgb(255, 255, 255));
+  drawAmbientDigit3x5(minuteValue / 10, xStart + 11, yStart, minuteColor);
+  drawAmbientDigit3x5(minuteValue % 10, xStart + 16, yStart, minuteColor);
+  if (isPm) {
+    fillAmbientRect(xStart + 22, yStart, 1, 1, makeRgb(255, 255, 255));
+    fillAmbientRect(xStart + 22, yStart + 1, 1, 1, makeRgb(255, 255, 255));
+    fillAmbientRect(xStart + 23, yStart, 1, 1, makeRgb(255, 255, 255));
+    fillAmbientRect(xStart + 23, yStart + 1, 1, 1, makeRgb(255, 255, 255));
+  } else {
+    fillAmbientRect(xStart + 22, yStart + 3, 1, 1, makeRgb(255, 255, 255));
+    fillAmbientRect(xStart + 22, yStart + 4, 1, 1, makeRgb(255, 255, 255));
+    fillAmbientRect(xStart + 23, yStart + 3, 1, 1, makeRgb(255, 255, 255));
+    fillAmbientRect(xStart + 23, yStart + 4, 1, 1, makeRgb(255, 255, 255));
+  }
 }
 
 static void renderAmbientCountdownScene(unsigned long elapsed, float speedUnit) {
@@ -1585,36 +2598,46 @@ static void renderAmbientCountdownScene(unsigned long elapsed, float speedUnit) 
   char buffer[8];
   snprintf(buffer, sizeof(buffer), "%02d:%02d", minutes, seconds);
   float progress = (float)remaining / (float)totalSeconds;
-  fillAmbientRect(7, 16, 50, 34, makeRgb(10, 16, 28));
-  fillAmbientRect(8, 50, max(1, (int)roundf(progress * 48.0f)), 2, makeRgb(255, 112, 64));
-  DisplayManager::drawTinyText(buffer, 11, 29, DisplayManager::dma_display->color565(255, 212, 82), 3);
+  bool warning = progress < 0.25f;
+  NativeRgb accent = warning ? makeRgb(255, 108, 82) : makeRgb(255, 212, 82);
+  NativeRgb border = warning ? makeRgb(124, 48, 44) : makeRgb(108, 84, 40);
+  drawAmbientPanelFrame(5, 13, 54, 38, makeRgb(10, 16, 28), border, scaleRgbColor(accent, 0.55f));
+  DisplayManager::drawTinyText("TIMER", 10, 17, DisplayManager::dma_display->color565(accent.r, accent.g, accent.b), 1);
+  drawAmbientChip(42, 17, 10, scaleRgbColor(accent, 0.7f));
+  drawAmbientTextCenteredInBox(buffer, 5, 54, 26, accent, 2);
+  drawAmbientRectOutline(10, 43, 44, 5, border);
+  int fillWidth = max(2, (int)roundf(progress * 42.0f));
+  fillAmbientRect(11, 44, fillWidth, 3, accent);
+  drawAmbientGlowDot(11 + fillWidth, 45, accent, 0.28f, 1);
 }
 
 static void renderAmbientWeatherScene(unsigned long elapsed, float speedUnit) {
   DisplayManager::dma_display->fillScreenRGB888(6, 10, 18);
   int phase = ((int)floorf(((float)elapsed / 1000.0f) * (0.28f + speedUnit * 0.2f))) % 3;
   int temp = phase == 0 ? 26 : (phase == 1 ? 18 : 8);
-  char buffer[4];
-  snprintf(buffer, sizeof(buffer), "%02d", temp);
-  fillAmbientRect(6, 10, 52, 40, makeRgb(10, 16, 28));
+  char buffer[5];
+  snprintf(buffer, sizeof(buffer), "%02dC", temp);
+  NativeRgb panelBg = makeRgb(10, 16, 28);
+  NativeRgb border = makeRgb(30, 64, 94);
+  NativeRgb accent = makeRgb(224, 244, 255);
+  drawAmbientPanelFrame(6, 10, 52, 40, panelBg, border, makeRgb(92, 150, 198));
 
   if (phase == 0) {
-    drawAmbientGlowDot(18, 24, makeRgb(255, 206, 84), 0.95f, 4);
+    drawAmbientSunIcon(18, 24, makeRgb(255, 206, 84));
+    drawAmbientCloudIcon(10, 23, makeRgb(228, 236, 244), makeRgb(126, 184, 232));
+    DisplayManager::drawTinyText("SUN", 10, 41, DisplayManager::dma_display->color565(255, 214, 102), 1);
   } else if (phase == 1) {
-    drawAmbientGlowDot(16, 22, makeRgb(188, 212, 255), 0.8f, 4);
-    for (int row = 0; row < 5; row++) {
-      fillAmbientRect(14 + row * 3, 30 + row, 1, 4, makeRgb(88, 176, 255));
-    }
+    drawAmbientCloudIcon(8, 18, makeRgb(196, 214, 232), makeRgb(120, 176, 228));
+    drawAmbientRainDrops(13, 32, makeRgb(88, 176, 255));
+    DisplayManager::drawTinyText("RAIN", 8, 41, DisplayManager::dma_display->color565(146, 204, 255), 1);
   } else {
-    drawAmbientGlowDot(18, 24, makeRgb(208, 232, 255), 0.72f, 4);
-    for (int index = 0; index < 6; index++) {
-      DisplayManager::dma_display->drawPixelRGB888(12 + index * 3, 32 + (index % 2), 240, 248, 255);
-      DisplayManager::dma_display->drawPixelRGB888(13 + index * 3, 33 + (index % 2), 240, 248, 255);
-    }
+    drawAmbientCloudIcon(8, 18, makeRgb(214, 226, 236), makeRgb(156, 198, 236));
+    drawAmbientSnowFlakes(12, 33, makeRgb(240, 248, 255));
+    DisplayManager::drawTinyText("SNOW", 8, 41, DisplayManager::dma_display->color565(214, 234, 255), 1);
   }
 
-  DisplayManager::drawTinyText(buffer, 35, 29, DisplayManager::dma_display->color565(224, 244, 255), 3);
-  fillAmbientRect(48, 22, 2, 2, makeRgb(120, 196, 255));
+  DisplayManager::drawTinyText(buffer, 32, 24, DisplayManager::dma_display->color565(accent.r, accent.g, accent.b), 2);
+  fillAmbientRect(35, 18, 18, 1, makeRgb(80, 132, 176));
 }
 
 static void renderAmbientGameOfLife(unsigned long elapsed, float intensityUnit) {
@@ -1718,8 +2741,24 @@ static void renderAmbientReactionDiffusion(unsigned long elapsed, float speedUni
 }
 
 static bool renderAmbientExtendedScene(uint8_t preset, unsigned long elapsed, float speedUnit, float intensityUnit) {
+  if (preset == AMBIENT_PRESET_AURORA) {
+    renderAmbientDigitalRain(elapsed, speedUnit);
+    return true;
+  }
+  if (preset == AMBIENT_PRESET_PLASMA) {
+    renderAmbientStarfield(elapsed, speedUnit);
+    return true;
+  }
+  if (preset == AMBIENT_PRESET_MATRIX_RAIN) {
+    renderAmbientNeonTunnel(elapsed, speedUnit);
+    return true;
+  }
   if (preset == AMBIENT_PRESET_BOIDS) {
     renderAmbientBoids(elapsed, speedUnit, intensityUnit);
+    return true;
+  }
+  if (preset == AMBIENT_PRESET_FIREFLY_SWARM) {
+    renderAmbientMetaBlob(elapsed);
     return true;
   }
   if (preset == AMBIENT_PRESET_BOUNCING_LOGO) {
@@ -1752,6 +2791,19 @@ static bool renderAmbientExtendedScene(uint8_t preset, unsigned long elapsed, fl
   }
   if (preset == AMBIENT_PRESET_REACTION_DIFFUSION) {
     renderAmbientReactionDiffusion(elapsed, speedUnit, intensityUnit);
+    return true;
+  }
+  if (preset == AMBIENT_PRESET_SUNSET_BLUSH) {
+    renderAmbientRainbowRain(
+      elapsed,
+      speedUnit,
+      DisplayManager::ambientEffectConfig.density,
+      makeRgb(
+        DisplayManager::ambientEffectConfig.colorR,
+        DisplayManager::ambientEffectConfig.colorG,
+        DisplayManager::ambientEffectConfig.colorB
+      )
+    );
     return true;
   }
   return false;
@@ -2363,27 +3415,6 @@ void DisplayManager::renderNativeEffect() {
           if (((x + (int)(elapsed / 42UL)) % 9) == 0 && tail > 0.16f) {
             addHighlight(r, g, b, 0.1f + intensityUnit * 0.12f);
           }
-        } else if (ambientEffectConfig.preset == AMBIENT_PRESET_PLASMA) {
-          float nebulaA = 0.5f + 0.5f * sinf(nx * 5.0f + timeBase * 0.45f + ny * 4.0f);
-          float nebulaB = 0.5f + 0.5f * sinf((nx - ny) * 7.2f - timeBase * 0.62f);
-          float backdrop = clampUnit(0.03f + nebulaA * 0.08f + nebulaB * 0.06f);
-          r = clampByte((int)roundf(4.0f + 16.0f * nebulaB * backdrop));
-          g = clampByte((int)roundf(6.0f + 22.0f * nebulaA * backdrop));
-          b = clampByte((int)roundf(12.0f + 46.0f * (nebulaA * 0.55f + nebulaB * 0.45f) * backdrop));
-
-          int starIndex = (x * 31 + y * 17) % 97;
-          if (starIndex < 3) {
-            float twinkle = glowPulsef(timeBase * (1.1f + (float)starIndex * 0.35f), (float)(x + y) * 0.21f);
-            float shine = 0.28f + twinkle * (0.42f + intensityUnit * 0.18f);
-            r = clampByte((int)roundf((float)r + 140.0f * shine));
-            g = clampByte((int)roundf((float)g + 150.0f * shine));
-            b = clampByte((int)roundf((float)b + 185.0f * shine));
-            if (x > 0 && starIndex == 0 && twinkle > 0.72f) {
-              r = clampByte((int)r + 32);
-              g = clampByte((int)g + 34);
-              b = clampByte((int)b + 40);
-            }
-          }
         } else if (ambientEffectConfig.preset == AMBIENT_PRESET_MATRIX_RAIN) {
           float angle = atan2f(ny, nx) / (3.1415926f * 2.0f);
           float tunnelDepth = fractf32(dist * 4.4f - timeBase * (1.8f + speedUnit * 1.1f));
@@ -2491,30 +3522,6 @@ void DisplayManager::renderNativeEffect() {
           r = clampByte((int)roundf((8.0f + 44.0f * waveB + 16.0f * stripe) * glow));
           g = clampByte((int)roundf((18.0f + 110.0f * stripe + 40.0f * waveA) * glow));
           b = clampByte((int)roundf((40.0f + 170.0f * waveA + 72.0f * stripe) * glow));
-        } else if (ambientEffectConfig.preset == AMBIENT_PRESET_SUNSET_BLUSH) {
-          float cloud = 0.5f + 0.5f * sinf(nx * 4.6f + timeBase * 0.24f + sinf(ny * 6.2f));
-          r = clampByte((int)roundf(3.0f + 8.0f * cloud));
-          g = clampByte((int)roundf(8.0f + 12.0f * cloud));
-          b = clampByte((int)roundf(14.0f + 26.0f * cloud));
-
-          int band = x % 5;
-          float trail = fractf32(timeBase * (0.72f + speedUnit * 0.66f) + (float)x * 0.041f);
-          float headY = trail * 1.22f - 0.12f;
-          float distance = headY - (float)y / 63.0f;
-          if (band < 2 && distance >= 0.0f && distance <= 0.24f + intensityUnit * 0.2f) {
-            float drop = 1.0f - distance / (0.24f + intensityUnit * 0.2f);
-            r = clampByte((int)r + (int)roundf(34.0f * drop));
-            g = clampByte((int)g + (int)roundf(88.0f * drop));
-            b = clampByte((int)b + (int)roundf(150.0f * drop));
-          }
-
-          if (y > 47) {
-            float puddle = 0.5f + 0.5f * sinf(nx * 10.2f - timeBase * 1.4f);
-            float floor = clampUnit((float)(y - 47) / 16.0f);
-            r = clampByte((int)r + (int)roundf(6.0f * puddle * floor));
-            g = clampByte((int)g + (int)roundf(20.0f * puddle * floor));
-            b = clampByte((int)b + (int)roundf(52.0f * puddle * floor));
-          }
         } else {
           float plasmaA = 0.5f + 0.5f * sinf(nx * 5.8f + timeBase * 1.2f + sinf(ny * 4.2f));
           float plasmaB = 0.5f + 0.5f * sinf((nx + ny) * 6.6f - timeBase * 1.9f);

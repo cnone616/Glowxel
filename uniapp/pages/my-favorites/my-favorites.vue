@@ -44,7 +44,7 @@
     <!-- 收藏列表 -->
     <scroll-view scroll-y class="content glx-scroll-region glx-page-shell__content">
       <view v-if="filteredFavorites.length === 0" class="empty-state glx-panel-card">
-        <Icon name="favorite" :size="120" color="#777777" />
+        <Icon name="favorite" :size="120" color="var(--text-tertiary)" />
         <text class="empty-title">暂无收藏</text>
         <text class="empty-desc">去社区发现更多精彩作品吧</text>
         <button class="explore-btn glx-cta-button" @click="goToExplore">
@@ -77,7 +77,7 @@
               v-else
               name="circle"
               :size="40"
-              color="#777777"
+              color="var(--text-tertiary)"
             />
           </view>
 
@@ -93,7 +93,7 @@
               <Icon
                 :name="getTypeIcon(item.type)"
                 :size="60"
-                color="#777777"
+                color="var(--text-tertiary)"
               />
             </view>
 
@@ -127,11 +127,7 @@
               <Icon name="download" :size="32" />
             </view>
             <view class="action-btn danger" @click.stop="removeFavorite(item)">
-              <Icon
-                name="ashbin"
-                :size="32"
-                color="#ff6b6b"
-              />
+              <Icon name="ashbin" :size="32" color="currentColor" />
             </view>
           </view>
         </view>
@@ -520,15 +516,6 @@ export default {
   box-sizing: border-box;
 }
 
-.empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  height: 60vh;
-  gap: 24rpx;
-}
-
 .empty-title {
   font-size: 32rpx;
   font-weight: 600;
@@ -575,7 +562,6 @@ export default {
 }
 
 .favorite-item:active {
-  transform: scale(0.98);
   box-shadow: 2rpx 2rpx 0 var(--nb-ink);
 }
 
@@ -705,13 +691,13 @@ export default {
 }
 
 .action-btn:active {
-  transform: translate(2rpx, 2rpx);
   box-shadow: none;
 }
 
 .action-btn.danger {
   background-color: #d92d20;
   border-color: #000000;
+  color: #ffffff;
 }
 
 .batch-actions {

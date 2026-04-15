@@ -15,7 +15,7 @@
     <scroll-view scroll-y class="content glx-scroll-region glx-page-shell__content">
       <view class="hero-actions">
         <view class="hero-action-btn" @click="shareAchievements">
-          <Icon name="share" :size="28" color="#0F172A" />
+          <Icon name="share" :size="28" color="var(--nb-ink)" />
           <text class="hero-action-text">分享成就</text>
         </view>
       </view>
@@ -65,7 +65,7 @@
             :class="rarity.key"
           >
             <view class="rarity-icon-shell">
-              <Icon name="trophy" :size="50" color="#FFFFFF" />
+              <Icon name="trophy" :size="50" color="currentColor" />
             </view>
             <text class="rarity-name">{{ rarity.label }}</text>
             <text class="rarity-percent">{{ rarity.percent }}</text>
@@ -118,14 +118,14 @@
                 <Icon
                   :name="achievement.icon"
                   :size="64"
-                  :color="achievement.unlocked ? '#FFFFFF' : '#94A3B8'"
+                  :color="achievement.unlocked ? 'currentColor' : 'var(--text-tertiary)'"
                 />
                 <view
                   v-if="achievement.unlocked && achievement.rarity !== 'common'"
                   class="rarity-glow"
                 ></view>
                 <view v-if="!achievement.unlocked" class="locked-overlay">
-                  <Icon name="lock" :size="34" color="#94A3B8" />
+                  <Icon name="lock" :size="34" color="var(--text-tertiary)" />
                 </view>
               </view>
               <view class="rarity-badge" :class="achievement.rarity">
@@ -187,11 +187,11 @@
     >
       <view class="achievement-modal" @click.stop>
         <view class="modal-close" @click="selectedAchievement = null">
-          <Icon name="close" :size="32" color="#0F172A" />
+          <Icon name="close" :size="32" color="var(--nb-ink)" />
         </view>
 
         <view class="modal-icon" :class="selectedAchievement.rarity">
-          <Icon :name="selectedAchievement.icon" :size="88" color="#FFFFFF" />
+          <Icon :name="selectedAchievement.icon" :size="88" color="currentColor" />
           <view v-if="selectedAchievement.rarity !== 'common'" class="modal-glow"></view>
           <view class="modal-rarity-chip" :class="selectedAchievement.rarity">
             <text class="rarity-text">{{
@@ -248,8 +248,8 @@
             <text class="modal-action-text">关闭</text>
           </view>
           <view class="modal-action-button primary" @click="shareSelectedAchievement">
-            <Icon name="share" :size="28" color="#FFFFFF" />
-            <text class="modal-action-text white">分享成就</text>
+            <Icon name="share" :size="28" color="currentColor" />
+            <text class="modal-action-text">分享成就</text>
           </view>
         </view>
       </view>
@@ -577,9 +577,7 @@ export default {
 <style scoped>
 .achievements-page {
   height: 100vh;
-  background:
-    radial-gradient(circle at top right, rgba(167, 139, 250, 0.12), transparent 34%),
-    linear-gradient(180deg, #f8f9fd 0%, #eef3fb 100%);
+  background: var(--nb-paper);
   display: flex;
   flex-direction: column;
 }
@@ -681,15 +679,15 @@ export default {
 
 .hero-subtitle {
   font-size: 24rpx;
-  color: #64748b;
+  color: var(--text-tertiary);
 }
 
 .hero-stats-card {
   padding: 28rpx;
-  border-radius: 32rpx;
-  background: linear-gradient(145deg, #ffffff 0%, #f7faff 100%);
-  border: 2rpx solid rgba(148, 163, 184, 0.14);
-  box-shadow: 0 16rpx 44rpx rgba(15, 23, 42, 0.05);
+  border-radius: 0;
+  background: var(--tone-paper-soft);
+  border: 2rpx solid var(--nb-ink);
+  box-shadow: var(--nb-shadow-strong);
   display: flex;
   align-items: center;
   flex-wrap: wrap;
@@ -707,18 +705,18 @@ export default {
 .hero-stat-number {
   font-size: 38rpx;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--nb-ink);
 }
 
 .hero-stat-label {
   font-size: 24rpx;
-  color: #64748b;
+  color: var(--text-tertiary);
 }
 
 .hero-stat-divider {
   width: 2rpx;
   height: 60rpx;
-  background: rgba(148, 163, 184, 0.18);
+  background: rgba(0, 0, 0, 0.12);
   margin: 0 32rpx;
 }
 
@@ -734,7 +732,7 @@ export default {
 .hero-progress-fill {
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, #4f7fff 0%, #8b5cf6 100%);
+  background: var(--nb-blue);
 }
 
 .section-block {
@@ -752,12 +750,12 @@ export default {
 .section-title {
   font-size: 30rpx;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--nb-ink);
 }
 
 .section-meta {
   font-size: 22rpx;
-  color: #64748b;
+  color: var(--text-tertiary);
 }
 
 .rarity-grid,
@@ -768,23 +766,26 @@ export default {
 }
 
 .rarity-card {
-  border-radius: 28rpx;
+  border-radius: 0;
   padding: 24rpx 16rpx;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 12rpx;
-  border: 2rpx solid transparent;
+  border: 2rpx solid var(--nb-ink);
+  box-shadow: var(--nb-shadow-soft);
 }
 
 .rarity-icon-shell {
   width: 96rpx;
   height: 96rpx;
-  border-radius: 26rpx;
+  border-radius: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 14rpx 30rpx rgba(15, 23, 42, 0.12);
+  border: 2rpx solid var(--nb-ink);
+  box-shadow: var(--nb-shadow-soft);
+  color: var(--nb-ink);
 }
 
 .rarity-name {
@@ -794,43 +795,39 @@ export default {
 
 .rarity-percent {
   font-size: 22rpx;
-  color: #64748b;
+  color: var(--text-tertiary);
 }
 
 .rarity-card.common {
-  background: linear-gradient(180deg, rgba(156, 163, 175, 0.12), rgba(156, 163, 175, 0.04));
-  border-color: rgba(156, 163, 175, 0.18);
+  background: #f2f2f0;
 }
 
 .rarity-card.common .rarity-icon-shell {
-  background: linear-gradient(135deg, #9ca3af 0%, #6b7280 100%);
+  background: #a8afb8;
 }
 
 .rarity-card.rare {
-  background: linear-gradient(180deg, rgba(96, 165, 250, 0.12), rgba(96, 165, 250, 0.04));
-  border-color: rgba(96, 165, 250, 0.18);
+  background: var(--tone-blue-soft);
 }
 
 .rarity-card.rare .rarity-icon-shell {
-  background: linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%);
+  background: var(--nb-blue);
 }
 
 .rarity-card.epic {
-  background: linear-gradient(180deg, rgba(167, 139, 250, 0.12), rgba(167, 139, 250, 0.04));
-  border-color: rgba(167, 139, 250, 0.18);
+  background: #eee7ff;
 }
 
 .rarity-card.epic .rarity-icon-shell {
-  background: linear-gradient(135deg, #a78bfa 0%, #8b5cf6 100%);
+  background: #9b72ff;
 }
 
 .rarity-card.legendary {
-  background: linear-gradient(180deg, rgba(251, 191, 36, 0.12), rgba(251, 191, 36, 0.04));
-  border-color: rgba(251, 191, 36, 0.18);
+  background: var(--tone-yellow-soft);
 }
 
 .rarity-card.legendary .rarity-icon-shell {
-  background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+  background: var(--nb-yellow);
 }
 
 .category-tabs {
@@ -841,41 +838,42 @@ export default {
 
 .category-tab {
   padding: 16rpx 22rpx;
-  border-radius: 999rpx;
-  border: 2rpx solid rgba(148, 163, 184, 0.18);
-  background: rgba(255, 255, 255, 0.86);
+  border-radius: 0;
+  border: 2rpx solid var(--nb-ink);
+  background: var(--tone-paper-soft);
+  box-shadow: var(--nb-shadow-soft);
   display: flex;
   align-items: center;
   gap: 10rpx;
 }
 
 .category-tab.active {
-  box-shadow: 0 10rpx 24rpx rgba(15, 23, 42, 0.08);
+  box-shadow: var(--nb-shadow-soft);
 }
 
 .category-tab.all.active {
-  color: #6b7280;
-  border-color: rgba(107, 114, 128, 0.24);
+  color: var(--nb-ink);
+  background: #f2f2f0;
 }
 
 .category-tab.create.active {
-  color: #4f7fff;
-  border-color: rgba(79, 127, 255, 0.26);
+  color: var(--nb-ink);
+  background: var(--tone-blue-soft);
 }
 
 .category-tab.social.active {
-  color: #00d9d9;
-  border-color: rgba(0, 217, 217, 0.26);
+  color: var(--nb-ink);
+  background: #eafaf7;
 }
 
 .category-tab.skill.active {
-  color: #8b5cf6;
-  border-color: rgba(139, 92, 246, 0.26);
+  color: var(--nb-ink);
+  background: #eee7ff;
 }
 
 .category-tab.special.active {
-  color: #f59e0b;
-  border-color: rgba(245, 158, 11, 0.26);
+  color: var(--nb-ink);
+  background: var(--tone-yellow-soft);
 }
 
 .category-text,
@@ -887,25 +885,22 @@ export default {
 .achievement-card {
   position: relative;
   padding: 24rpx;
-  border-radius: 32rpx;
-  border: 2rpx solid rgba(156, 163, 175, 0.18);
-  background: linear-gradient(180deg, rgba(156, 163, 175, 0.12), rgba(255, 255, 255, 0.92));
-  box-shadow: 0 16rpx 40rpx rgba(15, 23, 42, 0.05);
+  border-radius: 0;
+  border: 2rpx solid var(--nb-ink);
+  background: #f2f2f0;
+  box-shadow: var(--nb-shadow-soft);
 }
 
 .achievement-card.rare {
-  border-color: rgba(79, 127, 255, 0.18);
-  background: linear-gradient(180deg, rgba(79, 127, 255, 0.12), rgba(255, 255, 255, 0.92));
+  background: var(--tone-blue-soft);
 }
 
 .achievement-card.epic {
-  border-color: rgba(139, 92, 246, 0.18);
-  background: linear-gradient(180deg, rgba(139, 92, 246, 0.12), rgba(255, 255, 255, 0.92));
+  background: #eee7ff;
 }
 
 .achievement-card.legendary {
-  border-color: rgba(245, 158, 11, 0.18);
-  background: linear-gradient(180deg, rgba(245, 158, 11, 0.12), rgba(255, 255, 255, 0.92));
+  background: var(--tone-yellow-soft);
 }
 
 .achievement-card:not(.unlocked) {
@@ -923,32 +918,34 @@ export default {
 .achievement-icon-shell {
   width: 112rpx;
   height: 112rpx;
-  border-radius: 30rpx;
-  background: linear-gradient(135deg, #9ca3af 0%, #6b7280 100%);
+  border-radius: 0;
+  background: #a8afb8;
   display: flex;
   align-items: center;
   justify-content: center;
   position: relative;
-  box-shadow: 0 16rpx 30rpx rgba(15, 23, 42, 0.14);
+  border: 2rpx solid var(--nb-ink);
+  box-shadow: var(--nb-shadow-soft);
+  color: var(--nb-ink);
 }
 
 .achievement-card.rare .achievement-icon-shell {
-  background: linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%);
+  background: var(--nb-blue);
 }
 
 .achievement-card.epic .achievement-icon-shell {
-  background: linear-gradient(135deg, #a78bfa 0%, #8b5cf6 100%);
+  background: #9b72ff;
 }
 
 .achievement-card.legendary .achievement-icon-shell {
-  background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+  background: var(--nb-yellow);
 }
 
 .rarity-glow {
   position: absolute;
   inset: -6rpx;
   border-radius: inherit;
-  background: rgba(255, 255, 255, 0.24);
+  background: rgba(255, 255, 255, 0.16);
 }
 
 .locked-overlay {
@@ -1022,7 +1019,7 @@ export default {
 .progress-fill-modal {
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, #4f7fff 0%, #8b5cf6 100%);
+  background: var(--nb-blue);
 }
 
 .rarity-badge,
@@ -1102,25 +1099,27 @@ export default {
   width: 160rpx;
   height: 160rpx;
   margin: 0 auto 28rpx;
-  border-radius: 42rpx;
-  background: linear-gradient(135deg, #9ca3af 0%, #6b7280 100%);
+  border-radius: 0;
+  background: #a8afb8;
   display: flex;
   align-items: center;
   justify-content: center;
   position: relative;
-  box-shadow: 0 24rpx 48rpx rgba(15, 23, 42, 0.18);
+  border: 2rpx solid var(--nb-ink);
+  box-shadow: var(--nb-shadow-strong);
+  color: var(--nb-ink);
 }
 
 .modal-icon.rare {
-  background: linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%);
+  background: var(--nb-blue);
 }
 
 .modal-icon.epic {
-  background: linear-gradient(135deg, #a78bfa 0%, #8b5cf6 100%);
+  background: #9b72ff;
 }
 
 .modal-icon.legendary {
-  background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+  background: var(--nb-yellow);
 }
 
 .modal-glow {
@@ -1189,6 +1188,7 @@ export default {
   align-items: center;
   justify-content: center;
   gap: 10rpx;
+  color: var(--nb-ink);
 }
 
 .modal-action-button.ghost {
@@ -1202,10 +1202,6 @@ export default {
 .modal-action-text {
   font-size: 26rpx;
   font-weight: 700;
-  color: #0f172a;
-}
-
-.modal-action-text.white {
-  color: #000000;
+  color: currentColor;
 }
 </style>

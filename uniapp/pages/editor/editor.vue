@@ -913,7 +913,6 @@ export default {
 }
 
 .row-btn:active {
-  transform: translate(2rpx, 2rpx);
   background-color: var(--nb-yellow);
   color: #000000;
 }
@@ -942,9 +941,6 @@ export default {
   transition: var(--transition-base);
 }
 
-.tool-btn:active {
-  transform: scale(0.98);
-}
 
 .tool-btn.active {
   border-color: #000000;

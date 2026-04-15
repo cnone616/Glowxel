@@ -1,20 +1,20 @@
 <template>
-  <view class="logo-container" :style="{ gap: showText ? '24rpx' : '0' }">
-    <!-- Logo 图标 -->
+  <view class="logo-container" :style="{ gap: logoGap }">
     <image
-      src="/static/RenLight-logo.png"
+      src="/static/glowxel-icon.png"
       class="logo-image"
       :style="{ width: size + 'rpx', height: size + 'rpx' }"
       mode="aspectFit"
     />
 
-    <!-- RenLight 渐变文字 -->
-    <text
-      v-if="showText"
-      class="logo-text"
-      :style="{ fontSize: textSize + 'rpx' }"
-      >RenLight</text
-    >
+    <view v-if="showText" class="logo-copy">
+      <text class="logo-title" :style="{ fontSize: titleSize + 'rpx' }">
+        光格像素工坊
+      </text>
+      <text class="logo-tag" :style="{ fontSize: tagSize + 'rpx' }">
+        PIXEL STUDIO
+      </text>
+    </view>
   </view>
 </template>
 
@@ -32,8 +32,14 @@ export default {
   },
 
   computed: {
-    textSize() {
-      return this.size * 0.7;
+    logoGap() {
+      return this.showText ? `${Math.round(this.size * 0.22)}rpx` : "0";
+    },
+    titleSize() {
+      return Math.round(this.size * 0.42);
+    },
+    tagSize() {
+      return Math.max(18, Math.round(this.size * 0.18));
     },
   },
 };
@@ -43,26 +49,36 @@ export default {
 .logo-container {
   display: flex;
   align-items: center;
+  padding-bottom: 24rpx;
 }
 
 .logo-image {
   flex-shrink: 0;
 }
 
-.logo-text {
-  background: linear-gradient(
-    to right,
-    rgb(249, 115, 22),
-    rgb(239, 68, 68),
-    rgb(251, 191, 36),
-    rgb(59, 130, 246)
-  );
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  font-family: monospace;
-  font-weight: bold;
-  letter-spacing: 0.1em;
+.logo-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 10rpx;
+}
+
+.logo-title {
+  color: #111111;
+  font-weight: 900;
+  letter-spacing: 2rpx;
   line-height: 1;
+}
+
+.logo-tag {
+  align-self: flex-start;
+  padding: 6rpx 14rpx 4rpx;
+  color: #111111;
+  font-weight: 900;
+  letter-spacing: 3rpx;
+  line-height: 1;
+  border: 4rpx solid #111111;
+  background: #ffd23f;
+  /* box-shadow: 6rpx 6rpx 0 #111111; */
   user-select: none;
 }
 </style>

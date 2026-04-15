@@ -65,29 +65,16 @@ export default {
 </script>
 
 <style scoped>
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(0, 0, 0, 0.45);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 9999;
-  padding: 64rpx;
-}
-
 .modal-content {
   width: 100%;
-  max-width: 560rpx;
+  max-width: 620rpx;
   background-color: var(--nb-surface);
   border-radius: 0;
   border: var(--nb-border-width-panel) solid var(--nb-ink);
   box-shadow: var(--nb-shadow-strong);
   overflow: hidden;
-  animation: scaleIn 0.2s ease-out;
+  animation: scaleIn 0.18s ease-out;
+  box-sizing: border-box;
 }
 
 @keyframes scaleIn {
@@ -102,7 +89,7 @@ export default {
 }
 
 .modal-header {
-  padding: 32rpx 32rpx 24rpx;
+  padding: 24rpx 24rpx 20rpx;
   border-bottom: var(--nb-border-width-panel) solid var(--nb-ink);
 }
 
@@ -115,11 +102,11 @@ export default {
 }
 
 .modal-body {
-  padding: 32rpx;
+  padding: 24rpx;
 }
 
 .modal-text {
-  font-size: 28rpx;
+  font-size: 26rpx;
   color: #4a4a4a;
   line-height: 1.6;
   text-align: center;
@@ -128,30 +115,27 @@ export default {
 
 .modal-footer {
   display: flex;
+  gap: 12rpx;
+  padding: 18rpx 24rpx 24rpx;
   border-top: var(--nb-border-width-panel) solid var(--nb-ink);
 }
 
 .modal-btn {
   flex: 1;
-  min-height: 88rpx;
+  min-height: 84rpx;
   padding: 0 24rpx;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: var(--transition-base);
   background: var(--nb-surface);
   box-sizing: border-box;
   border: var(--nb-border-width-control) solid var(--nb-ink);
   box-shadow: var(--nb-shadow-soft);
 }
 
-.modal-btn:active {
-  transform: translate(2rpx, 2rpx);
-  box-shadow: none;
-}
 
 .cancel-btn {
-  border-right: var(--nb-border-width-control) solid var(--nb-ink);
+  background: #ffffff;
 }
 
 .btn-text {
@@ -164,7 +148,7 @@ export default {
 }
 
 .confirm-btn {
-  background: var(--nb-yellow);
+  background: #f2cf4a;
 }
 
 .confirm-btn .btn-text {

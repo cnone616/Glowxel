@@ -5,6 +5,59 @@
 Preferences ConfigManager::preferences;
 
 namespace {
+GameScreensaverConfig makeDefaultGameScreensaverConfig() {
+  GameScreensaverConfig config = {};
+  config.game = GAME_SCREENSAVER_MAZE;
+  config.speed = 6;
+  config.snakeWidth = 1;
+  config.mazeSizeMode = GAME_SCREENSAVER_MAZE_WIDE;
+  config.cellSize = 2;
+  config.showClock = true;
+  return config;
+}
+
+DeviceParamsConfig makeDefaultDeviceParamsConfig() {
+  DeviceParamsConfig config = {};
+  config.swapBlueGreen = false;
+  config.swapBlueRed = false;
+  config.clkphase = false;
+  config.displayBright = 50;
+  config.brightnessDay = 50;
+  config.brightnessNight = 50;
+  config.displayRotation = 0;
+  config.driver = 0;
+  config.i2cSpeed = 8000000;
+  config.E_pin = 18;
+  memcpy(config.nightStart, "22:00", sizeof("22:00"));
+  memcpy(config.nightEnd, "07:00", sizeof("07:00"));
+  memcpy(config.ntpServer, "ntp2.aliyun.com", sizeof("ntp2.aliyun.com"));
+  return config;
+}
+
+void readDeviceParamsConfigFromPreferences(DeviceParamsConfig& targetConfig) {
+  ConfigManager::preferences.begin("device", true);
+
+  size_t configSize = ConfigManager::preferences.getBytesLength("config");
+  if (configSize > 0) {
+    DeviceParamsConfig loadedConfig = makeDefaultDeviceParamsConfig();
+    size_t bytesToRead = configSize;
+    if (bytesToRead > sizeof(DeviceParamsConfig)) {
+      bytesToRead = sizeof(DeviceParamsConfig);
+    }
+    ConfigManager::preferences.getBytes("config", &loadedConfig, bytesToRead);
+    loadedConfig.nightStart[sizeof(loadedConfig.nightStart) - 1] = '\0';
+    loadedConfig.nightEnd[sizeof(loadedConfig.nightEnd) - 1] = '\0';
+    loadedConfig.ntpServer[sizeof(loadedConfig.ntpServer) - 1] = '\0';
+    targetConfig = loadedConfig;
+    Serial.printf("device params config loaded (%u bytes)\n", (unsigned int)bytesToRead);
+  } else {
+    targetConfig = makeDefaultDeviceParamsConfig();
+    Serial.println("device params config: using default");
+  }
+
+  ConfigManager::preferences.end();
+}
+
 bool migrateLegacyDefaultClockLayout(ClockConfig& config) {
   if (config.font != CLOCK_FONT_CLASSIC_5X7) {
     return false;
@@ -72,7 +125,6 @@ EyesConfig makeDefaultEyesConfig() {
   defaultEyesConfig.time.font = CLOCK_FONT_CLASSIC_5X7;
   defaultEyesConfig.time.fontSize = 1;
   memcpy(defaultEyesConfig.style.eyeColor, "#9bdcff", sizeof(defaultEyesConfig.style.eyeColor));
-  memcpy(defaultEyesConfig.style.pupilColor, "#1b6dff", sizeof(defaultEyesConfig.style.pupilColor));
   memcpy(defaultEyesConfig.style.timeColor, "#64c8ff", sizeof(defaultEyesConfig.style.timeColor));
   return defaultEyesConfig;
 }
@@ -151,7 +203,7 @@ bool sanitizeEyesConfig(EyesConfig& config) {
     changed = true;
   }
 
-  if (config.time.font > CLOCK_FONT_CLASSIC_5X7) {
+  if (config.time.font > CLOCK_FONT_RETRO_5X7) {
     config.time.font = defaults.time.font;
     changed = true;
   }
@@ -162,10 +214,6 @@ bool sanitizeEyesConfig(EyesConfig& config) {
 
   if (!isValidHexColorString(config.style.eyeColor)) {
     memcpy(config.style.eyeColor, defaults.style.eyeColor, sizeof(config.style.eyeColor));
-    changed = true;
-  }
-  if (!isValidHexColorString(config.style.pupilColor)) {
-    memcpy(config.style.pupilColor, defaults.style.pupilColor, sizeof(config.style.pupilColor));
     changed = true;
   }
   if (!isValidHexColorString(config.style.timeColor)) {
@@ -200,9 +248,11 @@ EyesConfig ConfigManager::eyesConfig = {
   .behavior = {true, 3200, 4200, 2, 45000},
   .interaction = {1200, 1800},
   .time = {true, false, CLOCK_FONT_MINIMAL_3X5, 1},
-  .style = {"#9bdcff", "#1b6dff", "#d8f3ff"}
+  .style = {"#9bdcff", "#d8f3ff"}
 };
 ThemeConfig ConfigManager::themeConfig = {};
+GameScreensaverConfig ConfigManager::gameScreensaverConfig = makeDefaultGameScreensaverConfig();
+DeviceParamsConfig ConfigManager::deviceParamsConfig = makeDefaultDeviceParamsConfig();
 PixelData* ConfigManager::staticImagePixels = nullptr;
 int ConfigManager::staticImagePixelCount = 0;
 PixelData* ConfigManager::animImagePixels = nullptr;
@@ -226,6 +276,7 @@ void ConfigManager::init() {
     preferences.putInt("cfgVer", CONFIG_VERSION);
     preferences.end();
   } else {
+    loadDeviceParamsConfig();
     loadClockConfig();
     loadAnimClockConfig();
     loadStaticImagePixels();
@@ -233,9 +284,39 @@ void ConfigManager::init() {
     loadEyesConfig();
     loadAmbientEffectConfig();
     loadThemeConfig();
+    loadGameScreensaverConfig();
     loadPacmanRoute();
     loadCanvasPixels();
   }
+}
+
+void ConfigManager::preloadDeviceParamsConfig() {
+  preferences.begin("clock", true);
+  int savedVersion = preferences.getInt("cfgVer", 0);
+  preferences.end();
+
+  if (savedVersion != CONFIG_VERSION) {
+    deviceParamsConfig = makeDefaultDeviceParamsConfig();
+    DisplayManager::currentBrightness = deviceParamsConfig.displayBright;
+    Serial.println("device params preload: using default because config version changed");
+    return;
+  }
+
+  readDeviceParamsConfigFromPreferences(deviceParamsConfig);
+  DisplayManager::currentBrightness = deviceParamsConfig.displayBright;
+}
+
+void ConfigManager::loadDeviceParamsConfig() {
+  readDeviceParamsConfigFromPreferences(deviceParamsConfig);
+  DisplayManager::currentBrightness = deviceParamsConfig.displayBright;
+  DisplayManager::applyDeviceParams(false);
+}
+
+void ConfigManager::saveDeviceParamsConfig() {
+  preferences.begin("device", false);
+  preferences.putBytes("config", &deviceParamsConfig, sizeof(DeviceParamsConfig));
+  preferences.end();
+  Serial.println("device params config saved");
 }
 
 void ConfigManager::loadClockConfig() {
@@ -505,7 +586,7 @@ void ConfigManager::loadAmbientEffectConfig() {
     preferences.getBytes("config", &DisplayManager::ambientEffectConfig, sizeof(AmbientEffectConfig));
     Serial.println("ambient effect config loaded");
   } else {
-    DisplayManager::ambientEffectConfig = {AMBIENT_PRESET_AURORA, 6, 72, true};
+    DisplayManager::ambientEffectConfig = {AMBIENT_PRESET_AURORA, 6, 72, 72, 100, 200, 255, true};
     Serial.println("ambient effect config: using default");
   }
 
@@ -538,6 +619,26 @@ void ConfigManager::saveThemeConfig() {
   preferences.putBytes("config", &themeConfig, sizeof(ThemeConfig));
   preferences.end();
   Serial.printf("theme config saved: %s\n", themeConfig.themeId);
+}
+
+void ConfigManager::loadGameScreensaverConfig() {
+  preferences.begin("game_ss", true);
+  size_t configSize = preferences.getBytesLength("config");
+  if (configSize == sizeof(GameScreensaverConfig)) {
+    preferences.getBytes("config", &gameScreensaverConfig, sizeof(GameScreensaverConfig));
+    Serial.println("game screensaver config loaded");
+  } else {
+    gameScreensaverConfig = makeDefaultGameScreensaverConfig();
+    Serial.println("game screensaver config: using default");
+  }
+  preferences.end();
+}
+
+void ConfigManager::saveGameScreensaverConfig() {
+  preferences.begin("game_ss", false);
+  preferences.putBytes("config", &gameScreensaverConfig, sizeof(GameScreensaverConfig));
+  preferences.end();
+  Serial.println("game screensaver config saved");
 }
 
 void ConfigManager::loadPacmanRoute() {
@@ -679,6 +780,10 @@ void ConfigManager::resetToDefault() {
   preferences.begin("theme", false);
   preferences.clear();
   preferences.end();
+
+  preferences.begin("device", false);
+  preferences.clear();
+  preferences.end();
   if (pacmanRouteData != nullptr) {
     free(pacmanRouteData);
     pacmanRouteData = nullptr;
@@ -718,8 +823,10 @@ void ConfigManager::resetToDefault() {
   };
 
   eyesConfig = makeDefaultEyesConfig();
-  DisplayManager::ambientEffectConfig = {AMBIENT_PRESET_AURORA, 6, 72, true};
+  DisplayManager::ambientEffectConfig = {AMBIENT_PRESET_AURORA, 6, 72, 72, 100, 200, 255, true};
   themeConfig.themeId[0] = '\0';
+  deviceParamsConfig = makeDefaultDeviceParamsConfig();
+  DisplayManager::currentBrightness = deviceParamsConfig.displayBright;
 
   Serial.println("配置已恢复默认");
 }

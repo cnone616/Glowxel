@@ -28,7 +28,7 @@
             @click="previewImage"
           />
           <view class="zoom-hint">
-            <Icon name="zoom-in" :size="32" color="#FFFFFF" />
+            <Icon name="zoom-in" :size="32" color="currentColor" />
             <text class="zoom-text">点击查看大图</text>
           </view>
         </view>
@@ -40,17 +40,17 @@
           <text class="artwork-title">{{ artwork.title }}</text>
           <view class="artwork-meta">
             <view class="meta-item">
-              <Icon name="modular" :size="28" color="#666666" />
+              <Icon name="modular" :size="28" color="currentColor" />
               <text class="meta-text"
                 >{{ artwork.width }}×{{ artwork.height }}</text
               >
             </view>
             <view class="meta-item">
-              <Icon name="picture" :size="28" color="#666666" />
+              <Icon name="picture" :size="28" color="currentColor" />
               <text class="meta-text">{{ artwork.color_count }}色</text>
             </view>
             <view class="meta-item">
-              <Icon name="calendar" :size="28" color="#666666" />
+              <Icon name="calendar" :size="28" color="currentColor" />
               <text class="meta-text">{{ formatDate(artwork.created_at) }}</text>
             </view>
           </view>
@@ -150,7 +150,7 @@
 
         <!-- 空状态 -->
         <view v-else class="empty-comments">
-          <Icon name="comment" :size="80" color="#CCCCCC" />
+          <Icon name="comment" :size="80" color="var(--text-tertiary)" />
           <text class="empty-text">还没有评论，快来抢沙发吧！</text>
         </view>
       </view>
@@ -185,11 +185,11 @@
           @blur="handleCommentBlur"
         />
         <view
-          class="send-btn"
-          :class="{ active: commentText.trim() }"
+          class="send-comment-btn glx-primary-action"
+          :class="{ active: commentText.trim(), disabled: !commentText.trim() }"
           @click="sendComment"
         >
-          <text class="send-text">发送</text>
+          <text class="send-comment-text">发送</text>
         </view>
       </view>
     </view>
@@ -210,16 +210,16 @@
     <!-- 更多操作弹窗 -->
     <Modal v-model:visible="showMoreModal" title="更多操作">
       <view class="more-actions">
-        <view class="action-item" @click="downloadArtwork">
-          <Icon name="download" :size="40" color="#4F7FFF" />
+        <view class="action-item primary" @click="downloadArtwork">
+          <Icon name="download" :size="40" color="currentColor" />
           <text class="action-label">下载作品</text>
         </view>
-        <view class="action-item" @click="useAsTemplate">
-          <Icon name="copy" :size="40" color="#4F7FFF" />
+        <view class="action-item primary" @click="useAsTemplate">
+          <Icon name="copy" :size="40" color="currentColor" />
           <text class="action-label">用作模板</text>
         </view>
-        <view class="action-item" @click="reportArtwork">
-          <Icon name="warning" :size="40" color="#FF4757" />
+        <view class="action-item danger" @click="reportArtwork">
+          <Icon name="warning" :size="40" color="currentColor" />
           <text class="action-label">举报作品</text>
         </view>
       </view>
@@ -756,11 +756,6 @@ export default {
   transition: all 0.2s ease;
 }
 
-.back-btn:active {
-  transform: scale(0.95);
-  background-color: var(--nb-paper);
-}
-
 .header-title {
   flex: 1;
   text-align: center;
@@ -804,6 +799,7 @@ export default {
   padding: 12rpx 16rpx;
   border-radius: 0;
   border: 2rpx solid #000000;
+  color: #ffffff;
 }
 
 .zoom-text {
@@ -844,11 +840,12 @@ export default {
   display: flex;
   align-items: center;
   gap: 8rpx;
+  color: var(--text-secondary);
 }
 
 .meta-text {
   font-size: 26rpx;
-  color: #4a4a4a;
+  color: currentColor;
 }
 
 .tags-container {
@@ -917,9 +914,6 @@ export default {
   border: 2rpx solid var(--nb-ink);
 }
 
-.follow-btn:active {
-  transform: scale(0.95);
-}
 
 .follow-text {
   font-size: 28rpx;
@@ -963,7 +957,6 @@ export default {
 }
 
 .action-btn:active {
-  transform: scale(0.95);
   background-color: var(--nb-paper);
 }
 
@@ -1055,24 +1048,18 @@ export default {
   gap: 16rpx;
 }
 
-.send-btn {
-  padding: 12rpx 24rpx;
-  background-color: #777777;
-  border-radius: 0;
-  border: 2rpx solid var(--nb-ink);
-  transition: all 0.2s ease;
+.send-comment-btn {
+  min-height: 72rpx;
+  padding: 0 26rpx;
   flex-shrink: 0;
+  transition: background-color 0.2s ease;
 }
 
-.send-btn.active {
-  background-color: var(--nb-yellow);
+.send-comment-btn.disabled {
+  background-color: var(--nb-surface);
 }
 
-.send-btn:active {
-  transform: scale(0.95);
-}
-
-.send-text {
+.send-comment-text {
   font-size: 26rpx;
   color: var(--nb-ink);
   font-weight: 700;
@@ -1144,14 +1131,23 @@ export default {
   gap: 24rpx;
   padding: 24rpx 32rpx;
   transition: all 0.2s ease;
+  color: var(--nb-ink);
 }
 
 .action-item:active {
   background-color: var(--nb-paper);
 }
 
+.action-item.primary {
+  color: var(--nb-blue);
+}
+
+.action-item.danger {
+  color: var(--nb-coral);
+}
+
 .action-label {
   font-size: 32rpx;
-  color: var(--nb-ink);
+  color: currentColor;
 }
 </style>

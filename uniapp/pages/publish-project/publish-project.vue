@@ -177,10 +177,9 @@
                   >其他用户可以在社区中看到您的作品</text
                 >
               </view>
-              <switch
+              <GlxSwitch
                 :checked="form.isPublic"
                 @change="handlePublicChange"
-                color="var(--nb-yellow)"
               />
             </view>
           </view>
@@ -234,6 +233,7 @@ import { useToast } from "../../composables/useToast.js";
 import statusBarMixin from "../../mixins/statusBar.js";
 import Icon from "../../components/Icon.vue";
 import Toast from "../../components/Toast.vue";
+import GlxSwitch from "../../components/GlxSwitch.vue";
 
 import { PERLER_BOARD_SIZE } from "../../constants/perler.js";
 
@@ -242,6 +242,7 @@ export default {
   components: {
     Icon,
     Toast,
+    GlxSwitch,
   },
 
   data() {
@@ -849,12 +850,6 @@ export default {
   gap: 16rpx;
 }
 
-.form-label {
-  display: flex;
-  align-items: center;
-  gap: 8rpx;
-}
-
 .label-text {
   font-size: 28rpx;
   font-weight: 600;
@@ -1078,7 +1073,6 @@ export default {
 }
 
 .publish-btn:active {
-  transform: translate(2rpx, 2rpx);
   box-shadow: none;
 }
 
@@ -1086,10 +1080,6 @@ export default {
   background: #777777;
   box-shadow: none;
   opacity: 0.6;
-}
-
-.publish-btn.disabled:active {
-  transform: none;
 }
 
 .loading-spinner {

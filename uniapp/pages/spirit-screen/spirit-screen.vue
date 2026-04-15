@@ -48,7 +48,7 @@
             :class="{ disabled: isSending }"
             @click="saveAndApply"
           >
-            <Icon name="link" :size="36" color="#000000" />
+            <Icon name="link" :size="36" color="var(--nb-ink)" />
             <text>{{ isSending ? "发送中" : "发送" }}</text>
           </view>
         </view>
@@ -58,7 +58,7 @@
     <scroll-view scroll-y class="content glx-scroll-region glx-page-shell__content" :style="{ height: contentHeight }">
       <view class="content-wrapper glx-scroll-stack">
         <view v-show="currentTab === 0" class="tab-panel glx-tab-panel">
-          <view class="card glx-panel-card">
+          <view class="card glx-panel-card glx-editor-card spirit-section-card">
             <view class="card-title-section glx-panel-head">
               <text class="card-title glx-panel-title">表情模式</text>
               <text class="card-subtitle glx-panel-subtitle">{{ expressionModeLabel }}</text>
@@ -71,27 +71,27 @@
                 :class="{ active: expressionModeValue === item.value }"
                 @click="handleExpressionModeChange(item.value)"
               >
-                <text>{{ item.label }}</text>
+                <text class="glx-feature-option__label">{{ item.label }}</text>
               </view>
             </view>
           </view>
 
-          <view v-show="expressionModeValue === 'manual'" class="card glx-panel-card">
+          <view v-show="expressionModeValue === 'manual'" class="card glx-panel-card glx-editor-card spirit-section-card">
             <text class="card-title glx-panel-title">指定表情</text>
             <view class="expression-grid">
               <view
                 v-for="item in expressionOptions"
                 :key="item.value"
-                class="expression-item"
+                class="expression-item glx-feature-option"
                 :class="{ active: selectedEyesExpression === item.value }"
                 @click="handleExpressionSelect(item.value)"
               >
-                <text class="expression-cn">{{ item.label }}</text>
+                <text class="expression-cn glx-feature-option__label">{{ item.label }}</text>
               </view>
             </view>
           </view>
 
-          <view class="card glx-panel-card">
+          <view class="card glx-panel-card glx-editor-card spirit-section-card">
             <view class="card-title-section glx-panel-head">
               <text class="card-title glx-panel-title">眼睛颜色</text>
             </view>
@@ -103,19 +103,7 @@
             />
           </view>
 
-          <view class="card glx-panel-card">
-            <view class="card-title-section glx-panel-head">
-              <text class="card-title glx-panel-title">瞳孔颜色</text>
-            </view>
-            <ColorPanelPicker
-              :value="eyesConfig.style.pupilColor"
-              label="瞳孔颜色"
-              :preset-colors="pupilColorOptions"
-              @input="handlePupilColorChange"
-            />
-          </view>
-
-          <view class="card glx-panel-card">
+          <view class="card glx-panel-card glx-editor-card spirit-section-card">
             <view class="card-title-section glx-panel-head">
               <text class="card-title glx-panel-title">参数调整</text>
             </view>
@@ -124,7 +112,7 @@
               <text class="form-label">
                 眨眼步频 {{ blinkRhythmLevel }}
               </text>
-              <GlxSlider
+              <GlxStepper
                 :value="blinkRhythmLevel"
                 :min="1"
                 :max="10"
@@ -137,7 +125,7 @@
               <text class="form-label">
                 游走步频 {{ lookRhythmLevel }}
               </text>
-              <GlxSlider
+              <GlxStepper
                 :value="lookRhythmLevel"
                 :min="1"
                 :max="10"
@@ -150,7 +138,7 @@
               <text class="form-label">
                 灵动幅度 {{ motionAmplitudeLevel }}
               </text>
-              <GlxSlider
+              <GlxStepper
                 :value="motionAmplitudeLevel"
                 :min="1"
                 :max="10"
@@ -160,7 +148,7 @@
             </view>
           </view>
 
-          <view class="card glx-panel-card">
+          <view class="card glx-panel-card glx-editor-card spirit-section-card">
             <view class="card-title-section glx-panel-head">
               <text class="card-title glx-panel-title">互动预览</text>
             </view>
@@ -215,7 +203,7 @@
       <view
         v-for="(tab, index) in tabs"
         :key="tab"
-        class="bottom-tab-item"
+        class="glx-bottom-tab-item"
         :class="{ active: currentTab === index }"
         @click="currentTab = index"
       >
@@ -224,7 +212,7 @@
           :size="36"
           :color="currentTab === index ? '#000000' : '#6b7280'"
         />
-        <text class="bottom-tab-text">{{ tab }}</text>
+        <text class="glx-bottom-tab-text">{{ tab }}</text>
       </view>
     </view>
 
@@ -240,7 +228,7 @@ import Icon from "../../components/Icon.vue";
 import Toast from "../../components/Toast.vue";
 import PixelCanvas from "../../components/PixelCanvas.vue";
 import ColorPanelPicker from "../../components/ColorPanelPicker.vue";
-import GlxSlider from "../../components/GlxSlider.vue";
+import GlxStepper from "../../components/GlxStepper.vue";
 import ClockFontPanel from "../../components/clock-editor/ClockFontPanel.vue";
 import ClockTextSettingsCard from "../../components/clock-editor/ClockTextSettingsCard.vue";
 import {
@@ -397,14 +385,9 @@ function createDefaultEyesConfig() {
     },
     style: {
       eyeColor: "#9bdcff",
-      pupilColor: "#1b6dff",
       timeColor: "#64c8ff",
     },
   };
-}
-
-function cloneEyesConfig(config) {
-  return JSON.parse(JSON.stringify(config));
 }
 
 function isValidEyesConfig(config) {
@@ -460,7 +443,6 @@ function isValidEyesConfig(config) {
   }
   if (
     config.style.eyeColor === undefined ||
-    config.style.pupilColor === undefined ||
     config.style.timeColor === undefined
   ) {
     return false;
@@ -756,7 +738,7 @@ export default {
     Toast,
     PixelCanvas,
     ColorPanelPicker,
-    GlxSlider,
+    GlxStepper,
     ClockFontPanel,
     ClockTextSettingsCard,
   },
@@ -792,14 +774,6 @@ export default {
         { name: "天青", hex: "#68c9ff" },
         { name: "雾蓝", hex: "#8ebcff" },
         { name: "霓虹蓝", hex: "#52b7ff" },
-      ],
-      pupilColorOptions: [
-        { name: "深蓝", hex: "#1b6dff" },
-        { name: "电蓝", hex: "#245dff" },
-        { name: "靛蓝", hex: "#3758ff" },
-        { name: "青蓝", hex: "#187bff" },
-        { name: "亮青", hex: "#00a6ff" },
-        { name: "冰青", hex: "#36cfff" },
       ],
       timeColorOptions: [
         { name: "青色", hex: "#64c8ff" },
@@ -986,10 +960,8 @@ export default {
           ...nextConfig.time,
           ...parsedConfig.time,
         };
-        nextConfig.style = {
-          ...nextConfig.style,
-          ...parsedConfig.style,
-        };
+        nextConfig.style.eyeColor = parsedConfig.style.eyeColor;
+        nextConfig.style.timeColor = parsedConfig.style.timeColor;
         if (parsedConfig.time.align === undefined) {
           nextConfig.time.align = "center";
           nextConfig.layout.timeX = resolveLegacyEyesTimeAnchorX(nextConfig);
@@ -1040,6 +1012,7 @@ export default {
 
       this.isSending = true;
       try {
+        this.normalizeTimeLayout();
         const ws = this.deviceStore.getWebSocket();
         await ws.setMode("eyes");
         await ws.setEyesConfig(this.buildEyesConfigPayload());
@@ -1090,12 +1063,6 @@ export default {
       this.renderPreviewFrame();
     },
 
-    handlePupilColorChange(value) {
-      this.eyesConfig.style.pupilColor = value;
-      this.saveEyesConfig();
-      this.renderPreviewFrame();
-    },
-
     handleTimeShowChange(event) {
       this.eyesConfig.time.show = event.detail.value;
       this.saveEyesConfig();
@@ -1119,18 +1086,20 @@ export default {
       }
 
       if (field === "x") {
+        const bounds = this.getSpiritTimeLayoutBounds();
         this.eyesConfig.layout.timeX = clamp(
           Number(this.eyesConfig.layout.timeX) + delta,
-          minValue,
-          maxValue,
+          bounds.minAnchorX,
+          bounds.maxAnchorX,
         );
       }
 
       if (field === "y") {
+        const bounds = this.getSpiritTimeLayoutBounds();
         this.eyesConfig.layout.timeY = clamp(
           Number(this.eyesConfig.layout.timeY) + delta,
-          minValue,
-          maxValue,
+          bounds.minTimeY,
+          bounds.maxTimeY,
         );
       }
 
@@ -1147,6 +1116,7 @@ export default {
       } else if (align === "right") {
         this.eyesConfig.layout.timeX = 63;
       }
+      this.normalizeTimeLayout();
       this.saveEyesConfig();
       this.renderPreviewFrame();
     },
@@ -1184,20 +1154,22 @@ export default {
     },
 
     handleTimeXChange(event) {
+      const bounds = this.getSpiritTimeLayoutBounds();
       this.eyesConfig.layout.timeX = clamp(
         Number(event.detail.value),
-        0,
-        64,
+        bounds.minAnchorX,
+        bounds.maxAnchorX,
       );
       this.saveEyesConfig();
       this.renderPreviewFrame();
     },
 
     handleTimeYChange(event) {
+      const bounds = this.getSpiritTimeLayoutBounds();
       this.eyesConfig.layout.timeY = clamp(
         Number(event.detail.value),
-        0,
-        64,
+        bounds.minTimeY,
+        bounds.maxTimeY,
       );
       this.saveEyesConfig();
       this.renderPreviewFrame();
@@ -1222,35 +1194,117 @@ export default {
       ) {
         this.eyesConfig.time.align = "center";
       }
+      const bounds = this.getSpiritTimeLayoutBounds();
       this.eyesConfig.layout.timeX = clamp(
         Number(this.eyesConfig.layout.timeX),
-        0,
-        64,
+        bounds.minAnchorX,
+        bounds.maxAnchorX,
       );
       this.eyesConfig.layout.timeY = clamp(
         Number(this.eyesConfig.layout.timeY),
-        0,
-        64,
+        bounds.minTimeY,
+        bounds.maxTimeY,
       );
     },
 
+    getSpiritTimeLayoutBounds() {
+      const panelSize = 64;
+      const textWidth = Math.max(0, Math.round(this.timeTextWidth));
+      const textHeight = Math.max(0, Math.round(this.timeTextHeight));
+      const maxStartX = Math.max(0, panelSize - textWidth);
+      const maxTimeY = Math.max(0, panelSize - textHeight);
+
+      if (this.eyesConfig.time.align === "center") {
+        const anchorOffset = Math.floor(textWidth / 2);
+        return {
+          minAnchorX: anchorOffset,
+          maxAnchorX: maxStartX + anchorOffset,
+          minTimeY: 0,
+          maxTimeY,
+          minStartX: 0,
+          maxStartX,
+        };
+      }
+
+      if (this.eyesConfig.time.align === "right") {
+        return {
+          minAnchorX: textWidth,
+          maxAnchorX: maxStartX + textWidth,
+          minTimeY: 0,
+          maxTimeY,
+          minStartX: 0,
+          maxStartX,
+        };
+      }
+
+      return {
+        minAnchorX: 0,
+        maxAnchorX: maxStartX,
+        minTimeY: 0,
+        maxTimeY,
+        minStartX: 0,
+        maxStartX,
+      };
+    },
+
     getSpiritTimeStartX() {
+      const bounds = this.getSpiritTimeLayoutBounds();
       const align = this.eyesConfig.time.align;
       const anchorX = Number(this.eyesConfig.layout.timeX);
       if (align === "center") {
-        return anchorX - Math.floor(this.timeTextWidth / 2);
+        return clamp(
+          anchorX - Math.floor(this.timeTextWidth / 2),
+          bounds.minStartX,
+          bounds.maxStartX,
+        );
       }
       if (align === "right") {
-        return anchorX - this.timeTextWidth;
+        return clamp(
+          anchorX - this.timeTextWidth,
+          bounds.minStartX,
+          bounds.maxStartX,
+        );
       }
-      return anchorX;
+      return clamp(anchorX, bounds.minStartX, bounds.maxStartX);
     },
 
     buildEyesConfigPayload() {
-      const payload = cloneEyesConfig(this.eyesConfig);
-      payload.layout.timeX = this.getSpiritTimeStartX();
-      delete payload.time.align;
-      return payload;
+      const bounds = this.getSpiritTimeLayoutBounds();
+      return {
+        layout: {
+          eyeY: this.eyesConfig.layout.eyeY,
+          eyeSpacing: this.eyesConfig.layout.eyeSpacing,
+          eyeWidth: this.eyesConfig.layout.eyeWidth,
+          eyeHeight: this.eyesConfig.layout.eyeHeight,
+          timeX: this.getSpiritTimeStartX(),
+          timeY: clamp(
+            Number(this.eyesConfig.layout.timeY),
+            bounds.minTimeY,
+            bounds.maxTimeY,
+          ),
+        },
+        behavior: {
+          autoSwitch: this.eyesConfig.behavior.autoSwitch,
+          blinkIntervalMs: this.eyesConfig.behavior.blinkIntervalMs,
+          lookIntervalMs: this.eyesConfig.behavior.lookIntervalMs,
+          idleMove: this.eyesConfig.behavior.idleMove,
+          sleepyAfterMs: this.eyesConfig.behavior.sleepyAfterMs,
+        },
+        interaction: {
+          lookHoldMs: this.eyesConfig.interaction.lookHoldMs,
+          moodHoldMs: this.eyesConfig.interaction.moodHoldMs,
+        },
+        time: {
+          show: this.eyesConfig.time.show,
+          showSeconds: this.eyesConfig.time.showSeconds,
+          font: this.eyesConfig.time.font,
+          fontSize: this.eyesConfig.time.fontSize,
+        },
+        style: {
+          eyeColor: this.eyesConfig.style.eyeColor,
+          timeColor: this.eyesConfig.style.timeColor,
+        },
+      };
     },
 
     handleBlinkIntervalChange(event) {
@@ -1929,41 +1983,8 @@ export default {
   background-color: #1a1a1a;
 }
 
-.canvas-section {
-  display: flex;
-  flex-direction: column;
-  background: #000000;
-  border-bottom: 2rpx solid var(--nb-ink);
-  flex-shrink: 0;
-}
-
-.preview-canvas-container {
-  width: 100%;
-  aspect-ratio: 1;
-  position: relative;
-  overflow: hidden;
-  background-color: #000000;
-}
-
 .preview-canvas-placeholder {
   background-color: #000000;
-}
-
-.preview-caption {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12rpx;
-  padding: 10rpx 16rpx 12rpx;
-  background: var(--bg-tertiary);
-}
-
-.preview-caption-info {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0;
 }
 
 .preview-title {
@@ -1977,47 +1998,6 @@ export default {
   color: var(--text-secondary);
 }
 
-.preview-actions {
-  display: flex;
-  align-items: center;
-  gap: 12rpx;
-  flex-shrink: 0;
-}
-
-.action-btn-sm {
-  width: auto;
-  min-width: 118rpx;
-  height: 64rpx;
-  padding: 0 18rpx;
-  gap: 10rpx;
-  border-radius: 0;
-  border: 2rpx solid var(--nb-ink);
-  background-color: var(--bg-tertiary);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.action-btn-sm text {
-  font-size: 24rpx;
-  font-weight: 600;
-  color: var(--text-primary);
-  line-height: 1;
-}
-
-.action-btn-sm.primary {
-  border-color: var(--nb-ink);
-  background: var(--nb-yellow);
-}
-
-.action-btn-sm.primary text {
-  color: #000000;
-}
-
-.action-btn-sm.disabled {
-  opacity: 0.4;
-}
-
 .content {
   flex: 1;
   width: 100%;
@@ -2027,42 +2007,20 @@ export default {
   padding: 16rpx 20rpx 0;
 }
 
-.content-wrapper {
-  padding: 0 0 56rpx;
-}
-
 .tab-panel {
   min-height: 100%;
 }
 
-.card {
-  padding-top: 16rpx;
+.spirit-section-card {
+  background: transparent !important;
   border: 0 !important;
   box-shadow: none !important;
+}
+
+:deep(.settings-card.glx-panel-card) {
   background: transparent !important;
-}
-
-.card-title-section {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8rpx;
-  margin-bottom: 14rpx;
-}
-
-.card-title {
-  font-size: 22rpx;
-  font-weight: 500;
-  color: var(--text-primary);
-}
-
-.card-subtitle {
-  font-size: 20rpx;
-  color: var(--text-secondary);
-}
-
-.form-row {
-  margin-top: 16rpx;
+  border: 0 !important;
+  box-shadow: none !important;
 }
 
 .inline-row {
@@ -2071,11 +2029,11 @@ export default {
   justify-content: space-between;
 }
 
-.form-label {
-  display: block;
-  font-size: 26rpx;
-  color: var(--text-primary);
-  font-weight: 500;
+.option-row,
+.expression-grid {
+  overflow: visible;
+  box-sizing: border-box;
+  padding-bottom: 4rpx;
 }
 
 .expression-grid {
@@ -2086,9 +2044,6 @@ export default {
 
 .expression-item {
   min-height: 74rpx;
-  border-radius: 0;
-  background: #ffffff;
-  border: 2rpx solid #000000;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2096,89 +2051,30 @@ export default {
   box-sizing: border-box;
 }
 
-.expression-item.active {
-  background: var(--nb-yellow);
-  border-color: var(--nb-ink);
+.option-btn.glx-feature-option,
+.expression-item.glx-feature-option {
+  position: relative;
+  z-index: 1;
+  overflow: visible;
+  border-width: var(--nb-border-width-control) !important;
 }
 
-.expression-item.active .expression-cn {
-  color: #000000;
-  font-weight: 700;
+.option-btn.glx-feature-option.active,
+.expression-item.glx-feature-option.active {
+  background: var(--nb-yellow) !important;
+  border-color: var(--nb-ink) !important;
+  color: var(--nb-ink) !important;
+}
+
+.option-btn.glx-feature-option.active .glx-feature-option__label,
+.expression-item.glx-feature-option.active .glx-feature-option__label {
+  color: var(--nb-ink) !important;
+  font-weight: 900 !important;
 }
 
 .expression-cn {
   font-size: 23rpx;
-  color: var(--text-primary);
-  font-weight: 600;
+  font-weight: 700;
 }
 
-.option-row {
-  margin-top: 8rpx;
-  display: flex;
-  gap: 12rpx;
-}
-
-.option-row-wrap {
-  flex-wrap: wrap;
-}
-
-.option-btn {
-  min-width: calc(25% - 12rpx);
-  height: 72rpx;
-  padding: 0 16rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-sizing: border-box;
-}
-
-.option-btn text {
-  font-size: 24rpx;
-  font-size: 26rpx;
-}
-
-.toggle-switch {
-  display: inline-flex;
-  align-items: center;
-}
-
-.bottom-tabs {
-  display: flex;
-  flex-shrink: 0;
-  padding: 2rpx 10rpx 0;
-  padding-bottom: var(--layout-bottom-offset);
-  background-color: var(--bg-elevated);
-  border-top: 2rpx solid var(--nb-ink);
-  gap: 2rpx;
-}
-
-.bottom-tab-item {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 2rpx;
-  min-height: 68rpx;
-}
-
-.bottom-tab-item.active {
-  background-color: transparent;
-}
-
-.bottom-tab-text {
-  font-size: 20rpx;
-  color: var(--text-secondary);
-}
-
-.bottom-tab-item.active .bottom-tab-text {
-  color: #000000;
-  font-weight: 900;
-  font-size: 22rpx;
-}
-
-.bottom-tab-item.active :deep(.iconfont) {
-  color: #000000 !important;
-  font-size: 40rpx !important;
-}
 </style>

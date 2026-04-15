@@ -5,6 +5,7 @@
 #include <Preferences.h>
 #include <ArduinoJson.h>
 #include "clock_font_renderer.h"
+#include "game_screensaver_types.h"
 
 #define CONFIG_VERSION 11  // 改默认配置时递增此版本号
 
@@ -84,13 +85,28 @@ struct EyesConfig {
 
   struct {
     char eyeColor[8];
-    char pupilColor[8];
     char timeColor[8];
   } style;
 };
 
 struct ThemeConfig {
   char themeId[48];
+};
+
+struct DeviceParamsConfig {
+  bool swapBlueGreen;
+  bool swapBlueRed;
+  bool clkphase;
+  uint8_t displayBright;
+  uint8_t brightnessDay;
+  uint8_t brightnessNight;
+  uint8_t displayRotation;
+  uint8_t driver;
+  uint32_t i2cSpeed;
+  uint8_t E_pin;
+  char nightStart[6];
+  char nightEnd[6];
+  char ntpServer[64];
 };
 
 // 像素数据结构
@@ -105,6 +121,7 @@ struct PixelData {
 class ConfigManager {
 public:
   static void init();
+  static void preloadDeviceParamsConfig();
   static void loadClockConfig();
   static void saveClockConfig();
   static void loadAnimClockConfig();
@@ -119,6 +136,10 @@ public:
   static void saveAmbientEffectConfig();
   static void loadThemeConfig();
   static void saveThemeConfig();
+  static void loadGameScreensaverConfig();
+  static void saveGameScreensaverConfig();
+  static void loadDeviceParamsConfig();
+  static void saveDeviceParamsConfig();
   static void loadPacmanRoute();
   static bool savePacmanRoute(const uint8_t* routeData, uint16_t routeLength);
   static void clearPacmanRoute();
@@ -131,6 +152,8 @@ public:
   static ClockConfig animClockConfig;
   static EyesConfig eyesConfig;
   static ThemeConfig themeConfig;
+  static GameScreensaverConfig gameScreensaverConfig;
+  static DeviceParamsConfig deviceParamsConfig;
 
   // 静态时钟的背景图片像素
   static PixelData* staticImagePixels;

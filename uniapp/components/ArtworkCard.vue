@@ -10,7 +10,7 @@
       />
       <!-- 图片加载失败占位 -->
       <view v-if="imageError" class="image-placeholder">
-        <Icon name="picture" :size="64" color="#AAAAAA" />
+        <Icon name="picture" :size="64" color="var(--text-tertiary)" />
       </view>
     </view>
     
@@ -31,22 +31,26 @@
       
       <!-- 互动数据 -->
       <view class="artwork-stats">
-        <view class="stat-item" @click.stop="handleLike">
+        <view
+          class="stat-item"
+          :class="{ 'stat-item--active': isLiked }"
+          @click.stop="handleLike"
+        >
           <Icon 
             :name="isLiked ? 'favorite-filling' : 'favorite'" 
             :size="32" 
-            :color="isLiked ? '#E74C3C' : '#666666'" 
+            color="currentColor"
           />
           <text class="stat-text">{{ formatNumber(artwork.likes) }}</text>
         </view>
         
         <view class="stat-item" @click.stop="handleComment">
-          <Icon name="comment" :size="32" color="#666666" />
+          <Icon name="comment" :size="32" color="currentColor" />
           <text class="stat-text">{{ formatNumber(artwork.comments_count) }}</text>
         </view>
         
         <view class="stat-item">
-          <Icon name="browse" :size="32" color="#666666" />
+          <Icon name="browse" :size="32" color="currentColor" />
           <text class="stat-text">{{ formatNumber(artwork.views) }}</text>
         </view>
       </view>
@@ -131,10 +135,6 @@ export default {
   transition: all 0.2s ease;
 }
 
-.artwork-card:active {
-  transform: translate(4rpx, 4rpx);
-  box-shadow: 2rpx 2rpx 0 var(--nb-ink);
-}
 
 .artwork-image-container {
   position: relative;
@@ -203,20 +203,18 @@ export default {
   align-items: center;
   gap: 8rpx;
   transition: all 0.2s ease;
+  color: #4a4a4a;
 }
 
-.stat-item:active {
-  transform: scale(0.95);
+.stat-item--active {
+  color: var(--nb-coral);
 }
 
 .stat-text {
   font-size: 22rpx;
-  color: #4a4a4a;
+  color: currentColor;
   font-weight: 800;
 }
 
 /* 点赞动画 */
-.stat-item:first-child:active {
-  transform: translate(2rpx, 2rpx);
-}
 </style>
