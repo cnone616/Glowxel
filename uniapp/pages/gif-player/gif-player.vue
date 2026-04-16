@@ -15,7 +15,7 @@
     <view class="canvas-section">
       <view class="preview-canvas-container" :style="previewCanvasBoxStyle">
         <PixelCanvas
-          v-if="previewCanvasReady"
+          v-if="previewCanvasReady && previewCanvasVisible"
           :width="64"
           :height="64"
           :pixels="currentPreviewPixels"
@@ -98,7 +98,19 @@
       </view>
     </scroll-view>
 
-    <Toast ref="toastRef" />
+    <view v-if="isSending" class="glx-sending-overlay" @touchmove.stop.prevent>
+      <view class="glx-sending-modal">
+        <view class="glx-sending-spinner"></view>
+        <text class="glx-sending-title">正在传输数据...</text>
+        <text class="glx-sending-tip">请勿切换网络或关闭程序</text>
+      </view>
+    </view>
+
+    <Toast
+      ref="toastRef"
+      @show="handleToastShow"
+      @hide="handleToastHide"
+    />
   </view>
 </template>
 
@@ -132,8 +144,10 @@ export default {
       deviceStore: null,
       toast: null,
       isSending: false,
+      isToastVisible: false,
       contentHeight: "calc(100vh - 88rpx - 520rpx)",
       previewCanvasReady: false,
+      previewCanvasVisible: true,
       previewZoom: 4,
       previewOffset: { x: 0, y: 0 },
       previewContainerSize: { width: 320, height: 320 },
@@ -201,6 +215,26 @@ export default {
   methods: {
     handleBack() {
       uni.navigateBack();
+    },
+    syncPreviewCanvasVisibility() {
+      const nextVisible = !this.isSending && !this.isToastVisible;
+      if (this.previewCanvasVisible === nextVisible) {
+        return;
+      }
+      this.previewCanvasVisible = nextVisible;
+      if (nextVisible) {
+        this.$nextTick(() => {
+          this.schedulePreviewRefresh();
+        });
+      }
+    },
+    handleToastShow() {
+      this.isToastVisible = true;
+      this.syncPreviewCanvasVisibility();
+    },
+    handleToastHide() {
+      this.isToastVisible = false;
+      this.syncPreviewCanvasVisibility();
     },
     initPreviewCanvas() {
       const systemInfo = uni.getSystemInfoSync();
@@ -345,6 +379,7 @@ export default {
     },
     async saveAndApply() {
       if (this.isSending) {
+        this.toast.showInfo("正在传输中，请等待完成");
         return;
       }
       if (!this.deviceStore.connected) {
@@ -353,6 +388,7 @@ export default {
       }
 
       this.isSending = true;
+      this.syncPreviewCanvasVisibility();
       try {
         const ws = this.deviceStore.getWebSocket();
         const payload = buildGifPlayerAnimationPayload({
@@ -360,11 +396,16 @@ export default {
           speed: this.speed,
           intensity: this.intensity,
         });
-        await ws.send({
-          cmd: "set_gif_animation",
-          animationData: payload.animationData,
-        });
+        await ws.setGifAnimation(payload.animationData);
         await ws.setMode("animation");
+        const status = await ws.getStatus();
+        if (
+          status.mode !== "animation" ||
+          !Number.isFinite(Number(status.animationFrames)) ||
+          Number(status.animationFrames) <= 0
+        ) {
+          throw new Error("设备未成功加载 GIF 动画");
+        }
         this.deviceStore.setDeviceMode("animation", { businessMode: true });
         this.saveConfig();
         this.toast.showSuccess("离线素材已发送到设备");
@@ -373,6 +414,7 @@ export default {
         this.toast.showError("发送失败：" + error.message);
       } finally {
         this.isSending = false;
+        this.syncPreviewCanvasVisibility();
       }
     },
   },

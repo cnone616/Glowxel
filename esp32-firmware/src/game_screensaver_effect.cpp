@@ -123,6 +123,21 @@ uint16_t rgb565(uint8_t r, uint8_t g, uint8_t b) {
   return MatrixPanel_I2S_DMA::color565(r, g, b);
 }
 
+void* allocateEffectBuffer(size_t size) {
+  if (size == 0) {
+    return nullptr;
+  }
+
+  if (psramFound()) {
+    void* buffer = ps_malloc(size);
+    if (buffer != nullptr) {
+      return buffer;
+    }
+  }
+
+  return malloc(size);
+}
+
 int clampInt(int value, int minValue, int maxValue) {
   if (value < minValue) {
     return minValue;
@@ -166,11 +181,17 @@ bool ensureSnakeBuffers(int totalCells) {
   }
 
   releaseSnakeBuffers();
-  s_snake = static_cast<Point*>(malloc(sizeof(Point) * totalCells));
-  s_snakeVisited = static_cast<uint8_t*>(malloc(totalCells));
-  s_snakeDistance = static_cast<int16_t*>(malloc(sizeof(int16_t) * totalCells));
-  s_snakeQueue = static_cast<uint16_t*>(malloc(sizeof(uint16_t) * totalCells));
+  s_snake = static_cast<Point*>(allocateEffectBuffer(sizeof(Point) * totalCells));
+  s_snakeVisited = static_cast<uint8_t*>(allocateEffectBuffer(totalCells));
+  s_snakeDistance = static_cast<int16_t*>(allocateEffectBuffer(sizeof(int16_t) * totalCells));
+  s_snakeQueue = static_cast<uint16_t*>(allocateEffectBuffer(sizeof(uint16_t) * totalCells));
   if (s_snake == nullptr || s_snakeVisited == nullptr || s_snakeDistance == nullptr || s_snakeQueue == nullptr) {
+    Serial.printf(
+      "[GAME] 蛇屏保缓冲分配失败, cells=%d, freeHeap=%u, freePsram=%u\n",
+      totalCells,
+      ESP.getFreeHeap(),
+      ESP.getFreePsram()
+    );
     releaseSnakeBuffers();
     return false;
   }
@@ -226,13 +247,13 @@ bool ensureMazeBuffers(int totalCells) {
   }
 
   releaseMazeBuffers();
-  s_mazeGrid = static_cast<uint8_t*>(malloc(totalCells));
-  s_mazeReveal = static_cast<uint16_t*>(malloc(sizeof(uint16_t) * totalCells));
-  s_mazePath = static_cast<uint16_t*>(malloc(sizeof(uint16_t) * totalCells));
-  s_mazeParent = static_cast<int16_t*>(malloc(sizeof(int16_t) * totalCells));
-  s_mazeVisited = static_cast<uint8_t*>(malloc(totalCells));
-  s_mazeStack = static_cast<uint16_t*>(malloc(sizeof(uint16_t) * totalCells));
-  s_mazeQueue = static_cast<uint16_t*>(malloc(sizeof(uint16_t) * totalCells));
+  s_mazeGrid = static_cast<uint8_t*>(allocateEffectBuffer(totalCells));
+  s_mazeReveal = static_cast<uint16_t*>(allocateEffectBuffer(sizeof(uint16_t) * totalCells));
+  s_mazePath = static_cast<uint16_t*>(allocateEffectBuffer(sizeof(uint16_t) * totalCells));
+  s_mazeParent = static_cast<int16_t*>(allocateEffectBuffer(sizeof(int16_t) * totalCells));
+  s_mazeVisited = static_cast<uint8_t*>(allocateEffectBuffer(totalCells));
+  s_mazeStack = static_cast<uint16_t*>(allocateEffectBuffer(sizeof(uint16_t) * totalCells));
+  s_mazeQueue = static_cast<uint16_t*>(allocateEffectBuffer(sizeof(uint16_t) * totalCells));
   if (s_mazeGrid == nullptr ||
       s_mazeReveal == nullptr ||
       s_mazePath == nullptr ||
@@ -240,6 +261,12 @@ bool ensureMazeBuffers(int totalCells) {
       s_mazeVisited == nullptr ||
       s_mazeStack == nullptr ||
       s_mazeQueue == nullptr) {
+    Serial.printf(
+      "[GAME] 迷宫屏保缓冲分配失败, cells=%d, freeHeap=%u, freePsram=%u\n",
+      totalCells,
+      ESP.getFreeHeap(),
+      ESP.getFreePsram()
+    );
     releaseMazeBuffers();
     return false;
   }

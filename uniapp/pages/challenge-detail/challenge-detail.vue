@@ -155,17 +155,24 @@
         <text class="button-text">{{ buttonText }}</text>
       </view>
     </view>
+
+    <Toast />
   </view>
 </template>
 
 <script>
 import Icon from '@/components/Icon.vue'
+import Toast from '@/components/Toast.vue'
 import { challengeAPI } from '@/api/index.js'
+import { useToast } from '@/composables/useToast.js'
+
+const toast = useToast()
 
 export default {
   name: 'ChallengeDetail',
   components: {
-    Icon
+    Icon,
+    Toast
   },
   
   data() {
@@ -235,10 +242,7 @@ export default {
         return
       }
 
-      uni.showToast({
-        title: '挑战不存在',
-        icon: 'none'
-      })
+      toast.showError('挑战不存在')
       setTimeout(() => {
         uni.navigateBack()
       }, 1500)
@@ -256,18 +260,12 @@ export default {
     
     async handleJoin() {
       if (this.challenge.status === 'ended') {
-        uni.showToast({
-          title: '挑战已结束',
-          icon: 'none'
-        })
+        toast.showInfo('挑战已结束')
         return
       }
       
       if (this.challenge.status === 'upcoming') {
-        uni.showToast({
-          title: '已设置提醒',
-          icon: 'success'
-        })
+        toast.showSuccess('已设置提醒')
         return
       }
       
@@ -283,10 +281,7 @@ export default {
             this.challenge.participants += 1
           }
 
-          uni.showToast({
-            title: '参与成功！',
-            icon: 'success'
-          })
+          toast.showSuccess('参与成功！')
 
           setTimeout(() => {
             uni.navigateTo({
@@ -294,10 +289,7 @@ export default {
             })
           }, 1500)
         } catch (error) {
-          uni.showToast({
-            title: '参与失败',
-            icon: 'none'
-          })
+          toast.showError('参与失败')
         }
         return
       }

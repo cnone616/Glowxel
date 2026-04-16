@@ -241,29 +241,36 @@
       </view>
     </view>
 
-    <!-- Toast -->
+    <ConfirmDialogHost />
+    <LoadingOverlay />
     <Toast ref="toastRef" />
   </view>
 </template>
 
 <script>
 import { useToast } from "../../composables/useToast.js";
+import { useDialog } from "../../composables/useDialog.js";
 import statusBarMixin from "../../mixins/statusBar.js";
 import Icon from "../../components/Icon.vue";
 import Toast from "../../components/Toast.vue";
+import ConfirmDialogHost from "../../components/ConfirmDialogHost.vue";
 import GlxSwitch from "../../components/GlxSwitch.vue";
+import LoadingOverlay from "../../components/LoadingOverlay.vue";
 
 export default {
   mixins: [statusBarMixin],
   components: {
     Icon,
     Toast,
+    ConfirmDialogHost,
     GlxSwitch,
+    LoadingOverlay,
   },
 
   data() {
     return {
       toast: null,
+      dialog: null,
       showLanguageModal: false,
       appVersion: "1.0.0",
       firmwareVersion: "",
@@ -296,6 +303,7 @@ export default {
 
   onLoad() {
     this.toast = useToast();
+    this.dialog = useDialog();
     this.loadSettings();
 
     this.$nextTick(() => {
@@ -329,29 +337,26 @@ export default {
       });
     },
 
-    goToPrivacy() {
-      uni.showModal({
+    async goToPrivacy() {
+      await this.dialog.alert({
         title: "隐私设置",
         content:
           "Glowxel 会在本地保存登录状态、项目草稿、应用设置和设备连接信息，用于创作、同步与设备控制。",
-        showCancel: false,
       });
     },
 
-    goToHelp() {
-      uni.showModal({
+    async goToHelp() {
+      await this.dialog.alert({
         title: "帮助与反馈",
         content:
           "创作前请先创建或导入画布；设备功能需先完成热点配网；如遇同步异常，可在云同步页面重新执行同步。",
-        showCancel: false,
       });
     },
 
-    goToAbout() {
-      uni.showModal({
+    async goToAbout() {
+      await this.dialog.alert({
         title: "关于 Glowxel",
         content: `Glowxel 是面向像素创作与设备联动的创作平台。当前应用版本 v${this.appVersion}。`,
-        showCancel: false,
       });
     },
 
@@ -366,13 +371,13 @@ export default {
         return;
       }
 
-      uni.showLoading({ title: "检查更新中..." });
+      this.toast.showLoading("检查更新中...");
       const ws = deviceStore.getWebSocket();
 
       // 发送检查更新命令
       ws.send({ cmd: "ota_check" })
         .then((res) => {
-          uni.hideLoading();
+          this.toast.hideLoading();
           this.firmwareVersion = res.firmware_version || "";
           this.hasUpdate = res.has_update || false;
 
@@ -388,48 +393,48 @@ export default {
           }
         })
         .catch(() => {
-          uni.hideLoading();
+          this.toast.hideLoading();
           this.toast.showError("检查更新失败");
         });
     },
 
-    showUpdateDialog() {
+    async showUpdateDialog() {
       if (!this.latestFirmware) return;
-      uni.showModal({
+      const confirmed = await this.dialog.confirm({
         title: "发现新版本 v" + this.latestFirmware.version,
         content: this.latestFirmware.changelog || "修复已知问题，提升稳定性",
         confirmText: "立即更新",
-        cancelText: this.latestFirmware.isForce ? "" : "稍后",
+        cancelText: "稍后",
         showCancel: !this.latestFirmware.isForce,
-        success: (res) => {
-          if (res.confirm) {
-            this.startFirmwareUpdate();
-          }
-        },
+        maskClosable: !this.latestFirmware.isForce,
       });
+
+      if (confirmed) {
+        this.startFirmwareUpdate();
+      }
     },
 
     startFirmwareUpdate() {
       const deviceStore = this.getDeviceStore();
       if (!deviceStore || !deviceStore.connected) return;
 
-      uni.showLoading({ title: "正在更新固件...", mask: true });
+      this.toast.showLoading("正在更新固件...");
       const ws = deviceStore.getWebSocket();
 
       ws.send({ cmd: "ota_update" })
         .then(() => {
           // 设备会重启，连接会断开
           setTimeout(() => {
-            uni.hideLoading();
-            uni.showModal({
+            this.toast.hideLoading();
+            this.dialog.alert({
               title: "更新中",
               content: "设备正在更新固件并重启，请稍等约30秒后重新连接设备",
-              showCancel: false,
+              maskClosable: false,
             });
           }, 3000);
         })
         .catch(() => {
-          uni.hideLoading();
+          this.toast.hideLoading();
           this.toast.showError("更新失败");
         });
     },
@@ -511,27 +516,27 @@ export default {
       this.toast.showSuccess("语言设置已更新");
     },
 
-    showStorageInfo() {
-      uni.showModal({
+    async showStorageInfo() {
+      await this.dialog.alert({
         title: "存储空间",
         content: `已使用: ${this.storageInfo.used}\n作品数据: ${this.storageInfo.projects}\n缓存数据: ${this.storageInfo.cache}`,
-        showCancel: false,
       });
     },
 
-    clearCache() {
-      uni.showModal({
+    async clearCache() {
+      const confirmed = await this.dialog.confirm({
         title: "清除缓存",
         content: "确定要清除应用缓存吗？这不会删除您的作品数据。",
-        success: (res) => {
-          if (res.confirm) {
-            // 清除缓存逻辑
-            this.toast.showSuccess("缓存已清除");
-            this.storageInfo.cache = "0MB";
-            this.storageInfo.used = this.storageInfo.projects;
-          }
-        },
+        danger: true,
       });
+
+      if (!confirmed) {
+        return;
+      }
+
+      this.toast.showSuccess("缓存已清除");
+      this.storageInfo.cache = "0MB";
+      this.storageInfo.used = this.storageInfo.projects;
     },
   },
 };

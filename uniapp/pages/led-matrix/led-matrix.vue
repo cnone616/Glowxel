@@ -15,7 +15,7 @@
     <view class="canvas-section">
       <view class="preview-canvas-container" :style="previewCanvasBoxStyle">
         <PixelCanvas
-          v-if="previewCanvasReady"
+          v-if="previewCanvasReady && previewCanvasVisible"
           :width="64"
           :height="64"
           :pixels="currentPreviewPixels"
@@ -69,6 +69,25 @@
                 <text class="glx-feature-option__label">{{ item.label }}</text>
               </view>
             </view>
+            <view class="github-preview-entry glx-list-card" @click="openGithubScenePreview">
+              <view class="github-preview-entry__main">
+                <view class="github-preview-entry__icon">
+                  <Icon name="picture" :size="38" color="var(--nb-ink)" />
+                </view>
+                <view class="github-preview-entry__body">
+                  <text class="github-preview-entry__title">GitHub 候选预览</text>
+                  <text class="github-preview-entry__desc">
+                    已整理好的 64×64 风景与霓虹城市候选，现在可以直接在 uniapp 里浏览主推和备选。
+                  </text>
+                </view>
+              </view>
+              <view class="github-preview-entry__meta glx-list-meta">
+                <text class="github-preview-entry__count">
+                  主推 {{ githubScenePriorityCount }} / 备选 {{ githubSceneBackupCount }}
+                </text>
+                <Icon name="arrow-right" :size="24" class="glx-list-arrow" />
+              </view>
+            </view>
           </view>
         </view>
 
@@ -106,7 +125,19 @@
       </view>
     </scroll-view>
 
-    <Toast ref="toastRef" />
+    <view v-if="isSending" class="glx-sending-overlay" @touchmove.stop.prevent>
+      <view class="glx-sending-modal">
+        <view class="glx-sending-spinner"></view>
+        <text class="glx-sending-title">正在传输数据...</text>
+        <text class="glx-sending-tip">请勿切换网络或关闭程序</text>
+      </view>
+    </view>
+
+    <Toast
+      ref="toastRef"
+      @show="handleToastShow"
+      @hide="handleToastHide"
+    />
   </view>
 </template>
 
@@ -125,6 +156,7 @@ import {
   buildLedMatrixSendPlan,
   getLedMatrixDemoItems,
 } from "../../utils/ledMatrixShowcase.js";
+import githubSceneManifest from "../../utils/githubSceneFinalistsManifest.js";
 
 const LED_MATRIX_CONFIG_KEY = "led_matrix_showcase_config";
 
@@ -143,8 +175,10 @@ export default {
       deviceStore: null,
       toast: null,
       isSending: false,
+      isToastVisible: false,
       contentHeight: "calc(100vh - 88rpx - 520rpx)",
       previewCanvasReady: false,
+      previewCanvasVisible: true,
       previewZoom: 4,
       previewOffset: { x: 0, y: 0 },
       previewContainerSize: { width: 320, height: 320 },
@@ -224,6 +258,12 @@ export default {
     hasParameterControl() {
       return this.showSpeedControl || this.showIntensityControl || this.showDensityControl || this.showColorControl;
     },
+    githubScenePriorityCount() {
+      return githubSceneManifest.priority.length;
+    },
+    githubSceneBackupCount() {
+      return githubSceneManifest.backup.length;
+    },
     previewCanvasBoxStyle() {
       const size = this.previewContainerSize && this.previewContainerSize.height
         ? this.previewContainerSize.height
@@ -275,6 +315,31 @@ export default {
   methods: {
     handleBack() {
       uni.navigateBack();
+    },
+    openGithubScenePreview() {
+      uni.navigateTo({
+        url: "/pages/github-scene-preview/index",
+      });
+    },
+    syncPreviewCanvasVisibility() {
+      const nextVisible = !this.isSending && !this.isToastVisible;
+      if (this.previewCanvasVisible === nextVisible) {
+        return;
+      }
+      this.previewCanvasVisible = nextVisible;
+      if (nextVisible) {
+        this.$nextTick(() => {
+          this.schedulePreviewRefresh();
+        });
+      }
+    },
+    handleToastShow() {
+      this.isToastVisible = true;
+      this.syncPreviewCanvasVisibility();
+    },
+    handleToastHide() {
+      this.isToastVisible = false;
+      this.syncPreviewCanvasVisibility();
     },
     initPreviewCanvas() {
       const systemInfo = uni.getSystemInfoSync();
@@ -446,6 +511,7 @@ export default {
     },
     async saveAndApply() {
       if (this.isSending) {
+        this.toast.showInfo("正在传输中，请等待完成");
         return;
       }
       if (!this.deviceStore.connected) {
@@ -454,6 +520,7 @@ export default {
       }
 
       this.isSending = true;
+      this.syncPreviewCanvasVisibility();
       try {
         const ws = this.deviceStore.getWebSocket();
         const sendPlan = buildLedMatrixSendPlan({
@@ -466,7 +533,14 @@ export default {
         if (sendPlan.type !== "command") {
           throw new Error("LED 演示集仅支持板载原生命令");
         }
-        await ws.send(sendPlan.command);
+        await ws.waitForCommand(sendPlan.command, "ambient effect applied", 5000);
+        const status = await ws.getStatus();
+        if (
+          status.effectMode !== "ambient_effect" ||
+          status.effectPreset !== sendPlan.command.preset
+        ) {
+          throw new Error("设备未进入对应像素场景");
+        }
 
         this.saveConfig();
         this.deviceStore.setDeviceMode(sendPlan.deviceMode, { businessMode: true });
@@ -476,6 +550,7 @@ export default {
         this.toast.showError("发送失败：" + error.message);
       } finally {
         this.isSending = false;
+        this.syncPreviewCanvasVisibility();
       }
     },
   },
@@ -539,6 +614,66 @@ export default {
   display: flex;
   flex-direction: column;
   gap: 12rpx;
+}
+
+.github-preview-entry {
+  margin-top: 18rpx;
+  padding: 18rpx 20rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
+  box-sizing: border-box;
+}
+
+.github-preview-entry__main {
+  display: flex;
+  align-items: flex-start;
+  gap: 16rpx;
+}
+
+.github-preview-entry__icon {
+  width: 68rpx;
+  height: 68rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: var(--nb-yellow);
+  border: 2rpx solid var(--nb-ink);
+  box-shadow: var(--nb-shadow-soft);
+  box-sizing: border-box;
+}
+
+.github-preview-entry__body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+}
+
+.github-preview-entry__title {
+  font-size: 26rpx;
+  line-height: 1.2;
+  font-weight: 900;
+  color: var(--nb-ink);
+}
+
+.github-preview-entry__desc {
+  font-size: 22rpx;
+  line-height: 1.55;
+  color: var(--text-secondary);
+}
+
+.github-preview-entry__meta {
+  justify-content: space-between;
+}
+
+.github-preview-entry__count {
+  font-size: 22rpx;
+  line-height: 1.2;
+  font-weight: 900;
+  color: var(--nb-ink);
 }
 
 </style>

@@ -171,7 +171,8 @@
       </view>
     </scroll-view>
 
-    <!-- Toast -->
+    <ConfirmDialogHost />
+    <LoadingOverlay />
     <Toast ref="toastRef" />
   </view>
 </template>
@@ -180,10 +181,13 @@
 import { useUserStore } from "../../store/user.js";
 import { useProjectStore } from "../../store/project.js";
 import { useToast } from "../../composables/useToast.js";
+import { useDialog } from "../../composables/useDialog.js";
 import statusBarMixin from "../../mixins/statusBar.js";
 import Icon from "../../components/Icon.vue";
 import Toast from "../../components/Toast.vue";
+import ConfirmDialogHost from "../../components/ConfirmDialogHost.vue";
 import GlxSwitch from "../../components/GlxSwitch.vue";
+import LoadingOverlay from "../../components/LoadingOverlay.vue";
 import { userAPI, artworkAPI, collectionAPI } from "../../api/index.js";
 
 export default {
@@ -191,7 +195,9 @@ export default {
   components: {
     Icon,
     Toast,
+    ConfirmDialogHost,
     GlxSwitch,
+    LoadingOverlay,
   },
 
   data() {
@@ -203,6 +209,7 @@ export default {
       userStore,
       projectStore,
       toast: null,
+      dialog: null,
     };
   },
 
@@ -216,6 +223,7 @@ export default {
 
   onLoad() {
     this.toast = useToast();
+    this.dialog = useDialog();
 
     // 注册 Toast
     this.$nextTick(() => {
@@ -228,11 +236,11 @@ export default {
   methods: {
     // 登录
     async handleLogin() {
-      uni.showLoading({ title: "登录中..." });
+      this.toast.showLoading("登录中...");
 
       const res = await this.userStore.login();
 
-      uni.hideLoading();
+      this.toast.hideLoading();
 
       if (res.success) {
         this.toast.showSuccess("登录成功");
@@ -315,17 +323,19 @@ export default {
     },
 
     // 退出登录
-    handleLogout() {
-      uni.showModal({
+    async handleLogout() {
+      const confirmed = await this.dialog.confirm({
         title: "确认退出",
         content: "退出后将无法同步数据到云端",
-        success: (res) => {
-          if (res.confirm) {
-            this.userStore.logout();
-            this.toast.showSuccess("已退出登录");
-          }
-        },
+        danger: true,
       });
+
+      if (!confirmed) {
+        return;
+      }
+
+      this.userStore.logout();
+      this.toast.showSuccess("已退出登录");
     },
   },
 };

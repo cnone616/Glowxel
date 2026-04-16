@@ -461,21 +461,21 @@ function renderPacmanTheme(context) {
 
 function renderPokedexTheme(context) {
   const pixels = new Map();
-  fillRect(pixels, 0, 0, 31, 64, "#ef392c");
-  fillRect(pixels, 31, 0, 33, 64, "#11111a");
-  fillRect(pixels, 33, 0, 31, 64, "#2c2c36");
-  fillRect(pixels, 35, 6, 25, 18, "#402858");
-  fillRect(pixels, 5, 13, 21, 23, "#d9e2d8");
+  fillRect(pixels, 0, 0, 31, 64, "#a72b25");
+  fillRect(pixels, 31, 0, 33, 64, "#101017");
+  fillRect(pixels, 33, 0, 31, 64, "#24242c");
+  fillRect(pixels, 35, 6, 25, 18, "#312044");
+  fillRect(pixels, 5, 13, 21, 23, "#98a39a");
   drawRect(pixels, 4, 12, 23, 25, "#151515");
   drawRect(pixels, 34, 0, 30, 24, "#1f1f2c");
   drawRect(pixels, 2, 2, 8, 8, "#0d0d15");
-  drawFilledCircle(pixels, 6, 6, 2, "#67dbff");
+  drawFilledCircle(pixels, 6, 6, 2, "#4ca6c4");
 
   drawClockTextToPixels(
     context.timeText.slice(0, 2),
     38,
     8,
-    "#ffffff",
+    "#d8dfd7",
     pixels,
     "rounded_4x6",
     2,
@@ -484,28 +484,28 @@ function renderPokedexTheme(context) {
     context.timeText.slice(3),
     42,
     21,
-    "#ffffff",
+    "#d8dfd7",
     pixels,
     "rounded_4x6",
     2,
   );
 
-  drawFilledCircle(pixels, 13, 24, 6, "#7ad6b3");
+  drawFilledCircle(pixels, 13, 24, 6, "#5da48b");
   setPixel(pixels, 11, 22, "#222222");
   setPixel(pixels, 15, 22, "#222222");
   drawLine(pixels, 11, 28, 15, 28, "#222222");
 
   for (let row = 0; row < 2; row++) {
     for (let col = 0; col < 4; col++) {
-      fillRect(pixels, 37 + col * 6, 33 + row * 6, 4, 4, "#39bfff");
+      fillRect(pixels, 37 + col * 6, 33 + row * 6, 4, 4, "#2d87ad");
     }
   }
 
-  fillRect(pixels, 8, 49, 10, 5, "#69dd5d");
+  fillRect(pixels, 8, 49, 10, 5, "#57a64f");
   fillRect(pixels, 21, 47, 3, 11, "#111111");
   fillRect(pixels, 17, 51, 11, 3, "#111111");
-  fillRect(pixels, 35, 49, 10, 2, "#ffffff");
-  fillRect(pixels, 35, 55, 22, 2, "#ef392c");
+  fillRect(pixels, 35, 49, 10, 2, "#d8dfd7");
+  fillRect(pixels, 35, 55, 22, 2, "#a72b25");
   return pixels;
 }
 

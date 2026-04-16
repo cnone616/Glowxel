@@ -358,10 +358,7 @@ export default {
     this.deviceStore.init();
 
     if (!options || typeof options.reminderId !== "string") {
-      uni.showToast({
-        title: "提醒参数缺失",
-        icon: "none",
-      });
+      this.toast.showError("提醒参数缺失");
       setTimeout(() => {
         uni.navigateBack();
       }, 300);
@@ -370,10 +367,7 @@ export default {
 
     const reminder = getNotificationReminder(options.reminderId);
     if (!reminder) {
-      uni.showToast({
-        title: "提醒不存在",
-        icon: "none",
-      });
+      this.toast.showError("提醒不存在");
       setTimeout(() => {
         uni.navigateBack();
       }, 300);

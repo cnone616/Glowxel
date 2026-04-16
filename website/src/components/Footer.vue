@@ -52,16 +52,17 @@ onUnmounted(() => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: var(--nb-border-width) solid var(--nb-ink);
-  background: var(--tone-paper-soft);
-  box-shadow: 6px 6px 0 #000000;
+  border: 1px solid rgba(36, 49, 66, 0.08);
+  background: rgba(255, 255, 255, 0.82);
+  border-radius: 20px;
+  box-shadow: var(--nb-shadow-card);
   color: var(--nb-ink);
   cursor: pointer;
   z-index: 1100;
 }
 
 .back-to-top:hover {
-  background: var(--nb-blue);
+  background: rgba(136, 161, 186, 0.16);
 }
 
 .back-to-top__arrow {
@@ -76,7 +77,7 @@ onUnmounted(() => {
     bottom: 16px;
     width: 52px;
     height: 52px;
-    box-shadow: 4px 4px 0 #000000;
+    border-radius: 18px;
   }
 
   .back-to-top__arrow {

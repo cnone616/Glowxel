@@ -451,6 +451,13 @@ uint16_t readProgmemColor565(const uint16_t* bitmap, int index) {
   return pgm_read_word(&bitmap[index]);
 }
 
+uint16_t scaleColor565(uint16_t color, uint8_t scale) {
+  uint8_t red = static_cast<uint8_t>(((color >> 11) & 0x1F) * scale / 255);
+  uint8_t green = static_cast<uint8_t>(((color >> 5) & 0x3F) * scale / 255);
+  uint8_t blue = static_cast<uint8_t>((color & 0x1F) * scale / 255);
+  return static_cast<uint16_t>((red << 11) | (green << 5) | blue);
+}
+
 void drawBitmap565(
   MatrixPanel_I2S_DMA* display,
   int x,
@@ -463,6 +470,23 @@ void drawBitmap565(
     for (int px = 0; px < width; px++) {
       uint16_t color = readProgmemColor565(bitmap, py * width + px);
       setPixel(display, x + px, y + py, color);
+    }
+  }
+}
+
+void drawBitmap565Scaled(
+  MatrixPanel_I2S_DMA* display,
+  int x,
+  int y,
+  const uint16_t* bitmap,
+  int width,
+  int height,
+  uint8_t scale
+) {
+  for (int py = 0; py < height; py++) {
+    for (int px = 0; px < width; px++) {
+      uint16_t color = readProgmemColor565(bitmap, py * width + px);
+      setPixel(display, x + px, y + py, scaleColor565(color, scale));
     }
   }
 }
@@ -1878,12 +1902,16 @@ void renderPokedexTheme(
   MatrixPanel_I2S_DMA* display,
   const struct tm* timeinfo
 ) {
-  const uint16_t kLightGreen = 0x754d;
-  const uint16_t kDarkGreen = 0x0264;
-  const uint16_t kDarkBlue = 0x016D;
-  const uint16_t kLightBlack = 0x10c4;
-  const uint16_t kStatusLedOn = display->color565(164, 244, 255);
-  const uint16_t kStatusLedOff = display->color565(78, 116, 122);
+  constexpr uint8_t kPokedexBackgroundScale = 144;
+  constexpr uint8_t kPokedexPokemonScale = 156;
+  constexpr uint8_t kPokedexAccentScale = 176;
+  const uint16_t kLightGreen = scaleColor565(0x754d, kPokedexAccentScale);
+  const uint16_t kDarkGreen = scaleColor565(0x0264, 196);
+  const uint16_t kDarkBlue = scaleColor565(0x016D, 184);
+  const uint16_t kLightBlack = scaleColor565(0x10c4, 172);
+  const uint16_t kStatusLedOn = scaleColor565(display->color565(164, 244, 255), 160);
+  const uint16_t kStatusLedOff = scaleColor565(display->color565(78, 116, 122), 170);
+  const uint16_t kClockTextColor = scaleColor565(0xFFFF, 208);
   const uint16_t* const pokemons[] = {
     pokemon1, pokemon2, pokemon3, pokemon4, pokemon5, pokemon6, pokemon7
   };
@@ -1909,9 +1937,19 @@ void renderPokedexTheme(
     gPokedexThemeState.blinkColor = (second % 2 == 0) ? kStatusLedOn : kStatusLedOff;
   }
 
-  drawBitmap565(display, 0, 0, POKEDEX_BG, 64, 64);
+  // 图鉴主题原图亮面占比很高，板载上会明显放大供电压力。
+  // 这里仅收这个主题的像素亮度，不改其他主题和全局亮度语义。
+  drawBitmap565Scaled(display, 0, 0, POKEDEX_BG, 64, 64, kPokedexBackgroundScale);
 
-  drawBitmap565(display, 8, 21, pokemons[gPokedexThemeState.pokemonIndex], 16, 16);
+  drawBitmap565Scaled(
+    display,
+    8,
+    21,
+    pokemons[gPokedexThemeState.pokemonIndex],
+    16,
+    16,
+    kPokedexPokemonScale
+  );
 
   fillRect(display, 35, 17, 26, 14, kLightBlack);
 
@@ -1926,13 +1964,13 @@ void renderPokedexTheme(
   }
 
   display->setFont(&PKMN_RBYGSC4pt7b);
-  display->setTextColor(0xFFFF);
+  display->setTextColor(kClockTextColor);
   display->setCursor(35, 22);
   display->print(hourText);
   display->setCursor(46, 30);
   display->print(minuteText);
   if (themeUses12HourFormat()) {
-    display->drawBitmap(55, 18, isThemeAM(timeinfo) ? AM_SIGN : PM_SIGN, 4, 4, 0xFFFF);
+    display->drawBitmap(55, 18, isThemeAM(timeinfo) ? AM_SIGN : PM_SIGN, 4, 4, kClockTextColor);
   }
 
   if (timeinfo != nullptr) {

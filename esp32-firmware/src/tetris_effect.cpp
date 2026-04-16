@@ -12,8 +12,10 @@ int TetrisEffect::cols = 32;
 int TetrisEffect::rows = 32;
 int TetrisEffect::curType = 0;
 int TetrisEffect::curRot = 0;
+int TetrisEffect::targetRot = 0;
 int TetrisEffect::curX = 0;
 int TetrisEffect::curY = 0;
+int TetrisEffect::targetX = 0;
 uint8_t TetrisEffect::curColor = 1;
 unsigned long TetrisEffect::lastDropTime = 0;
 bool TetrisEffect::needsRender = true;
@@ -217,9 +219,42 @@ void TetrisEffect::spawnPiece() {
     }
   }
 
-  curRot = bestRot;
-  curX = bestX;
-  curY = -2;
+  targetRot = bestRot;
+  targetX = bestX;
+  curRot = 0;
+  curY = 0;
+
+  const int preferredSpawnX = constrain(cols / 2 - 2, 0, max(0, cols - 1));
+  curX = preferredSpawnX;
+
+  if (!canMove(curType, curRot, curX, curY)) {
+    bool foundSpawn = false;
+    const int maxSpawnX = max(0, cols - 1);
+    for (int delta = 1; delta <= cols; delta++) {
+      const int leftX = preferredSpawnX - delta;
+      if (leftX >= 0 && leftX <= maxSpawnX &&
+          canMove(curType, curRot, leftX, curY)) {
+        curX = leftX;
+        foundSpawn = true;
+        break;
+      }
+
+      const int rightX = preferredSpawnX + delta;
+      if (rightX >= 0 && rightX <= maxSpawnX &&
+          canMove(curType, curRot, rightX, curY)) {
+        curX = rightX;
+        foundSpawn = true;
+        break;
+      }
+    }
+
+    if (!foundSpawn) {
+      resetBoard();
+      spawnPiece();
+      return;
+    }
+  }
+
   needsRender = true;
 }
 
@@ -268,30 +303,53 @@ void TetrisEffect::update() {
   }
   lastDropTime = now;
 
+  if (curRot != targetRot) {
+    const int nextRot = (curRot + 1) % 4;
+    if (canMove(curType, nextRot, curX, curY)) {
+      curRot = nextRot;
+      needsRender = true;
+      return;
+    }
+    targetRot = curRot;
+  }
+
+  if (curX < targetX && canMove(curType, curRot, curX + 1, curY)) {
+    curX++;
+    needsRender = true;
+    return;
+  }
+
+  if (curX > targetX && canMove(curType, curRot, curX - 1, curY)) {
+    curX--;
+    needsRender = true;
+    return;
+  }
+
   if (canMove(curType, curRot, curX, curY + 1)) {
     curY++;
     needsRender = true;
-  } else {
-    lockPiece();
-
-    if (doClearLines) {
-      clearLines();
-    }
-
-    bool topFull = false;
-    for (int x = 0; x < cols; x++) {
-      if (board[0][x] != 0 || board[1][x] != 0) {
-        topFull = true;
-        break;
-      }
-    }
-    if (topFull) {
-      resetBoard();
-    }
-
-    spawnPiece();
-    needsRender = true;
+    return;
   }
+
+  lockPiece();
+
+  if (doClearLines) {
+    clearLines();
+  }
+
+  bool topFull = false;
+  for (int x = 0; x < cols; x++) {
+    if (board[0][x] != 0 || board[1][x] != 0) {
+      topFull = true;
+      break;
+    }
+  }
+  if (topFull) {
+    resetBoard();
+  }
+
+  spawnPiece();
+  needsRender = true;
 }
 
 void TetrisEffect::render(MatrixPanel_I2S_DMA* display) {
@@ -300,20 +358,33 @@ void TetrisEffect::render(MatrixPanel_I2S_DMA* display) {
   }
   needsRender = false;
 
+  uint16_t* frameBuffer = &DisplayManager::animationBuffer[0][0];
+  if (!DisplayManager::beginRedirectedFrame(frameBuffer, 0)) {
+    return;
+  }
+
   for (int y = 0; y < rows; y++) {
     for (int x = 0; x < cols; x++) {
       uint8_t c = board[y][x];
+      uint16_t blockColor565 = 0;
       if (c > 0) {
         const uint8_t* rgb = colors[c - 1];
+        blockColor565 = display->color565(rgb[0], rgb[1], rgb[2]);
         for (int dy = 0; dy < cellSize; dy++) {
           for (int dx = 0; dx < cellSize; dx++) {
-            display->drawPixelRGB888(x * cellSize + dx, y * cellSize + dy, rgb[0], rgb[1], rgb[2]);
+            int px = x * cellSize + dx;
+            int py = y * cellSize + dy;
+            display->drawPixelRGB888(px, py, rgb[0], rgb[1], rgb[2]);
+            DisplayManager::backgroundBuffer[py][px] = blockColor565;
           }
         }
       } else {
         for (int dy = 0; dy < cellSize; dy++) {
           for (int dx = 0; dx < cellSize; dx++) {
-            display->drawPixelRGB888(x * cellSize + dx, y * cellSize + dy, 0, 0, 0);
+            int px = x * cellSize + dx;
+            int py = y * cellSize + dy;
+            display->drawPixelRGB888(px, py, 0, 0, 0);
+            DisplayManager::backgroundBuffer[py][px] = 0;
           }
         }
       }
@@ -327,9 +398,13 @@ void TetrisEffect::render(MatrixPanel_I2S_DMA* display) {
     int px = curX + cells[i][0];
     int py = curY + cells[i][1];
     if (px >= 0 && px < cols && py >= 0 && py < rows) {
+      uint16_t pieceColor565 = display->color565(rgb[0], rgb[1], rgb[2]);
       for (int dy = 0; dy < cellSize; dy++) {
         for (int dx = 0; dx < cellSize; dx++) {
-          display->drawPixelRGB888(px * cellSize + dx, py * cellSize + dy, rgb[0], rgb[1], rgb[2]);
+          int drawX = px * cellSize + dx;
+          int drawY = py * cellSize + dy;
+          display->drawPixelRGB888(drawX, drawY, rgb[0], rgb[1], rgb[2]);
+          DisplayManager::backgroundBuffer[drawY][drawX] = pieceColor565;
         }
       }
     }
@@ -338,4 +413,6 @@ void TetrisEffect::render(MatrixPanel_I2S_DMA* display) {
   if (showClock) {
     DisplayManager::drawClockOverlay();
   }
+
+  DisplayManager::endRedirectedFrame(true);
 }

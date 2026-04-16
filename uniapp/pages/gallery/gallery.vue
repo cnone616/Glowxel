@@ -121,16 +121,22 @@
         </view>
       </view>
     </scroll-view>
+
+    <Toast />
   </view>
 </template>
 
 <script>
 import { artworkAPI, challengeAPI, likeAPI, templateAPI } from '../../api/index.js'
+import { useToast } from '../../composables/useToast.js'
 import statusBarMixin from '../../mixins/statusBar.js'
 import ArtworkCard from '../../components/ArtworkCard.vue'
 import TemplateCard from '../../components/TemplateCard.vue'
 import ChallengeCard from '../../components/ChallengeCard.vue'
 import Icon from '../../components/Icon.vue'
+import Toast from '../../components/Toast.vue'
+
+const toast = useToast()
 
 export default {
   mixins: [statusBarMixin],
@@ -138,7 +144,8 @@ export default {
     ArtworkCard,
     TemplateCard,
     ChallengeCard,
-    Icon
+    Icon,
+    Toast
   },
   
   data() {
@@ -267,10 +274,7 @@ export default {
         await this.loadArtworks(true)
       } catch (error) {
         console.error('加载数据失败:', error)
-        uni.showToast({
-          title: '加载失败',
-          icon: 'error'
-        })
+        toast.showError('加载失败')
       } finally {
         this.isLoading = false
       }
@@ -432,10 +436,7 @@ export default {
           artwork.likes -= 1
         }
       } catch (error) {
-        uni.showToast({
-          title: '操作失败',
-          icon: 'none'
-        })
+        toast.showError('操作失败')
       }
     },
     
@@ -495,15 +496,9 @@ export default {
         if (res.data.changed) {
           challenge.participants += 1
         }
-        uni.showToast({
-          title: '已参与挑战',
-          icon: 'success'
-        })
+        toast.showSuccess('已参与挑战')
       } catch (error) {
-        uni.showToast({
-          title: '参与失败',
-          icon: 'none'
-        })
+        toast.showError('参与失败')
       }
     }
   }

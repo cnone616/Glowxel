@@ -169,6 +169,15 @@
       }
     },
     {
+      "path": "pages/github-scene-preview/index",
+      "style": {
+        "navigationStyle": "custom",
+        "navigationBarTextStyle": "white",
+        "backgroundColor": "#1a1a1a",
+        "enablePullDownRefresh": false
+      }
+    },
+    {
       "path": "pages/gif-player/gif-player",
       "style": {
         "navigationStyle": "custom",
@@ -179,6 +188,15 @@
     },
     {
       "path": "pages/game-screensaver/game-screensaver",
+      "style": {
+        "navigationStyle": "custom",
+        "navigationBarTextStyle": "white",
+        "backgroundColor": "#1a1a1a",
+        "enablePullDownRefresh": false
+      }
+    },
+    {
+      "path": "pages/planet-screensaver/planet-screensaver",
       "style": {
         "navigationStyle": "custom",
         "navigationBarTextStyle": "white",

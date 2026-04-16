@@ -3,7 +3,9 @@
     <div class="container">
       <div class="header">
         <div class="header-content">
+          <span class="header-kicker">Workspace</span>
           <h1 class="header-title">创作中心</h1>
+          <p class="header-desc">从这里开始新建、导入图片，或者继续编辑已有画布。</p>
         </div>
       </div>
 
@@ -147,22 +149,49 @@ onMounted(async () => {
 
 .header {
   margin-bottom: 24px;
-  border: 3px solid var(--nb-ink);
-  background: var(--tone-paper-soft);
+  border: 1px solid rgba(36, 49, 66, 0.08);
+  border-radius: 30px;
+  background:
+    radial-gradient(circle at top right, rgba(136, 161, 186, 0.16), transparent 30%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(251, 247, 241, 0.82));
   box-shadow: var(--nb-shadow-strong);
 }
 
 .header-content {
-  height: 72px;
+  min-height: 168px;
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  align-items: flex-start;
   justify-content: center;
+  gap: 10px;
+  padding: 30px 32px;
+}
+
+.header-kicker {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: rgba(136, 161, 186, 0.14);
+  color: var(--nb-ink);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .header-title {
-  font-size: 28px;
-  font-weight: 900;
+  font-size: 34px;
+  font-weight: 700;
   color: var(--nb-ink);
+}
+
+.header-desc {
+  max-width: 560px;
+  font-size: 15px;
+  line-height: 1.75;
+  color: var(--text-secondary);
 }
 
 .main-content {
@@ -181,8 +210,9 @@ onMounted(async () => {
 .quick-actions,
 .my-projects {
   padding: 24px;
-  border: 3px solid var(--nb-ink);
-  background: var(--tone-paper-soft);
+  border: 1px solid rgba(36, 49, 66, 0.08);
+  border-radius: 28px;
+  background: rgba(255, 255, 255, 0.8);
   box-shadow: var(--nb-shadow-card);
 }
 
@@ -195,13 +225,21 @@ onMounted(async () => {
 .action-card {
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: flex-start;
   gap: 10px;
   padding: 28px 18px;
-  border: 3px solid var(--nb-ink);
-  background: var(--tone-paper-soft);
+  border: 1px solid rgba(36, 49, 66, 0.08);
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.74);
   text-decoration: none;
   box-shadow: var(--nb-shadow-soft);
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.action-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(136, 161, 186, 0.18);
+  box-shadow: var(--nb-shadow-card);
 }
 
 .action-icon {
@@ -210,23 +248,23 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 2px solid var(--nb-ink);
+  border-radius: 22px;
 }
 
 .action-icon.blue {
-  background: var(--nb-blue);
+  background: rgba(136, 161, 186, 0.18);
   color: var(--nb-ink);
 }
 
 .action-icon.green {
-  background: var(--nb-green);
+  background: rgba(155, 179, 158, 0.2);
   color: var(--nb-ink);
 }
 
 .action-title {
   font-size: 18px;
   color: var(--nb-ink);
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .action-subtitle {
@@ -250,7 +288,7 @@ onMounted(async () => {
 
 .section-title {
   font-size: 24px;
-  font-weight: 900;
+  font-weight: 700;
   color: var(--nb-ink);
 }
 
@@ -273,8 +311,9 @@ onMounted(async () => {
 .spinner {
   width: 28px;
   height: 28px;
-  border: 3px solid var(--nb-ink);
-  border-top-color: var(--nb-yellow);
+  border: 3px solid rgba(136, 161, 186, 0.2);
+  border-top-color: var(--nb-blue);
+  border-radius: 999px;
   animation: spin 0.7s linear infinite;
 }
 
@@ -290,7 +329,7 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 3px solid var(--nb-ink);
+  border-radius: 22px;
   background: var(--tone-blue-soft);
   box-shadow: var(--nb-shadow-soft);
 }
@@ -298,7 +337,7 @@ onMounted(async () => {
 .empty-title {
   font-size: 18px;
   color: var(--nb-ink);
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .empty-subtitle {
@@ -312,13 +351,14 @@ onMounted(async () => {
   justify-content: center;
   min-height: 44px;
   padding: 10px 18px;
-  border: 2px solid var(--nb-ink);
+  border: 1px solid rgba(215, 178, 109, 0.36);
+  border-radius: 999px;
   background: var(--nb-yellow);
   box-shadow: var(--nb-shadow-soft);
   color: var(--nb-ink);
   text-decoration: none;
   font-size: 14px;
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .projects-grid {
@@ -329,19 +369,20 @@ onMounted(async () => {
 
 .project-card {
   overflow: hidden;
-  border: 3px solid var(--nb-ink);
-  background: var(--tone-paper-soft);
+  border: 1px solid rgba(36, 49, 66, 0.08);
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.78);
   box-shadow: var(--nb-shadow-soft);
 }
 
 .project-thumb {
   position: relative;
   aspect-ratio: 1;
-  background: var(--tone-paper-soft);
+  background: rgba(255, 255, 255, 0.72);
   background-size: cover;
   background-position: center;
   cursor: pointer;
-  border-bottom: 3px solid var(--nb-ink);
+  border-bottom: 1px solid rgba(36, 49, 66, 0.08);
 }
 
 .thumb-placeholder {
@@ -363,17 +404,18 @@ onMounted(async () => {
 .action-btn {
   height: 30px;
   padding: 0 12px;
-  border: 2px solid var(--nb-ink);
-  background: var(--tone-paper-soft);
+  border: 1px solid rgba(36, 49, 66, 0.08);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.84);
   color: var(--nb-ink);
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 700;
   cursor: pointer;
-  box-shadow: 2px 2px 0 #000000;
+  box-shadow: var(--nb-shadow-soft);
 }
 
 .action-btn.danger {
-  background: var(--nb-coral);
+  background: rgba(213, 155, 142, 0.22);
   color: var(--nb-ink);
 }
 
@@ -386,7 +428,7 @@ onMounted(async () => {
 .project-name {
   font-size: 15px;
   color: var(--nb-ink);
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .project-meta,
@@ -407,15 +449,19 @@ onMounted(async () => {
 
   .header {
     margin-bottom: 12px;
-    box-shadow: 6px 6px 0 #000000;
   }
 
   .header-content {
-    height: 56px;
+    min-height: 128px;
+    padding: 22px 20px;
   }
 
   .header-title {
-    font-size: 20px;
+    font-size: 26px;
+  }
+
+  .header-desc {
+    font-size: 14px;
   }
 
   .quick-actions,
@@ -430,6 +476,7 @@ onMounted(async () => {
 
   .action-card {
     padding: 18px 10px;
+    align-items: center;
   }
 
   .action-icon {

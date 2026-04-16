@@ -33,6 +33,7 @@ pnpm-debug.log*
 *.tmp
 *.temp
 .cache/
+.tmp-repos/
 
 # 系统文件
 Thumbs.db

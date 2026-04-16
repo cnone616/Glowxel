@@ -58,15 +58,15 @@ defineProps({
 .brand-copy {
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 4px;
   min-width: 0;
 }
 
 .brand-name {
   color: var(--nb-ink);
   font-size: 18px;
-  font-weight: 900;
-  letter-spacing: 0.04em;
+  font-weight: 700;
+  letter-spacing: 0.02em;
   line-height: 1;
   white-space: nowrap;
 }
@@ -77,12 +77,13 @@ defineProps({
   width: fit-content;
   padding: 4px 9px 3px;
   color: var(--nb-ink);
-  font-size: 11px;
-  font-weight: 900;
-  letter-spacing: 0.18em;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
   line-height: 1;
-  border: var(--nb-border-width) solid var(--nb-ink);
-  background: var(--nb-yellow);
+  border: 1px solid rgba(215, 178, 109, 0.28);
+  border-radius: 999px;
+  background: rgba(215, 178, 109, 0.18);
   white-space: nowrap;
 }
 

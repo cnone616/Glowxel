@@ -90,7 +90,8 @@ export const useDeviceStore = defineStore('device', {
           data.effectMode === 'weather' ||
           data.effectMode === 'countdown' ||
           data.effectMode === 'stopwatch' ||
-          data.effectMode === 'notification'
+          data.effectMode === 'notification' ||
+          data.effectMode === 'planet_screensaver'
         ) {
           return data.effectMode
         }
@@ -108,7 +109,8 @@ export const useDeviceStore = defineStore('device', {
         data.mode === 'weather' ||
         data.mode === 'countdown' ||
         data.mode === 'stopwatch' ||
-        data.mode === 'notification'
+        data.mode === 'notification' ||
+        data.mode === 'planet_screensaver'
       ) {
         return data.mode
       }

@@ -401,15 +401,24 @@ export default {
       uni.setStorageSync("tetris_config", this.config);
       try {
         const ws = this.deviceStore.getWebSocket();
-        await ws.send({
-          cmd: "set_mode",
-          mode: "tetris",
-          clearMode: this.config.clearMode,
-          cellSize: this.config.cellSize,
-          speed: TETRIS_SPEED_OPTIONS[this.config.speed],
-          showClock: this.config.showClock,
-          pieces: this.config.pieces,
-        });
+        await ws.waitForCommand(
+          {
+            cmd: "set_mode",
+            mode: "tetris",
+            clearMode: this.config.clearMode,
+            cellSize: this.config.cellSize,
+            speed: TETRIS_SPEED_OPTIONS[this.config.speed],
+            showClock: this.config.showClock,
+            pieces: this.config.pieces,
+          },
+          "tetris started",
+          5000,
+        );
+        const status = await ws.getStatus();
+        if (status.effectMode !== "tetris") {
+          throw new Error("设备未进入俄罗斯方块屏保");
+        }
+        this.deviceStore.setDeviceMode("tetris", { businessMode: true });
         this.toast.showSuccess("已应用");
         const pages = getCurrentPages();
         if (pages.length >= 2) {

@@ -68,6 +68,9 @@
 
 <script>
 import Icon from './Icon.vue'
+import { useToast } from '../composables/useToast.js'
+
+const toast = useToast()
 
 export default {
   components: {
@@ -116,7 +119,7 @@ export default {
 
       const status = this.project.status || 'draft'
       if (status === 'reviewing') {
-        uni.showToast({ title: '审核中，暂不可编辑', icon: 'none' })
+        toast.showInfo('审核中，暂不可编辑')
         return
       }
       // 所有项目都先进入看板总览

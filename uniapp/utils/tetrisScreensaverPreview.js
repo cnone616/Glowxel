@@ -212,6 +212,37 @@ function pickPiece(state) {
   return state.pieces[choiceIndex];
 }
 
+function resolveSpawnX(state, type) {
+  const preferredSpawnX = Math.max(
+    0,
+    Math.min(state.cols - 1, Math.floor(state.cols / 2) - 2),
+  );
+
+  if (canMove(state.board, state.cols, state.rows, type, 0, preferredSpawnX, 0)) {
+    return preferredSpawnX;
+  }
+
+  for (let delta = 1; delta <= state.cols; delta += 1) {
+    const leftX = preferredSpawnX - delta;
+    if (
+      leftX >= 0 &&
+      canMove(state.board, state.cols, state.rows, type, 0, leftX, 0)
+    ) {
+      return leftX;
+    }
+
+    const rightX = preferredSpawnX + delta;
+    if (
+      rightX < state.cols &&
+      canMove(state.board, state.cols, state.rows, type, 0, rightX, 0)
+    ) {
+      return rightX;
+    }
+  }
+
+  return null;
+}
+
 function spawnPiece(state) {
   const type = pickPiece(state);
   const colorIndex = type + 1;
@@ -262,12 +293,20 @@ function spawnPiece(state) {
     }
   }
 
+  const spawnX = resolveSpawnX(state, type);
+  if (spawnX === null) {
+    state.board = createBoard(state.rows, state.cols);
+    return spawnPiece(state);
+  }
+
   return {
     type,
-    rotation: bestRotation,
-    x: bestX,
-    y: -2,
+    rotation: 0,
+    x: spawnX,
+    y: 0,
     colorIndex,
+    targetRotation: bestRotation,
+    targetX: bestX,
   };
 }
 
@@ -372,22 +411,6 @@ function drawClockOverlay(map) {
   );
 }
 
-function dropPieceToLanding(state, piece) {
-  while (
-    canMove(
-      state.board,
-      state.cols,
-      state.rows,
-      piece.type,
-      piece.rotation,
-      piece.x,
-      piece.y + 1,
-    )
-  ) {
-    piece.y += 1;
-  }
-}
-
 function settlePiece(state, piece) {
   lockPiece(state, piece);
   if (state.clearMode) {
@@ -398,46 +421,6 @@ function settlePiece(state, piece) {
     return true;
   }
   return false;
-}
-
-function movePieceIntoPreviewArea(state, piece) {
-  const targetY = Math.max(0, Math.floor(state.rows * 0.18));
-  while (
-    piece.y < targetY &&
-    canMove(
-      state.board,
-      state.cols,
-      state.rows,
-      piece.type,
-      piece.rotation,
-      piece.x,
-      piece.y + 1,
-    )
-  ) {
-    piece.y += 1;
-  }
-}
-
-function seedPreviewBoard(state) {
-  const seedCount = 4;
-  for (let index = 0; index < seedCount; index += 1) {
-    const piece = spawnPiece(state);
-    if (
-      !canMove(
-        state.board,
-        state.cols,
-        state.rows,
-        piece.type,
-        piece.rotation,
-        piece.x,
-        piece.y,
-      )
-    ) {
-      state.board = createBoard(state.rows, state.cols);
-    }
-    dropPieceToLanding(state, piece);
-    settlePiece(state, piece);
-  }
 }
 
 function renderFrame(state, piece, showClock) {
@@ -484,10 +467,7 @@ function createTetrisScreensaverPreviewState(config) {
     frameDelay: resolveFrameDelay(safeConfig.speed),
     currentPiece: null,
   };
-
-  seedPreviewBoard(state);
   state.currentPiece = spawnPiece(state);
-  movePieceIntoPreviewArea(state, state.currentPiece);
   return state;
 }
 
@@ -500,6 +480,57 @@ function renderTetrisScreensaverPreviewState(state) {
 
 function stepTetrisScreensaverPreviewState(state) {
   if (!state || !state.currentPiece) {
+    return state;
+  }
+
+  if (state.currentPiece.rotation !== state.currentPiece.targetRotation) {
+    const nextRotation = (state.currentPiece.rotation + 1) % 4;
+    if (
+      canMove(
+        state.board,
+        state.cols,
+        state.rows,
+        state.currentPiece.type,
+        nextRotation,
+        state.currentPiece.x,
+        state.currentPiece.y,
+      )
+    ) {
+      state.currentPiece.rotation = nextRotation;
+      return state;
+    }
+    state.currentPiece.targetRotation = state.currentPiece.rotation;
+  }
+
+  if (
+    state.currentPiece.x < state.currentPiece.targetX &&
+    canMove(
+      state.board,
+      state.cols,
+      state.rows,
+      state.currentPiece.type,
+      state.currentPiece.rotation,
+      state.currentPiece.x + 1,
+      state.currentPiece.y,
+    )
+  ) {
+    state.currentPiece.x += 1;
+    return state;
+  }
+
+  if (
+    state.currentPiece.x > state.currentPiece.targetX &&
+    canMove(
+      state.board,
+      state.cols,
+      state.rows,
+      state.currentPiece.type,
+      state.currentPiece.rotation,
+      state.currentPiece.x - 1,
+      state.currentPiece.y,
+    )
+  ) {
+    state.currentPiece.x -= 1;
     return state;
   }
 
@@ -520,10 +551,9 @@ function stepTetrisScreensaverPreviewState(state) {
 
   const didResetBoard = settlePiece(state, state.currentPiece);
   if (didResetBoard) {
-    seedPreviewBoard(state);
+    state.board = createBoard(state.rows, state.cols);
   }
   state.currentPiece = spawnPiece(state);
-  movePieceIntoPreviewArea(state, state.currentPiece);
   return state;
 }
 

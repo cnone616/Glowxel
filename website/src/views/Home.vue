@@ -157,7 +157,7 @@ const hardwareSpecs = [
   {
     icon: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>`,
     label: "连接方式",
-    value: "WiFi + BLE",
+    value: "热点配网 + 局域网连接",
   },
   {
     icon: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12.55a11 11 0 0 1 14.08 0M1.42 9a16 16 0 0 1 21.16 0M8.53 16.11a6 6 0 0 1 6.95 0M12 20h.01"/></svg>`,
@@ -177,7 +177,7 @@ const hardwareSpecs = [
 ];
 
 const setupSteps = [
-  "连接设备并完成基础配网",
+  "首次使用先连接设备热点并打开 192.168.4.1 完成配网",
   "选择图片、像素内容或时钟样式",
   "一键同步到设备并立即预览效果",
   "在网页或小程序中继续调整和控制",
@@ -210,16 +210,19 @@ onMounted(async () => {
 }
 
 .hero {
-  padding: 24px 0 56px;
+  padding: 18px 0 48px;
 }
 
 .hero .container {
   position: relative;
   overflow: hidden;
-  padding: 52px 40px;
+  padding: 64px 40px;
   text-align: center;
-  border: 3px solid var(--nb-ink);
-  background: linear-gradient(180deg, var(--nb-paper) 0%, var(--tone-yellow-soft) 100%);
+  border: 1px solid rgba(36, 49, 66, 0.08);
+  border-radius: 36px;
+  background:
+    radial-gradient(circle at top, rgba(215, 178, 109, 0.18), transparent 34%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.92) 0%, rgba(251, 247, 241, 0.86) 100%);
   box-shadow: var(--shadow-card);
 }
 
@@ -227,24 +230,25 @@ onMounted(async () => {
 .hero .container::after {
   content: "";
   position: absolute;
-  border: 3px solid var(--nb-ink);
   z-index: 0;
+  border-radius: 999px;
+  filter: blur(4px);
 }
 
 .hero .container::before {
-  width: 120px;
-  height: 120px;
-  top: -36px;
-  right: -36px;
-  background: var(--nb-blue);
+  width: 280px;
+  height: 280px;
+  top: -120px;
+  right: -80px;
+  background: rgba(136, 161, 186, 0.16);
 }
 
 .hero .container::after {
-  width: 88px;
-  height: 88px;
-  left: -24px;
-  bottom: -24px;
-  background: var(--nb-green);
+  width: 220px;
+  height: 220px;
+  left: -84px;
+  bottom: -110px;
+  background: rgba(155, 179, 158, 0.18);
 }
 
 .hero .container > * {
@@ -254,9 +258,9 @@ onMounted(async () => {
 
 .hero-title {
   font-size: 64px;
-  font-weight: 900;
+  font-weight: 700;
   color: var(--nb-ink);
-  letter-spacing: -0.03em;
+  letter-spacing: -0.04em;
   line-height: 1.05;
 }
 
@@ -267,11 +271,12 @@ onMounted(async () => {
   min-height: 42px;
   padding: 8px 16px;
   margin-top: 16px;
-  border: 2px solid var(--nb-ink);
-  background: var(--tone-paper-soft);
+  border: 1px solid rgba(136, 161, 186, 0.22);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.78);
   box-shadow: var(--nb-shadow-soft);
-  font-size: 16px;
-  font-weight: 800;
+  font-size: 15px;
+  font-weight: 600;
   color: var(--nb-ink);
 }
 
@@ -279,9 +284,10 @@ onMounted(async () => {
   font-size: 16px;
   color: var(--nb-text-secondary);
   margin-top: 18px;
-  max-width: 620px;
+  max-width: 680px;
   margin-left: auto;
   margin-right: auto;
+  line-height: 1.8;
 }
 
 .hero-actions {
@@ -293,13 +299,13 @@ onMounted(async () => {
 }
 
 .features {
-  padding: 60px 0;
+  padding: 52px 0;
 }
 
 .section-title {
   text-align: center;
   font-size: 34px;
-  font-weight: 900;
+  font-weight: 700;
   color: var(--nb-ink);
   margin-bottom: 40px;
   letter-spacing: -0.02em;
@@ -312,8 +318,9 @@ onMounted(async () => {
 }
 
 .feature-card {
-  background: var(--tone-paper-soft);
-  border: 3px solid var(--nb-ink);
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid rgba(36, 49, 66, 0.08);
+  border-radius: 28px;
   padding: 28px 24px;
   box-shadow: var(--nb-shadow-card);
 }
@@ -322,8 +329,8 @@ onMounted(async () => {
   width: 56px;
   height: 56px;
   background: var(--tone-blue-soft);
-  border: 2px solid var(--nb-ink);
-  box-shadow: var(--nb-shadow-soft);
+  border-radius: 18px;
+  box-shadow: inset 0 0 0 1px rgba(136, 161, 186, 0.18);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -333,7 +340,7 @@ onMounted(async () => {
 
 .feature-card h3 {
   font-size: 18px;
-  font-weight: 900;
+  font-weight: 700;
   color: var(--nb-ink);
   margin-bottom: 8px;
 }
@@ -345,7 +352,7 @@ onMounted(async () => {
 }
 
 .showcase {
-  padding: 60px 0;
+  padding: 52px 0;
 }
 
 .artwork-grid {
@@ -355,17 +362,24 @@ onMounted(async () => {
 }
 
 .artwork-card {
-  background: var(--tone-paper-soft);
-  border: 3px solid var(--nb-ink);
+  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(36, 49, 66, 0.08);
+  border-radius: 24px;
   overflow: hidden;
   cursor: pointer;
   box-shadow: var(--nb-shadow-card);
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.artwork-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--nb-shadow-strong);
 }
 
 .artwork-img {
   width: 100%;
   height: 176px;
-  border-bottom: 3px solid var(--nb-ink);
+  border-bottom: 1px solid rgba(36, 49, 66, 0.08);
 }
 
 .artwork-info {
@@ -378,7 +392,7 @@ onMounted(async () => {
 
 .artwork-title {
   font-size: 14px;
-  font-weight: 800;
+  font-weight: 700;
   color: var(--nb-ink);
 }
 
@@ -389,13 +403,14 @@ onMounted(async () => {
 }
 
 .about {
-  padding: 60px 0;
+  padding: 52px 0;
 }
 
 .about .container {
   padding: 32px 24px;
-  border: 3px solid var(--nb-ink);
-  background: var(--tone-paper-soft);
+  border: 1px solid rgba(36, 49, 66, 0.08);
+  border-radius: 30px;
+  background: rgba(255, 255, 255, 0.78);
   box-shadow: var(--nb-shadow-card);
 }
 
@@ -409,7 +424,7 @@ onMounted(async () => {
 }
 
 .hardware {
-  padding: 60px 0;
+  padding: 52px 0;
 }
 
 .section-desc {
@@ -427,8 +442,9 @@ onMounted(async () => {
 }
 
 .hardware-card {
-  background: var(--tone-paper-soft);
-  border: 3px solid var(--nb-ink);
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid rgba(36, 49, 66, 0.08);
+  border-radius: 24px;
   padding: 24px;
   text-align: center;
   box-shadow: var(--nb-shadow-card);
@@ -450,7 +466,7 @@ onMounted(async () => {
 
 .spec-value {
   font-size: 16px;
-  font-weight: 900;
+  font-weight: 700;
   color: var(--nb-ink);
 }
 
@@ -467,24 +483,25 @@ onMounted(async () => {
   display: flex;
   align-items: flex-start;
   gap: 12px;
-  background: var(--tone-paper-soft);
+  background: rgba(255, 255, 255, 0.74);
   padding: 16px;
-  border: 3px solid var(--nb-ink);
+  border: 1px solid rgba(36, 49, 66, 0.08);
+  border-radius: 22px;
   box-shadow: var(--nb-shadow-soft);
 }
 
 .step-num {
   width: 28px;
   height: 28px;
-  border: 2px solid var(--nb-ink);
-  background: var(--nb-blue);
+  background: rgba(136, 161, 186, 0.2);
   color: var(--nb-ink);
   font-size: 14px;
-  font-weight: 900;
+  font-weight: 700;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  border-radius: 999px;
 }
 
 .step-text {
@@ -508,6 +525,7 @@ onMounted(async () => {
 
   .hero .container {
     padding: 32px 18px;
+    border-radius: 26px;
     box-shadow: var(--nb-shadow-strong);
   }
 
@@ -544,6 +562,14 @@ onMounted(async () => {
   .section-title {
     font-size: 24px;
     margin-bottom: 24px;
+  }
+
+  .feature-card,
+  .hardware-card,
+  .artwork-card,
+  .about .container,
+  .step {
+    border-radius: 20px;
   }
 }
 </style>

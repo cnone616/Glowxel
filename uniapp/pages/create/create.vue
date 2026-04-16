@@ -425,6 +425,7 @@
       @cancel="onCropCancel"
     />
 
+    <LoadingOverlay />
     <!-- 自定义 Toast 组件 -->
     <Toast ref="toastRef" />
   </view>
@@ -439,6 +440,7 @@ import {
 } from "../../data/artkal-colors-full.js";
 import statusBarMixin from "../../mixins/statusBar.js";
 import Icon from "../../components/Icon.vue";
+import LoadingOverlay from "../../components/LoadingOverlay.vue";
 import Toast from "../../components/Toast.vue";
 import ImageCropper from "../../components/ImageCropper.vue";
 import createProjectSourceMixin from "./mixins/projectSourceMixin.js";
@@ -453,6 +455,7 @@ export default {
   mixins: [statusBarMixin, createProjectSourceMixin, createImagePreviewMixin],
   components: {
     Icon,
+    LoadingOverlay,
     Toast,
     ImageCropper,
   },

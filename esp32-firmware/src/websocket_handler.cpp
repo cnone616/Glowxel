@@ -181,6 +181,18 @@ void WebSocketHandler::restoreDisplayForCurrentMode() {
     return;
   }
 
+  if (DisplayManager::currentBusinessModeTag == "gif_player") {
+    if (AnimationManager::currentGIF != nullptr) {
+      AnimationManager::currentGIF->isPlaying = true;
+      AnimationManager::currentGIF->currentFrame = 0;
+      AnimationManager::currentGIF->lastFrameTime = millis();
+      AnimationManager::renderGIFFrame(0);
+      return;
+    }
+    DisplayManager::displayClock(true);
+    return;
+  }
+
   if (DisplayManager::currentBusinessModeTag == "text_display" ||
       DisplayManager::currentBusinessModeTag == "weather" ||
       DisplayManager::currentBusinessModeTag == "countdown" ||
@@ -192,13 +204,24 @@ void WebSocketHandler::restoreDisplayForCurrentMode() {
     }
   }
 
+  if (DisplayManager::currentBusinessModeTag == "planet_screensaver") {
+    if (!BoardNativeEffect::isActive()) {
+      BoardNativeEffect::applyPlanetScreensaverConfig(
+        BoardNativeEffect::getPlanetScreensaverConfig()
+      );
+    }
+    BoardNativeEffect::render();
+    return;
+  }
+
   if (DisplayManager::currentBusinessModeTag == "eyes") {
     DisplayManager::activateEyesEffect(ConfigManager::eyesConfig);
     DisplayManager::renderNativeEffect();
     return;
   }
 
-  if (DisplayManager::currentBusinessModeTag == "ambient_effect") {
+  if (DisplayManager::currentBusinessModeTag == "ambient_effect" ||
+      DisplayManager::currentBusinessModeTag == "led_matrix_showcase") {
     DisplayManager::activateAmbientEffect(DisplayManager::ambientEffectConfig);
     DisplayManager::renderNativeEffect();
     return;
@@ -306,8 +329,14 @@ void WebSocketHandler::onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *c
     // 连接时不切换模式，保持当前状态
 
     // 返回当前实际模式
-    String modeStr = getCurrentModeString();
-    String response = "{\"status\":\"connected\",\"device\":\"RenLight\",\"mode\":\"" + modeStr + "\"}";
+    String modeStr = modeToString(DisplayManager::currentMode);
+    String businessModeStr = getCurrentModeString();
+    String response =
+      "{\"status\":\"connected\",\"device\":\"RenLight\",\"mode\":\"" +
+      modeStr +
+      "\",\"businessMode\":\"" +
+      businessModeStr +
+      "\"}";
     client->text(response);
   }
   else if (type == WS_EVT_DISCONNECT) {

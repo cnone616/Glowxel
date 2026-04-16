@@ -139,7 +139,7 @@
       </view>
     </view>
 
-    <!-- Toast -->
+    <ConfirmDialogHost />
     <Toast ref="toastRef" />
   </view>
 </template>
@@ -147,8 +147,10 @@
 <script>
 import { useProjectStore } from "../../store/project.js";
 import { useToast } from "../../composables/useToast.js";
+import { useDialog } from "../../composables/useDialog.js";
 import statusBarMixin from "../../mixins/statusBar.js";
 import Icon from "../../components/Icon.vue";
+import ConfirmDialogHost from "../../components/ConfirmDialogHost.vue";
 import Toast from "../../components/Toast.vue";
 import ProjectCard from "../../components/ProjectCard.vue";
 
@@ -156,6 +158,7 @@ export default {
   mixins: [statusBarMixin],
   components: {
     Icon,
+    ConfirmDialogHost,
     Toast,
     ProjectCard,
   },
@@ -164,6 +167,7 @@ export default {
     return {
       projectStore: null,
       toast: null,
+      dialog: null,
       searchQuery: "",
       currentFilter: "all",
       currentSort: "updated",
@@ -289,6 +293,7 @@ export default {
   onLoad() {
     this.projectStore = useProjectStore();
     this.toast = useToast();
+    this.dialog = useDialog();
 
     // 加载项目数据
     this.projectStore.loadProjects();
@@ -350,13 +355,10 @@ export default {
       }
     },
 
-    viewPublishedWork(work) {
-      // 创建作品详情页面或弹窗显示
-      uni.showModal({
+    async viewPublishedWork(work) {
+      await this.dialog.alert({
         title: work.title || work.name,
         content: `作品尺寸: ${work.width}×${work.height}\n发布时间: ${this.formatDate(work.createTime)}\n\n${work.description || "暂无描述"}`,
-        showCancel: false,
-        confirmText: "确定",
       });
     },
 
@@ -415,30 +417,34 @@ export default {
       this.selectedWork = null;
     },
 
-    deleteWork() {
+    async deleteWork() {
       if (!this.selectedWork) return;
 
       const workName = this.selectedWork.name || this.selectedWork.title;
       const typeLabel =
         this.selectedWork.type === "published" ? "作品" : "草稿";
 
-      uni.showModal({
+      const selectedWork = this.selectedWork;
+      const confirmed = await this.dialog.confirm({
         title: "确认删除",
         content: `确定要删除${typeLabel}"${workName}"吗？`,
-        success: (res) => {
-          if (res.confirm) {
-            try {
-              this.projectStore.deleteProject(this.selectedWork.id);
-              this.toast.showSuccess(`${typeLabel}已删除`);
-              this.updateFilterCounts();
-            } catch (error) {
-              console.error("删除失败:", error);
-              this.toast.showError("删除失败");
-            }
-          }
-          this.selectedWork = null;
-        },
+        danger: true,
       });
+
+      if (!confirmed) {
+        this.selectedWork = null;
+        return;
+      }
+
+      try {
+        this.projectStore.deleteProject(selectedWork.id);
+        this.toast.showSuccess(`${typeLabel}已删除`);
+        this.updateFilterCounts();
+      } catch (error) {
+        console.error("删除失败:", error);
+        this.toast.showError("删除失败");
+      }
+      this.selectedWork = null;
     },
 
     loadMore() {

@@ -23,6 +23,81 @@ function hexToRgb(value) {
   };
 }
 
+function isErrorResponse(message) {
+  return !!(message && (message.error || message.status === "error"));
+}
+
+function buildMessageMatcher(expectedMessages) {
+  const targets = Array.isArray(expectedMessages)
+    ? expectedMessages
+    : [expectedMessages];
+
+  return (message) => {
+    if (!message || typeof message !== "object") {
+      return false;
+    }
+    if (isErrorResponse(message)) {
+      return true;
+    }
+    if (typeof message.message !== "string") {
+      return false;
+    }
+    return targets.includes(message.message);
+  };
+}
+
+function getSetModeSuccessMessage(mode) {
+  if (mode === "clock") {
+    return "switched to static clock mode";
+  }
+  if (mode === "canvas") {
+    return "switched to canvas mode";
+  }
+  if (mode === "animation") {
+    return "switched to animation mode";
+  }
+  if (mode === "theme") {
+    return "switched to theme mode";
+  }
+  if (mode === "text_display") {
+    return "switched to text display mode";
+  }
+  if (mode === "breath_effect") {
+    return "switched to breath effect mode";
+  }
+  if (mode === "rhythm_effect") {
+    return "switched to rhythm effect mode";
+  }
+  if (mode === "ambient_effect") {
+    return "switched to ambient effect mode";
+  }
+  if (mode === "transferring") {
+    return "entered transferring mode";
+  }
+  if (mode === "tetris") {
+    return "tetris started";
+  }
+  if (mode === "weather") {
+    return "switched to weather mode";
+  }
+  if (mode === "countdown") {
+    return "switched to countdown mode";
+  }
+  if (mode === "stopwatch") {
+    return "switched to stopwatch mode";
+  }
+  if (mode === "notification") {
+    return "switched to notification mode";
+  }
+  if (mode === "planet_screensaver") {
+    return "switched to planet screensaver mode";
+  }
+  if (mode === "eyes") {
+    return "switched to eyes mode";
+  }
+  return "";
+}
+
 class WebSocket {
   constructor() {
     this.socket = null;
@@ -568,7 +643,11 @@ class WebSocket {
             if (!message || typeof message !== "object") {
               return false;
             }
-            return message.status === "ok" || message.status === "error";
+            return (
+              message.status === "ok" ||
+              message.status === "success" ||
+              message.status === "error"
+            );
           };
 
     return new Promise((resolve, reject) => {
@@ -603,8 +682,40 @@ class WebSocket {
     );
   }
 
+  async getInfo() {
+    return this.sendAndWait(
+      { cmd: "get_info" },
+      3000,
+      (response) => {
+        if (!response || typeof response !== "object") {
+          return false;
+        }
+        if (isErrorResponse(response)) {
+          return true;
+        }
+        return (
+          response.status === "ok" &&
+          typeof response.firmware_version === "string" &&
+          typeof response.ip === "string"
+        );
+      },
+    );
+  }
+
+  waitForCommand(data, expectedMessages, timeout = 5000) {
+    return this.sendAndWait(
+      data,
+      timeout,
+      buildMessageMatcher(expectedMessages),
+    );
+  }
+
   async setMode(mode) {
-    return this.send({ cmd: "set_mode", mode });
+    const expectedMessage = getSetModeSuccessMessage(mode);
+    if (!expectedMessage) {
+      throw new Error(`未支持的模式切换确认：${mode}`);
+    }
+    return this.waitForCommand({ cmd: "set_mode", mode }, expectedMessage, 5000);
   }
 
   async setClockConfig(config) {
@@ -612,42 +723,89 @@ class WebSocket {
   }
 
   async setThemeConfig(themeId) {
-    return this.send({ cmd: "set_theme_config", themeId });
+    return this.waitForCommand(
+      { cmd: "set_theme_config", themeId },
+      "theme config updated",
+      5000,
+    );
   }
 
   async setEyesConfig(config) {
-    return this.send({ cmd: "set_eyes_config", config });
+    return this.waitForCommand(
+      { cmd: "set_eyes_config", config },
+      "eyes config updated",
+      5000,
+    );
   }
 
   async setAmbientEffect(config) {
     if (config.preset === "rain_scene") {
-      return this.send({
+      return this.waitForCommand(
+        {
+          cmd: "set_ambient_effect",
+          preset: config.preset,
+          speed: config.speed,
+          density: config.density,
+          color: hexToRgb(config.color),
+          loop: config.loop,
+        },
+        "ambient effect applied",
+        5000,
+      );
+    }
+
+    return this.waitForCommand(
+      {
         cmd: "set_ambient_effect",
         preset: config.preset,
         speed: config.speed,
-        density: config.density,
-        color: hexToRgb(config.color),
+        intensity: config.intensity,
         loop: config.loop,
-      });
-    }
-
-    return this.send({
-      cmd: "set_ambient_effect",
-      preset: config.preset,
-      speed: config.speed,
-      intensity: config.intensity,
-      loop: config.loop,
-    });
+      },
+      "ambient effect applied",
+      5000,
+    );
   }
 
   async setCountdownBoard(config) {
-    return this.send({
-      cmd: "set_countdown_board",
-      hours: config.hours,
-      minutes: config.minutes,
-      seconds: config.seconds,
-      progress: config.progress,
-    });
+    return this.waitForCommand(
+      {
+        cmd: "set_countdown_board",
+        hours: config.hours,
+        minutes: config.minutes,
+        seconds: config.seconds,
+        progress: config.progress,
+      },
+      "countdown board applied",
+      5000,
+    );
+  }
+
+  async setPlanetScreensaver(config) {
+    return this.waitForCommand(
+      {
+        cmd: "set_planet_screensaver",
+        preset: config.preset,
+        size: config.size,
+        direction: config.direction,
+        speed: config.speed,
+        seed: config.seed,
+        colorSeed: config.colorSeed,
+      },
+      "planet screensaver applied",
+      5000,
+    );
+  }
+
+  async setGifAnimation(animationData) {
+    return this.waitForCommand(
+      {
+        cmd: "set_gif_animation",
+        animationData,
+      },
+      animationData == null ? "animation cleared" : "compact animation loaded",
+      10000,
+    );
   }
 
   async eyesInteract(action) {
@@ -656,6 +814,14 @@ class WebSocket {
 
   async clear() {
     return this.send({ cmd: "clear" });
+  }
+
+  async saveCanvas() {
+    return this.waitForCommand({ cmd: "save_canvas" }, "canvas saved", 5000);
+  }
+
+  async clearCanvas() {
+    return this.waitForCommand({ cmd: "clear_canvas" }, "canvas cleared", 5000);
   }
 
   async setBrightness(value) {

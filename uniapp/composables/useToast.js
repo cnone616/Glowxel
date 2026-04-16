@@ -1,36 +1,75 @@
 /**
- * Toast 提示组合式函数
- * 支持自定义 Toast 组件（使用 cover-view 覆盖 canvas）
+ * Toast / Loading 统一提示组合式函数
  */
 
-let toastInstance = null
+const toastInstances = []
+const loadingInstances = []
+
+const registerInstance = (instances, instance) => {
+  if (!instance) {
+    return
+  }
+
+  const currentIndex = instances.indexOf(instance)
+  if (currentIndex !== -1) {
+    instances.splice(currentIndex, 1)
+  }
+  instances.push(instance)
+}
+
+const unregisterInstance = (instances, instance) => {
+  if (!instance) {
+    instances.length = 0
+    return
+  }
+
+  const currentIndex = instances.indexOf(instance)
+  if (currentIndex !== -1) {
+    instances.splice(currentIndex, 1)
+  }
+}
+
+const getActiveInstance = (instances) => {
+  if (instances.length === 0) {
+    return null
+  }
+
+  return instances[instances.length - 1]
+}
+
+export const bindToastInstance = (instance) => {
+  registerInstance(toastInstances, instance)
+}
+
+export const unbindToastInstance = (instance) => {
+  unregisterInstance(toastInstances, instance)
+}
+
+export const bindLoadingInstance = (instance) => {
+  registerInstance(loadingInstances, instance)
+}
+
+export const unbindLoadingInstance = (instance) => {
+  unregisterInstance(loadingInstances, instance)
+}
 
 export function useToast() {
-  // 设置 toast 实例（由页面组件调用）
   const setToastInstance = (instance) => {
-    toastInstance = instance
+    bindToastInstance(instance)
   }
-  
+
+  const setLoadingInstance = (instance) => {
+    bindLoadingInstance(instance)
+  }
+
   const showToast = (message, type = 'success', duration = 2000) => {
-    if (toastInstance) {
-      // 使用自定义 toast 组件
+    const toastInstance = getActiveInstance(toastInstances)
+    if (toastInstance && typeof toastInstance.show === 'function') {
       toastInstance.show(message, type, duration)
-    } else {
-      // 降级到原生 toast
-      const iconMap = {
-        success: 'success',
-        error: 'error',
-        warning: 'none',
-        info: 'none'
-      }
-      
-      uni.showToast({
-        title: message,
-        icon: iconMap[type] || 'none',
-        duration: duration,
-        mask: false
-      })
+      return
     }
+
+    console.warn('[Glowxel] Toast 组件未挂载，已跳过提示:', message)
   }
 
   const showSuccess = (message) => {
@@ -50,18 +89,25 @@ export function useToast() {
   }
 
   const showLoading = (message = '加载中...') => {
-    uni.showLoading({
-      title: message,
-      mask: true
-    })
+    const loadingInstance = getActiveInstance(loadingInstances)
+    if (loadingInstance && typeof loadingInstance.show === 'function') {
+      loadingInstance.show(message)
+      return
+    }
+
+    console.warn('[Glowxel] LoadingOverlay 组件未挂载，已跳过加载提示:', message)
   }
 
   const hideLoading = () => {
-    uni.hideLoading()
+    const loadingInstance = getActiveInstance(loadingInstances)
+    if (loadingInstance && typeof loadingInstance.hide === 'function') {
+      loadingInstance.hide()
+    }
   }
 
   return {
     setToastInstance,
+    setLoadingInstance,
     showToast,
     showSuccess,
     showError,

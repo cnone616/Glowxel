@@ -103,7 +103,16 @@ const char* ambientPresetToString(uint8_t preset) {
   if (preset == AMBIENT_PRESET_REACTION_DIFFUSION) {
     return "reaction_diffusion";
   }
-  return "digital_rain";
+  if (preset == AMBIENT_PRESET_COSMIC_KALE) {
+    return "cosmic_kale";
+  }
+  if (preset == AMBIENT_PRESET_VOID_FIRE) {
+    return "void_fire";
+  }
+  if (preset == AMBIENT_PRESET_DEEP_SPACE_NEBULA) {
+    return "deep_space_nebula";
+  }
+  return "";
 }
 
 bool parseUnsignedValue(const String& text, uint32_t minValue, uint32_t maxValue, uint32_t& outValue) {
@@ -2325,10 +2334,8 @@ void WebServer::setupAPIRoutes() {
   server.on("/status", HTTP_GET, [](AsyncWebServerRequest *request){
     Serial.println("收到状态查询请求");
     StaticJsonDocument<640> doc;
-    const char* mode = "";
-    if (DisplayManager::currentBusinessModeTag.length() > 0) {
-      mode = DisplayManager::currentBusinessModeTag.c_str();
-    } else if (DisplayManager::currentMode == MODE_CLOCK) {
+    const char* mode = "unknown";
+    if (DisplayManager::currentMode == MODE_CLOCK) {
       mode = "clock";
     } else if (DisplayManager::currentMode == MODE_CANVAS) {
       mode = "canvas";

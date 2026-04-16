@@ -1,37 +1,34 @@
 const WIDTH = 64;
 const HEIGHT = 64;
-
-const TOP_CHAMBER = [
-  { x: 22, y: 10 },
-  { x: 42, y: 10 },
-  { x: 32, y: 27 },
+const STACK_DEPTH = 6;
+const SAND_FILL_RATIO = 0.84;
+const TOP_POLYGON = [
+  { x: 20, y: 8 },
+  { x: 44, y: 8 },
+  { x: 32, y: 28 },
 ];
-
-const BOTTOM_CHAMBER = [
-  { x: 32, y: 30 },
-  { x: 22, y: 46 },
-  { x: 42, y: 46 },
+const BOTTOM_POLYGON = [
+  { x: 32, y: 31 },
+  { x: 20, y: 47 },
+  { x: 44, y: 47 },
 ];
-
-const TOP_RANGE = { minX: 22, maxX: 42, minY: 10, maxY: 27 };
-const BOTTOM_RANGE = { minX: 22, maxX: 42, minY: 30, maxY: 46 };
+const TOP_RANGE = { minX: 20, maxX: 44, minY: 8, maxY: 28 };
+const BOTTOM_RANGE = { minX: 20, maxX: 44, minY: 31, maxY: 47 };
 const NECK_X = 32;
-const NECK_Y = 28;
-const DROP_TARGET_Y = BOTTOM_RANGE.minY;
-
+const NECK_Y = 29;
+const STREAM_ENTRY_Y = 30;
+const MAX_STREAM_PARTICLES = 6;
+const PHYSICS_STEPS_PER_FRAME = 2;
 const PREVIEW_TARGET_INTERVAL_MS = 120;
 const PREVIEW_MIN_FRAME_COUNT = 300;
 const PREVIEW_MAX_FRAME_COUNT = 2400;
-const FLOW_SETTLE_FRAMES = 12;
-const PHYSICS_STEPS_PER_FRAME = 1;
+const FLOW_SETTLE_FRAMES = 8;
 
 const COLORS = {
-  outline: "#c4d2f4",
-  sand: "#ffcf4a",
-  sandHighlight: "#fff1a6",
-  sandShadow: "#f4a935",
-  panelLine: "#203044",
-  text: "#ffe7a4",
+  outline: "#c8d6f6",
+  sand: "#ffd15a",
+  sandBright: "#fff0a6",
+  text: "#ffe9ab",
 };
 
 const FONT_3X5 = {
@@ -59,6 +56,10 @@ function clampInt(value, minValue, maxValue) {
     return maxValue;
   }
   return value;
+}
+
+function indexOf(x, y) {
+  return y * WIDTH + x;
 }
 
 function setPixel(frameMap, x, y, color) {
@@ -168,15 +169,6 @@ function createSeededRandom(seed) {
   };
 }
 
-function keyOfCell(x, y) {
-  return `${x},${y}`;
-}
-
-function parseCellKey(key) {
-  const [x, y] = key.split(",").map(Number);
-  return { x, y };
-}
-
 function hashConfig(config) {
   return (
     (config.hours * 73856093) ^
@@ -198,75 +190,46 @@ function resolveTotalSeconds(config) {
   return config.hours * 3600 + config.minutes * 60 + config.seconds;
 }
 
-function buildMaskSet(cells) {
-  const set = new Set();
-  cells.forEach((cell) => set.add(keyOfCell(cell.x, cell.y)));
-  return set;
-}
-
-function buildTopFilledSet(cells, count) {
-  const sorted = cells
-    .slice()
-    .sort((a, b) => (a.y - b.y) || (Math.abs(a.x - NECK_X) - Math.abs(b.x - NECK_X)));
-  const set = new Set();
-  const limit = Math.min(count, sorted.length);
-  for (let index = 0; index < limit; index += 1) {
-    const cell = sorted[index];
-    set.add(keyOfCell(cell.x, cell.y));
+function createMask(cells) {
+  const mask = new Uint8Array(WIDTH * HEIGHT);
+  for (let index = 0; index < cells.length; index += 1) {
+    const cell = cells[index];
+    mask[indexOf(cell.x, cell.y)] = 1;
   }
-  return set;
+  return mask;
 }
 
-function buildBottomFilledSet(cells, count) {
-  const sorted = cells
-    .slice()
-    .sort((a, b) => (b.y - a.y) || (Math.abs(a.x - NECK_X) - Math.abs(b.x - NECK_X)));
-  const set = new Set();
-  const limit = Math.min(count, sorted.length);
-  for (let index = 0; index < limit; index += 1) {
-    const cell = sorted[index];
-    set.add(keyOfCell(cell.x, cell.y));
-  }
-  return set;
-}
-
-function isEmpty(maskSet, grainSet, x, y) {
-  const key = keyOfCell(x, y);
-  if (!maskSet.has(key)) {
+function canReceive(mask, depthGrid, x, y) {
+  if (x < 0 || x >= WIDTH || y < 0 || y >= HEIGHT) {
     return false;
   }
-  return !grainSet.has(key);
-}
-
-function moveGrain(grainSet, fromX, fromY, toX, toY) {
-  const fromKey = keyOfCell(fromX, fromY);
-  const toKey = keyOfCell(toX, toY);
-  grainSet.delete(fromKey);
-  grainSet.add(toKey);
-}
-
-// eHorglass SandMove downward semantics:
-// MID -> LEFT -> RIGHT with random split when both diagonals are available.
-function settleChamber(grainSet, maskSet, range, random) {
-  for (let y = range.maxY - 1; y >= range.minY; y -= 1) {
-    const leftFirst = random() < 0.5;
-    if (leftFirst) {
-      for (let x = range.minX; x <= range.maxX; x += 1) {
-        settleOne(grainSet, maskSet, random, x, y);
-      }
-      continue;
-    }
-    for (let x = range.maxX; x >= range.minX; x -= 1) {
-      settleOne(grainSet, maskSet, random, x, y);
-    }
+  const index = indexOf(x, y);
+  if (mask[index] !== 1) {
+    return false;
   }
+  return depthGrid[index] < STACK_DEPTH;
 }
 
-function settleOne(grainSet, maskSet, random, x, y) {
-  const key = keyOfCell(x, y);
-  if (!grainSet.has(key)) {
+function hasSand(depthGrid, x, y) {
+  if (x < 0 || x >= WIDTH || y < 0 || y >= HEIGHT) {
+    return false;
+  }
+  return depthGrid[indexOf(x, y)] > 0;
+}
+
+function moveDepth(depthGrid, fromX, fromY, toX, toY) {
+  const fromIndex = indexOf(fromX, fromY);
+  const toIndex = indexOf(toX, toY);
+  depthGrid[fromIndex] -= 1;
+  depthGrid[toIndex] += 1;
+}
+
+function settleOne(depthGrid, mask, random, x, y) {
+  const currentIndex = indexOf(x, y);
+  if (depthGrid[currentIndex] <= 0) {
     return;
   }
+
   const midX = x;
   const midY = y + 1;
   const leftX = x - 1;
@@ -274,127 +237,270 @@ function settleOne(grainSet, maskSet, random, x, y) {
   const rightX = x + 1;
   const rightY = y + 1;
 
-  const midEmpty = isEmpty(maskSet, grainSet, midX, midY);
-  const leftEmpty = isEmpty(maskSet, grainSet, leftX, leftY);
-  const rightEmpty = isEmpty(maskSet, grainSet, rightX, rightY);
+  const midOpen = canReceive(mask, depthGrid, midX, midY);
+  const leftOpen = canReceive(mask, depthGrid, leftX, leftY);
+  const rightOpen = canReceive(mask, depthGrid, rightX, rightY);
 
-  if (midEmpty) {
-    moveGrain(grainSet, x, y, midX, midY);
+  if (midOpen) {
+    moveDepth(depthGrid, x, y, midX, midY);
     return;
   }
-  if (leftEmpty && !rightEmpty) {
-    moveGrain(grainSet, x, y, leftX, leftY);
+  if (leftOpen && !rightOpen) {
+    moveDepth(depthGrid, x, y, leftX, leftY);
     return;
   }
-  if (!leftEmpty && rightEmpty) {
-    moveGrain(grainSet, x, y, rightX, rightY);
+  if (!leftOpen && rightOpen) {
+    moveDepth(depthGrid, x, y, rightX, rightY);
     return;
   }
-  if (leftEmpty && rightEmpty) {
+  if (leftOpen && rightOpen) {
     if (random() < 0.5) {
-      moveGrain(grainSet, x, y, leftX, leftY);
+      moveDepth(depthGrid, x, y, leftX, leftY);
       return;
     }
-    moveGrain(grainSet, x, y, rightX, rightY);
+    moveDepth(depthGrid, x, y, rightX, rightY);
   }
 }
 
-function pickTopLeakCell(topSet) {
+function settleChamber(depthGrid, mask, range, random) {
+  for (let y = range.maxY - 1; y >= range.minY; y -= 1) {
+    if (random() < 0.5) {
+      for (let x = range.minX; x <= range.maxX; x += 1) {
+        settleOne(depthGrid, mask, random, x, y);
+      }
+      continue;
+    }
+    for (let x = range.maxX; x >= range.minX; x -= 1) {
+      settleOne(depthGrid, mask, random, x, y);
+    }
+  }
+}
+
+function findTopReleaseSource(topDepthGrid) {
   for (let y = TOP_RANGE.maxY; y >= TOP_RANGE.minY; y -= 1) {
     for (let offset = 0; offset <= TOP_RANGE.maxX - TOP_RANGE.minX; offset += 1) {
       const leftX = NECK_X - offset;
-      if (leftX >= TOP_RANGE.minX) {
-        const leftKey = keyOfCell(leftX, y);
-        if (topSet.has(leftKey)) {
-          return { x: leftX, y };
-        }
+      if (leftX >= TOP_RANGE.minX && hasSand(topDepthGrid, leftX, y)) {
+        return { x: leftX, y };
       }
       if (offset === 0) {
         continue;
       }
       const rightX = NECK_X + offset;
-      if (rightX <= TOP_RANGE.maxX) {
-        const rightKey = keyOfCell(rightX, y);
-        if (topSet.has(rightKey)) {
-          return { x: rightX, y };
-        }
+      if (rightX <= TOP_RANGE.maxX && hasSand(topDepthGrid, rightX, y)) {
+        return { x: rightX, y };
       }
     }
   }
   return null;
 }
 
-function findBottomLandingCell(bottomSet, bottomMask, originX, originY, random) {
-  let x = originX;
-  let y = originY;
+function buildInitialDepthGrid(cells, count, preferNeck) {
+  const depthGrid = new Uint8Array(WIDTH * HEIGHT);
+  const sorted = cells.slice().sort((a, b) => {
+    const yDelta = b.y - a.y;
+    if (yDelta !== 0) {
+      return yDelta;
+    }
+    if (preferNeck) {
+      return Math.abs(a.x - NECK_X) - Math.abs(b.x - NECK_X);
+    }
+    return a.x - b.x;
+  });
 
-  for (let step = 0; step < 36; step += 1) {
-    const downEmpty = isEmpty(bottomMask, bottomSet, x, y + 1);
-    const leftEmpty = isEmpty(bottomMask, bottomSet, x - 1, y + 1);
-    const rightEmpty = isEmpty(bottomMask, bottomSet, x + 1, y + 1);
-
-    if (downEmpty) {
-      y += 1;
-      continue;
-    }
-    if (leftEmpty && !rightEmpty) {
-      x -= 1;
-      y += 1;
-      continue;
-    }
-    if (!leftEmpty && rightEmpty) {
-      x += 1;
-      y += 1;
-      continue;
-    }
-    if (leftEmpty && rightEmpty) {
-      if (random() < 0.5) {
-        x -= 1;
-      } else {
-        x += 1;
-      }
-      y += 1;
-      continue;
-    }
-    break;
+  let remaining = count;
+  for (let index = 0; index < sorted.length && remaining > 0; index += 1) {
+    const cell = sorted[index];
+    const fill = Math.min(STACK_DEPTH, remaining);
+    depthGrid[indexOf(cell.x, cell.y)] = fill;
+    remaining -= fill;
   }
+  return depthGrid;
+}
 
-  const targetKey = keyOfCell(x, y);
-  if (bottomMask.has(targetKey) && !bottomSet.has(targetKey)) {
-    return { x, y };
+function countParticles(depthGrid, cells) {
+  let total = 0;
+  for (let index = 0; index < cells.length; index += 1) {
+    const cell = cells[index];
+    total += depthGrid[indexOf(cell.x, cell.y)];
   }
+  return total;
+}
 
-  for (let scanY = BOTTOM_RANGE.minY; scanY <= BOTTOM_RANGE.maxY; scanY += 1) {
-    for (let offset = 0; offset <= BOTTOM_RANGE.maxX - BOTTOM_RANGE.minX; offset += 1) {
-      const leftX = NECK_X - offset;
-      if (leftX >= BOTTOM_RANGE.minX) {
-        const leftKey = keyOfCell(leftX, scanY);
-        if (bottomMask.has(leftKey) && !bottomSet.has(leftKey)) {
-          return { x: leftX, y: scanY };
-        }
-      }
-      if (offset === 0) {
-        continue;
-      }
-      const rightX = NECK_X + offset;
-      if (rightX <= BOTTOM_RANGE.maxX) {
-        const rightKey = keyOfCell(rightX, scanY);
-        if (bottomMask.has(rightKey) && !bottomSet.has(rightKey)) {
-          return { x: rightX, y: scanY };
-        }
-      }
-    }
+function buildOccupiedParticleSet(particles) {
+  const occupied = new Set();
+  for (let index = 0; index < particles.length; index += 1) {
+    const particle = particles[index];
+    occupied.add(`${particle.x},${particle.y}`);
   }
+  return occupied;
+}
 
+function canMoveParticleTo(state, occupied, x, y) {
+  if (occupied.has(`${x},${y}`)) {
+    return false;
+  }
+  if (y < BOTTOM_RANGE.minY) {
+    return x >= NECK_X - 1 && x <= NECK_X + 1 && y <= BOTTOM_RANGE.minY;
+  }
+  return canReceive(state.bottomMask, state.bottomDepthGrid, x, y);
+}
+
+function chooseParticleTarget(state, occupied, particle) {
+  const targets = [
+    { x: particle.x, y: particle.y + 1 },
+    { x: particle.x - 1, y: particle.y + 1 },
+    { x: particle.x + 1, y: particle.y + 1 },
+  ];
+
+  const downOpen = canMoveParticleTo(state, occupied, targets[0].x, targets[0].y);
+  const leftOpen = canMoveParticleTo(state, occupied, targets[1].x, targets[1].y);
+  const rightOpen = canMoveParticleTo(state, occupied, targets[2].x, targets[2].y);
+
+  if (downOpen) {
+    return targets[0];
+  }
+  if (leftOpen && !rightOpen) {
+    return targets[1];
+  }
+  if (!leftOpen && rightOpen) {
+    return targets[2];
+  }
+  if (leftOpen && rightOpen) {
+    return state.random() < 0.5 ? targets[1] : targets[2];
+  }
   return null;
+}
+
+function pushSplash(state, x, y) {
+  const left = x - 1;
+  const right = x + 1;
+  if (left >= BOTTOM_RANGE.minX) {
+    state.splashes.push({ x: left, y, ttl: 2 });
+  }
+  if (right <= BOTTOM_RANGE.maxX) {
+    state.splashes.push({ x: right, y, ttl: 2 });
+  }
+}
+
+function advanceParticles(state) {
+  if (state.particles.length === 0) {
+    return;
+  }
+
+  const occupied = buildOccupiedParticleSet(state.particles);
+  const nextParticles = [];
+  const sorted = state.particles.slice().sort((a, b) => b.y - a.y || a.x - b.x);
+
+  for (let index = 0; index < sorted.length; index += 1) {
+    const particle = sorted[index];
+    occupied.delete(`${particle.x},${particle.y}`);
+
+    const target = chooseParticleTarget(state, occupied, particle);
+    if (target) {
+      particle.x = target.x;
+      particle.y = target.y;
+      occupied.add(`${particle.x},${particle.y}`);
+      nextParticles.push(particle);
+      continue;
+    }
+
+    if (
+      particle.y >= BOTTOM_RANGE.minY &&
+      particle.y <= BOTTOM_RANGE.maxY &&
+      canReceive(state.bottomMask, state.bottomDepthGrid, particle.x, particle.y)
+    ) {
+      state.bottomDepthGrid[indexOf(particle.x, particle.y)] += 1;
+      pushSplash(state, particle.x, particle.y);
+      continue;
+    }
+
+    occupied.add(`${particle.x},${particle.y}`);
+    nextParticles.push(particle);
+  }
+
+  state.particles = nextParticles.slice(0, MAX_STREAM_PARTICLES);
+}
+
+function updateSplashes(state) {
+  const next = [];
+  for (let index = 0; index < state.splashes.length; index += 1) {
+    const splash = state.splashes[index];
+    const ttl = splash.ttl - 1;
+    if (ttl <= 0) {
+      continue;
+    }
+    next.push({ x: splash.x, y: splash.y, ttl });
+  }
+  state.splashes = next;
+}
+
+function scheduleRelease(state, frameIndex) {
+  if (!state.hasFlow) {
+    return;
+  }
+  if (frameIndex >= state.drainFrames) {
+    return;
+  }
+  state.releaseAccumulator += state.releaseRatePerFrame;
+  while (
+    state.releaseAccumulator >= 1 &&
+    state.particles.length < MAX_STREAM_PARTICLES
+  ) {
+    const source = findTopReleaseSource(state.topDepthGrid);
+    if (!source) {
+      state.releaseAccumulator = 0;
+      break;
+    }
+    state.topDepthGrid[indexOf(source.x, source.y)] -= 1;
+    state.particles.push({ x: NECK_X, y: NECK_Y });
+    state.releaseAccumulator -= 1;
+  }
 }
 
 function drawHourglassOutline(frameMap) {
-  drawPolygon(frameMap, TOP_CHAMBER, COLORS.outline);
-  drawPolygon(frameMap, BOTTOM_CHAMBER, COLORS.outline);
-  drawLine(frameMap, 22, 29, 30, 29, COLORS.outline);
-  drawLine(frameMap, 34, 29, 42, 29, COLORS.outline);
-  drawLine(frameMap, 32, 28, 32, 30, COLORS.outline);
+  drawPolygon(frameMap, TOP_POLYGON, COLORS.outline);
+  drawPolygon(frameMap, BOTTOM_POLYGON, COLORS.outline);
+  drawLine(frameMap, 31, 28, 31, 30, COLORS.outline);
+  drawLine(frameMap, 33, 28, 33, 30, COLORS.outline);
+}
+
+function isSurface(depthGrid, mask, x, y) {
+  if (!hasSand(depthGrid, x, y)) {
+    return false;
+  }
+  if (y - 1 < 0) {
+    return true;
+  }
+  const aboveIndex = indexOf(x, y - 1);
+  if (mask[aboveIndex] !== 1) {
+    return true;
+  }
+  return depthGrid[aboveIndex] === 0;
+}
+
+function drawDepthGrid(frameMap, depthGrid, mask, cells, frameIndex) {
+  for (let index = 0; index < cells.length; index += 1) {
+    const cell = cells[index];
+    if (!hasSand(depthGrid, cell.x, cell.y)) {
+      continue;
+    }
+    const highlight =
+      isSurface(depthGrid, mask, cell.x, cell.y) ||
+      ((cell.x * 11 + cell.y * 7 + frameIndex) % 17 === 0);
+    setPixel(frameMap, cell.x, cell.y, highlight ? COLORS.sandBright : COLORS.sand);
+  }
+}
+
+function drawParticles(frameMap, state) {
+  for (let index = 0; index < state.particles.length; index += 1) {
+    const particle = state.particles[index];
+    setPixel(frameMap, particle.x, particle.y, index % 2 === 0 ? COLORS.sandBright : COLORS.sand);
+  }
+  for (let index = 0; index < state.splashes.length; index += 1) {
+    const splash = state.splashes[index];
+    setPixel(frameMap, splash.x, splash.y, COLORS.sandBright);
+  }
 }
 
 export function createDefaultCountdownBoardConfig() {
@@ -452,132 +558,7 @@ function drawTimeText(frameMap, config) {
   const textConfig = formatCountdownBoardText(config);
   const textWidth = textConfig.text.length * 4 * textConfig.size - textConfig.size;
   const textX = Math.floor((WIDTH - textWidth) / 2);
-  const textY = HEIGHT - 8;
-  drawTinyText(frameMap, textConfig.text, textX + 1, textY + 1, COLORS.panelLine, textConfig.size);
-  drawTinyText(frameMap, textConfig.text, textX, textY, COLORS.text, textConfig.size);
-}
-
-function isSurface(set, x, y) {
-  return !set.has(keyOfCell(x, y - 1));
-}
-
-function drawGrainSet(frameMap, set, frameIndex, mainColor, highlightColor, shadowColor) {
-  set.forEach((key) => {
-    const cell = parseCellKey(key);
-    let color = mainColor;
-    if (isSurface(set, cell.x, cell.y)) {
-      color = highlightColor;
-    } else if ((cell.x + cell.y + frameIndex) % 6 === 0) {
-      color = shadowColor;
-    }
-    setPixel(frameMap, cell.x, cell.y, color);
-  });
-}
-
-function drawLeakParticle(frameMap, leakParticle) {
-  if (!leakParticle) {
-    return;
-  }
-  setPixel(frameMap, leakParticle.x, leakParticle.y, COLORS.sand);
-}
-
-function createSandState(config, frameCount) {
-  const totalSeconds = resolveTotalSeconds(config);
-  const remainingSeconds = resolveCountdownBoardRemainingSeconds(config);
-  let ratio = 0;
-  if (totalSeconds > 0) {
-    ratio = remainingSeconds / totalSeconds;
-  }
-  ratio = Math.max(0, Math.min(1, ratio));
-
-  const topCells = collectCellsInPolygon(TOP_CHAMBER, TOP_RANGE);
-  const bottomCells = collectCellsInPolygon(BOTTOM_CHAMBER, BOTTOM_RANGE);
-  const topMask = buildMaskSet(topCells);
-  const bottomMask = buildMaskSet(bottomCells);
-  const random = createSeededRandom(hashConfig(config));
-  const totalCapacity = topCells.length + bottomCells.length;
-  const grainTotal = clampInt(Math.round(totalCapacity * 0.58), 96, totalCapacity);
-  const topCount = clampInt(Math.round(grainTotal * ratio), 0, grainTotal);
-  const bottomCount = grainTotal - topCount;
-  const drainFrames = Math.max(1, frameCount - FLOW_SETTLE_FRAMES);
-
-  return {
-    random,
-    topMask,
-    bottomMask,
-    topSet: buildTopFilledSet(topCells, topCount),
-    bottomSet: buildBottomFilledSet(bottomCells, bottomCount),
-    hasFlow: totalSeconds > 0 && ratio > 0,
-    drainFrames,
-    topInitialCount: topCount,
-    releasedCount: 0,
-    landedCount: 0,
-    pendingRelease: 0,
-    leakParticle: null,
-  };
-}
-
-function scheduleLeak(state, frameIndex) {
-  if (!state.hasFlow) {
-    return;
-  }
-  if (frameIndex >= state.drainFrames) {
-    return;
-  }
-  const expectedReleased = Math.floor(((frameIndex + 1) * state.topInitialCount) / state.drainFrames);
-  if (expectedReleased <= state.releasedCount) {
-    return;
-  }
-  state.pendingRelease += expectedReleased - state.releasedCount;
-}
-
-function spawnLeak(state) {
-  if (!state.hasFlow) {
-    return;
-  }
-  if (state.pendingRelease <= 0) {
-    return;
-  }
-  if (state.leakParticle) {
-    return;
-  }
-  const leakCell = pickTopLeakCell(state.topSet);
-  if (!leakCell) {
-    return;
-  }
-  state.topSet.delete(keyOfCell(leakCell.x, leakCell.y));
-  state.leakParticle = { x: NECK_X, y: NECK_Y };
-  state.pendingRelease -= 1;
-  state.releasedCount += 1;
-}
-
-function advanceLeak(state) {
-  if (!state.leakParticle) {
-    return;
-  }
-
-  state.leakParticle.y += 1;
-  if (state.leakParticle.y < DROP_TARGET_Y) {
-    return;
-  }
-
-  const landing = findBottomLandingCell(
-    state.bottomSet,
-    state.bottomMask,
-    state.leakParticle.x,
-    DROP_TARGET_Y,
-    state.random,
-  );
-  if (landing) {
-    state.bottomSet.add(keyOfCell(landing.x, landing.y));
-    state.landedCount += 1;
-  }
-  state.leakParticle = null;
-}
-
-function runPhysicsStep(state) {
-  settleChamber(state.topSet, state.topMask, TOP_RANGE, state.random);
-  settleChamber(state.bottomSet, state.bottomMask, BOTTOM_RANGE, state.random);
+  drawTinyText(frameMap, textConfig.text, textX, 55, COLORS.text, textConfig.size);
 }
 
 function resolvePreviewFrameCount(totalSeconds) {
@@ -586,6 +567,39 @@ function resolvePreviewFrameCount(totalSeconds) {
   }
   const estimated = Math.round((totalSeconds * 1000) / PREVIEW_TARGET_INTERVAL_MS);
   return clampInt(estimated, PREVIEW_MIN_FRAME_COUNT, PREVIEW_MAX_FRAME_COUNT);
+}
+
+function createSandState(config, frameCount) {
+  const totalSeconds = resolveTotalSeconds(config);
+  const remainingSeconds = resolveCountdownBoardRemainingSeconds(config);
+  const ratio = totalSeconds > 0 ? Math.max(0, Math.min(1, remainingSeconds / totalSeconds)) : 0;
+  const topCells = collectCellsInPolygon(TOP_POLYGON, TOP_RANGE);
+  const bottomCells = collectCellsInPolygon(BOTTOM_POLYGON, BOTTOM_RANGE);
+  const totalCapacity = (topCells.length + bottomCells.length) * STACK_DEPTH;
+  const grainTotal = clampInt(
+    Math.round(totalCapacity * SAND_FILL_RATIO),
+    Math.min(totalCapacity, 180),
+    totalCapacity,
+  );
+  const topCount = clampInt(Math.round(grainTotal * ratio), 0, grainTotal);
+  const bottomCount = grainTotal - topCount;
+  const drainFrames = Math.max(1, frameCount - FLOW_SETTLE_FRAMES);
+
+  return {
+    random: createSeededRandom(hashConfig(config)),
+    topCells,
+    bottomCells,
+    topMask: createMask(topCells),
+    bottomMask: createMask(bottomCells),
+    topDepthGrid: buildInitialDepthGrid(topCells, topCount, true),
+    bottomDepthGrid: buildInitialDepthGrid(bottomCells, bottomCount, true),
+    particles: [],
+    splashes: [],
+    hasFlow: totalSeconds > 0 && remainingSeconds > 0,
+    drainFrames,
+    releaseAccumulator: 0,
+    releaseRatePerFrame: topCount / drainFrames,
+  };
 }
 
 export function resolveCountdownBoardPreviewFrameInterval(config) {
@@ -606,31 +620,18 @@ export function buildCountdownBoardPreviewFrames(config) {
   const state = createSandState(normalized, frameCount);
 
   for (let frameIndex = 0; frameIndex < frameCount; frameIndex += 1) {
+    scheduleRelease(state, frameIndex);
     for (let step = 0; step < PHYSICS_STEPS_PER_FRAME; step += 1) {
-      runPhysicsStep(state);
+      settleChamber(state.topDepthGrid, state.topMask, TOP_RANGE, state.random);
+      settleChamber(state.bottomDepthGrid, state.bottomMask, BOTTOM_RANGE, state.random);
+      advanceParticles(state);
     }
-    scheduleLeak(state, frameIndex);
-    spawnLeak(state);
-    advanceLeak(state);
+    updateSplashes(state);
 
     const frameMap = new Map();
-    drawGrainSet(
-      frameMap,
-      state.topSet,
-      frameIndex,
-      COLORS.sand,
-      COLORS.sandHighlight,
-      COLORS.sandShadow,
-    );
-    drawGrainSet(
-      frameMap,
-      state.bottomSet,
-      frameIndex,
-      COLORS.sandShadow,
-      COLORS.sandHighlight,
-      COLORS.sand,
-    );
-    drawLeakParticle(frameMap, state.leakParticle);
+    drawDepthGrid(frameMap, state.topDepthGrid, state.topMask, state.topCells, frameIndex);
+    drawDepthGrid(frameMap, state.bottomDepthGrid, state.bottomMask, state.bottomCells, frameIndex);
+    drawParticles(frameMap, state);
     drawHourglassOutline(frameMap);
     drawTimeText(frameMap, normalized);
     frames.push(frameMap);
