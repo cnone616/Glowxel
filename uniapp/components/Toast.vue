@@ -1,5 +1,5 @@
 <template>
-  <view v-if="visible" class="glx-toast-overlay" :style="overlayStyle">
+  <view v-if="visible" class="glx-toast-overlay">
     <view :class="['glx-toast-container', `glx-toast--${type}`]">
       <view class="glx-toast-main">
         <view class="glx-toast-icon-wrapper">
@@ -15,6 +15,8 @@
 </template>
 
 <script>
+import { bindToastInstance, unbindToastInstance } from '../composables/useToast.js'
+
 export default {
   data() {
     return {
@@ -22,8 +24,7 @@ export default {
       message: '',
       type: 'success',
       timer: null,
-      showTimer: null,
-      overlayTopPx: 0
+      showTimer: null
     }
   },
   
@@ -36,29 +37,10 @@ export default {
         info: 'i'
       }
       return icons[this.type] || icons.success
-    },
-    overlayStyle() {
-      return {
-        paddingTop: `${this.overlayTopPx}px`
-      }
     }
-  },
-
-  created() {
-    this.syncOverlayTop()
   },
   
   methods: {
-    syncOverlayTop() {
-      const systemInfo = uni.getSystemInfoSync()
-      const safeTop =
-        (systemInfo.safeAreaInsets && systemInfo.safeAreaInsets.top) ||
-        systemInfo.statusBarHeight ||
-        0
-      const windowWidth = systemInfo.windowWidth || systemInfo.screenWidth || 375
-      const baseTopPx = (120 * windowWidth) / 750
-      this.overlayTopPx = Math.max(Math.round(baseTopPx), Math.round(safeTop + 20))
-    },
     show(message, type = 'success', duration = 2000) {
       if (this.timer) {
         clearTimeout(this.timer)
@@ -70,7 +52,6 @@ export default {
       
       this.message = message
       this.type = type
-      this.syncOverlayTop()
       
       // 通知父组件显示toast（用于隐藏canvas）
       this.$emit('show')
@@ -103,8 +84,13 @@ export default {
       }
     }
   },
+
+  mounted() {
+    bindToastInstance(this)
+  },
   
   beforeDestroy() {
+    unbindToastInstance(this)
     if (this.timer) {
       clearTimeout(this.timer)
     }
@@ -128,9 +114,7 @@ export default {
   z-index: 10000;
   background-color: transparent;
   pointer-events: none;
-  padding-top: 120rpx;
-  padding-left: 24rpx;
-  padding-right: 24rpx;
+  padding: 120rpx 24rpx 0;
   box-sizing: border-box;
 }
 

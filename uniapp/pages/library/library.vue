@@ -99,17 +99,23 @@
         />
       </view>
     </scroll-view>
+
+    <Toast />
   </view>
 </template>
 
 <script>
 import { artworkAPI, challengeAPI, likeAPI, templateAPI } from '../../api/index.js'
+import { useToast } from '../../composables/useToast.js'
 import statusBarMixin from '../../mixins/statusBar.js'
 import Logo from '../../components/Logo.vue'
 import ArtworkCard from '../../components/ArtworkCard.vue'
 import TemplateCard from '../../components/TemplateCard.vue'
 import ChallengeCard from '../../components/ChallengeCard.vue'
 import Icon from '../../components/Icon.vue'
+import Toast from '../../components/Toast.vue'
+
+const toast = useToast()
 
 export default {
   mixins: [statusBarMixin],
@@ -118,7 +124,8 @@ export default {
     ArtworkCard,
     TemplateCard,
     ChallengeCard,
-    Icon
+    Icon,
+    Toast
   },
   
   data() {
@@ -297,10 +304,7 @@ export default {
           data.artwork.likes -= 1
         }
       } catch (error) {
-        uni.showToast({
-          title: '操作失败',
-          icon: 'none'
-        })
+        toast.showError('操作失败')
       }
     },
     
@@ -328,15 +332,9 @@ export default {
         if (res.data.changed) {
           challenge.participants += 1
         }
-        uni.showToast({
-          title: '已参与挑战',
-          icon: 'success'
-        })
+        toast.showSuccess('已参与挑战')
       } catch (error) {
-        uni.showToast({
-          title: '参与失败',
-          icon: 'none'
-        })
+        toast.showError('参与失败')
       }
     }
   }

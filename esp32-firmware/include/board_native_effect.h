@@ -9,7 +9,8 @@ enum BoardNativeMode : uint8_t {
   BOARD_NATIVE_WEATHER = 2,
   BOARD_NATIVE_COUNTDOWN = 3,
   BOARD_NATIVE_STOPWATCH = 4,
-  BOARD_NATIVE_NOTIFICATION = 5
+  BOARD_NATIVE_NOTIFICATION = 5,
+  BOARD_NATIVE_PLANET = 6
 };
 
 struct TextDisplayNativeConfig {
@@ -64,6 +65,15 @@ struct NotificationBoardNativeConfig {
   uint8_t minute;
 };
 
+struct PlanetScreensaverNativeConfig {
+  String preset;
+  String size;
+  String direction;
+  uint8_t speed;
+  uint32_t seed;
+  uint32_t colorSeed;
+};
+
 namespace BoardNativeEffect {
   void init();
   void deactivate();
@@ -75,6 +85,7 @@ namespace BoardNativeEffect {
   void applyCountdownConfig(const CountdownBoardNativeConfig& config);
   void applyStopwatchConfig(const StopwatchBoardNativeConfig& config);
   void applyNotificationConfig(const NotificationBoardNativeConfig& config);
+  void applyPlanetScreensaverConfig(const PlanetScreensaverNativeConfig& config);
 
   void update();
   void render();
@@ -84,6 +95,7 @@ namespace BoardNativeEffect {
   const CountdownBoardNativeConfig& getCountdownConfig();
   const StopwatchBoardNativeConfig& getStopwatchConfig();
   const NotificationBoardNativeConfig& getNotificationConfig();
+  const PlanetScreensaverNativeConfig& getPlanetScreensaverConfig();
   int getCountdownRemainingSeconds();
   unsigned long getStopwatchElapsedMs();
 }

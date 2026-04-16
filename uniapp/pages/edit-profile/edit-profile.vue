@@ -131,6 +131,7 @@
       </view>
     </view>
 
+    <LoadingOverlay />
     <!-- Toast -->
     <Toast ref="toastRef" />
   </view>
@@ -142,6 +143,7 @@ import { useToast } from "../../composables/useToast.js";
 import { getUploadUrl } from "../../config/api.js";
 import statusBarMixin from "../../mixins/statusBar.js";
 import Icon from "../../components/Icon.vue";
+import LoadingOverlay from "../../components/LoadingOverlay.vue";
 import Toast from "../../components/Toast.vue";
 import GlxSwitch from "../../components/GlxSwitch.vue";
 
@@ -149,6 +151,7 @@ export default {
   mixins: [statusBarMixin],
   components: {
     Icon,
+    LoadingOverlay,
     Toast,
     GlxSwitch,
   },
@@ -227,7 +230,7 @@ export default {
         sourceType: ["album", "camera"],
         success: (res) => {
           const tempPath = res.tempFilePaths[0];
-          uni.showLoading({ title: "上传中..." });
+          this.toast.showLoading("上传中...");
           uni.uploadFile({
             url: getUploadUrl("avatar"),
             filePath: tempPath,
@@ -248,7 +251,7 @@ export default {
               }
             },
             fail: () => this.toast.showError("上传失败，请重试"),
-            complete: () => uni.hideLoading(),
+            complete: () => this.toast.hideLoading(),
           });
         },
       });
@@ -271,20 +274,20 @@ export default {
         return;
       }
 
-      uni.showLoading({ title: "保存中..." });
+      this.toast.showLoading("保存中...");
 
       try {
         // 更新用户信息
         await this.userStore.updateProfile(this.form);
 
-        uni.hideLoading();
+        this.toast.hideLoading();
         this.toast.showSuccess("保存成功");
 
         setTimeout(() => {
           uni.navigateBack();
         }, 1000);
       } catch (error) {
-        uni.hideLoading();
+        this.toast.hideLoading();
         this.toast.showError("保存失败，请重试");
       }
     },

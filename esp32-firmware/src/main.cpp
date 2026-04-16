@@ -74,6 +74,19 @@ void renderStartupRestoredFrame() {
   }
 
   if (DisplayManager::currentMode == MODE_ANIMATION &&
+      DisplayManager::currentBusinessModeTag == "gif_player") {
+    if (AnimationManager::currentGIF != nullptr) {
+      AnimationManager::currentGIF->isPlaying = true;
+      AnimationManager::currentGIF->currentFrame = 0;
+      AnimationManager::currentGIF->lastFrameTime = millis();
+      AnimationManager::renderGIFFrame(0);
+      return;
+    }
+    renderTimeOrSyncHint();
+    return;
+  }
+
+  if (DisplayManager::currentMode == MODE_ANIMATION &&
       (DisplayManager::currentBusinessModeTag == "text_display" ||
        DisplayManager::currentBusinessModeTag == "weather" ||
        DisplayManager::currentBusinessModeTag == "countdown" ||
@@ -86,6 +99,15 @@ void renderStartupRestoredFrame() {
   }
 
   if (DisplayManager::currentMode == MODE_ANIMATION &&
+      DisplayManager::currentBusinessModeTag == "planet_screensaver") {
+    BoardNativeEffect::applyPlanetScreensaverConfig(
+      BoardNativeEffect::getPlanetScreensaverConfig()
+    );
+    BoardNativeEffect::render();
+    return;
+  }
+
+  if (DisplayManager::currentMode == MODE_ANIMATION &&
       DisplayManager::currentBusinessModeTag == "eyes") {
     DisplayManager::activateEyesEffect(ConfigManager::eyesConfig);
     DisplayManager::renderNativeEffect();
@@ -93,7 +115,8 @@ void renderStartupRestoredFrame() {
   }
 
   if (DisplayManager::currentMode == MODE_ANIMATION &&
-      DisplayManager::currentBusinessModeTag == "ambient_effect") {
+      (DisplayManager::currentBusinessModeTag == "ambient_effect" ||
+       DisplayManager::currentBusinessModeTag == "led_matrix_showcase")) {
     DisplayManager::activateAmbientEffect(DisplayManager::ambientEffectConfig);
     DisplayManager::renderNativeEffect();
     return;
@@ -159,10 +182,11 @@ void setup() {
     GameScreensaverEffect::init();
     BoardNativeEffect::init();
 
+    if (!DisplayManager::doubleBufferEnabled) {
+      DisplayManager::enableDoubleBuffer();
+    }
+
     if (WiFiManager::isTimeSynced()) {
-      if (!DisplayManager::doubleBufferEnabled) {
-        DisplayManager::enableDoubleBuffer();
-      }
       Serial.printf("[BOOT] 准备渲染恢复模式首帧，模式=%d，业务模式=%s\n",
                     DisplayManager::currentMode,
                     DisplayManager::currentBusinessModeTag.c_str());
@@ -312,7 +336,8 @@ void loop() {
                 DisplayManager::currentBusinessModeTag == "weather" ||
                 DisplayManager::currentBusinessModeTag == "countdown" ||
                 DisplayManager::currentBusinessModeTag == "stopwatch" ||
-                DisplayManager::currentBusinessModeTag == "notification") &&
+                DisplayManager::currentBusinessModeTag == "notification" ||
+                DisplayManager::currentBusinessModeTag == "planet_screensaver") &&
                BoardNativeEffect::isActive()) {
       BoardNativeEffect::update();
       BoardNativeEffect::render();

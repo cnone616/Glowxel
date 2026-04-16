@@ -251,6 +251,7 @@
       title="编辑器操作指南"
       :items="helpItems"
     />
+    <ConfirmDialogHost />
     <!-- 自定义 Toast 组件 -->
     <Toast ref="toastRef" @show="handleToastShow" @hide="handleToastHide" />
   </view>
@@ -264,9 +265,11 @@ import statusBarMixin from "../../mixins/statusBar.js";
 import PixelCanvas from "../../components/PixelCanvas.vue";
 import ColorPalette from "../../components/ColorPalette.vue";
 import HelpModal from "../../components/HelpModal.vue";
+import ConfirmDialogHost from "../../components/ConfirmDialogHost.vue";
 import Toast from "../../components/Toast.vue";
 import Icon from "../../components/Icon.vue";
 import editorPersistenceMixin from "./mixins/editorPersistenceMixin.js";
+import { useDialog } from "../../composables/useDialog.js";
 import { PERLER_BOARD_SIZE } from "../../constants/perler.js";
 
 export default {
@@ -275,6 +278,7 @@ export default {
     PixelCanvas,
     ColorPalette,
     HelpModal,
+    ConfirmDialogHost,
     Toast,
     Icon,
   },
@@ -283,6 +287,7 @@ export default {
     return {
       projectStore: null,
       toast: null,
+      dialog: null,
 
       projectId: "",
       boardId: "",
@@ -454,6 +459,7 @@ export default {
   onLoad(options) {
     this.projectStore = useProjectStore();
     this.toast = useToast();
+    this.dialog = useDialog();
 
     this.projectId = options.id;
     this.boardId = options.board || "";
@@ -471,22 +477,14 @@ export default {
 
     // 收藏项目提示只读
     if (this.project.source === "collected") {
-      uni.showToast({
-        title: "收藏作品仅可查看和辅助拼豆",
-        icon: "none",
-        duration: 2000,
-      });
+      this.toast.showInfo("收藏作品仅可查看和辅助拼豆");
     }
     // 已发布/审核中项目提示只读
     else if (
       this.project.status === "published" ||
       this.project.status === "reviewing"
     ) {
-      uni.showToast({
-        title: "已发布作品仅可查看和拼豆",
-        icon: "none",
-        duration: 2000,
-      });
+      this.toast.showInfo("已发布作品仅可查看和拼豆");
     }
 
     this.loadPalette();
@@ -622,7 +620,7 @@ export default {
         const msg = this.isCollectedProject
           ? "收藏作品不可编辑"
           : "已发布作品不可编辑";
-        uni.showToast({ title: msg, icon: "none" });
+        this.toast.showInfo(msg);
         return;
       }
       if (this.tool === "move") return;

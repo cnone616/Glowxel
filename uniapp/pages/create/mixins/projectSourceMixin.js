@@ -59,7 +59,7 @@ export default {
     },
 
     async loadTemplateProject() {
-      uni.showLoading({ title: "加载模板..." });
+      this.toast.showLoading("加载模板...");
 
       try {
         const res = await templateAPI.getTemplateById(this.templateId);
@@ -104,13 +104,13 @@ export default {
           console.error("更新模板使用次数失败:", error);
         }
 
-        uni.hideLoading();
+        this.toast.hideLoading();
         this.toast.showSuccess("模板已载入");
         uni.redirectTo({
           url: `/pages/overview/overview?id=${projectId}`,
         });
       } catch (error) {
-        uni.hideLoading();
+        this.toast.hideLoading();
         console.error("加载模板失败:", error);
         this.toast.showError("模板加载失败");
         setTimeout(() => {
@@ -120,7 +120,7 @@ export default {
     },
 
     async loadChallengeInfo() {
-      uni.showLoading({ title: "加载挑战..." });
+      this.toast.showLoading("加载挑战...");
 
       try {
         const res = await challengeAPI.getChallengeById(this.challengeId);
@@ -129,10 +129,10 @@ export default {
         }
 
         this.name = res.data.challenge.title;
-        uni.hideLoading();
+        this.toast.hideLoading();
         this.toast.showSuccess("已载入挑战");
       } catch (error) {
-        uni.hideLoading();
+        this.toast.hideLoading();
         console.error("加载挑战失败:", error);
         this.toast.showError("挑战加载失败");
         setTimeout(() => {

@@ -305,6 +305,14 @@ export default {
           bucket: "secondary",
         },
         {
+          key: "planet_screensaver",
+          name: "星球屏保",
+          icon: "map",
+          variant: "indigo",
+          type: "mode",
+          bucket: "secondary",
+        },
+        {
           key: "gif_player",
           name: "GIF播放器",
           icon: "film",
@@ -382,6 +390,11 @@ export default {
     },
 
     async switchMode(mode) {
+      if (mode === "planet_screensaver") {
+        this.openPlanetScreensaver();
+        return;
+      }
+
       this.deviceMode = mode;
       this.deviceStore.setDeviceMode(mode, {
         businessMode: false,
@@ -457,6 +470,16 @@ export default {
     openSpiritScreen() {
       uni.navigateTo({
         url: "/pages/spirit-screen/spirit-screen",
+      });
+    },
+
+    openPlanetScreensaver() {
+      uni.navigateTo({
+        url: "/pages/planet-screensaver/planet-screensaver",
+        fail: (error) => {
+          console.error("打开星球屏保页面失败:", error);
+          this.toast.showError("星球屏保页面路由未刷新，请重新运行项目");
+        },
       });
     },
 
@@ -969,7 +992,6 @@ export default {
 .connect-entry-card {
   border-radius: 0;
   background: var(--nb-surface);
-  border: 2rpx solid var(--nb-ink);
   box-shadow: var(--nb-shadow-soft);
   padding: 20rpx;
   display: flex;
@@ -1214,7 +1236,7 @@ export default {
 
 .panel-card {
   background: transparent;
-  border: 0;
+  border: none !important;
   box-shadow: none;
   border-radius: 0;
   overflow: hidden;

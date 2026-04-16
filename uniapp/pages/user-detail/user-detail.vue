@@ -156,16 +156,26 @@
         </view>
       </view>
     </Modal>
+
+    <ConfirmDialogHost />
+    <Toast />
   </view>
 </template>
 
 <script>
 import { userAPI, followAPI } from '../../api/index.js'
+import { useDialog } from '../../composables/useDialog.js'
+import { useToast } from '../../composables/useToast.js'
 import statusBarMixin from '../../mixins/statusBar.js'
 import Icon from '../../components/Icon.vue'
 import Avatar from '../../components/Avatar.vue'
 import ArtworkCard from '../../components/ArtworkCard.vue'
+import ConfirmDialogHost from '../../components/ConfirmDialogHost.vue'
 import Modal from '../../components/Modal.vue'
+import Toast from '../../components/Toast.vue'
+
+const dialog = useDialog()
+const toast = useToast()
 
 export default {
   mixins: [statusBarMixin],
@@ -173,7 +183,9 @@ export default {
     Icon,
     Avatar,
     ArtworkCard,
-    Modal
+    ConfirmDialogHost,
+    Modal,
+    Toast
   },
   
   data() {
@@ -255,10 +267,7 @@ export default {
         
       } catch (error) {
         console.error('加载用户详情失败:', error)
-        uni.showToast({
-          title: '加载失败',
-          icon: 'error'
-        })
+        toast.showError('加载失败')
       } finally {
         this.isLoading = false
       }
@@ -373,24 +382,17 @@ export default {
           this.userInfo.followers_count -= 1
         }
         
-        uni.showToast({
-          title: res.data.followed ? '关注成功' : '取消关注',
-          icon: 'success'
-        })
+        toast.showSuccess(res.data.followed ? '关注成功' : '取消关注')
       } catch (error) {
         console.error('关注操作失败:', error)
-        uni.showToast({
-          title: '操作失败',
-          icon: 'error'
-        })
+        toast.showError('操作失败')
       }
     },
     
-    sendMessage() {
-      uni.showModal({
+    async sendMessage() {
+      await dialog.alert({
         title: '私信说明',
-        content: '当前版本暂未开放站内私信，你可以先通过分享主页或关注对方保持联系。',
-        showCancel: false
+        content: '当前版本暂未开放站内私信，你可以先通过分享主页或关注对方保持联系。'
       })
     },
     
@@ -410,26 +412,19 @@ export default {
       uni.setClipboardData({
         data: `举报用户：${this.userInfo.name}（ID: ${this.userInfo.id}）`,
         success: () => {
-          uni.showToast({
-            title: '举报信息已复制',
-            icon: 'success'
-          })
+          toast.showSuccess('举报信息已复制')
         },
         fail: () => {
-          uni.showToast({
-            title: '复制失败',
-            icon: 'error'
-          })
+          toast.showError('复制失败')
         }
       })
     },
     
-    blockUser() {
+    async blockUser() {
       this.showMoreModal = false
-      uni.showModal({
+      await dialog.alert({
         title: '拉黑说明',
-        content: '当前版本暂未提供拉黑能力，如遇恶意内容，可先复制举报信息并联系平台处理。',
-        showCancel: false
+        content: '当前版本暂未提供拉黑能力，如遇恶意内容，可先复制举报信息并联系平台处理。'
       })
     },
     
@@ -438,10 +433,7 @@ export default {
       uni.setClipboardData({
         data: `用户：${this.userInfo.name}`,
         success: () => {
-          uni.showToast({
-            title: '链接已复制',
-            icon: 'success'
-          })
+          toast.showSuccess('链接已复制')
         }
       })
     },

@@ -224,6 +224,9 @@
         </view>
       </view>
     </Modal>
+
+    <LoadingOverlay />
+    <Toast />
   </view>
 </template>
 
@@ -236,16 +239,21 @@ import {
   followAPI,
 } from "../../api/index.js";
 import { ARTKAL_COLORS_FULL } from "../../data/artkal-colors-full.js";
+import { useToast } from "../../composables/useToast.js";
 import { useProjectStore } from "../../store/project.js";
 import statusBarMixin from "../../mixins/statusBar.js";
 import Icon from "../../components/Icon.vue";
 import Avatar from "../../components/Avatar.vue";
 import Comment from "../../components/Comment.vue";
 import ArtworkCard from "../../components/ArtworkCard.vue";
+import LoadingOverlay from "../../components/LoadingOverlay.vue";
 import Modal from "../../components/Modal.vue";
 import Input from "../../components/Input.vue";
+import Toast from "../../components/Toast.vue";
 
 import { PERLER_BOARD_SIZE } from "../../constants/perler.js";
+
+const toast = useToast();
 
 export default {
   mixins: [statusBarMixin],
@@ -254,8 +262,10 @@ export default {
     Avatar,
     Comment,
     ArtworkCard,
+    LoadingOverlay,
     Modal,
     Input,
+    Toast,
   },
 
   data() {
@@ -378,10 +388,7 @@ export default {
         this.isCollected = await collectionAPI.isCollected(this.artworkId);
       } catch (error) {
         console.error("加载作品详情失败:", error);
-        uni.showToast({
-          title: "加载失败",
-          icon: "error",
-        });
+        toast.showError("加载失败");
       } finally {
         this.isLoading = false;
       }
@@ -412,16 +419,10 @@ export default {
         }
         this.artwork.isFollowing = res.data.followed;
 
-        uni.showToast({
-          title: res.data.followed ? "关注成功" : "取消关注",
-          icon: "success",
-        });
+        toast.showSuccess(res.data.followed ? "关注成功" : "取消关注");
       } catch (error) {
         console.error("关注操作失败:", error);
-        uni.showToast({
-          title: "操作失败",
-          icon: "error",
-        });
+        toast.showError("操作失败");
       }
     },
 
@@ -440,10 +441,7 @@ export default {
         this.isLiked = liked;
       } catch (error) {
         console.error("点赞操作失败:", error);
-        uni.showToast({
-          title: "操作失败",
-          icon: "error",
-        });
+        toast.showError("操作失败");
       }
     },
 
@@ -465,16 +463,10 @@ export default {
 
         this.isCollected = collected;
 
-        uni.showToast({
-          title: collected ? "已收藏并添加到我的项目" : "取消收藏",
-          icon: "success",
-        });
+        toast.showSuccess(collected ? "已收藏并添加到我的项目" : "取消收藏");
       } catch (error) {
         console.error("收藏操作失败:", error);
-        uni.showToast({
-          title: "操作失败",
-          icon: "error",
-        });
+        toast.showError("操作失败");
       }
     },
 
@@ -537,16 +529,10 @@ export default {
         this.commentText = "";
         this.showCommentBar = false;
 
-        uni.showToast({
-          title: "评论成功",
-          icon: "success",
-        });
+        toast.showSuccess("评论成功");
       } catch (error) {
         console.error("发表评论失败:", error);
-        uni.showToast({
-          title: "评论失败",
-          icon: "error",
-        });
+        toast.showError("评论失败");
       }
     },
 
@@ -577,16 +563,10 @@ export default {
           this.artwork.comments_count -= 1;
         }
 
-        uni.showToast({
-          title: "删除成功",
-          icon: "success",
-        });
+        toast.showSuccess("删除成功");
       } catch (error) {
         console.error("删除评论失败:", error);
-        uni.showToast({
-          title: "删除失败",
-          icon: "error",
-        });
+        toast.showError("删除失败");
       }
     },
 
@@ -605,24 +585,16 @@ export default {
       this.showMoreModal = false;
       try {
         await this.saveArtworkImage(this.artwork.cover_url, this.artwork.title);
-        uni.showToast({
-          title: "下载成功",
-          icon: "success",
-        });
+        toast.showSuccess("下载成功");
       } catch (error) {
         console.error("下载作品失败:", error);
-        uni.showToast({
-          title: "下载失败",
-          icon: "error",
-        });
+        toast.showError("下载失败");
       }
     },
 
     async useAsTemplate() {
       this.showMoreModal = false;
-      uni.showLoading({
-        title: "载入作品...",
-      });
+      toast.showLoading("载入作品...");
 
       try {
         const res = await artworkAPI.getArtworkPixels(this.artworkId);
@@ -652,21 +624,15 @@ export default {
 
         projectStore.saveProjectPixels(projectId, pixels);
 
-        uni.hideLoading();
-        uni.showToast({
-          title: "已创建草稿",
-          icon: "success",
-        });
+        toast.hideLoading();
+        toast.showSuccess("已创建草稿");
         uni.navigateTo({
           url: `/pages/overview/overview?id=${projectId}`,
         });
       } catch (error) {
-        uni.hideLoading();
+        toast.hideLoading();
         console.error("载入作品失败:", error);
-        uni.showToast({
-          title: "载入失败",
-          icon: "error",
-        });
+        toast.showError("载入失败");
       }
     },
 
@@ -675,16 +641,10 @@ export default {
       uni.setClipboardData({
         data: `举报作品：${this.artwork.title}（ID: ${this.artwork.id}）`,
         success: () => {
-          uni.showToast({
-            title: "举报信息已复制",
-            icon: "success",
-          });
+          toast.showSuccess("举报信息已复制");
         },
         fail: () => {
-          uni.showToast({
-            title: "复制失败",
-            icon: "error",
-          });
+          toast.showError("复制失败");
         },
       });
     },

@@ -460,7 +460,11 @@ export default {
         const ws = this.deviceStore.getWebSocket();
 
         if (this.pixels.size === 0) {
-          await ws.send({ cmd: "clear_canvas" });
+          await ws.clearCanvas();
+          const status = await ws.getStatus();
+          if (status.mode !== "canvas") {
+            throw new Error("设备未保持在画板模式");
+          }
           this.deviceStore.setDeviceMode("canvas", { businessMode: false });
           this.toast.showSuccess("已清空并发布到设备");
           return;
@@ -474,12 +478,16 @@ export default {
         });
 
         await this.deviceStore.sendSparseImage(sparsePixels, 64, 64);
-        await ws.send({ cmd: "save_canvas" });
+        await ws.saveCanvas();
+        const status = await ws.getStatus();
+        if (status.mode !== "canvas") {
+          throw new Error("设备未保持在画板模式");
+        }
         this.deviceStore.setDeviceMode("canvas", { businessMode: false });
         this.toast.showSuccess("已发布到设备");
       } catch (err) {
         console.error("画板发送失败:", err);
-        this.toast.showError("发送失败");
+        this.toast.showError("发送失败：" + err.message);
       } finally {
         this.isSending = false;
       }

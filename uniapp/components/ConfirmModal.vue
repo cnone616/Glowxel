@@ -1,5 +1,5 @@
 <template>
-  <view v-if="visible" class="modal-overlay" @tap="handleCancel">
+  <view v-if="visible" class="modal-overlay" @tap="handleMaskTap">
     <view class="modal-content" @tap.stop>
       <view class="modal-header">
         <text class="modal-title">{{ title }}</text>
@@ -9,8 +9,8 @@
         <text class="modal-text">{{ content }}</text>
       </view>
       
-      <view class="modal-footer">
-        <view class="modal-btn cancel-btn" @tap="handleCancel">
+      <view class="modal-footer" :class="{ 'modal-footer--single': !showCancel }">
+        <view v-if="showCancel" class="modal-btn cancel-btn" @tap="handleCancel">
           <text class="btn-text">{{ cancelText }}</text>
         </view>
         <view class="modal-btn confirm-btn" :class="{ 'danger': danger }" @tap="handleConfirm">
@@ -44,6 +44,14 @@ export default {
       type: String,
       default: '取消'
     },
+    showCancel: {
+      type: Boolean,
+      default: true
+    },
+    maskClosable: {
+      type: Boolean,
+      default: true
+    },
     danger: {
       type: Boolean,
       default: false
@@ -51,6 +59,14 @@ export default {
   },
   
   methods: {
+    handleMaskTap() {
+      if (!this.maskClosable) {
+        return
+      }
+
+      this.handleCancel()
+    },
+
     handleConfirm() {
       this.$emit('confirm')
       this.$emit('update:visible', false)
@@ -68,6 +84,7 @@ export default {
 .modal-content {
   width: 100%;
   max-width: 620rpx;
+  max-height: calc(100vh - 120rpx);
   background-color: var(--nb-surface);
   border-radius: 0;
   border: var(--nb-border-width-panel) solid var(--nb-ink);
@@ -75,6 +92,8 @@ export default {
   overflow: hidden;
   animation: scaleIn 0.18s ease-out;
   box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
 }
 
 @keyframes scaleIn {
@@ -103,6 +122,8 @@ export default {
 
 .modal-body {
   padding: 24rpx;
+  flex: 1;
+  overflow-y: auto;
 }
 
 .modal-text {
@@ -111,6 +132,8 @@ export default {
   line-height: 1.6;
   text-align: center;
   display: block;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .modal-footer {
@@ -118,6 +141,10 @@ export default {
   gap: 12rpx;
   padding: 18rpx 24rpx 24rpx;
   border-top: var(--nb-border-width-panel) solid var(--nb-ink);
+}
+
+.modal-footer--single {
+  gap: 0;
 }
 
 .modal-btn {

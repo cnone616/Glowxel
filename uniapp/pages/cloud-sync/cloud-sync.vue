@@ -295,7 +295,8 @@
       </view>
     </scroll-view>
 
-    <!-- Toast -->
+    <ConfirmDialogHost />
+    <LoadingOverlay />
     <Toast ref="toastRef" />
   </view>
 </template>
@@ -304,10 +305,13 @@
 import { useUserStore } from "../../store/user.js";
 import { useProjectStore } from "../../store/project.js";
 import { useToast } from "../../composables/useToast.js";
+import { useDialog } from "../../composables/useDialog.js";
 import statusBarMixin from "../../mixins/statusBar.js";
 import Icon from "../../components/Icon.vue";
 import Toast from "../../components/Toast.vue";
+import ConfirmDialogHost from "../../components/ConfirmDialogHost.vue";
 import GlxSwitch from "../../components/GlxSwitch.vue";
+import LoadingOverlay from "../../components/LoadingOverlay.vue";
 import {
   getSyncStatus,
   syncProject,
@@ -318,13 +322,14 @@ import {
 
 export default {
   mixins: [statusBarMixin],
-  components: { Icon, Toast, GlxSwitch },
+  components: { Icon, Toast, ConfirmDialogHost, GlxSwitch, LoadingOverlay },
 
   data() {
     return {
       userStore: useUserStore(),
       projectStore: useProjectStore(),
       toast: null,
+      dialog: null,
       syncStatus: {
         enabled: false,
         lastSync: null,
@@ -347,6 +352,7 @@ export default {
 
   onLoad() {
     this.toast = useToast();
+    this.dialog = useDialog();
     this.$nextTick(() => {
       if (this.$refs.toastRef) this.toast.setToastInstance(this.$refs.toastRef);
     });
@@ -398,14 +404,18 @@ export default {
         await this.loadSyncStats();
         this.toast.showSuccess("云同步已开启");
       } else {
-        uni.showModal({
+        const confirmed = await this.dialog.confirm({
           title: "关闭云同步",
           content: "关闭后将无法在多设备间同步数据，确定要关闭吗？",
-          success: (res) => {
-            if (!res.confirm) this.syncStatus.enabled = true;
-            else this.toast.showInfo("云同步已关闭");
-          },
+          danger: true,
         });
+
+        if (!confirmed) {
+          this.syncStatus.enabled = true;
+          return;
+        }
+
+        this.toast.showInfo("云同步已关闭");
       }
     },
 
@@ -434,7 +444,7 @@ export default {
         return;
       }
       this.syncStatus.syncing = true;
-      uni.showLoading({ title: "同步中..." });
+      this.toast.showLoading("同步中...");
       try {
         const projects = this.projectStore.projects;
         if (projects.length === 0) {
@@ -463,43 +473,46 @@ export default {
         this.toast.showError("同步失败，请重试");
       } finally {
         this.syncStatus.syncing = false;
-        uni.hideLoading();
+        this.toast.hideLoading();
       }
     },
 
     async downloadFromCloud() {
-      uni.showModal({
+      const confirmed = await this.dialog.confirm({
         title: "从云端恢复",
         content: "这将用云端数据覆盖本地数据，确定要继续吗？",
-        success: async (res) => {
-          if (!res.confirm) return;
-          uni.showLoading({ title: "恢复中..." });
-          try {
-            const listRes = await getCloudProjects(1, 100);
-            if (!listRes.success) throw new Error(listRes.message);
-            const cloudProjects = listRes.data.list || [];
-            for (const cp of cloudProjects) {
-              this.projectStore.updateProject(cp.id, {
-                name: cp.name,
-                width: cp.width,
-                height: cp.height,
-                thumbnail: cp.thumbnail_url,
-                progress: cp.progress,
-              });
-            }
-            this.addSyncLog(
-              `从云端恢复 ${cloudProjects.length} 个项目`,
-              "success",
-            );
-            this.toast.showSuccess("恢复完成");
-          } catch (e) {
-            this.addSyncLog("恢复失败", "error", e.message);
-            this.toast.showError("恢复失败，请重试");
-          } finally {
-            uni.hideLoading();
-          }
-        },
+        danger: true,
       });
+
+      if (!confirmed) {
+        return;
+      }
+
+      this.toast.showLoading("恢复中...");
+      try {
+        const listRes = await getCloudProjects(1, 100);
+        if (!listRes.success) throw new Error(listRes.message);
+        const cloudProjects = listRes.data.list || [];
+        for (const cp of cloudProjects) {
+          this.projectStore.updateProject(cp.id, {
+            name: cp.name,
+            width: cp.width,
+            height: cp.height,
+            thumbnail: cp.thumbnail_url,
+            progress: cp.progress,
+          });
+        }
+        this.addSyncLog(
+          `从云端恢复 ${cloudProjects.length} 个项目`,
+          "success",
+        );
+        this.toast.showSuccess("恢复完成");
+      } catch (e) {
+        this.addSyncLog("恢复失败", "error", e.message);
+        this.toast.showError("恢复失败，请重试");
+      } finally {
+        this.toast.hideLoading();
+      }
     },
 
     async uploadToCloud() {
@@ -507,7 +520,7 @@ export default {
         this.toast.showError("请先登录");
         return;
       }
-      uni.showLoading({ title: "上传中..." });
+      this.toast.showLoading("上传中...");
       try {
         const projects = this.projectStore.projects;
         const items = projects.map((p) => ({ project: p, pixels: null }));
@@ -523,36 +536,38 @@ export default {
         this.addSyncLog("上传失败", "error", e.message);
         this.toast.showError("上传失败，请重试");
       } finally {
-        uni.hideLoading();
+        this.toast.hideLoading();
       }
     },
 
-    clearCloudData() {
-      uni.showModal({
+    async clearCloudData() {
+      const confirmed = await this.dialog.confirm({
         title: "清除云端数据",
         content: "这将永久删除所有云端备份数据，此操作无法撤销！",
-        confirmColor: "#E74C3C",
-        success: async (res) => {
-          if (!res.confirm) return;
-          uni.showLoading({ title: "清除中..." });
-          try {
-            const listRes = await getCloudProjects(1, 100);
-            if (listRes.success) {
-              for (const p of listRes.data.list || []) {
-                await deleteCloudProject(p.id);
-              }
-            }
-            this.syncStats.projects = 0;
-            this.addSyncLog("清除云端数据", "success");
-            this.toast.showSuccess("云端数据已清除");
-          } catch (e) {
-            this.addSyncLog("清除失败", "error", e.message);
-            this.toast.showError("清除失败，请重试");
-          } finally {
-            uni.hideLoading();
-          }
-        },
+        danger: true,
       });
+
+      if (!confirmed) {
+        return;
+      }
+
+      this.toast.showLoading("清除中...");
+      try {
+        const listRes = await getCloudProjects(1, 100);
+        if (listRes.success) {
+          for (const p of listRes.data.list || []) {
+            await deleteCloudProject(p.id);
+          }
+        }
+        this.syncStats.projects = 0;
+        this.addSyncLog("清除云端数据", "success");
+        this.toast.showSuccess("云端数据已清除");
+      } catch (e) {
+        this.addSyncLog("清除失败", "error", e.message);
+        this.toast.showError("清除失败，请重试");
+      } finally {
+        this.toast.hideLoading();
+      }
     },
 
     addSyncLog(action, status, error = null) {
@@ -566,7 +581,7 @@ export default {
       if (this.syncLogs.length > 20) this.syncLogs = this.syncLogs.slice(0, 20);
     },
 
-    viewAllLogs() {
+    async viewAllLogs() {
       if (!this.syncLogs.length) {
         this.toast.showInfo("暂无同步日志");
         return;
@@ -582,10 +597,9 @@ export default {
         )
         .join("\n");
 
-      uni.showModal({
+      await this.dialog.alert({
         title: "同步日志",
         content,
-        showCancel: false,
       });
     },
 

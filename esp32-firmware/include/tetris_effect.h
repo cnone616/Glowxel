@@ -23,7 +23,9 @@ private:
   static int cols, rows;
   static int curType;
   static int curRot;
+  static int targetRot;
   static int curX, curY;
+  static int targetX;
   static uint8_t curColor;
   static unsigned long lastDropTime;
   static bool needsRender;

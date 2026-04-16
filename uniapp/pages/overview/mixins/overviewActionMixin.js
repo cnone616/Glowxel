@@ -133,7 +133,7 @@ export default {
     },
 
     async deleteProjectWithCloud() {
-      uni.showLoading({ title: "删除中..." });
+      this.toast.showLoading("删除中...");
 
       try {
         const cloudRes = await getCloudProjects();
@@ -148,13 +148,13 @@ export default {
 
         this.projectStore.deleteProject(this.project.id);
 
-        uni.hideLoading();
+        this.toast.hideLoading();
         this.toast.showSuccess("本地和云端画布已删除");
         uni.switchTab({
           url: "/pages/workspace/workspace",
         });
       } catch (error) {
-        uni.hideLoading();
+        this.toast.hideLoading();
         console.error("删除云端项目失败:", error);
         this.toast.showError("云端删除失败，仅删除了本地");
 

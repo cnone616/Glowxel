@@ -159,7 +159,7 @@
       </view>
     </view>
 
-    <!-- Toast -->
+    <ConfirmDialogHost />
     <Toast ref="toastRef" />
   </view>
 </template>
@@ -167,20 +167,24 @@
 <script>
 import { collectionAPI } from "../../api/index.js";
 import { useToast } from "../../composables/useToast.js";
+import { useDialog } from "../../composables/useDialog.js";
 import statusBarMixin from "../../mixins/statusBar.js";
 import Icon from "../../components/Icon.vue";
+import ConfirmDialogHost from "../../components/ConfirmDialogHost.vue";
 import Toast from "../../components/Toast.vue";
 
 export default {
   mixins: [statusBarMixin],
   components: {
     Icon,
+    ConfirmDialogHost,
     Toast,
   },
 
   data() {
     return {
       toast: null,
+      dialog: null,
       currentCategory: "all",
       isEditMode: false,
       selectedItems: [],
@@ -205,6 +209,7 @@ export default {
 
   onLoad() {
     this.toast = useToast();
+    this.dialog = useDialog();
     this.loadFavorites();
 
     this.$nextTick(() => {
@@ -339,26 +344,28 @@ export default {
     },
 
     async removeFavorite(item) {
-      uni.showModal({
+      const confirmed = await this.dialog.confirm({
         title: "移除收藏",
         content: `确定要移除"${item.title}"吗？`,
-        success: async (res) => {
-          if (res.confirm) {
-            try {
-              await collectionAPI.uncollectArtwork(item.id);
-              const index = this.favorites.findIndex((f) => f.id === item.id);
-              if (index > -1) {
-                this.favorites.splice(index, 1);
-                this.updateCategoryCounts();
-              }
-              this.toast.showSuccess("已移除收藏");
-            } catch (error) {
-              console.error("移除收藏失败:", error);
-              this.toast.showError("移除失败");
-            }
-          }
-        },
+        danger: true,
       });
+
+      if (!confirmed) {
+        return;
+      }
+
+      try {
+        await collectionAPI.uncollectArtwork(item.id);
+        const index = this.favorites.findIndex((f) => f.id === item.id);
+        if (index > -1) {
+          this.favorites.splice(index, 1);
+          this.updateCategoryCounts();
+        }
+        this.toast.showSuccess("已移除收藏");
+      } catch (error) {
+        console.error("移除收藏失败:", error);
+        this.toast.showError("移除失败");
+      }
     },
 
     async batchDownload() {
@@ -381,28 +388,30 @@ export default {
     async batchRemove() {
       if (this.selectedItems.length === 0) return;
 
-      uni.showModal({
+      const confirmed = await this.dialog.confirm({
         title: "批量移除",
         content: `确定要移除选中的 ${this.selectedItems.length} 项收藏吗？`,
-        success: async (res) => {
-          if (res.confirm) {
-            try {
-              await Promise.all(
-                this.selectedItems.map((id) => collectionAPI.uncollectArtwork(id)),
-              );
-              this.favorites = this.favorites.filter(
-                (f) => !this.selectedItems.includes(f.id),
-              );
-              this.selectedItems = [];
-              this.updateCategoryCounts();
-              this.toast.showSuccess("批量移除成功");
-            } catch (error) {
-              console.error("批量移除收藏失败:", error);
-              this.toast.showError("批量移除失败");
-            }
-          }
-        },
+        danger: true,
       });
+
+      if (!confirmed) {
+        return;
+      }
+
+      try {
+        await Promise.all(
+          this.selectedItems.map((id) => collectionAPI.uncollectArtwork(id)),
+        );
+        this.favorites = this.favorites.filter(
+          (f) => !this.selectedItems.includes(f.id),
+        );
+        this.selectedItems = [];
+        this.updateCategoryCounts();
+        this.toast.showSuccess("批量移除成功");
+      } catch (error) {
+        console.error("批量移除收藏失败:", error);
+        this.toast.showError("批量移除失败");
+      }
     },
 
     getTypeIcon(type) {

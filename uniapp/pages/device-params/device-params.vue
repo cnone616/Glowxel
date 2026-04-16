@@ -9,12 +9,12 @@
         <Icon name="direction-left" :size="32" color="var(--nb-ink)" />
       </view>
       <text class="nav-title glx-topbar__title">设备参数</text>
-      <view class="nav-right" @click="loadDeviceParams">
-        <Icon name="refresh" :size="28" color="var(--nb-ink)" />
-      </view>
     </view>
 
-    <scroll-view scroll-y class="content glx-scroll-region glx-page-shell__content">
+    <scroll-view
+      scroll-y
+      class="content glx-scroll-region glx-page-shell__content"
+    >
       <view class="section-block">
         <view class="section-header glx-section-head">
           <text class="section-title glx-section-title">特殊LED</text>
@@ -34,7 +34,9 @@
                 :value="rotationIndex"
                 @change="handleRotationChange"
               >
-                <view class="param-picker-text">{{ rotationLabels[rotationIndex] }}</view>
+                <view class="param-picker-text">{{
+                  rotationLabels[rotationIndex]
+                }}</view>
               </picker>
             </view>
             <view class="param-row">
@@ -49,7 +51,9 @@
                 :value="colorOrderIndex"
                 @change="handleColorOrderChange"
               >
-                <view class="param-picker-text">{{ colorOrderLabels[colorOrderIndex] }}</view>
+                <view class="param-picker-text">{{
+                  colorOrderLabels[colorOrderIndex]
+                }}</view>
               </picker>
             </view>
             <view class="param-row">
@@ -69,32 +73,63 @@
       <view class="section-block">
         <view class="section-header glx-section-head">
           <text class="section-title glx-section-title">日夜亮度</text>
-          <text class="section-meta">只补基础定时亮度</text>
+          <text class="section-meta">按设备当前值回显</text>
         </view>
         <view class="panel-card glx-panel-card">
           <view class="param-card">
             <view class="param-stack compact-gap">
-              <text class="param-label">日间亮度</text>
-              <text class="param-desc">默认作为白天显示亮度</text>
+              <text class="param-label">当前亮度</text>
+              <text class="param-desc">设备常规显示亮度，范围 0-178</text>
               <view class="slider-inline-head">
-                <text class="slider-inline-value">{{ brightnessDay }}%</text>
+                <text class="slider-inline-value">{{ brightness }}</text>
               </view>
-              <GlxSlider :value="brightnessDay" :min="0" :max="100" @change="handleBrightnessDayChange" />
+              <GlxSlider
+                :value="brightness"
+                :min="0"
+                :max="178"
+                :step="1"
+                @change="handleBrightnessChange"
+              />
+            </view>
+            <view class="param-stack">
+              <text class="param-label">日间亮度</text>
+              <text class="param-desc">白天自动亮度，范围 0-178</text>
+              <view class="slider-inline-head">
+                <text class="slider-inline-value">{{ brightnessDay }}</text>
+              </view>
+              <GlxSlider
+                :value="brightnessDay"
+                :min="0"
+                :max="178"
+                :step="1"
+                @change="handleBrightnessDayChange"
+              />
             </view>
             <view class="param-stack">
               <text class="param-label">夜间亮度</text>
-              <text class="param-desc">夜间时段会切换到这个亮度</text>
+              <text class="param-desc">夜间自动亮度，范围 0-178</text>
               <view class="slider-inline-head">
-                <text class="slider-inline-value">{{ brightnessNight }}%</text>
+                <text class="slider-inline-value">{{ brightnessNight }}</text>
               </view>
-              <GlxSlider :value="brightnessNight" :min="0" :max="100" @change="handleBrightnessNightChange" />
+              <GlxSlider
+                :value="brightnessNight"
+                :min="0"
+                :max="178"
+                :step="1"
+                @change="handleBrightnessNightChange"
+              />
             </view>
             <view class="param-row">
               <view class="param-copy">
                 <text class="param-label">夜间开始时间</text>
                 <text class="param-desc">夜间开始时间</text>
               </view>
-              <picker class="param-picker param-picker-wide" mode="time" :value="params.nightStart" @change="handleNightStartChange">
+              <picker
+                class="param-picker param-picker-wide"
+                mode="time"
+                :value="params.nightStart"
+                @change="handleNightStartChange"
+              >
                 <view class="param-picker-text">{{ params.nightStart }}</view>
               </picker>
             </view>
@@ -103,12 +138,76 @@
                 <text class="param-label">夜间结束时间</text>
                 <text class="param-desc">夜间结束时间</text>
               </view>
-              <picker class="param-picker param-picker-wide" mode="time" :value="params.nightEnd" @change="handleNightEndChange">
+              <picker
+                class="param-picker param-picker-wide"
+                mode="time"
+                :value="params.nightEnd"
+                @change="handleNightEndChange"
+              >
                 <view class="param-picker-text">{{ params.nightEnd }}</view>
               </picker>
             </view>
             <view class="param-tip-box">
-              <text class="param-tip-text">只有当日间亮度和夜间亮度设置成不同数值时，设备才会按时间自动切换。</text>
+              <text class="param-tip-text"
+                >只有当日间亮度和夜间亮度设置成不同数值时，设备才会按时间自动切换。</text
+              >
+            </view>
+          </view>
+        </view>
+      </view>
+
+      <view class="section-block">
+        <view class="section-header glx-section-head">
+          <text class="section-title glx-section-title">驱动参数</text>
+          <text class="section-meta">面板驱动相关配置</text>
+        </view>
+        <view class="panel-card glx-panel-card">
+          <view class="param-card">
+            <view class="param-row">
+              <view class="param-copy">
+                <text class="param-label">驱动芯片</text>
+                <text class="param-desc">按设备当前 driver 参数回显</text>
+              </view>
+              <picker
+                class="param-picker param-picker-wide"
+                mode="selector"
+                :range="driverLabels"
+                :value="driverIndex"
+                @change="handleDriverChange"
+              >
+                <view class="param-picker-text">{{
+                  driverLabels[driverIndex]
+                }}</view>
+              </picker>
+            </view>
+            <view class="param-row">
+              <view class="param-copy">
+                <text class="param-label">I2S 速度</text>
+                <text class="param-desc">按设备当前 i2cSpeed 参数回显</text>
+              </view>
+              <picker
+                class="param-picker param-picker-wide"
+                mode="selector"
+                :range="speedLabels"
+                :value="speedIndex"
+                @change="handleSpeedChange"
+              >
+                <view class="param-picker-text">{{
+                  speedLabels[speedIndex]
+                }}</view>
+              </picker>
+            </view>
+            <view class="param-row">
+              <view class="param-copy">
+                <text class="param-label">E 引脚</text>
+                <text class="param-desc">按设备当前 E_pin 参数回显</text>
+              </view>
+              <input
+                class="number-input"
+                type="number"
+                :value="String(params.E_pin)"
+                @input="handleEPinInput"
+              />
             </view>
           </view>
         </view>
@@ -133,12 +232,16 @@
                 :value="ntpPresetIndex"
                 @change="handleNtpPresetChange"
               >
-                <view class="param-picker-text">{{ ntpPresetLabels[ntpPresetIndex] }}</view>
+                <view class="param-picker-text">{{
+                  ntpPresetLabels[ntpPresetIndex]
+                }}</view>
               </picker>
             </view>
             <view class="param-stack">
               <text class="param-label">自定义时间服务器</text>
-              <text class="param-desc">如果默认地址慢或不可用，可以手动填写</text>
+              <text class="param-desc"
+                >如果默认地址慢或不可用，可以手动填写</text
+              >
               <input
                 class="text-input"
                 type="text"
@@ -164,21 +267,27 @@
                 <text class="param-label">固件版本</text>
                 <text class="param-desc">当前固件版本</text>
               </view>
-              <text class="readonly-value value-box">{{ info.firmwareVersion.length > 0 ? info.firmwareVersion : '--' }}</text>
+              <text class="readonly-value value-box">{{
+                info.firmwareVersion.length > 0 ? info.firmwareVersion : "--"
+              }}</text>
             </view>
             <view class="param-row">
               <view class="param-copy">
                 <text class="param-label">运行时长</text>
                 <text class="param-desc">设备已运行时长</text>
               </view>
-              <text class="readonly-value value-box">{{ formattedUptime }}</text>
+              <text class="readonly-value value-box">{{
+                formattedUptime
+              }}</text>
             </view>
             <view class="param-row">
               <view class="param-copy">
                 <text class="param-label">当前 WiFi</text>
                 <text class="param-desc">当前已连接 WiFi</text>
               </view>
-              <text class="readonly-value value-box">{{ info.wifiSsid.length > 0 ? info.wifiSsid : '未连接' }}</text>
+              <text class="readonly-value value-box">{{
+                info.wifiSsid.length > 0 ? info.wifiSsid : "未连接"
+              }}</text>
             </view>
           </view>
         </view>
@@ -196,12 +305,14 @@
             </view>
             <view class="panel-action-text">
               <text class="panel-action-label">保存并应用</text>
-              <text class="panel-action-desc">把当前参数写入设备并立即生效</text>
+              <text class="panel-action-desc"
+                >把当前参数写入设备并立即生效</text
+              >
             </view>
             <Icon name="direction-right" :size="28" color="var(--nb-ink)" />
           </view>
           <view class="panel-divider"></view>
-          <view class="panel-action" @click="loadDeviceParams">
+          <view class="panel-action" @click="handleReloadParams">
             <view class="panel-action-icon">
               <Icon name="refresh" :size="32" color="var(--nb-ink)" />
             </view>
@@ -226,7 +337,9 @@
             </view>
             <view class="panel-action-text">
               <text class="panel-action-label danger-text">重置网络</text>
-              <text class="panel-action-desc">清除 WiFi 配置并自动重启设备</text>
+              <text class="panel-action-desc"
+                >清除 WiFi 配置并自动重启设备</text
+              >
             </view>
             <Icon name="direction-right" :size="28" color="var(--nb-ink)" />
           </view>
@@ -236,61 +349,68 @@
       <view style="height: 120rpx"></view>
     </scroll-view>
 
+    <ConfirmDialogHost />
+    <LoadingOverlay />
     <Toast ref="toastRef" />
   </view>
 </template>
 
 <script>
-import { useDeviceStore } from '../../store/device.js'
-import { useToast } from '../../composables/useToast.js'
-import statusBarMixin from '../../mixins/statusBar.js'
-import Icon from '../../components/Icon.vue'
-import Toast from '../../components/Toast.vue'
-import GlxSwitch from '../../components/GlxSwitch.vue'
-import GlxSlider from '../../components/GlxSlider.vue'
+import { useDeviceStore } from "../../store/device.js";
+import { useToast } from "../../composables/useToast.js";
+import { useDialog } from "../../composables/useDialog.js";
+import statusBarMixin from "../../mixins/statusBar.js";
+import ConfirmDialogHost from "../../components/ConfirmDialogHost.vue";
+import Icon from "../../components/Icon.vue";
+import LoadingOverlay from "../../components/LoadingOverlay.vue";
+import Toast from "../../components/Toast.vue";
+import GlxSwitch from "../../components/GlxSwitch.vue";
+import GlxSlider from "../../components/GlxSlider.vue";
 
 const DRIVER_OPTIONS = [
-  { label: 'SHIFTREG', value: 0 },
-  { label: 'FM6124', value: 1 },
-  { label: 'FM6126A', value: 2 },
-  { label: 'ICN2038S', value: 3 },
-  { label: 'MBI5124', value: 4 },
-  { label: 'DP3246', value: 5 },
-]
+  { label: "SHIFTREG", value: 0 },
+  { label: "FM6124", value: 1 },
+  { label: "FM6126A", value: 2 },
+  { label: "ICN2038S", value: 3 },
+  { label: "MBI5124", value: 4 },
+  { label: "DP3246", value: 5 },
+];
 
 const SPEED_OPTIONS = [
-  { label: 'HZ_8M', value: 8000000 },
-  { label: 'HZ_16M', value: 16000000 },
-  { label: 'HZ_20M', value: 20000000 },
-]
+  { label: "HZ_8M", value: 8000000 },
+  { label: "HZ_16M", value: 16000000 },
+  { label: "HZ_20M", value: 20000000 },
+];
 
 const ROTATION_OPTIONS = [
-  { label: '0°', value: 0 },
-  { label: '90°', value: 1 },
-  { label: '180°', value: 2 },
-  { label: '270°', value: 3 },
-]
+  { label: "0°", value: 0 },
+  { label: "90°", value: 1 },
+  { label: "180°", value: 2 },
+  { label: "270°", value: 3 },
+];
 
 const COLOR_ORDER_OPTIONS = [
-  { label: 'RGB', swapBlueGreen: false, swapBlueRed: false },
-  { label: 'RBG', swapBlueGreen: true, swapBlueRed: false },
-  { label: 'GBR', swapBlueGreen: false, swapBlueRed: true },
-]
+  { label: "RGB", swapBlueGreen: false, swapBlueRed: false },
+  { label: "RBG", swapBlueGreen: true, swapBlueRed: false },
+  { label: "GBR", swapBlueGreen: false, swapBlueRed: true },
+];
 
 const NTP_PRESET_OPTIONS = [
-  { label: '阿里云 2', value: 'ntp2.aliyun.com' },
-  { label: '阿里云', value: 'ntp.aliyun.com' },
-  { label: '腾讯云', value: 'ntp.tencent.com' },
-  { label: '国家授时中心', value: 'ntp.ntsc.ac.cn' },
-  { label: '自定义', value: '__custom__' },
-]
+  { label: "阿里云 2", value: "ntp2.aliyun.com" },
+  { label: "阿里云", value: "ntp.aliyun.com" },
+  { label: "腾讯云", value: "ntp.tencent.com" },
+  { label: "国家授时中心", value: "ntp.ntsc.ac.cn" },
+  { label: "自定义", value: "__custom__" },
+];
 
-const UI_BRIGHTNESS_MAX = 178
+const UI_BRIGHTNESS_MAX = 178;
 
 export default {
   mixins: [statusBarMixin],
   components: {
+    ConfirmDialogHost,
     Icon,
+    LoadingOverlay,
     Toast,
     GlxSwitch,
     GlxSlider,
@@ -299,7 +419,8 @@ export default {
     return {
       deviceStore: null,
       toast: null,
-      deviceIp: '',
+      dialog: null,
+      deviceIp: "",
       brightness: 50,
       brightnessDay: 50,
       brightnessNight: 50,
@@ -311,14 +432,14 @@ export default {
         driver: 0,
         i2cSpeed: 8000000,
         E_pin: 18,
-        ntpServer: 'ntp2.aliyun.com',
-        nightStart: '22:00',
-        nightEnd: '07:00',
+        ntpServer: "ntp2.aliyun.com",
+        nightStart: "22:00",
+        nightEnd: "07:00",
       },
       info: {
-        firmwareVersion: '',
+        firmwareVersion: "",
         uptime: 0,
-        wifiSsid: '',
+        wifiSsid: "",
       },
       snapshot: {
         displayBright: 89,
@@ -331,258 +452,268 @@ export default {
         driver: 0,
         i2cSpeed: 8000000,
         E_pin: 18,
-        ntpServer: 'ntp2.aliyun.com',
-        nightStart: '22:00',
-        nightEnd: '07:00',
+        ntpServer: "ntp2.aliyun.com",
+        nightStart: "22:00",
+        nightEnd: "07:00",
       },
       saving: false,
+      loadingParams: false,
       waitingForSaveSettle: false,
       saveSettled: false,
       saveFinalizeTimer: null,
       saveNavigateTimer: null,
       leavingForDisconnect: false,
-    }
+    };
   },
   computed: {
     isDeviceConnected() {
       if (this.deviceStore == null) {
-        return false
+        return false;
       }
-      return this.deviceStore.connected
+      return this.deviceStore.connected;
     },
     driverLabels() {
-      return DRIVER_OPTIONS.map((item) => item.label)
+      return DRIVER_OPTIONS.map((item) => item.label);
     },
     driverIndex() {
-      return DRIVER_OPTIONS.findIndex((item) => item.value === this.params.driver)
+      return DRIVER_OPTIONS.findIndex(
+        (item) => item.value === this.params.driver,
+      );
     },
     speedLabels() {
-      return SPEED_OPTIONS.map((item) => item.label)
+      return SPEED_OPTIONS.map((item) => item.label);
     },
     speedIndex() {
-      return SPEED_OPTIONS.findIndex((item) => item.value === this.params.i2cSpeed)
+      return SPEED_OPTIONS.findIndex(
+        (item) => item.value === this.params.i2cSpeed,
+      );
     },
     rotationLabels() {
-      return ROTATION_OPTIONS.map((item) => item.label)
+      return ROTATION_OPTIONS.map((item) => item.label);
     },
     rotationIndex() {
-      return ROTATION_OPTIONS.findIndex((item) => item.value === this.params.displayRotation)
+      return ROTATION_OPTIONS.findIndex(
+        (item) => item.value === this.params.displayRotation,
+      );
     },
     colorOrderLabels() {
-      return COLOR_ORDER_OPTIONS.map((item) => item.label)
+      return COLOR_ORDER_OPTIONS.map((item) => item.label);
     },
     colorOrderIndex() {
       return COLOR_ORDER_OPTIONS.findIndex((item) => {
         return (
           item.swapBlueGreen === this.params.swapBlueGreen &&
           item.swapBlueRed === this.params.swapBlueRed
-        )
-      })
+        );
+      });
     },
     ntpPresetLabels() {
-      return NTP_PRESET_OPTIONS.map((item) => item.label)
+      return NTP_PRESET_OPTIONS.map((item) => item.label);
     },
     ntpPresetIndex() {
-      const index = NTP_PRESET_OPTIONS.findIndex((item) => item.value === this.params.ntpServer)
+      const index = NTP_PRESET_OPTIONS.findIndex(
+        (item) => item.value === this.params.ntpServer,
+      );
       if (index >= 0) {
-        return index
+        return index;
       }
-      return NTP_PRESET_OPTIONS.length - 1
+      return NTP_PRESET_OPTIONS.length - 1;
     },
     formattedUptime() {
-      const totalSeconds = Number(this.info.uptime)
+      const totalSeconds = Number(this.info.uptime);
       if (!Number.isFinite(totalSeconds) || totalSeconds <= 0) {
-        return '--'
+        return "--";
       }
-      const days = Math.floor(totalSeconds / 86400)
-      const hours = Math.floor((totalSeconds % 86400) / 3600)
-      const minutes = Math.floor((totalSeconds % 3600) / 60)
+      const days = Math.floor(totalSeconds / 86400);
+      const hours = Math.floor((totalSeconds % 86400) / 3600);
+      const minutes = Math.floor((totalSeconds % 3600) / 60);
       if (days > 0) {
-        return `${days}天 ${hours}小时 ${minutes}分`
+        return `${days}天 ${hours}小时 ${minutes}分`;
       }
       if (hours > 0) {
-        return `${hours}小时 ${minutes}分`
+        return `${hours}小时 ${minutes}分`;
       }
-      return `${minutes}分`
+      return `${minutes}分`;
     },
   },
   watch: {
     isDeviceConnected(nextValue, previousValue) {
       if (nextValue !== false) {
-        return
+        return;
       }
       if (previousValue === true && this.saving && this.waitingForSaveSettle) {
-        this.finishSaveAndLeave()
-        return
+        this.finishSaveAndLeave();
+        return;
       }
-      this.leaveWhenDisconnected()
+      this.leaveWhenDisconnected();
     },
   },
   onLoad() {
-    this.deviceStore = useDeviceStore()
-    this.toast = useToast()
-    this.deviceStore.init()
+    this.deviceStore = useDeviceStore();
+    this.toast = useToast();
+    this.dialog = useDialog();
+    this.deviceStore.init();
 
-    const savedIp = uni.getStorageSync('device_ip')
-    if (typeof savedIp === 'string') {
-      this.deviceIp = savedIp
+    const savedIp = uni.getStorageSync("device_ip");
+    if (typeof savedIp === "string") {
+      this.deviceIp = savedIp;
     }
   },
   onReady() {
     if (this.$refs.toastRef) {
-      this.toast.setToastInstance(this.$refs.toastRef)
+      this.toast.setToastInstance(this.$refs.toastRef);
     }
   },
   onHide() {
-    this.clearSaveTimers()
+    this.clearSaveTimers();
   },
   onUnload() {
-    this.clearSaveTimers()
+    this.clearSaveTimers();
   },
   onShow() {
-    if (this.deviceStore && typeof this.deviceStore.deviceIp === 'string' && this.deviceStore.deviceIp.length > 0) {
-      this.deviceIp = this.deviceStore.deviceIp
+    if (
+      this.deviceStore &&
+      typeof this.deviceStore.deviceIp === "string" &&
+      this.deviceStore.deviceIp.length > 0
+    ) {
+      this.deviceIp = this.deviceStore.deviceIp;
     }
     if (!this.ensureConnectedOrLeave()) {
-      return
+      return;
     }
-    this.loadDeviceParams()
+    this.loadDeviceParams(true);
   },
   methods: {
     goBack() {
-      uni.navigateBack()
+      uni.navigateBack();
     },
     ensureConnectedOrLeave() {
       if (this.isDeviceConnected) {
-        return true
+        return true;
       }
-      this.leaveWhenDisconnected()
-      return false
+      this.leaveWhenDisconnected();
+      return false;
     },
     leaveWhenDisconnected() {
       if (this.leavingForDisconnect) {
-        return
+        return;
       }
-      this.leavingForDisconnect = true
-      this.clearSaveTimers()
-      this.saving = false
-      this.waitingForSaveSettle = false
-      uni.hideLoading()
+      this.leavingForDisconnect = true;
+      this.clearSaveTimers();
+      this.saving = false;
+      this.waitingForSaveSettle = false;
+      this.toast.hideLoading();
       setTimeout(() => {
-        const pages = getCurrentPages()
+        const pages = getCurrentPages();
         if (pages.length > 1) {
-          uni.navigateBack()
-          return
+          uni.navigateBack();
+          return;
         }
         uni.switchTab({
-          url: '/pages/control/control',
-        })
-      }, 0)
+          url: "/pages/control/control",
+        });
+      }, 0);
     },
     clearSaveTimers() {
       if (this.saveFinalizeTimer != null) {
-        clearTimeout(this.saveFinalizeTimer)
-        this.saveFinalizeTimer = null
+        clearTimeout(this.saveFinalizeTimer);
+        this.saveFinalizeTimer = null;
       }
       if (this.saveNavigateTimer != null) {
-        clearTimeout(this.saveNavigateTimer)
-        this.saveNavigateTimer = null
+        clearTimeout(this.saveNavigateTimer);
+        this.saveNavigateTimer = null;
       }
     },
     finishSaveAndLeave() {
       if (this.saveSettled) {
-        return
+        return;
       }
-      this.saveSettled = true
-      this.waitingForSaveSettle = false
-      this.clearSaveTimers()
-      this.saving = false
-      uni.hideLoading()
-      this.toast.showSuccess('设备参数已应用')
+      this.saveSettled = true;
+      this.waitingForSaveSettle = false;
+      this.clearSaveTimers();
+      this.saving = false;
+      this.toast.hideLoading();
+      this.toast.showSuccess("设备参数已应用");
       this.saveNavigateTimer = setTimeout(() => {
-        this.saveNavigateTimer = null
-        uni.navigateBack()
-      }, 260)
+        this.saveNavigateTimer = null;
+        uni.navigateBack();
+      }, 260);
     },
     scheduleSaveFallback() {
-      this.clearSaveTimers()
+      this.clearSaveTimers();
       this.saveFinalizeTimer = setTimeout(() => {
-        this.saveFinalizeTimer = null
-        this.finishSaveAndLeave()
-      }, 1200)
-    },
-    convertBrightnessToPercent(rawValue) {
-      const numericValue = Number(rawValue)
-      if (!Number.isFinite(numericValue)) {
-        return 0
-      }
-      const percent = Math.round((numericValue / UI_BRIGHTNESS_MAX) * 100)
-      if (percent < 0) {
-        return 0
-      }
-      if (percent > 100) {
-        return 100
-      }
-      return percent
-    },
-    convertPercentToBrightness(percentValue) {
-      const numericValue = Number(percentValue)
-      if (!Number.isFinite(numericValue)) {
-        return 0
-      }
-      const rawValue = Math.round((numericValue * UI_BRIGHTNESS_MAX) / 100)
-      if (rawValue < 0) {
-        return 0
-      }
-      if (rawValue > UI_BRIGHTNESS_MAX) {
-        return UI_BRIGHTNESS_MAX
-      }
-      return rawValue
+        this.saveFinalizeTimer = null;
+        this.finishSaveAndLeave();
+      }, 1200);
     },
     getBaseUrl() {
       if (this.deviceIp.length === 0) {
-        throw new Error('请先连接设备')
+        throw new Error("请先连接设备");
       }
-      return `http://${this.deviceIp}`
+      return `http://${this.deviceIp}`;
     },
     requestDevice(options) {
       return new Promise((resolve, reject) => {
         uni.request({
           ...options,
           success: (res) => {
-            if (typeof res.statusCode === 'number' && res.statusCode >= 200 && res.statusCode < 300) {
-              resolve(res)
-              return
+            if (
+              typeof res.statusCode === "number" &&
+              res.statusCode >= 200 &&
+              res.statusCode < 300
+            ) {
+              resolve(res);
+              return;
             }
-            reject(new Error('设备请求失败'))
+            reject(new Error("设备请求失败"));
           },
           fail: (err) => {
-            reject(err)
+            reject(err);
           },
-        })
-      })
+        });
+      });
     },
     parseJsonData(data) {
-      if (typeof data === 'string') {
-        return JSON.parse(data)
+      if (typeof data === "string") {
+        return JSON.parse(data);
       }
-      return data
+      return data;
     },
-    async loadDeviceParams() {
+    clampBrightnessValue(rawValue) {
+      const numericValue = Number(rawValue);
+      if (!Number.isFinite(numericValue)) {
+        return 0;
+      }
+      if (numericValue < 0) {
+        return 0;
+      }
+      if (numericValue > UI_BRIGHTNESS_MAX) {
+        return UI_BRIGHTNESS_MAX;
+      }
+      return Math.round(numericValue);
+    },
+    async loadDeviceParams(showLoading = false) {
       if (this.deviceIp.length === 0) {
-        return
+        return;
+      }
+      if (this.loadingParams) {
+        return;
       }
 
       try {
-        const baseUrl = this.getBaseUrl()
+        this.loadingParams = true;
+        if (showLoading) {
+          this.toast.showLoading("读取设备参数...");
+        }
+        const baseUrl = this.getBaseUrl();
         const response = await this.requestDevice({
           url: `${baseUrl}/get`,
-          method: 'GET',
-        })
-        const data = this.parseJsonData(response.data)
-        const displayBright = Number(data.displayBright)
-        const brightnessDay = Number(data.brightnessDay)
-        const brightnessNight = Number(data.brightnessNight)
+          method: "GET",
+        });
+        const data = this.parseJsonData(response.data);
+        const displayBright = Number(data.displayBright);
+        const brightnessDay = Number(data.brightnessDay);
+        const brightnessNight = Number(data.brightnessNight);
 
         this.snapshot = {
           displayBright,
@@ -598,11 +729,11 @@ export default {
           ntpServer: String(data.ntpServer),
           nightStart: String(data.nightStart),
           nightEnd: String(data.nightEnd),
-        }
+        };
 
-        this.brightness = this.convertBrightnessToPercent(displayBright)
-        this.brightnessDay = this.convertBrightnessToPercent(brightnessDay)
-        this.brightnessNight = this.convertBrightnessToPercent(brightnessNight)
+        this.brightness = this.clampBrightnessValue(displayBright);
+        this.brightnessDay = this.clampBrightnessValue(brightnessDay);
+        this.brightnessNight = this.clampBrightnessValue(brightnessNight);
         this.params = {
           displayRotation: this.snapshot.displayRotation,
           swapBlueGreen: this.snapshot.swapBlueGreen,
@@ -614,224 +745,275 @@ export default {
           ntpServer: this.snapshot.ntpServer,
           nightStart: this.snapshot.nightStart,
           nightEnd: this.snapshot.nightEnd,
+        };
+        let firmwareVersion = "";
+        if (typeof data.firmwareVersion === "string") {
+          firmwareVersion = data.firmwareVersion;
         }
-        let firmwareVersion = ''
-        if (typeof data.firmwareVersion === 'string') {
-          firmwareVersion = data.firmwareVersion
+        let uptime = 0;
+        if (typeof data.uptime === "number") {
+          uptime = data.uptime;
         }
-        let uptime = 0
-        if (typeof data.uptime === 'number') {
-          uptime = data.uptime
-        }
-        let wifiSsid = ''
-        if (typeof data.wifiSsid === 'string') {
-          wifiSsid = data.wifiSsid
+        let wifiSsid = "";
+        if (typeof data.wifiSsid === "string") {
+          wifiSsid = data.wifiSsid;
         }
         this.info = {
           firmwareVersion,
           uptime,
           wifiSsid,
-        }
+        };
       } catch (err) {
-        console.error('加载设备参数失败:', err)
+        console.error("加载设备参数失败:", err);
+        if (showLoading) {
+          this.toast.showError("读取设备参数失败");
+        }
+      } finally {
+        this.loadingParams = false;
+        if (showLoading) {
+          this.toast.hideLoading();
+        }
       }
+    },
+    handleBrightnessChange(e) {
+      this.brightness = this.clampBrightnessValue(e.detail.value);
     },
     handleBrightnessDayChange(e) {
-      this.brightnessDay = Number(e.detail.value)
+      this.brightnessDay = this.clampBrightnessValue(e.detail.value);
     },
     handleBrightnessNightChange(e) {
-      this.brightnessNight = Number(e.detail.value)
+      this.brightnessNight = this.clampBrightnessValue(e.detail.value);
     },
     handleRotationChange(e) {
-      const index = Number(e.detail.value)
-      this.params.displayRotation = ROTATION_OPTIONS[index].value
+      const index = Number(e.detail.value);
+      this.params.displayRotation = ROTATION_OPTIONS[index].value;
     },
     handleColorOrderChange(e) {
-      const index = Number(e.detail.value)
-      const option = COLOR_ORDER_OPTIONS[index]
-      this.params.swapBlueGreen = option.swapBlueGreen
-      this.params.swapBlueRed = option.swapBlueRed
+      const index = Number(e.detail.value);
+      const option = COLOR_ORDER_OPTIONS[index];
+      this.params.swapBlueGreen = option.swapBlueGreen;
+      this.params.swapBlueRed = option.swapBlueRed;
     },
     handleDriverChange(e) {
-      const index = Number(e.detail.value)
-      this.params.driver = DRIVER_OPTIONS[index].value
+      const index = Number(e.detail.value);
+      this.params.driver = DRIVER_OPTIONS[index].value;
     },
     handleSpeedChange(e) {
-      const index = Number(e.detail.value)
-      this.params.i2cSpeed = SPEED_OPTIONS[index].value
+      const index = Number(e.detail.value);
+      this.params.i2cSpeed = SPEED_OPTIONS[index].value;
     },
     handleSwitchChange(key, event) {
-      this.params[key] = event.detail.value === true
+      this.params[key] = event.detail.value === true;
     },
     handleEPinInput(event) {
-      const rawValue = String(event.detail.value)
+      const rawValue = String(event.detail.value);
       if (rawValue.length === 0) {
-        this.params.E_pin = 0
-        return
+        this.params.E_pin = 0;
+        return;
       }
-      this.params.E_pin = Number(rawValue)
+      this.params.E_pin = Number(rawValue);
     },
     handleNightStartChange(event) {
-      this.params.nightStart = String(event.detail.value)
+      this.params.nightStart = String(event.detail.value);
     },
     handleNightEndChange(event) {
-      this.params.nightEnd = String(event.detail.value)
+      this.params.nightEnd = String(event.detail.value);
     },
     handleNtpPresetChange(e) {
-      const index = Number(e.detail.value)
-      const option = NTP_PRESET_OPTIONS[index]
-      if (option.value !== '__custom__') {
-        this.params.ntpServer = option.value
+      const index = Number(e.detail.value);
+      const option = NTP_PRESET_OPTIONS[index];
+      if (option.value !== "__custom__") {
+        this.params.ntpServer = option.value;
       }
     },
     handleNtpServerInput(event) {
-      this.params.ntpServer = String(event.detail.value).trim()
+      this.params.ntpServer = String(event.detail.value).trim();
+    },
+    handleReloadParams() {
+      this.loadDeviceParams(true);
     },
     async updateDeviceParam(key, value) {
-      const baseUrl = this.getBaseUrl()
+      const baseUrl = this.getBaseUrl();
       await this.requestDevice({
         url: `${baseUrl}/set?${key}=${encodeURIComponent(String(value))}`,
-        method: 'POST',
-      })
+        method: "POST",
+      });
     },
     async updateBrightness(rawValue) {
-      const baseUrl = this.getBaseUrl()
+      const baseUrl = this.getBaseUrl();
       await this.requestDevice({
         url: `${baseUrl}/brightness`,
-        method: 'POST',
+        method: "POST",
         data: `value=${rawValue}`,
         header: {
-          'content-type': 'application/x-www-form-urlencoded',
+          "content-type": "application/x-www-form-urlencoded",
         },
-      })
+      });
     },
     async saveDeviceParams() {
       if (this.saving) {
-        return
+        return;
       }
 
-      if (!Number.isInteger(this.params.E_pin) || this.params.E_pin < 0 || this.params.E_pin > 32) {
-        this.toast.showError('E_pin 必须是 0 到 32 之间的整数')
-        return
+      if (
+        !Number.isInteger(this.params.E_pin) ||
+        this.params.E_pin < 0 ||
+        this.params.E_pin > 32
+      ) {
+        this.toast.showError("E_pin 必须是 0 到 32 之间的整数");
+        return;
       }
       if (this.params.ntpServer.length === 0) {
-        this.toast.showError('ntpServer 不能为空')
-        return
+        this.toast.showError("ntpServer 不能为空");
+        return;
       }
 
       try {
-        this.saving = true
-        this.saveSettled = false
-        this.waitingForSaveSettle = false
-        this.clearSaveTimers()
-        const nextDisplayBright = this.convertPercentToBrightness(this.brightness)
-        const nextBrightnessDay = this.convertPercentToBrightness(this.brightnessDay)
-        const nextBrightnessNight = this.convertPercentToBrightness(this.brightnessNight)
-        const updates = []
+        this.saving = true;
+        this.saveSettled = false;
+        this.waitingForSaveSettle = false;
+        this.clearSaveTimers();
+        const nextDisplayBright = this.clampBrightnessValue(this.brightness);
+        const nextBrightnessDay = this.clampBrightnessValue(this.brightnessDay);
+        const nextBrightnessNight = this.clampBrightnessValue(this.brightnessNight);
+        const updates = [];
 
         if (this.snapshot.displayBright !== nextDisplayBright) {
-          updates.push(() => this.updateBrightness(nextDisplayBright))
+          updates.push(() => this.updateBrightness(nextDisplayBright));
         }
         if (this.snapshot.brightnessDay !== nextBrightnessDay) {
-          updates.push(() => this.updateDeviceParam('brightnessDay', nextBrightnessDay))
+          updates.push(() =>
+            this.updateDeviceParam("brightnessDay", nextBrightnessDay),
+          );
         }
         if (this.snapshot.brightnessNight !== nextBrightnessNight) {
-          updates.push(() => this.updateDeviceParam('brightnessNight', nextBrightnessNight))
+          updates.push(() =>
+            this.updateDeviceParam("brightnessNight", nextBrightnessNight),
+          );
         }
         if (this.snapshot.displayRotation !== this.params.displayRotation) {
-          updates.push(() => this.updateDeviceParam('displayRotation', this.params.displayRotation))
+          updates.push(() =>
+            this.updateDeviceParam(
+              "displayRotation",
+              this.params.displayRotation,
+            ),
+          );
         }
         if (this.snapshot.swapBlueGreen !== this.params.swapBlueGreen) {
-          updates.push(() => this.updateDeviceParam('swapBlueGreen', this.params.swapBlueGreen ? 1 : 0))
+          updates.push(() =>
+            this.updateDeviceParam(
+              "swapBlueGreen",
+              this.params.swapBlueGreen ? 1 : 0,
+            ),
+          );
         }
         if (this.snapshot.swapBlueRed !== this.params.swapBlueRed) {
-          updates.push(() => this.updateDeviceParam('swapBlueRed', this.params.swapBlueRed ? 1 : 0))
+          updates.push(() =>
+            this.updateDeviceParam(
+              "swapBlueRed",
+              this.params.swapBlueRed ? 1 : 0,
+            ),
+          );
         }
         if (this.snapshot.clkphase !== this.params.clkphase) {
-          updates.push(() => this.updateDeviceParam('clkphase', this.params.clkphase ? 1 : 0))
+          updates.push(() =>
+            this.updateDeviceParam("clkphase", this.params.clkphase ? 1 : 0),
+          );
         }
         if (this.snapshot.driver !== this.params.driver) {
-          updates.push(() => this.updateDeviceParam('driver', this.params.driver))
+          updates.push(() =>
+            this.updateDeviceParam("driver", this.params.driver),
+          );
         }
         if (this.snapshot.i2cSpeed !== this.params.i2cSpeed) {
-          updates.push(() => this.updateDeviceParam('i2cSpeed', this.params.i2cSpeed))
+          updates.push(() =>
+            this.updateDeviceParam("i2cSpeed", this.params.i2cSpeed),
+          );
         }
         if (this.snapshot.E_pin !== this.params.E_pin) {
-          updates.push(() => this.updateDeviceParam('E_pin', this.params.E_pin))
+          updates.push(() =>
+            this.updateDeviceParam("E_pin", this.params.E_pin),
+          );
         }
         if (this.snapshot.nightStart !== this.params.nightStart) {
-          updates.push(() => this.updateDeviceParam('nightStart', this.params.nightStart))
+          updates.push(() =>
+            this.updateDeviceParam("nightStart", this.params.nightStart),
+          );
         }
         if (this.snapshot.nightEnd !== this.params.nightEnd) {
-          updates.push(() => this.updateDeviceParam('nightEnd', this.params.nightEnd))
+          updates.push(() =>
+            this.updateDeviceParam("nightEnd", this.params.nightEnd),
+          );
         }
         if (this.snapshot.ntpServer !== this.params.ntpServer) {
-          updates.push(() => this.updateDeviceParam('ntpServer', this.params.ntpServer))
+          updates.push(() =>
+            this.updateDeviceParam("ntpServer", this.params.ntpServer),
+          );
         }
 
         if (updates.length === 0) {
-          this.toast.showInfo('参数没有变化')
-          this.saving = false
-          return
+          this.toast.showInfo("参数没有变化");
+          this.saving = false;
+          return;
         }
 
-        uni.showLoading({ title: '应用中...', mask: true })
+        this.toast.showLoading("应用中...");
         for (let i = 0; i < updates.length; i += 1) {
-          await updates[i]()
+          await updates[i]();
         }
-        this.waitingForSaveSettle = true
-        this.scheduleSaveFallback()
-        await this.loadDeviceParams()
-        this.finishSaveAndLeave()
+        this.waitingForSaveSettle = true;
+        this.scheduleSaveFallback();
+        await this.loadDeviceParams(false);
+        this.finishSaveAndLeave();
       } catch (err) {
         if (this.saveSettled) {
-          return
+          return;
         }
         if (this.waitingForSaveSettle) {
-          this.finishSaveAndLeave()
-          return
+          this.finishSaveAndLeave();
+          return;
         }
-        console.error('保存设备参数失败:', err)
-        this.toast.showError('保存失败，请检查设备连接')
+        console.error("保存设备参数失败:", err);
+        this.toast.showError("保存失败，请检查设备连接");
       } finally {
         if (!this.saveSettled) {
-          this.saving = false
-          this.waitingForSaveSettle = false
-          this.clearSaveTimers()
-          uni.hideLoading()
+          this.saving = false;
+          this.waitingForSaveSettle = false;
+          this.clearSaveTimers();
+          this.toast.hideLoading();
         }
       }
     },
     async handleResetWifi() {
       if (this.deviceIp.length === 0) {
-        this.toast.showError('请先连接设备')
-        return
+        this.toast.showError("请先连接设备");
+        return;
       }
 
-      uni.showModal({
-        title: '重置网络',
-        content: '将清除当前 WiFi 配置并重启设备，是否继续？',
-        confirmColor: '#FF7A45',
-        success: async (result) => {
-          if (result.confirm !== true) {
-            return
-          }
-          try {
-            const baseUrl = this.getBaseUrl()
-            await this.requestDevice({
-              url: `${baseUrl}/clear-wifi`,
-              method: 'GET',
-            })
-            this.toast.showSuccess('设备已开始重置网络')
-          } catch (err) {
-            console.error('重置网络失败:', err)
-            this.toast.showError('重置网络失败')
-          }
-        },
-      })
+      const confirmed = await this.dialog.confirm({
+        title: "重置网络",
+        content: "将清除当前 WiFi 配置并重启设备，是否继续？",
+        danger: true,
+      });
+
+      if (!confirmed) {
+        return;
+      }
+
+      try {
+        const baseUrl = this.getBaseUrl();
+        await this.requestDevice({
+          url: `${baseUrl}/clear-wifi`,
+          method: "GET",
+        });
+        this.toast.showSuccess("设备已开始重置网络");
+      } catch (err) {
+        console.error("重置网络失败:", err);
+        this.toast.showError("重置网络失败");
+      }
     },
   },
-}
+};
 </script>
 
 <style scoped>
@@ -882,7 +1064,7 @@ export default {
 
 .panel-card {
   background: transparent;
-  border: 0;
+  border: none !important;
   box-shadow: none;
   border-radius: 0;
   overflow: hidden;

@@ -3,7 +3,15 @@
     <div class="container">
       <div class="page-header">
         <h1 class="page-title">设备控制</h1>
-        <p class="page-desc">在网页直接连接光格像素工坊设备并进行基础控制</p>
+        <p class="page-desc">适用于已经完成配网的设备，在网页中直接连接并进行基础控制。</p>
+      </div>
+
+      <div class="notice-card">
+        <div class="notice-copy">
+          <strong>首次使用先完成热点配网</strong>
+          <span>网页端目前不直接提供 WiFi 配网表单。请先连接设备热点，在浏览器中打开 `192.168.4.1` 完成 WiFi 配置，再回到这里输入设备 IP 连接。</span>
+        </div>
+        <a class="notice-link" href="/hardware-guide.html" target="_self">查看连接说明</a>
       </div>
 
       <div class="card">
@@ -153,14 +161,17 @@ async function handleClear() {
 .page-header {
   margin-bottom: 20px;
   padding: 24px 24px 20px;
-  border: 3px solid var(--nb-ink);
-  background: linear-gradient(180deg, var(--nb-paper) 0%, var(--tone-yellow-soft) 100%);
+  border: 1px solid rgba(36, 49, 66, 0.08);
+  border-radius: 30px;
+  background:
+    radial-gradient(circle at top right, rgba(215, 178, 109, 0.18), transparent 32%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.9) 0%, rgba(251, 247, 241, 0.82) 100%);
   box-shadow: var(--nb-shadow-card);
 }
 
 .page-title {
   font-size: 34px;
-  font-weight: 900;
+  font-weight: 700;
   line-height: 1.05;
   color: var(--nb-ink);
   letter-spacing: -0.03em;
@@ -174,12 +185,59 @@ async function handleClear() {
   line-height: 1.6;
 }
 
+.notice-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+  padding: 20px 22px;
+  border: 1px solid rgba(36, 49, 66, 0.08);
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.78);
+  box-shadow: var(--nb-shadow-soft);
+}
+
+.notice-copy {
+  display: grid;
+  gap: 6px;
+}
+
+.notice-copy strong {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--nb-ink);
+}
+
+.notice-copy span {
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--text-secondary);
+}
+
+.notice-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  padding: 0 16px;
+  border: 1px solid rgba(136, 161, 186, 0.22);
+  border-radius: 999px;
+  background: rgba(136, 161, 186, 0.14);
+  color: var(--nb-ink);
+  font-size: 14px;
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
 .card {
   position: relative;
   margin-bottom: 16px;
   padding: 22px;
-  border: 3px solid var(--nb-ink);
-  background: var(--tone-paper-soft);
+  border: 1px solid rgba(36, 49, 66, 0.08);
+  border-radius: 28px;
+  background: rgba(255, 255, 255, 0.8);
   box-shadow: var(--nb-shadow-card);
 }
 
@@ -189,11 +247,11 @@ async function handleClear() {
   min-height: 40px;
   margin-bottom: 16px;
   padding: 6px 14px;
-  border: 3px solid var(--nb-ink);
-  background: var(--nb-blue);
+  border-radius: 999px;
+  background: rgba(136, 161, 186, 0.16);
   color: var(--nb-ink);
   font-size: 18px;
-  font-weight: 900;
+  font-weight: 700;
   letter-spacing: 0.01em;
 }
 
@@ -213,7 +271,7 @@ async function handleClear() {
 
 .field span {
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 700;
   letter-spacing: 0.04em;
   color: var(--text-secondary);
   text-transform: uppercase;
@@ -236,12 +294,14 @@ async function handleClear() {
   align-items: center;
   gap: 10px;
   padding: 0 14px;
-  border: 3px solid var(--nb-ink);
-  background: var(--tone-paper-soft);
+  border: 1px solid rgba(36, 49, 66, 0.08);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.72);
   color: var(--nb-ink);
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 700;
   white-space: nowrap;
+  box-shadow: var(--nb-shadow-soft);
 }
 
 .secure-switch input {
@@ -270,9 +330,10 @@ async function handleClear() {
 .dot {
   width: 14px;
   height: 14px;
-  border: 3px solid var(--nb-ink);
+  border: 2px solid rgba(255, 255, 255, 0.85);
   background: var(--text-tertiary);
   flex: 0 0 auto;
+  border-radius: 999px;
 }
 
 .dot.online {
@@ -284,8 +345,9 @@ async function handleClear() {
   align-items: center;
   min-height: 34px;
   padding: 6px 12px;
-  border: 3px solid var(--nb-ink);
-  background: var(--tone-paper-soft);
+  border: 1px solid rgba(36, 49, 66, 0.08);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.74);
   color: var(--nb-ink);
   white-space: nowrap;
 }
@@ -293,8 +355,9 @@ async function handleClear() {
 .msg {
   margin-top: 14px;
   padding: 10px 12px;
-  border: 2px solid var(--nb-ink);
-  background: var(--tone-paper-soft);
+  border: 1px solid rgba(36, 49, 66, 0.08);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.74);
   font-size: 13px;
   font-weight: 700;
   color: var(--text-secondary);
@@ -320,11 +383,12 @@ async function handleClear() {
 .mode-btn {
   min-height: 54px;
   padding: 10px 14px;
-  border: 3px solid var(--nb-ink);
-  background: var(--tone-paper-soft);
+  border: 1px solid rgba(36, 49, 66, 0.08);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.76);
   cursor: pointer;
   font-size: 14px;
-  font-weight: 900;
+  font-weight: 700;
   line-height: 1.35;
   color: var(--nb-ink);
   box-shadow: var(--nb-shadow-soft);
@@ -337,7 +401,7 @@ async function handleClear() {
 }
 
 .mode-btn.active {
-  background: var(--nb-blue);
+  background: rgba(136, 161, 186, 0.18);
   color: var(--nb-ink);
 }
 
@@ -351,8 +415,9 @@ async function handleClear() {
 .brightness-row {
   margin-bottom: 14px;
   padding: 14px;
-  border: 3px solid var(--nb-ink);
-  background: var(--tone-paper-soft);
+  border: 1px solid rgba(36, 49, 66, 0.08);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.72);
 }
 
 .brightness-row label {
@@ -360,7 +425,7 @@ async function handleClear() {
   margin-bottom: 10px;
   color: var(--nb-ink);
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .brightness-row input {
@@ -378,6 +443,11 @@ async function handleClear() {
 
   .connection-form {
     grid-template-columns: 1fr;
+  }
+
+  .notice-card {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }
 

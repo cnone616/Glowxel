@@ -4,7 +4,7 @@ export default {
   methods: {
     handleSave() {
       if (!this.isEditable) {
-        uni.showToast({ title: "已发布作品不可编辑", icon: "none" });
+        this.toast.showInfo("已发布作品不可编辑");
         return;
       }
       this.showSaveConfirm = true;
@@ -12,7 +12,7 @@ export default {
 
     handleRename() {
       if (!this.isEditable) {
-        uni.showToast({ title: "已发布作品不可重命名", icon: "none" });
+        this.toast.showInfo("已发布作品不可重命名");
         return;
       }
       if (!this.newProjectName.trim()) {
@@ -37,7 +37,7 @@ export default {
 
     async confirmSave() {
       if (!this.isEditable) {
-        uni.showToast({ title: "已发布作品不可编辑", icon: "none" });
+        this.toast.showInfo("已发布作品不可编辑");
         return;
       }
 
@@ -251,19 +251,20 @@ export default {
       }
 
       if (this.hasUnsavedChanges) {
-        uni.showModal({
-          title: "有未保存的修改",
-          content: "检测到您有未保存的修改，是否先保存再发布？",
-          confirmText: "保存并发布",
-          cancelText: "直接发布",
-          success: (res) => {
-            if (res.confirm) {
+        this.dialog
+          .confirm({
+            title: "有未保存的修改",
+            content: "检测到您有未保存的修改，是否先保存再发布？",
+            confirmText: "保存并发布",
+            cancelText: "直接发布",
+          })
+          .then((confirmed) => {
+            if (confirmed) {
               this.saveAndPublish();
-            } else if (res.cancel) {
-              this.navigateToPublish();
+              return;
             }
-          },
-        });
+            this.navigateToPublish();
+          });
       } else {
         this.navigateToPublish();
       }
@@ -271,7 +272,7 @@ export default {
 
     async saveAndPublish() {
       if (!this.isEditable) {
-        uni.showToast({ title: "已发布作品不可重复发布", icon: "none" });
+        this.toast.showInfo("已发布作品不可重复发布");
         return;
       }
 

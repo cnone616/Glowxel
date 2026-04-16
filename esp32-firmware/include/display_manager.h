@@ -97,7 +97,10 @@ enum AmbientEffectPreset : uint8_t {
   AMBIENT_PRESET_WEATHER_SCENE = 14,
   AMBIENT_PRESET_GAME_OF_LIFE = 15,
   AMBIENT_PRESET_JULIA_SET = 16,
-  AMBIENT_PRESET_REACTION_DIFFUSION = 17
+  AMBIENT_PRESET_REACTION_DIFFUSION = 17,
+  AMBIENT_PRESET_COSMIC_KALE = 18,
+  AMBIENT_PRESET_VOID_FIRE = 19,
+  AMBIENT_PRESET_DEEP_SPACE_NEBULA = 20
 };
 
 struct BreathEffectConfig {
@@ -192,6 +195,8 @@ public:
   static void clearLiveFrame(uint16_t color = 0);
   static void writeLiveFramePixel565(int x, int y, uint16_t color);
   static void writeLiveFramePixelRGB888(int x, int y, uint8_t r, uint8_t g, uint8_t b);
+  static bool beginRedirectedFrame(uint16_t* targetBuffer, uint16_t clearColor = 0);
+  static void endRedirectedFrame(bool present = true);
   static MatrixPanel_I2S_DMA* beginOffscreenFrame(uint16_t* targetBuffer, uint16_t clearColor = 0);
   static void presentOffscreenFrame(const uint16_t* targetBuffer);
 

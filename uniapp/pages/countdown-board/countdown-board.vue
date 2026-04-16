@@ -15,7 +15,7 @@
     <view class="canvas-section">
       <view class="preview-canvas-container" :style="previewCanvasBoxStyle">
         <PixelCanvas
-          v-if="previewCanvasReady"
+          v-if="previewCanvasReady && previewCanvasVisible"
           :width="64"
           :height="64"
           :pixels="currentPreviewPixels"
@@ -112,7 +112,19 @@
       </view>
     </scroll-view>
 
-    <Toast ref="toastRef" />
+    <view v-if="isSending" class="glx-sending-overlay" @touchmove.stop.prevent>
+      <view class="glx-sending-modal">
+        <view class="glx-sending-spinner"></view>
+        <text class="glx-sending-title">正在传输数据...</text>
+        <text class="glx-sending-tip">请勿切换网络或关闭程序</text>
+      </view>
+    </view>
+
+    <Toast
+      ref="toastRef"
+      @show="handleToastShow"
+      @hide="handleToastHide"
+    />
   </view>
 </template>
 
@@ -152,8 +164,10 @@ export default {
       deviceStore: null,
       toast: null,
       isSending: false,
+      isToastVisible: false,
       contentHeight: "calc(100vh - 88rpx - 520rpx)",
       previewCanvasReady: false,
+      previewCanvasVisible: true,
       previewZoom: 4,
       previewOffset: { x: 0, y: 0 },
       previewContainerSize: { width: 320, height: 320 },
@@ -226,6 +240,26 @@ export default {
     handleBack() {
       uni.navigateBack();
     },
+    syncPreviewCanvasVisibility() {
+      const nextVisible = !this.isSending && !this.isToastVisible;
+      if (this.previewCanvasVisible === nextVisible) {
+        return;
+      }
+      this.previewCanvasVisible = nextVisible;
+      if (nextVisible) {
+        this.$nextTick(() => {
+          this.refreshPreview();
+        });
+      }
+    },
+    handleToastShow() {
+      this.isToastVisible = true;
+      this.syncPreviewCanvasVisibility();
+    },
+    handleToastHide() {
+      this.isToastVisible = false;
+      this.syncPreviewCanvasVisibility();
+    },
     initPreviewCanvas() {
       const query = uni.createSelectorQuery().in(this);
       query
@@ -290,6 +324,7 @@ export default {
     },
     async saveAndApply() {
       if (this.isSending) {
+        this.toast.showInfo("正在传输中，请等待完成");
         return;
       }
       if (!this.deviceStore.connected) {
@@ -298,18 +333,30 @@ export default {
       }
 
       this.isSending = true;
+      this.syncPreviewCanvasVisibility();
       try {
         this.config.progress = 100;
         const ws = this.deviceStore.getWebSocket();
         await ws.setCountdownBoard(this.config);
+        const status = await ws.getStatus();
+        if (
+          status.effectMode !== "countdown" ||
+          status.hours !== this.config.hours ||
+          status.minutes !== this.config.minutes ||
+          status.seconds !== this.config.seconds ||
+          status.progress !== this.config.progress
+        ) {
+          throw new Error("设备未进入倒计时模式");
+        }
         uni.setStorageSync(COUNTDOWN_CONFIG_KEY, this.config);
         this.deviceStore.setDeviceMode("countdown", { businessMode: true });
         this.toast.showSuccess("已保存并应用");
       } catch (error) {
         console.error("应用沙漏倒计时失败:", error);
-        this.toast.showError("发送失败");
+        this.toast.showError("发送失败：" + error.message);
       } finally {
         this.isSending = false;
+        this.syncPreviewCanvasVisibility();
       }
     },
   },

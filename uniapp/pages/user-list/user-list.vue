@@ -93,22 +93,29 @@
         </view>
       </view>
     </scroll-view>
+
+    <Toast />
   </view>
 </template>
 
 <script>
 import { userAPI, followAPI } from '../../api/index.js'
+import { useToast } from '../../composables/useToast.js'
 import statusBarMixin from '../../mixins/statusBar.js'
 import Icon from '../../components/Icon.vue'
 import Avatar from '../../components/Avatar.vue'
 import Input from '../../components/Input.vue'
+import Toast from '../../components/Toast.vue'
+
+const toast = useToast()
 
 export default {
   mixins: [statusBarMixin],
   components: {
     Icon,
     Avatar,
-    Input
+    Input,
+    Toast
   },
   
   data() {
@@ -171,10 +178,7 @@ export default {
         await this.loadUsers(true)
       } catch (error) {
         console.error('加载数据失败:', error)
-        uni.showToast({
-          title: '加载失败',
-          icon: 'error'
-        })
+        toast.showError('加载失败')
       } finally {
         this.isLoading = false
       }
@@ -286,17 +290,11 @@ export default {
             user.followers_count -= 1
           }
           
-          uni.showToast({
-            title: result.data.followed ? '关注成功' : '取消关注',
-            icon: 'success'
-          })
+          toast.showSuccess(result.data.followed ? '关注成功' : '取消关注')
         }
       } catch (error) {
         console.error('关注操作失败:', error)
-        uni.showToast({
-          title: '操作失败',
-          icon: 'error'
-        })
+        toast.showError('操作失败')
       }
     },
     

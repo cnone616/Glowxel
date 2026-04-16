@@ -221,7 +221,7 @@
       "
     />
 
-    <!-- Toast -->
+    <ConfirmDialogHost />
     <Toast ref="toastRef" />
   </view>
 </template>
@@ -230,8 +230,10 @@
 import { artworkAPI, challengeAPI } from "../../api/index.js";
 import { useProjectStore } from "../../store/project.js";
 import { useToast } from "../../composables/useToast.js";
+import { useDialog } from "../../composables/useDialog.js";
 import statusBarMixin from "../../mixins/statusBar.js";
 import Icon from "../../components/Icon.vue";
+import ConfirmDialogHost from "../../components/ConfirmDialogHost.vue";
 import Toast from "../../components/Toast.vue";
 import GlxSwitch from "../../components/GlxSwitch.vue";
 
@@ -241,6 +243,7 @@ export default {
   mixins: [statusBarMixin],
   components: {
     Icon,
+    ConfirmDialogHost,
     Toast,
     GlxSwitch,
   },
@@ -249,6 +252,7 @@ export default {
     return {
       projectStore: null,
       toast: null,
+      dialog: null,
 
       // 画布数据
       canvasData: {
@@ -325,6 +329,7 @@ export default {
   onLoad() {
     this.projectStore = useProjectStore();
     this.toast = useToast();
+    this.dialog = useDialog();
 
     // 从临时存储中获取画布数据
     const tempData = uni.getStorageSync("temp_publish_data");
@@ -420,7 +425,7 @@ export default {
       return true;
     },
 
-    handleBack() {
+    async handleBack() {
       if (this.isPublishing) {
         return;
       }
@@ -431,15 +436,15 @@ export default {
         this.form.description.trim() ||
         this.form.tags.length > 0
       ) {
-        uni.showModal({
+        const confirmed = await this.dialog.confirm({
           title: "确认离开",
           content: "您填写的内容将会丢失，确定要离开吗？",
-          success: (res) => {
-            if (res.confirm) {
-              uni.navigateBack();
-            }
-          },
+          danger: true,
         });
+
+        if (confirmed) {
+          uni.navigateBack();
+        }
       } else {
         uni.navigateBack();
       }

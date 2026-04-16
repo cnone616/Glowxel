@@ -132,15 +132,21 @@
         </view>
       </view>
     </scroll-view>
+
+    <Toast />
   </view>
 </template>
 
 <script>
 import { artworkAPI, followAPI, likeAPI, userAPI } from "../../api/index.js";
+import { useToast } from "../../composables/useToast.js";
 import statusBarMixin from "../../mixins/statusBar.js";
 import ArtworkCard from "../../components/ArtworkCard.vue";
 import Avatar from "../../components/Avatar.vue";
 import Icon from "../../components/Icon.vue";
+import Toast from "../../components/Toast.vue";
+
+const toast = useToast();
 
 export default {
   mixins: [statusBarMixin],
@@ -148,6 +154,7 @@ export default {
     ArtworkCard,
     Avatar,
     Icon,
+    Toast,
   },
 
   data() {
@@ -223,10 +230,7 @@ export default {
         await this.loadArtworks(true);
       } catch (error) {
         console.error("加载数据失败:", error);
-        uni.showToast({
-          title: "加载失败",
-          icon: "error",
-        });
+        toast.showError("加载失败");
       } finally {
         this.isLoading = false;
       }
@@ -394,10 +398,7 @@ export default {
         }
       } catch (error) {
         console.error("点赞作品失败:", error);
-        uni.showToast({
-          title: "操作失败",
-          icon: "none",
-        });
+        toast.showError("操作失败");
       }
     },
 
@@ -422,16 +423,10 @@ export default {
           user.followers_count -= 1;
         }
 
-        uni.showToast({
-          title: res.data.followed ? "已关注" : "已取消关注",
-          icon: "success",
-        });
+        toast.showSuccess(res.data.followed ? "已关注" : "已取消关注");
       } catch (error) {
         console.error("关注用户失败:", error);
-        uni.showToast({
-          title: "操作失败",
-          icon: "none",
-        });
+        toast.showError("操作失败");
       }
     },
 

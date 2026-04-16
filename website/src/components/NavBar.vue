@@ -106,8 +106,9 @@ const handleLogout = () => {
 
 <style scoped>
 .navbar {
-  background: var(--nb-paper);
-  border-bottom: var(--nb-border-width) solid var(--nb-ink);
+  background: rgba(243, 238, 230, 0.78);
+  border-bottom: 1px solid rgba(36, 49, 66, 0.08);
+  backdrop-filter: blur(18px);
   position: sticky;
   top: 0;
   z-index: 1000;
@@ -128,7 +129,7 @@ const handleLogout = () => {
   align-items: center;
   text-decoration: none;
   flex-shrink: 0;
-  padding: 6px 10px;
+  padding: 6px 2px;
 }
 
 .nav-links {
@@ -142,22 +143,25 @@ const handleLogout = () => {
   color: var(--text-secondary);
   text-decoration: none;
   font-size: 14px;
-  font-weight: 800;
+  font-weight: 700;
   min-height: 38px;
   padding: 8px 14px;
-  border: var(--nb-border-width) solid var(--nb-ink);
-  background: var(--tone-paper-soft);
-  box-shadow: 3px 3px 0 #000000;
-  transition: background-color 0.15s ease, color 0.15s ease;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  transition: background-color 0.18s ease, color 0.18s ease,
+    border-color 0.18s ease;
 }
 
 .nav-links a:hover {
-  background: var(--nb-muted);
+  color: var(--nb-ink);
+  background: rgba(255, 255, 255, 0.72);
+  border-color: rgba(36, 49, 66, 0.08);
 }
 
 .nav-links a.router-link-exact-active {
   color: var(--nb-ink);
-  background: var(--nb-blue);
+  background: rgba(136, 161, 186, 0.18);
+  border-color: rgba(136, 161, 186, 0.22);
 }
 
 .nav-actions {
@@ -176,16 +180,19 @@ const handleLogout = () => {
   padding: 8px 16px;
   background: var(--nb-yellow);
   color: var(--nb-ink);
-  border: var(--nb-border-width) solid var(--nb-ink);
+  border: 1px solid rgba(215, 178, 109, 0.4);
+  border-radius: 999px;
   box-shadow: var(--nb-shadow-soft);
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 700;
   text-decoration: none;
-  transition: background-color 0.15s ease;
+  transition: transform 0.18s ease, background-color 0.18s ease,
+    box-shadow 0.18s ease;
 }
 
 .btn-create:hover {
   background: var(--color-primary-hover);
+  transform: translateY(-1px);
 }
 
 .btn-login {
@@ -195,18 +202,22 @@ const handleLogout = () => {
   min-height: 40px;
   padding: 8px 16px;
   color: var(--text-secondary);
-  border: var(--nb-border-width) solid var(--nb-ink);
-  background: var(--tone-paper-soft);
+  border: 1px solid rgba(36, 49, 66, 0.1);
+  background: rgba(255, 255, 255, 0.74);
+  border-radius: 999px;
   box-shadow: var(--nb-shadow-soft);
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 700;
   text-decoration: none;
-  transition: background-color 0.15s ease, color 0.15s ease;
+  transition: transform 0.18s ease, background-color 0.18s ease,
+    color 0.18s ease, border-color 0.18s ease;
 }
 
 .btn-login:hover {
   color: var(--nb-ink);
-  background: var(--nb-muted);
+  background: rgba(255, 255, 255, 0.92);
+  border-color: rgba(36, 49, 66, 0.16);
+  transform: translateY(-1px);
 }
 
 .btn-logout {
@@ -220,16 +231,17 @@ const handleLogout = () => {
   justify-content: center;
   width: 44px;
   height: 44px;
-  background: var(--tone-paper-soft);
-  border: var(--nb-border-width) solid var(--nb-ink);
-  box-shadow: 3px 3px 0 #000000;
+  background: rgba(255, 255, 255, 0.74);
+  border: 1px solid rgba(36, 49, 66, 0.12);
+  border-radius: 14px;
+  box-shadow: var(--nb-shadow-soft);
   cursor: pointer;
   padding: 0;
   color: var(--nb-text-primary);
 }
 
 .mobile-menu-btn:hover {
-  background: var(--nb-muted);
+  background: rgba(255, 255, 255, 0.96);
 }
 
 @media (max-width: 768px) {
@@ -256,12 +268,14 @@ const handleLogout = () => {
     top: 64px;
     left: 12px;
     right: 12px;
-    background: var(--nb-paper);
+    background: rgba(255, 255, 255, 0.92);
     flex-direction: column;
     padding: 14px;
     gap: 8px;
-    border: var(--nb-border-width) solid var(--nb-ink);
+    border: 1px solid rgba(36, 49, 66, 0.08);
+    border-radius: 22px;
     box-shadow: var(--nb-shadow-strong);
+    backdrop-filter: blur(20px);
   }
 
   .nav-links.active {

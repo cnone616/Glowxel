@@ -129,6 +129,15 @@ namespace {
     if (preset == AMBIENT_PRESET_REACTION_DIFFUSION) {
       return "reaction_diffusion";
     }
+    if (preset == AMBIENT_PRESET_COSMIC_KALE) {
+      return "cosmic_kale";
+    }
+    if (preset == AMBIENT_PRESET_VOID_FIRE) {
+      return "void_fire";
+    }
+    if (preset == AMBIENT_PRESET_DEEP_SPACE_NEBULA) {
+      return "deep_space_nebula";
+    }
     return "";
   }
 
@@ -205,6 +214,18 @@ namespace {
       preset = AMBIENT_PRESET_REACTION_DIFFUSION;
       return true;
     }
+    if (value == "cosmic_kale") {
+      preset = AMBIENT_PRESET_COSMIC_KALE;
+      return true;
+    }
+    if (value == "void_fire") {
+      preset = AMBIENT_PRESET_VOID_FIRE;
+      return true;
+    }
+    if (value == "deep_space_nebula") {
+      preset = AMBIENT_PRESET_DEEP_SPACE_NEBULA;
+      return true;
+    }
     return false;
   }
 }
@@ -223,6 +244,18 @@ bool WebSocketCommandHandlers::handleBasicCommand(
   }
 
   if (cmd == "status") {
+    const char* runtimeMode = "unknown";
+    if (DisplayManager::currentMode == MODE_CLOCK) {
+      runtimeMode = "clock";
+    } else if (DisplayManager::currentMode == MODE_CANVAS) {
+      runtimeMode = "canvas";
+    } else if (DisplayManager::currentMode == MODE_ANIMATION) {
+      runtimeMode = "animation";
+    } else if (DisplayManager::currentMode == MODE_TRANSFERRING) {
+      runtimeMode = "transferring";
+    } else if (DisplayManager::currentMode == MODE_THEME) {
+      runtimeMode = "theme";
+    }
     response["ip"] = WiFiManager::getDeviceIP();
     response["width"] = DisplayManager::PANEL_RES_X;
     response["height"] = DisplayManager::PANEL_RES_Y;
@@ -242,7 +275,8 @@ bool WebSocketCommandHandlers::handleBasicCommand(
     response["ntpServer"] = ConfigManager::deviceParamsConfig.ntpServer;
     response["wifiSsid"] = WiFiManager::getConnectedSSID();
     response["uptime"] = millis() / 1000;
-    response["mode"] = currentMode;
+    response["mode"] = runtimeMode;
+    response["businessMode"] = DisplayManager::currentBusinessModeTag;
     if (DisplayManager::nativeEffectType == NATIVE_EFFECT_BREATH) {
       response["effectMode"] = "breath_effect";
     } else if (DisplayManager::nativeEffectType == NATIVE_EFFECT_RHYTHM) {
@@ -330,6 +364,17 @@ bool WebSocketCommandHandlers::handleBasicCommand(
       accentColor["r"] = config.accentR;
       accentColor["g"] = config.accentG;
       accentColor["b"] = config.accentB;
+    } else if (BoardNativeEffect::isActive() &&
+               DisplayManager::currentBusinessModeTag == "planet_screensaver") {
+      response["effectMode"] = "planet_screensaver";
+      const PlanetScreensaverNativeConfig& config =
+        BoardNativeEffect::getPlanetScreensaverConfig();
+      response["preset"] = config.preset;
+      response["size"] = config.size;
+      response["direction"] = config.direction;
+      response["speed"] = config.speed;
+      response["seed"] = config.seed;
+      response["colorSeed"] = config.colorSeed;
     } else if (TetrisEffect::isActive) {
       response["effectMode"] = "tetris";
     } else if (DisplayManager::nativeEffectType == NATIVE_EFFECT_EYES) {
@@ -419,7 +464,8 @@ bool WebSocketCommandHandlers::handleModeCommand(
                        modeTag == "weather" ||
                        modeTag == "countdown" ||
                        modeTag == "stopwatch" ||
-                       modeTag == "notification";
+                       modeTag == "notification" ||
+                       modeTag == "planet_screensaver";
       if (boardMode && BoardNativeEffect::isActive()) {
         BoardNativeEffect::render();
       } else if (!playLoadedAnimation()) {
@@ -439,7 +485,8 @@ bool WebSocketCommandHandlers::handleModeCommand(
                           mode == "weather" ||
                           mode == "countdown" ||
                           mode == "stopwatch" ||
-                          mode == "notification";
+                          mode == "notification" ||
+                          mode == "planet_screensaver";
 
     TetrisEffect::isActive = false;
     GameScreensaverEffect::init();
@@ -477,6 +524,10 @@ bool WebSocketCommandHandlers::handleModeCommand(
 
     if (mode == "animation") {
       return setAnimationBusinessMode("animation", "switched to animation mode", true);
+    }
+
+    if (mode == "gif_player") {
+      return setAnimationBusinessMode("gif_player", "switched to gif player mode", true);
     }
 
     if (mode == "theme") {
@@ -531,6 +582,19 @@ bool WebSocketCommandHandlers::handleModeCommand(
 
       Serial.printf("模式切换: %s -> ambient_effect\n", modeToString(fromMode));
       response["message"] = "switched to ambient effect mode";
+      return true;
+    }
+
+    if (mode == "led_matrix_showcase") {
+      DisplayManager::currentMode = MODE_ANIMATION;
+      DisplayManager::lastBusinessMode = MODE_ANIMATION;
+      DisplayManager::currentBusinessModeTag = "led_matrix_showcase";
+      DisplayManager::lastBusinessModeTag = "led_matrix_showcase";
+      ConfigManager::saveClockConfig();
+      DisplayManager::activateAmbientEffect(DisplayManager::ambientEffectConfig);
+
+      Serial.printf("模式切换: %s -> led_matrix_showcase\n", modeToString(fromMode));
+      response["message"] = "switched to led matrix showcase mode";
       return true;
     }
 
@@ -589,6 +653,10 @@ bool WebSocketCommandHandlers::handleModeCommand(
 
     if (mode == "notification") {
       return setAnimationBusinessMode("notification", "switched to notification mode", false);
+    }
+
+    if (mode == "planet_screensaver") {
+      return setAnimationBusinessMode("planet_screensaver", "switched to planet screensaver mode", false);
     }
 
     if (mode == "eyes") {
@@ -1181,6 +1249,96 @@ bool WebSocketCommandHandlers::handleEffectCommand(
     return true;
   }
 
+  if (cmd == "set_planet_screensaver") {
+    if (!doc.containsKey("preset") ||
+        !doc.containsKey("size") ||
+        !doc.containsKey("direction") ||
+        !doc.containsKey("speed") ||
+        !doc.containsKey("seed") ||
+        !doc.containsKey("colorSeed")) {
+      setErrorResponse(response, "missing planet screensaver fields");
+      return true;
+    }
+
+    String preset = doc["preset"].as<String>();
+    if (preset != "terran_wet" &&
+        preset != "terran_dry" &&
+        preset != "islands" &&
+        preset != "no_atmosphere" &&
+        preset != "gas_giant_1" &&
+        preset != "gas_giant_2" &&
+        preset != "ice_world" &&
+        preset != "lava_world" &&
+        preset != "asteroid" &&
+        preset != "black_hole" &&
+        preset != "galaxy" &&
+        preset != "star") {
+      setErrorResponse(response, "invalid planet preset");
+      return true;
+    }
+
+    String size = doc["size"].as<String>();
+    if (size != "small" && size != "medium" && size != "large") {
+      setErrorResponse(response, "invalid planet size");
+      return true;
+    }
+
+    String direction = doc["direction"].as<String>();
+    if (direction != "left" && direction != "right") {
+      setErrorResponse(response, "invalid planet direction");
+      return true;
+    }
+
+    int speed = doc["speed"].as<int>();
+    if (speed < 1 || speed > 10) {
+      setErrorResponse(response, "invalid planet speed");
+      return true;
+    }
+
+    unsigned long seed = doc["seed"].as<unsigned long>();
+    if (seed > 999999999UL) {
+      setErrorResponse(response, "invalid planet seed");
+      return true;
+    }
+
+    unsigned long colorSeed = doc["colorSeed"].as<unsigned long>();
+    if (colorSeed > 999999999UL) {
+      setErrorResponse(response, "invalid planet colorSeed");
+      return true;
+    }
+
+    PlanetScreensaverNativeConfig config;
+    config.preset = preset;
+    config.size = size;
+    config.direction = direction;
+    config.speed = (uint8_t)speed;
+    config.seed = (uint32_t)seed;
+    config.colorSeed = (uint32_t)colorSeed;
+
+    DisplayManager::currentMode = MODE_ANIMATION;
+    DisplayManager::lastBusinessMode = MODE_ANIMATION;
+    DisplayManager::currentBusinessModeTag = "planet_screensaver";
+    DisplayManager::lastBusinessModeTag = "planet_screensaver";
+    ConfigManager::saveClockConfig();
+    TetrisEffect::isActive = false;
+    GameScreensaverEffect::init();
+    DisplayManager::setNativeEffectNone();
+    if (AnimationManager::currentGIF != nullptr) {
+      AnimationManager::currentGIF->isPlaying = false;
+    }
+    BoardNativeEffect::applyPlanetScreensaverConfig(config);
+    BoardNativeEffect::render();
+
+    response["message"] = "planet screensaver applied";
+    response["preset"] = config.preset;
+    response["size"] = config.size;
+    response["direction"] = config.direction;
+    response["speed"] = config.speed;
+    response["seed"] = config.seed;
+    response["colorSeed"] = config.colorSeed;
+    return true;
+  }
+
   if (cmd == "set_game_screensaver") {
     if (!doc.containsKey("game") || !doc.containsKey("speed")) {
       setErrorResponse(response, "missing game screensaver fields");
@@ -1243,6 +1401,23 @@ bool WebSocketCommandHandlers::handleEffectCommand(
     }
     config.speed = (uint8_t)speed;
 
+    const DeviceMode previousMode = DisplayManager::currentMode;
+    const String previousBusinessModeTag = DisplayManager::currentBusinessModeTag;
+    const bool previousGameScreensaverActive = GameScreensaverEffect::isActive();
+    const GameScreensaverConfig previousGameScreensaverConfig =
+      GameScreensaverEffect::getConfig();
+
+    GameScreensaverEffect::applyConfig(config);
+    if (!GameScreensaverEffect::isActive()) {
+      if (previousMode == MODE_ANIMATION &&
+          previousBusinessModeTag == "game_screensaver" &&
+          previousGameScreensaverActive) {
+        GameScreensaverEffect::applyConfig(previousGameScreensaverConfig);
+      }
+      setErrorResponse(response, "game screensaver activation failed");
+      return true;
+    }
+
     ConfigManager::gameScreensaverConfig = config;
     ConfigManager::saveGameScreensaverConfig();
     DisplayManager::currentMode = MODE_ANIMATION;
@@ -1256,7 +1431,7 @@ bool WebSocketCommandHandlers::handleEffectCommand(
       AnimationManager::currentGIF->isPlaying = false;
     }
     DisplayManager::setNativeEffectNone();
-    GameScreensaverEffect::applyConfig(config);
+    GameScreensaverEffect::render();
 
     response["message"] = "game screensaver applied";
     response["speed"] = config.speed;

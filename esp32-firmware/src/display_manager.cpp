@@ -56,6 +56,8 @@ const int DisplayManager::PANEL_CHAIN = 1;
 const int DisplayManager::MAX_PIXELS = PANEL_RES_X * PANEL_RES_Y;
 
 static BufferMatrixPanel* s_offscreenDisplay = nullptr;
+static uint16_t* s_redirectFrameBuffer = nullptr;
+static bool s_redirectFrameActive = false;
 
 namespace {
 bool isValidDriver(uint8_t driver) {
@@ -160,36 +162,85 @@ void destroyOffscreenDisplay() {
     s_offscreenDisplay = nullptr;
   }
 }
+
+bool isRedirectFrameReady() {
+  return s_redirectFrameActive && s_redirectFrameBuffer != nullptr;
+}
+
+void writeRedirectPixel(int16_t x, int16_t y, uint16_t color) {
+  if (!isRedirectFrameReady()) {
+    return;
+  }
+  if (x < 0 || x >= DisplayManager::PANEL_RES_X || y < 0 || y >= DisplayManager::PANEL_RES_Y) {
+    return;
+  }
+  s_redirectFrameBuffer[y * DisplayManager::PANEL_RES_X + x] = color;
+}
+
+void fillRedirectFrame(uint16_t color) {
+  if (!isRedirectFrameReady()) {
+    return;
+  }
+  for (int y = 0; y < DisplayManager::PANEL_RES_Y; y++) {
+    for (int x = 0; x < DisplayManager::PANEL_RES_X; x++) {
+      s_redirectFrameBuffer[y * DisplayManager::PANEL_RES_X + x] = color;
+    }
+  }
+}
 }
 
 static void presentFrame() {
   if (DisplayManager::dma_display == nullptr) {
     return;
   }
+  // 单缓冲模式下 drawPixel 已经即时生效，强制 flip 会造成整屏闪烁。
+  if (!DisplayManager::doubleBufferEnabled) {
+    return;
+  }
   DisplayManager::dma_display->flipDMABuffer();
 }
 
 void CaptureMatrixPanel::drawPixel(int16_t x, int16_t y, uint16_t color) {
+  if (isRedirectFrameReady()) {
+    writeRedirectPixel(x, y, color);
+    return;
+  }
   MatrixPanel_I2S_DMA::drawPixel(x, y, color);
   DisplayManager::writeLiveFramePixel565(x, y, color);
 }
 
 void CaptureMatrixPanel::fillScreen(uint16_t color) {
+  if (isRedirectFrameReady()) {
+    fillRedirectFrame(color);
+    return;
+  }
   MatrixPanel_I2S_DMA::fillScreen(color);
   DisplayManager::clearLiveFrame(color);
 }
 
 void CaptureMatrixPanel::drawPixelRGB888(int16_t x, int16_t y, uint8_t r, uint8_t g, uint8_t b) {
+  if (isRedirectFrameReady()) {
+    writeRedirectPixel(x, y, MatrixPanel_I2S_DMA::color565(r, g, b));
+    return;
+  }
   MatrixPanel_I2S_DMA::drawPixelRGB888(x, y, r, g, b);
   DisplayManager::writeLiveFramePixelRGB888(x, y, r, g, b);
 }
 
 void CaptureMatrixPanel::fillScreenRGB888(uint8_t r, uint8_t g, uint8_t b) {
+  if (isRedirectFrameReady()) {
+    fillRedirectFrame(MatrixPanel_I2S_DMA::color565(r, g, b));
+    return;
+  }
   MatrixPanel_I2S_DMA::fillScreenRGB888(r, g, b);
   DisplayManager::clearLiveFrame(MatrixPanel_I2S_DMA::color565(r, g, b));
 }
 
 void CaptureMatrixPanel::clearScreen() {
+  if (isRedirectFrameReady()) {
+    fillRedirectFrame(0);
+    return;
+  }
   MatrixPanel_I2S_DMA::clearScreen();
   DisplayManager::clearLiveFrame(0);
 }
@@ -253,6 +304,32 @@ void DisplayManager::writeLiveFramePixel565(int x, int y, uint16_t color) {
 
 void DisplayManager::writeLiveFramePixelRGB888(int x, int y, uint8_t r, uint8_t g, uint8_t b) {
   writeLiveFramePixel565(x, y, MatrixPanel_I2S_DMA::color565(r, g, b));
+}
+
+bool DisplayManager::beginRedirectedFrame(uint16_t* targetBuffer, uint16_t clearColor) {
+  if (targetBuffer == nullptr || dma_display == nullptr) {
+    return false;
+  }
+  s_redirectFrameBuffer = targetBuffer;
+  s_redirectFrameActive = true;
+  fillRedirectFrame(clearColor);
+  return true;
+}
+
+void DisplayManager::endRedirectedFrame(bool present) {
+  if (!s_redirectFrameActive || s_redirectFrameBuffer == nullptr) {
+    s_redirectFrameActive = false;
+    s_redirectFrameBuffer = nullptr;
+    return;
+  }
+
+  const uint16_t* targetBuffer = s_redirectFrameBuffer;
+  s_redirectFrameActive = false;
+  s_redirectFrameBuffer = nullptr;
+
+  if (present) {
+    presentOffscreenFrame(targetBuffer);
+  }
 }
 
 MatrixPanel_I2S_DMA* DisplayManager::beginOffscreenFrame(uint16_t* targetBuffer, uint16_t clearColor) {
@@ -597,6 +674,11 @@ void DisplayManager::drawPixels(const PixelData* pixels, int pixelCount, bool cl
 }
 
 void DisplayManager::renderAnimationFrame(const PixelData* pixels, int pixelCount, bool clearFirst) {
+  uint16_t* frameBuffer = &animationBuffer[0][0];
+  if (!beginRedirectedFrame(frameBuffer, 0)) {
+    return;
+  }
+
   if (clearFirst || !animationBufferValid) {
     memset(animationBuffer, 0, sizeof(animationBuffer));
     animationBufferValid = true;
@@ -626,7 +708,8 @@ void DisplayManager::renderAnimationFrame(const PixelData* pixels, int pixelCoun
   }
 
   drawClockOverlay();
-  presentFrame();
+  endRedirectedFrame(true);
+  memcpy(animationBuffer, backgroundBuffer, sizeof(animationBuffer));
 }
 
 void DisplayManager::renderCanvas() {
@@ -739,6 +822,11 @@ void DisplayManager::renderAnimationTransition(
     const PixelData* toPixels,
     int toPixelCount,
     uint8_t mix) {
+  uint16_t* frameBuffer = &animationBuffer[0][0];
+  if (!beginRedirectedFrame(frameBuffer, 0)) {
+    return;
+  }
+
   static uint8_t blended[PANEL_RES_Y][PANEL_RES_X][3];
   memset(blended, 0, sizeof(blended));
 
@@ -783,7 +871,8 @@ void DisplayManager::renderAnimationTransition(
   animationBufferValid = true;
 
   drawClockOverlay();
-  presentFrame();
+  endRedirectedFrame(true);
+  memcpy(animationBuffer, backgroundBuffer, sizeof(animationBuffer));
 }
 
 void DisplayManager::renderAnimationTransitionBuffers(
@@ -791,6 +880,11 @@ void DisplayManager::renderAnimationTransitionBuffers(
     const uint16_t* toBuffer,
     uint8_t mix) {
   if (fromBuffer == nullptr || toBuffer == nullptr) {
+    return;
+  }
+
+  uint16_t* frameBuffer = &animationBuffer[0][0];
+  if (!beginRedirectedFrame(frameBuffer, 0)) {
     return;
   }
 
@@ -823,7 +917,8 @@ void DisplayManager::renderAnimationTransitionBuffers(
   }
   animationBufferValid = true;
   drawClockOverlay();
-  presentFrame();
+  endRedirectedFrame(true);
+  memcpy(animationBuffer, backgroundBuffer, sizeof(animationBuffer));
 }
 
 // 独立背景绘制：清屏 + 画像素背景或 Logo，不涉及时钟文字
@@ -2261,6 +2356,685 @@ static void drawAmbientLine(int x0, int y0, int x1, int y1, const NativeRgb& col
   }
 }
 
+struct SpaceGeneratorNebulaLayer {
+  const NativeRgb* palette;
+  uint8_t paletteSize;
+  float threshold;
+  float density;
+  float alpha;
+  bool ditherEnabled;
+  bool modulationEnabled;
+  NativeRgb modulationColor;
+  float modulationIntensity;
+  float modulationAlphaIntensity;
+  float modulationDensity;
+  uint8_t modulationSteps;
+  bool oscillate;
+  float oscillationIntensity;
+  float oscillationRate;
+  float oscillationOffset;
+  float speed;
+  float seed;
+  float modulationSeed;
+};
+
+struct SpaceGeneratorStarLayer {
+  uint16_t sourceCount;
+  float speed;
+  float flickerRate;
+  float flickerDepth;
+  float seedOffset;
+  NativeRgb tint;
+};
+
+static const uint8_t kSpaceGeneratorBayer4x4[16] = {
+  0, 8, 2, 10,
+  12, 4, 14, 6,
+  3, 11, 1, 9,
+  15, 7, 13, 5
+};
+
+static const NativeRgb kCosmicKaleBackgroundPalette[] = {
+  {4, 12, 6},
+  {17, 35, 24},
+  {30, 58, 41},
+  {48, 93, 66},
+  {77, 128, 97},
+  {137, 162, 87},
+  {190, 220, 127},
+  {238, 255, 204}
+};
+
+static const NativeRgb kCosmicKaleForegroundPalette[] = {
+  {30, 58, 41},
+  {30, 58, 41},
+  {30, 58, 41},
+  {30, 58, 41},
+  {77, 128, 97},
+  {77, 128, 97},
+  {77, 128, 97},
+  {190, 220, 127},
+  {77, 128, 97},
+  {77, 128, 97},
+  {77, 128, 97},
+  {30, 58, 41},
+  {30, 58, 41},
+  {30, 58, 41},
+  {30, 58, 41}
+};
+
+static const NativeRgb kVoidFireDensePalette[] = {
+  {19, 2, 8},
+  {19, 2, 8},
+  {19, 2, 8},
+  {19, 2, 8},
+  {19, 2, 8},
+  {31, 5, 16},
+  {31, 5, 16},
+  {31, 5, 16},
+  {49, 5, 30},
+  {49, 5, 30},
+  {70, 14, 43},
+  {124, 24, 60},
+  {213, 60, 106},
+  {255, 130, 116}
+};
+
+static const NativeRgb kVoidFireCoarsePalette[] = {
+  {19, 2, 8},
+  {31, 5, 16},
+  {49, 5, 30},
+  {70, 14, 43},
+  {124, 24, 60},
+  {213, 60, 106},
+  {255, 130, 116}
+};
+
+static const SpaceGeneratorNebulaLayer kCosmicKaleBackgroundLayer = {
+  kCosmicKaleBackgroundPalette,
+  static_cast<uint8_t>(sizeof(kCosmicKaleBackgroundPalette) / sizeof(kCosmicKaleBackgroundPalette[0])),
+  0.36f,
+  0.01f,
+  0.63f,
+  false,
+  true,
+  {186, 165, 26},
+  0.5f,
+  0.38f,
+  0.0027598312f,
+  13,
+  false,
+  0.24f,
+  0.2f,
+  0.2f,
+  11.5f,
+  1.31f,
+  3.67f
+};
+
+static const SpaceGeneratorStarLayer kCosmicKaleStarsNear = {
+  256,
+  6.0f,
+  1.12f,
+  0.16f,
+  4.11f,
+  {245, 255, 213}
+};
+
+static const SpaceGeneratorStarLayer kCosmicKaleStarsFar = {
+  256,
+  6.0f,
+  1.12f,
+  0.16f,
+  7.39f,
+  {229, 255, 216}
+};
+
+static const SpaceGeneratorNebulaLayer kCosmicKaleForegroundLayer = {
+  kCosmicKaleForegroundPalette,
+  static_cast<uint8_t>(sizeof(kCosmicKaleForegroundPalette) / sizeof(kCosmicKaleForegroundPalette[0])),
+  0.0f,
+  0.01f,
+  0.69f,
+  false,
+  true,
+  {66, 255, 28},
+  0.73f,
+  0.6f,
+  0.0050061825f,
+  12,
+  true,
+  0.08545377f,
+  1.0859375f,
+  0.5f,
+  29.2f,
+  9.27f,
+  12.81f
+};
+
+static const SpaceGeneratorStarLayer kVoidFireStarsFar = {
+  360,
+  6.0f,
+  1.12f,
+  0.16f,
+  2.17f,
+  {255, 242, 210}
+};
+
+static const SpaceGeneratorNebulaLayer kVoidFireDenseLayer = {
+  kVoidFireDensePalette,
+  static_cast<uint8_t>(sizeof(kVoidFireDensePalette) / sizeof(kVoidFireDensePalette[0])),
+  0.25f,
+  0.0053201809f,
+  1.0f,
+  true,
+  true,
+  {173, 24, 24},
+  0.56f,
+  0.22f,
+  0.0052951898f,
+  10,
+  true,
+  0.02611940f,
+  0.8f,
+  0.5f,
+  6.0f,
+  14.37f,
+  15.91f
+};
+
+static const SpaceGeneratorNebulaLayer kVoidFireGlowLayer = {
+  kVoidFireDensePalette,
+  static_cast<uint8_t>(sizeof(kVoidFireDensePalette) / sizeof(kVoidFireDensePalette[0])),
+  0.42f,
+  0.0054803207f,
+  0.89f,
+  false,
+  true,
+  {255, 187, 0},
+  1.0f,
+  0.39f,
+  0.0054803379f,
+  16,
+  true,
+  0.01865672f,
+  0.6268657f,
+  0.235f,
+  6.0f,
+  17.23f,
+  18.49f
+};
+
+static const SpaceGeneratorStarLayer kVoidFireStarsNear = {
+  360,
+  6.0f,
+  1.12f,
+  0.16f,
+  6.83f,
+  {255, 224, 191}
+};
+
+static const SpaceGeneratorNebulaLayer kVoidFireDriftLayer = {
+  kVoidFireCoarsePalette,
+  static_cast<uint8_t>(sizeof(kVoidFireCoarsePalette) / sizeof(kVoidFireCoarsePalette[0])),
+  0.0f,
+  0.11278186f,
+  0.56f,
+  false,
+  true,
+  {255, 197, 36},
+  0.26f,
+  1.0f,
+  0.0024861244f,
+  16,
+  false,
+  0.04f,
+  0.8f,
+  0.5f,
+  19.6f,
+  20.17f,
+  22.31f
+};
+
+static const SpaceGeneratorNebulaLayer kVoidFireEmberLayer = {
+  kVoidFireCoarsePalette,
+  static_cast<uint8_t>(sizeof(kVoidFireCoarsePalette) / sizeof(kVoidFireCoarsePalette[0])),
+  0.03f,
+  0.03244237f,
+  0.78f,
+  true,
+  true,
+  {252, 0, 4},
+  0.44f,
+  1.0f,
+  0.0026630207f,
+  10,
+  true,
+  0.04f,
+  0.8f,
+  0.5f,
+  29.6f,
+  24.11f,
+  26.73f
+};
+
+static const NativeRgb kDeepSpaceNebulaBodyPalette[] = {
+  {5, 9, 18},
+  {8, 16, 32},
+  {14, 25, 51},
+  {21, 38, 74},
+  {33, 59, 104},
+  {48, 89, 142},
+  {68, 120, 173},
+  {105, 162, 216}
+};
+
+static const NativeRgb kDeepSpaceNebulaCorePalette[] = {
+  {12, 23, 48},
+  {22, 48, 86},
+  {33, 74, 122},
+  {47, 107, 163},
+  {79, 151, 202},
+  {142, 200, 239},
+  {205, 239, 255}
+};
+
+static const SpaceGeneratorStarLayer kDeepSpaceNebulaStarLayer = {
+  54,
+  2.8f,
+  0.74f,
+  0.08f,
+  1.37f,
+  {183, 202, 238}
+};
+
+static NativeRgb rgb565ToNativeRgb(uint16_t color) {
+  NativeRgb rgb = {
+    (uint8_t)((((color >> 11) & 0x1F) * 255 + 15) / 31),
+    (uint8_t)((((color >> 5) & 0x3F) * 255 + 31) / 63),
+    (uint8_t)(((color & 0x1F) * 255 + 15) / 31)
+  };
+  return rgb;
+}
+
+static void blendSpaceGeneratorPixel(int x, int y, const NativeRgb& src, float alpha) {
+  if (DisplayManager::dma_display == nullptr) {
+    return;
+  }
+  if (x < 0 || x >= 64 || y < 0 || y >= 64) {
+    return;
+  }
+
+  uint16_t currentColor565 = DisplayManager::liveFrameBuffer[y][x];
+  if (isRedirectFrameReady()) {
+    currentColor565 = s_redirectFrameBuffer[y * DisplayManager::PANEL_RES_X + x];
+  }
+  NativeRgb current = rgb565ToNativeRgb(currentColor565);
+  blendIntoPixel(current.r, current.g, current.b, src, alpha);
+  DisplayManager::dma_display->drawPixelRGB888(x, y, current.r, current.g, current.b);
+}
+
+static float spaceGeneratorHash(int x, int y, float seed) {
+  return fractf32(
+    sinf((float)(x + 1) * 12.9898f + (float)(y + 1) * 78.233f + seed * 37.719f) * 43758.5453f
+  );
+}
+
+static float spaceGeneratorBayerThreshold(int x, int y) {
+  return (float)kSpaceGeneratorBayer4x4[(x & 3) + ((y & 3) << 2)] / 16.0f;
+}
+
+static float sampleSpaceGeneratorLayerField(
+  int x,
+  int y,
+  unsigned long elapsed,
+  float speedUnit,
+  float density,
+  float seed,
+  float speed
+) {
+  float nx = (float)x / 63.0f;
+  float scroll = (float)elapsed * 0.000011f * speed * (0.45f + speedUnit * 0.85f);
+  float ny = fractf32((float)y / 63.0f + scroll);
+  float densityScale = 2.6f + density * 120.0f;
+  float warpX =
+    nx +
+    sinf((ny + seed * 0.07f) * (6.4f + densityScale * 0.32f) + scroll * 3.1f) * 0.12f +
+    cosf((nx + seed * 0.11f) * (3.8f + densityScale * 0.18f) - scroll * 2.4f) * 0.05f;
+  float warpY =
+    ny +
+    cosf((nx + seed * 0.13f) * (5.8f + densityScale * 0.28f) - scroll * 2.2f) * 0.11f +
+    sinf((ny + seed * 0.19f) * (4.2f + densityScale * 0.14f) + scroll * 1.6f) * 0.04f;
+  float fieldA =
+    0.5f +
+    0.5f *
+      sinf(
+        warpX * (8.4f + densityScale) +
+        seed * 0.91f +
+        sinf(warpY * (5.8f + densityScale * 0.46f) - scroll * 4.1f)
+      );
+  float fieldB =
+    0.5f +
+    0.5f *
+      cosf(
+        warpY * (9.1f + densityScale * 0.82f) -
+        seed * 0.63f +
+        sinf(warpX * (4.9f + densityScale * 0.28f) + scroll * 3.4f)
+      );
+  float fieldC =
+    0.5f +
+    0.5f *
+      sinf((warpX + warpY) * (6.7f + densityScale * 0.58f) + seed * 1.37f - scroll * 2.1f);
+  float grain = spaceGeneratorHash(x, y, seed * 1.71f);
+  return clampUnit(fieldA * 0.42f + fieldB * 0.34f + fieldC * 0.18f + grain * 0.06f);
+}
+
+static bool resolveSpaceGeneratorPaletteColor(
+  const SpaceGeneratorNebulaLayer& layer,
+  float value,
+  int x,
+  int y,
+  NativeRgb& outColor
+) {
+  if (value <= 0.0f || layer.paletteSize == 0) {
+    return false;
+  }
+
+  float scaled = clampUnit(value) * (float)(layer.paletteSize - 1);
+  int lowIndex = (int)floorf(scaled);
+  int highIndex = min((int)layer.paletteSize - 1, lowIndex + 1);
+  float paletteMix = scaled - (float)lowIndex;
+  int index =
+    layer.ditherEnabled && paletteMix > spaceGeneratorBayerThreshold(x, y)
+      ? highIndex
+      : lowIndex;
+  outColor = layer.palette[index];
+  return true;
+}
+
+static void blendSpaceGeneratorNebulaLayer(
+  unsigned long elapsed,
+  float speedUnit,
+  float intensityUnit,
+  const SpaceGeneratorNebulaLayer& layer
+) {
+  float thresholdShift = layer.oscillate
+    ? sinf(
+        (float)elapsed * 0.001f * layer.oscillationRate +
+        layer.oscillationOffset * 6.2831853f
+      ) * layer.oscillationIntensity
+    : 0.0f;
+  float threshold = max(0.0f, min(0.92f, layer.threshold + thresholdShift));
+
+  for (int y = 0; y < 64; y++) {
+    for (int x = 0; x < 64; x++) {
+      float field = sampleSpaceGeneratorLayerField(
+        x,
+        y,
+        elapsed,
+        speedUnit,
+        layer.density,
+        layer.seed,
+        layer.speed
+      );
+      float value = (field - threshold) / max(0.001f, 1.0f - threshold);
+      NativeRgb paletteColor;
+      if (!resolveSpaceGeneratorPaletteColor(layer, value, x, y, paletteColor)) {
+        continue;
+      }
+
+      NativeRgb finalColor = paletteColor;
+      float alpha = layer.alpha * (0.58f + intensityUnit * 0.48f);
+      if (layer.modulationEnabled) {
+        float modulationField = sampleSpaceGeneratorLayerField(
+          x,
+          y,
+          elapsed,
+          speedUnit,
+          layer.modulationDensity,
+          layer.modulationSeed,
+          layer.speed * 0.62f + 2.4f
+        );
+        float stepCount = max(1, (int)layer.modulationSteps);
+        float quantizedLum =
+          floorf(min(modulationField, 0.999f) * stepCount) / stepCount;
+        NativeRgb modulatedColor = scaleRgbColor(layer.modulationColor, quantizedLum);
+        finalColor = blendRgbColor(finalColor, modulatedColor, layer.modulationIntensity);
+        alpha *= 1.0f - (1.0f - quantizedLum) * layer.modulationAlphaIntensity;
+      }
+
+      blendSpaceGeneratorPixel(x, y, finalColor, clampUnit(alpha));
+    }
+  }
+}
+
+static void drawSpaceGeneratorStarShape(
+  int centerX,
+  int centerY,
+  uint8_t sizeTier,
+  const NativeRgb& color,
+  float alpha
+) {
+  if (sizeTier == 0) {
+    blendSpaceGeneratorPixel(centerX, centerY, color, alpha);
+    return;
+  }
+
+  NativeRgb core = addHighlightColor(color, 0.16f);
+  blendSpaceGeneratorPixel(centerX, centerY, core, alpha);
+  blendSpaceGeneratorPixel(centerX - 1, centerY, color, alpha * 0.56f);
+  blendSpaceGeneratorPixel(centerX + 1, centerY, color, alpha * 0.56f);
+  blendSpaceGeneratorPixel(centerX, centerY - 1, color, alpha * 0.56f);
+  blendSpaceGeneratorPixel(centerX, centerY + 1, color, alpha * 0.56f);
+
+  if (sizeTier == 2) {
+    blendSpaceGeneratorPixel(centerX - 2, centerY, color, alpha * 0.24f);
+    blendSpaceGeneratorPixel(centerX + 2, centerY, color, alpha * 0.24f);
+    blendSpaceGeneratorPixel(centerX, centerY - 2, color, alpha * 0.24f);
+    blendSpaceGeneratorPixel(centerX, centerY + 2, color, alpha * 0.24f);
+  }
+}
+
+static void paintSpaceGeneratorStarLayer(
+  unsigned long elapsed,
+  float speedUnit,
+  float intensityUnit,
+  const SpaceGeneratorStarLayer& layer
+) {
+  float densityRatio = (64.0f * 64.0f) / (360.0f * 240.0f);
+  int starCount = max(8, (int)roundf((float)layer.sourceCount * densityRatio));
+  float travel = (float)elapsed * 0.000011f * layer.speed * (0.45f + speedUnit * 0.85f);
+
+  for (int index = 0; index < starCount; index++) {
+    float seedOffset = layer.seedOffset + (float)index * 0.73f;
+    float baseX = spaceGeneratorHash(index, 2, seedOffset);
+    float baseY = spaceGeneratorHash(index, 7, seedOffset);
+    float sizeSeed = spaceGeneratorHash(index, 13, seedOffset);
+    float twinkleSeed = spaceGeneratorHash(index, 29, seedOffset);
+    float swaySeed = spaceGeneratorHash(index, 37, seedOffset);
+    uint8_t sizeTier = sizeSeed > 0.86f ? 2 : (sizeSeed > 0.62f ? 1 : 0);
+    int x = (int)roundf(
+      baseX * 63.0f +
+      sinf((float)elapsed * 0.00062f * (0.4f + swaySeed * 0.7f) + seedOffset) *
+        (sizeTier == 2 ? 1.2f : 0.7f)
+    );
+    int y = (int)roundf(fractf32(baseY + travel + sizeSeed * 0.12f) * 63.0f);
+    float twinkle =
+      0.66f +
+      0.34f *
+        sinf(
+          (float)elapsed * 0.0012f * layer.flickerRate * (0.78f + twinkleSeed * 0.44f) +
+          seedOffset * 4.1f
+        );
+    float brightness = clampUnit((0.55f + intensityUnit * 0.35f) * twinkle);
+    NativeRgb color = sizeTier == 2 ? addHighlightColor(layer.tint, 0.22f) : layer.tint;
+    drawSpaceGeneratorStarShape(
+      x,
+      y,
+      sizeTier,
+      color,
+      brightness * (1.0f - layer.flickerDepth * 0.45f)
+    );
+
+    if (sizeTier >= 1) {
+      NativeRgb glow = scaleRgbColor(color, 0.32f + intensityUnit * 0.12f);
+      blendSpaceGeneratorPixel(x - 1, y - 1, glow, brightness * 0.16f);
+      blendSpaceGeneratorPixel(x + 1, y - 1, glow, brightness * 0.16f);
+      blendSpaceGeneratorPixel(x - 1, y + 1, glow, brightness * 0.16f);
+      blendSpaceGeneratorPixel(x + 1, y + 1, glow, brightness * 0.16f);
+    }
+  }
+}
+
+static float ellipseMaskf(float nx, float ny, float cx, float cy, float rx, float ry) {
+  float dx = (nx - cx) / max(rx, 0.001f);
+  float dy = (ny - cy) / max(ry, 0.001f);
+  return clampUnit(1.0f - dx * dx - dy * dy);
+}
+
+static NativeRgb resolveDeepSpacePaletteColor(const NativeRgb* palette, uint8_t paletteSize, float value) {
+  if (palette == nullptr || paletteSize == 0) {
+    return makeRgb(0, 0, 0);
+  }
+  float scaled = clampUnit(value) * (float)(paletteSize - 1);
+  int lowIndex = (int)floorf(scaled);
+  int highIndex = min((int)paletteSize - 1, lowIndex + 1);
+  return blendRgbColor(palette[lowIndex], palette[highIndex], scaled - (float)lowIndex);
+}
+
+static float sampleDeepSpaceNoiseField(float nx, float ny, float timeBase) {
+  float warpX =
+    nx +
+    sinf(ny * 7.1f + timeBase * 0.46f + cosf(nx * 3.8f - timeBase * 0.18f)) * 0.085f +
+    cosf(nx * 5.2f - timeBase * 0.22f) * 0.032f;
+  float warpY =
+    ny +
+    cosf(nx * 6.4f - timeBase * 0.28f + sinf(ny * 4.2f + timeBase * 0.2f)) * 0.082f +
+    sinf(ny * 5.7f + timeBase * 0.16f) * 0.028f;
+  float bandA = 0.5f + 0.5f * sinf((warpX * 6.8f + warpY * 3.2f) + timeBase * 0.92f);
+  float bandB = 0.5f + 0.5f * cosf((warpY * 7.4f - warpX * 4.3f) - timeBase * 0.68f);
+  float detail = 0.5f + 0.5f * sinf((warpX + warpY) * 12.4f - timeBase * 1.34f);
+  return clampUnit(bandA * 0.48f + bandB * 0.34f + detail * 0.18f);
+}
+
+static void renderAmbientDeepSpaceNebulaBase(unsigned long elapsed, float speedUnit, float intensityUnit) {
+  NativeRgb backgroundA = makeRgb(2, 4, 10);
+  NativeRgb backgroundB = makeRgb(5, 10, 21);
+  NativeRgb clusterColor = makeRgb(217, 244, 255);
+  float timeBase = (float)elapsed * (0.00038f + speedUnit * 0.00072f);
+
+  for (int y = 0; y < 64; y++) {
+    for (int x = 0; x < 64; x++) {
+      float nx = (float)x / 63.0f;
+      float ny = (float)y / 63.0f;
+      float centerX = ((float)x - 31.5f) / 31.5f;
+      float centerY = ((float)y - 31.5f) / 31.5f;
+      float vignette = clampUnit(1.0f - sqrtf(centerX * centerX + centerY * centerY) * 0.58f);
+
+      float ridgeCenter = 0.8f - nx * 0.47f + sinf(timeBase * 0.34f + nx * 4.6f) * 0.032f;
+      float ridge = clampUnit(1.0f - fabsf(ny - ridgeCenter) / 0.17f);
+      float cloudA = ellipseMaskf(nx, ny, 0.3f, 0.67f, 0.62f, 0.34f);
+      float cloudB = ellipseMaskf(nx, ny, 0.66f, 0.34f, 0.34f, 0.26f);
+      float coreMask = ellipseMaskf(nx, ny, 0.68f, 0.3f, 0.16f, 0.12f);
+      float structure = clampUnit(cloudA * 0.84f + cloudB * 0.9f + ridge * 0.44f);
+
+      float largeNoise = sampleDeepSpaceNoiseField(nx, ny, timeBase);
+      float fineNoise = sampleDeepSpaceNoiseField(nx + 0.19f, ny - 0.13f, timeBase * 1.62f + 2.4f);
+      float bodyField = clampUnit(
+        (largeNoise * 0.7f + fineNoise * 0.3f) * structure - 0.21f + cloudA * 0.08f
+      );
+      float coreField = clampUnit(
+        (largeNoise * 0.38f + fineNoise * 0.62f) * (coreMask * 1.34f + cloudB * 0.12f) -
+        0.48f +
+        coreMask * 0.42f
+      );
+
+      float backgroundMix = clampUnit(0.18f + ridge * 0.18f + cloudA * 0.07f);
+      NativeRgb baseBackground = blendRgbColor(backgroundA, backgroundB, backgroundMix);
+      NativeRgb background = scaleRgbColor(baseBackground, 0.68f + vignette * 0.32f);
+      uint8_t r = background.r;
+      uint8_t g = background.g;
+      uint8_t b = background.b;
+
+      if (bodyField > 0.01f) {
+        NativeRgb bodyColor = resolveDeepSpacePaletteColor(
+          kDeepSpaceNebulaBodyPalette,
+          static_cast<uint8_t>(sizeof(kDeepSpaceNebulaBodyPalette) / sizeof(kDeepSpaceNebulaBodyPalette[0])),
+          bodyField
+        );
+        float bodyAlpha = clampUnit((0.16f + structure * 0.58f) * (0.52f + intensityUnit * 0.34f));
+        blendIntoPixel(r, g, b, bodyColor, bodyAlpha);
+      }
+
+      if (coreField > 0.01f) {
+        NativeRgb coreColor = resolveDeepSpacePaletteColor(
+          kDeepSpaceNebulaCorePalette,
+          static_cast<uint8_t>(sizeof(kDeepSpaceNebulaCorePalette) / sizeof(kDeepSpaceNebulaCorePalette[0])),
+          coreField
+        );
+        float coreAlpha = clampUnit((0.12f + coreMask * 0.62f) * (0.48f + intensityUnit * 0.38f));
+        blendIntoPixel(r, g, b, coreColor, coreAlpha);
+      }
+
+      float clusterGlow = smoothstepf(
+        0.34f,
+        0.02f,
+        fabsf(ny - (0.31f + sinf(nx * 8.0f + timeBase) * 0.012f))
+      );
+      if (clusterGlow > 0.24f && cloudB > 0.18f) {
+        float glowAlpha = clampUnit(clusterGlow * cloudB * 0.14f);
+        blendIntoPixel(r, g, b, clusterColor, glowAlpha);
+      }
+
+      DisplayManager::dma_display->drawPixelRGB888(x, y, r, g, b);
+    }
+  }
+}
+
+static void paintDeepSpaceNebulaCluster(unsigned long elapsed, float intensityUnit) {
+  const int centerX = 44;
+  const int centerY = 20;
+  NativeRgb tint = makeRgb(245, 251, 255);
+
+  for (int index = 0; index < 16; index++) {
+    float angle = spaceGeneratorHash(index, 5, 0.37f) * 6.2831853f;
+    float radius = powf(spaceGeneratorHash(index, 9, 0.91f), 1.65f) * 10.0f;
+    float orbitX = (float)centerX + cosf(angle) * radius;
+    float orbitY = (float)centerY + sinf(angle) * radius * 0.58f;
+    float twinkle =
+      0.64f +
+      0.36f * sinf((float)elapsed * 0.0011f * (0.8f + spaceGeneratorHash(index, 3, 0.61f) * 0.4f) + index * 1.7f);
+    float alpha = clampUnit((0.36f + intensityUnit * 0.24f) * twinkle);
+    uint8_t sizeTier = spaceGeneratorHash(index, 7, 0.44f) > 0.82f ? 1 : 0;
+    drawSpaceGeneratorStarShape((int)roundf(orbitX), (int)roundf(orbitY), sizeTier, tint, alpha);
+  }
+}
+
+static void renderAmbientCosmicKale(unsigned long elapsed, float speedUnit, float intensityUnit) {
+  DisplayManager::dma_display->fillScreenRGB888(0, 0, 0);
+  blendSpaceGeneratorNebulaLayer(elapsed, speedUnit, intensityUnit, kCosmicKaleBackgroundLayer);
+  paintSpaceGeneratorStarLayer(elapsed, speedUnit, intensityUnit, kCosmicKaleStarsNear);
+  paintSpaceGeneratorStarLayer(elapsed, speedUnit, intensityUnit, kCosmicKaleStarsFar);
+  blendSpaceGeneratorNebulaLayer(elapsed, speedUnit, intensityUnit, kCosmicKaleForegroundLayer);
+}
+
+static void renderAmbientVoidFire(unsigned long elapsed, float speedUnit, float intensityUnit) {
+  DisplayManager::dma_display->fillScreenRGB888(0, 0, 0);
+  paintSpaceGeneratorStarLayer(elapsed, speedUnit, intensityUnit, kVoidFireStarsFar);
+  blendSpaceGeneratorNebulaLayer(elapsed, speedUnit, intensityUnit, kVoidFireDenseLayer);
+  blendSpaceGeneratorNebulaLayer(elapsed, speedUnit, intensityUnit, kVoidFireGlowLayer);
+  paintSpaceGeneratorStarLayer(elapsed, speedUnit, intensityUnit, kVoidFireStarsNear);
+  blendSpaceGeneratorNebulaLayer(elapsed, speedUnit, intensityUnit, kVoidFireDriftLayer);
+  blendSpaceGeneratorNebulaLayer(elapsed, speedUnit, intensityUnit, kVoidFireEmberLayer);
+}
+
+static void renderAmbientDeepSpaceNebula(unsigned long elapsed, float speedUnit, float intensityUnit) {
+  DisplayManager::dma_display->fillScreenRGB888(0, 0, 0);
+  renderAmbientDeepSpaceNebulaBase(elapsed, speedUnit, intensityUnit);
+  paintSpaceGeneratorStarLayer(elapsed, speedUnit, intensityUnit, kDeepSpaceNebulaStarLayer);
+  paintDeepSpaceNebulaCluster(elapsed, intensityUnit);
+}
+
 static void renderAmbientDigitalRain(unsigned long elapsed, float speedUnit) {
   DisplayManager::dma_display->fillScreenRGB888(0, 0, 0);
 
@@ -2793,6 +3567,18 @@ static bool renderAmbientExtendedScene(uint8_t preset, unsigned long elapsed, fl
     renderAmbientReactionDiffusion(elapsed, speedUnit, intensityUnit);
     return true;
   }
+  if (preset == AMBIENT_PRESET_COSMIC_KALE) {
+    renderAmbientCosmicKale(elapsed, speedUnit, intensityUnit);
+    return true;
+  }
+  if (preset == AMBIENT_PRESET_VOID_FIRE) {
+    renderAmbientVoidFire(elapsed, speedUnit, intensityUnit);
+    return true;
+  }
+  if (preset == AMBIENT_PRESET_DEEP_SPACE_NEBULA) {
+    renderAmbientDeepSpaceNebula(elapsed, speedUnit, intensityUnit);
+    return true;
+  }
   if (preset == AMBIENT_PRESET_SUNSET_BLUSH) {
     renderAmbientRainbowRain(
       elapsed,
@@ -2816,11 +3602,57 @@ void DisplayManager::renderNativeEffect() {
 
   unsigned long now = millis();
   unsigned long elapsed = now - nativeEffectStartTime;
+  static unsigned long s_lastBreathRenderAt = 0;
+  static unsigned long s_lastRhythmRenderAt = 0;
+  static unsigned long s_lastAmbientRenderAt = 0;
+
+  struct NativeRenderGuard {
+    bool active;
+    bool shouldPresent;
+
+    NativeRenderGuard()
+      : active(false),
+        shouldPresent(true) {
+      if (DisplayManager::doubleBufferEnabled) {
+        return;
+      }
+      active = DisplayManager::beginRedirectedFrame(&DisplayManager::animationBuffer[0][0], 0);
+    }
+
+    bool ready() const {
+      if (DisplayManager::doubleBufferEnabled) {
+        return true;
+      }
+      return active;
+    }
+
+    void cancelPresent() {
+      shouldPresent = false;
+    }
+
+    ~NativeRenderGuard() {
+      if (!active) {
+        return;
+      }
+      DisplayManager::endRedirectedFrame(shouldPresent);
+    }
+  };
 
   if (nativeEffectType == NATIVE_EFFECT_BREATH) {
+    if (s_lastBreathRenderAt != 0 && now - s_lastBreathRenderAt < 33UL) {
+      return;
+    }
+    s_lastBreathRenderAt = now;
+
+    NativeRenderGuard breathRenderGuard;
+    if (!breathRenderGuard.ready()) {
+      return;
+    }
+
     unsigned long durationMs = breathDurationMs(breathEffectConfig);
     if (!breathEffectConfig.loop && elapsed >= durationMs) {
       setNativeEffectNone();
+      breathRenderGuard.cancelPresent();
       return;
     }
 
@@ -3107,8 +3939,19 @@ void DisplayManager::renderNativeEffect() {
   }
 
   if (nativeEffectType == NATIVE_EFFECT_RHYTHM) {
+    if (s_lastRhythmRenderAt != 0 && now - s_lastRhythmRenderAt < 33UL) {
+      return;
+    }
+    s_lastRhythmRenderAt = now;
+
+    NativeRenderGuard rhythmRenderGuard;
+    if (!rhythmRenderGuard.ready()) {
+      return;
+    }
+
     if (!rhythmEffectConfig.loop && elapsed >= 60000UL) {
       setNativeEffectNone();
+      rhythmRenderGuard.cancelPresent();
       return;
     }
 
@@ -3347,8 +4190,20 @@ void DisplayManager::renderNativeEffect() {
   }
 
   if (nativeEffectType == NATIVE_EFFECT_AMBIENT) {
+    if (s_lastAmbientRenderAt != 0 && now - s_lastAmbientRenderAt < 33UL) {
+      return;
+    }
+    s_lastAmbientRenderAt = now;
+
+    NativeRenderGuard ambientRenderGuard;
+
+    if (!ambientRenderGuard.ready()) {
+      return;
+    }
+
     if (!ambientEffectConfig.loop && elapsed >= 90000UL) {
       setNativeEffectNone();
+      ambientRenderGuard.cancelPresent();
       return;
     }
 

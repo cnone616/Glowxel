@@ -12,27 +12,19 @@
       <view class="nav-right"></view>
     </view>
 
-    <!-- Canvas 预览区域 -->
+    <!-- 主题图片展示区 -->
     <view class="canvas-section">
-      <view v-if="!canvasHidden" class="canvas-container" ref="canvasContainer">
-        <PixelCanvas
-          v-if="canvasReady"
-          :width="64"
-          :height="64"
-          :pixels="allPixelsForPreview"
-          :refresh-token="previewTick"
-          :zoom="zoom"
-          :offset-x="pan.x"
-          :offset-y="pan.y"
-          :canvas-width="containerSize.width"
-          :canvas-height="containerSize.height"
-          :grid-visible="true"
-          :is-dark-mode="true"
-          :touch-enabled="false"
-          canvas-id="clockThemeCanvas"
+      <view class="canvas-container theme-image-stage" ref="canvasContainer">
+        <image
+          v-if="displayClockThemePreset && displayClockThemePreset.previewImage"
+          :src="displayClockThemePreset.previewImage"
+          class="theme-image-stage__image"
+          mode="aspectFit"
         />
+        <view v-else class="theme-image-stage__empty">
+          <text class="theme-image-stage__empty-text">请选择主题</text>
+        </view>
       </view>
-      <view v-else class="canvas-placeholder"></view>
       <view class="preview-caption glx-preview-panel">
         <view class="preview-caption-info glx-preview-panel__info">
           <text class="preview-caption-title">{{ previewPanelTitle }}</text>
@@ -91,9 +83,7 @@ import imageGifMixin from "./mixins/imageGifMixin.js";
 import deviceSyncMixin from "./mixins/deviceSyncMixin.js";
 import Icon from "../../components/Icon.vue";
 import Toast from "../../components/Toast.vue";
-import PixelCanvas from "../../components/PixelCanvas.vue";
 import ClockThemePanel from "../../components/clock-editor/ClockThemePanel.vue";
-import { getClockThemePreviewPixels } from "../../utils/clockThemeRenderer.js";
 import {
   applyClockThemePreset,
   findClockThemePreset,
@@ -107,7 +97,6 @@ export default {
   components: {
     Icon,
     Toast,
-    PixelCanvas,
     ClockThemePanel,
   },
   data() {
@@ -234,10 +223,7 @@ export default {
       return false;
     },
     previewPanelTitle() {
-      return "模拟预览";
-    },
-    allPixelsForPreview() {
-      return this.getPreviewPixels();
+      return "主题展示";
     },
   },
 
@@ -262,84 +248,66 @@ export default {
     this.deviceStore = useDeviceStore();
     this.deviceStore.init();
     this.toast = useToast();
-    this.startPreviewClockTimer();
 
     const systemInfo = uni.getSystemInfoSync();
     const statusBarHeight = systemInfo.statusBarHeight || 0;
     const headerHeight = 56;
     this.contentHeight = `${systemInfo.windowHeight - statusBarHeight - headerHeight - 360}px`;
+  },
 
+  onReady() {
     this.$nextTick(() => {
       if (this.$refs.toastRef) {
         this.toast.setToastInstance(this.$refs.toastRef);
       }
-      setTimeout(() => {
-        const query = uni.createSelectorQuery().in(this);
-        query
-          .select(".canvas-container")
-          .boundingClientRect((data) => {
-            if (data && data.width > 0) {
-              this.containerSize = { width: data.width, height: data.width };
-              const fitZoom = Math.floor((data.width * 0.96) / 64);
-              this.zoom = Math.max(2, fitZoom);
-              this.pan = {
-                x: (data.width - 64 * this.zoom) / 2,
-                y: (data.width - 64 * this.zoom) / 2,
-              };
-            } else {
-              this.zoom = 4;
-              this.pan = { x: 16, y: 16 };
-            }
-            this.canvasReady = true;
-            this.isReady = true;
-            this.$nextTick(() => {
-              this.drawCanvas();
-            });
-          })
-          .exec();
-      }, 150);
+      this.initPreviewCanvas();
     });
   },
 
   onShow() {
-    this.startPreviewClockTimer();
     if (!this.isSending) {
       this.canvasHidden = false;
     }
   },
 
   methods: {
-    getPreviewPixels() {
-      const themePixels = getClockThemePreviewPixels({
-        themeId: this.displayClockThemeId,
-        config: this.config,
-        timeText: this.getTimeText(),
-        dateText: this.getDateText(),
-        weekText: this.getWeekText(),
-        hasImage: this.config.image.show && !!this.imagePixels,
+    initPreviewCanvas() {
+      const systemInfo = uni.getSystemInfoSync();
+      const statusBarHeight = systemInfo.statusBarHeight || 0;
+
+      this.$nextTick(() => {
+        setTimeout(() => {
+          const query = uni.createSelectorQuery().in(this);
+          query.select(".canvas-section").boundingClientRect((sectionRect) => {
+            if (!sectionRect || !sectionRect.height) {
+              return;
+            }
+
+            const nextHeight =
+              systemInfo.windowHeight - statusBarHeight - 88 - sectionRect.height;
+            this.contentHeight = `${Math.max(120, nextHeight)}px`;
+          });
+          query
+            .select(".canvas-container")
+            .boundingClientRect((data) => {
+              if (data && data.width > 0) {
+                this.containerSize = { width: data.width, height: data.width };
+                const fitZoom = Math.max(2, Math.floor((data.width * 0.96) / 64));
+                this.zoom = fitZoom;
+                this.pan = {
+                  x: (data.width - 64 * fitZoom) / 2,
+                  y: (data.width - 64 * fitZoom) / 2,
+                };
+              } else {
+                this.zoom = 4;
+                this.pan = { x: 16, y: 16 };
+              }
+              this.canvasReady = true;
+              this.isReady = true;
+            })
+            .exec();
+        }, 80);
       });
-
-      if (themePixels) {
-        return themePixels;
-      }
-
-      return this.getDefaultPreviewPixels();
-    },
-    startPreviewClockTimer() {
-      if (this.previewClockTimer) {
-        return;
-      }
-      const refreshPreview = () => {
-        this.drawCanvas();
-      };
-      refreshPreview();
-      this.previewClockTimer = setInterval(refreshPreview, 1000);
-    },
-    stopPreviewClockTimer() {
-      if (this.previewClockTimer) {
-        clearInterval(this.previewClockTimer);
-        this.previewClockTimer = null;
-      }
     },
 
     onToastHide() {
@@ -348,7 +316,6 @@ export default {
       }
     },
     cleanupTransientState() {
-      this.stopPreviewClockTimer();
       this.stopGifAnimation();
       this.stopLoading();
       if (this._resizeDebounceTimer) {
@@ -463,10 +430,30 @@ export default {
   background: #000000;
 }
 
-.canvas-placeholder {
+.theme-image-stage {
+  padding: 28rpx;
+  box-sizing: border-box;
+}
+
+.theme-image-stage__image {
   width: 100%;
-  aspect-ratio: 1;
-  background: #000000;
+  height: 100%;
+  display: block;
+  image-rendering: pixelated;
+}
+
+.theme-image-stage__empty {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.theme-image-stage__empty-text {
+  font-size: 24rpx;
+  font-weight: 600;
+  color: #ffffff;
 }
 
 .preview-caption {

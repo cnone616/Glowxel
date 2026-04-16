@@ -330,6 +330,7 @@
       "
     />
 
+    <LoadingOverlay />
     <!-- 自定义 Toast 组件 -->
     <Toast ref="toastRef" />
 
@@ -352,6 +353,7 @@ import { useProjectStore } from "../../store/project.js";
 import { useToast } from "../../composables/useToast.js";
 import statusBarMixin from "../../mixins/statusBar.js";
 import Icon from "../../components/Icon.vue";
+import LoadingOverlay from "../../components/LoadingOverlay.vue";
 import Toast from "../../components/Toast.vue";
 import ConfirmModal from "../../components/ConfirmModal.vue";
 import overviewActionMixin from "./mixins/overviewActionMixin.js";
@@ -362,6 +364,7 @@ export default {
   name: "OverviewPage",
   components: {
     Icon,
+    LoadingOverlay,
     Toast,
     ConfirmModal,
   },
