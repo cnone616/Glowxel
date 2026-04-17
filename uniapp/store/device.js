@@ -4,6 +4,26 @@ import DeviceWebSocket from '../utils/webSocket.js'
 
 const DEVICE_MODE_KEY = 'device_mode'
 const DEVICE_LAST_BUSINESS_MODE_KEY = 'device_last_business_mode'
+const VALID_BUSINESS_MODES = [
+  'clock',
+  'animation',
+  'theme',
+  'canvas',
+  'gif_player',
+  'text_display',
+  'breath_effect',
+  'rhythm_effect',
+  'ambient_effect',
+  'led_matrix_showcase',
+  'game_screensaver',
+  'tetris',
+  'planet_screensaver',
+  'eyes'
+]
+
+function isPersistedBusinessMode(mode) {
+  return typeof mode === 'string' && VALID_BUSINESS_MODES.includes(mode)
+}
 
 export const useDeviceStore = defineStore('device', {
   state: () => ({
@@ -77,42 +97,11 @@ export const useDeviceStore = defineStore('device', {
         return null
       }
 
-      if (typeof data.mode !== 'string') {
-        return null
-      }
-
-      if (data.mode === 'animation' && typeof data.effectMode === 'string') {
-        if (
-          data.effectMode === 'tetris' ||
-          data.effectMode === 'ambient_effect' ||
-          data.effectMode === 'eyes' ||
-          data.effectMode === 'game_screensaver' ||
-          data.effectMode === 'weather' ||
-          data.effectMode === 'countdown' ||
-          data.effectMode === 'stopwatch' ||
-          data.effectMode === 'notification' ||
-          data.effectMode === 'planet_screensaver'
-        ) {
-          return data.effectMode
-        }
-      }
-
       if (
-        data.mode === 'clock' ||
-        data.mode === 'animation' ||
-        data.mode === 'theme' ||
-        data.mode === 'canvas' ||
-        data.mode === 'eyes' ||
-        data.mode === 'ambient_effect' ||
-        data.mode === 'game_screensaver' ||
-        data.mode === 'tetris' ||
-        data.mode === 'weather' ||
-        data.mode === 'countdown' ||
-        data.mode === 'stopwatch' ||
-        data.mode === 'notification' ||
-        data.mode === 'planet_screensaver'
+        typeof data.businessMode === 'string' &&
+        VALID_BUSINESS_MODES.includes(data.businessMode)
       ) {
-        return data.mode
+        return data.businessMode
       }
 
       return null
@@ -132,14 +121,14 @@ export const useDeviceStore = defineStore('device', {
       }
 
       const savedMode = uni.getStorageSync(DEVICE_MODE_KEY)
-      if (savedMode) {
+      if (isPersistedBusinessMode(savedMode)) {
         this.deviceMode = savedMode
       }
 
       const savedBusinessMode = uni.getStorageSync(DEVICE_LAST_BUSINESS_MODE_KEY)
-      if (savedBusinessMode) {
+      if (isPersistedBusinessMode(savedBusinessMode)) {
         this.lastBusinessMode = savedBusinessMode
-      } else if (savedMode && savedMode !== 'canvas') {
+      } else if (isPersistedBusinessMode(savedMode) && savedMode !== 'canvas') {
         this.lastBusinessMode = savedMode
       }
     },
@@ -197,10 +186,10 @@ export const useDeviceStore = defineStore('device', {
       const businessMode = options.businessMode !== false
 
       this.deviceMode = mode
-      if (persist) {
+      if (persist && isPersistedBusinessMode(mode)) {
         uni.setStorageSync(DEVICE_MODE_KEY, mode)
       }
-      if (businessMode && mode !== 'canvas') {
+      if (businessMode && isPersistedBusinessMode(mode) && mode !== 'canvas') {
         this.lastBusinessMode = mode
         uni.setStorageSync(DEVICE_LAST_BUSINESS_MODE_KEY, mode)
       }

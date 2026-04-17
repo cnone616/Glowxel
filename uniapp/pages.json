@@ -151,15 +151,6 @@
       }
     },
     {
-      "path": "pages/countdown-board/countdown-board",
-      "style": {
-        "navigationStyle": "custom",
-        "navigationBarTextStyle": "white",
-        "backgroundColor": "#1a1a1a",
-        "enablePullDownRefresh": false
-      }
-    },
-    {
       "path": "pages/led-matrix/led-matrix",
       "style": {
         "navigationStyle": "custom",

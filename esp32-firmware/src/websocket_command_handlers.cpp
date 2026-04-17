@@ -609,14 +609,18 @@ bool WebSocketCommandHandlers::handleModeCommand(
     }
 
     if (mode == "tetris") {
-      DisplayManager::currentMode = MODE_ANIMATION;
-      DisplayManager::lastBusinessMode = MODE_ANIMATION;
-      DisplayManager::currentBusinessModeTag = "tetris";
-      DisplayManager::lastBusinessModeTag = "tetris";
-      bool clearMode = doc["clearMode"] | true;
-      int cellSz = doc["cellSize"] | 2;
-      int speed = doc["speed"] | 150;
-      bool clock = doc["showClock"] | true;
+      if (!doc.containsKey("clearMode") ||
+          !doc.containsKey("cellSize") ||
+          !doc.containsKey("speed") ||
+          !doc.containsKey("showClock")) {
+        setErrorResponse(response, "missing tetris mode fields");
+        return true;
+      }
+
+      bool clearMode = doc["clearMode"].as<bool>();
+      int cellSz = doc["cellSize"].as<int>();
+      int speed = doc["speed"].as<int>();
+      bool clock = doc["showClock"].as<bool>();
       uint8_t mask = 0x7F;
 
       if (doc.containsKey("pieces")) {
@@ -633,6 +637,10 @@ bool WebSocketCommandHandlers::handleModeCommand(
         }
       }
 
+      DisplayManager::currentMode = MODE_ANIMATION;
+      DisplayManager::lastBusinessMode = MODE_ANIMATION;
+      DisplayManager::currentBusinessModeTag = "tetris";
+      DisplayManager::lastBusinessModeTag = "tetris";
       TetrisEffect::init(clearMode, cellSz, speed, clock, mask);
       Serial.printf("模式切换: %s -> tetris\n", modeToString(fromMode));
       response["message"] = "tetris started";

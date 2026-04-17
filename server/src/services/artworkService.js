@@ -1,6 +1,10 @@
 const db = require('../config/db');
 const projectService = require('./projectService');
 
+function hasOwnProperty(target, key) {
+  return Object.prototype.hasOwnProperty.call(target, key);
+}
+
 async function publishArtwork(userId, payload) {
   const {
     title,
@@ -16,39 +20,56 @@ async function publishArtwork(userId, payload) {
     projectId,
   } = payload;
 
-  const pixelBuffer = pixelData ? Buffer.from(JSON.stringify(pixelData)) : null;
+  const pixelBuffer = Buffer.from(JSON.stringify(pixelData));
+  const fields = {
+    user_id: userId,
+    title,
+    cover_url: thumbnail,
+    width,
+    height,
+    pixel_data: pixelBuffer,
+  };
+
+  if (hasOwnProperty(payload, 'projectId')) {
+    fields.project_id = projectId;
+  }
+
+  if (hasOwnProperty(payload, 'description')) {
+    fields.description = description;
+  }
+
+  if (hasOwnProperty(payload, 'colorCount')) {
+    fields.color_count = colorCount;
+  }
+
+  if (hasOwnProperty(payload, 'boardCount')) {
+    fields.board_count = boardCount;
+  }
+
+  if (hasOwnProperty(payload, 'difficulty')) {
+    fields.difficulty = difficulty;
+  }
+
+  const columns = Object.keys(fields);
+  const placeholders = columns.map(() => '?').join(', ');
+  const values = columns.map((key) => fields[key]);
   const [result] = await db.query(
-    `INSERT INTO artworks (
-      user_id, project_id, title, description, cover_url,
-      width, height, color_count, board_count, difficulty, pixel_data
-    )
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [
-      userId,
-      projectId || null,
-      title,
-      description || '',
-      thumbnail || '',
-      width || 0,
-      height || 0,
-      colorCount || 0,
-      boardCount || 1,
-      difficulty || '中等',
-      pixelBuffer,
-    ]
+    `INSERT INTO artworks (${columns.join(', ')}) VALUES (${placeholders})`,
+    values
   );
 
-  if (tags && tags.length > 0) {
+  if (hasOwnProperty(payload, 'tags') && tags.length > 0) {
     const tagValues = tags.map((tag) => [result.insertId, tag]);
     await db.query('INSERT INTO artwork_tags (artwork_id, tag) VALUES ?', [tagValues]);
   }
 
-  if (projectId) {
+  if (hasOwnProperty(payload, 'projectId') && projectId !== null) {
     await projectService.updateProjectStatus(userId, projectId, 'published');
   }
 
   await db.query('UPDATE users SET works_count = works_count + 1 WHERE id = ?', [userId]);
-  return { artworkId: result.insertId, projectId: projectId || null };
+  const resultProjectId = hasOwnProperty(payload, 'projectId') ? projectId : null;
+  return { artworkId: result.insertId, projectId: resultProjectId };
 }
 
 async function removeArtwork(userId, artworkId) {

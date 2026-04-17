@@ -1,0 +1,60 @@
+@import "./tokens.scss";
+
+page {
+  --glx-bg: #{$glx-bg};
+  --glx-surface: #{$glx-surface};
+  --glx-surface-soft: #{$glx-surface-soft};
+  --glx-surface-muted: #{$glx-surface-muted};
+  --glx-border: #{$glx-border};
+  --glx-border-strong: #{$glx-border-strong};
+  --glx-text: #{$glx-text};
+  --glx-text-secondary: #{$glx-text-secondary};
+  --glx-text-tertiary: #{$glx-text-tertiary};
+  --glx-mint: #{$glx-mint};
+  --glx-mint-deep: #{$glx-mint-deep};
+  --glx-blue: #{$glx-blue};
+  --glx-blue-deep: #{$glx-blue-deep};
+  --glx-danger: #{$glx-danger};
+  --glx-danger-deep: #{$glx-danger-deep};
+  --glx-amber: #{$glx-amber};
+  --glx-shadow-soft: #{$glx-shadow-soft};
+  --glx-shadow-card: #{$glx-shadow-card};
+  --glx-radius-lg: #{$glx-radius-lg};
+  --glx-radius-md: #{$glx-radius-md};
+  --glx-radius-sm: #{$glx-radius-sm};
+  background: $glx-bg;
+  color: $glx-text;
+  font-family: "Avenir Next", "PingFang SC", "Helvetica Neue", sans-serif;
+}
+
+view,
+scroll-view,
+swiper,
+text,
+input,
+textarea,
+button,
+image {
+  box-sizing: border-box;
+}
+
+button {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  line-height: 1;
+}
+
+button::after {
+  border: 0;
+}
+
+image {
+  display: block;
+}
+
+input,
+textarea {
+  min-width: 0;
+}

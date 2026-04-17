@@ -397,16 +397,17 @@ export default {
           intensity: this.intensity,
         });
         await ws.setGifAnimation(payload.animationData);
-        await ws.setMode("animation");
+        await ws.setMode("gif_player");
         const status = await ws.getStatus();
         if (
+          status.businessMode !== "gif_player" ||
           status.mode !== "animation" ||
           !Number.isFinite(Number(status.animationFrames)) ||
           Number(status.animationFrames) <= 0
         ) {
           throw new Error("设备未成功加载 GIF 动画");
         }
-        this.deviceStore.setDeviceMode("animation", { businessMode: true });
+        this.deviceStore.setDeviceMode("gif_player", { businessMode: true });
         this.saveConfig();
         this.toast.showSuccess("离线素材已发送到设备");
       } catch (error) {

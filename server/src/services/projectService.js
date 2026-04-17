@@ -1,19 +1,23 @@
 const db = require('../config/db');
 
-function normalizeProjectPayload(project = {}) {
+function hasOwnProperty(target, key) {
+  return Object.prototype.hasOwnProperty.call(target, key);
+}
+
+function buildProjectRecord(project) {
   return {
     id: project.id,
-    name: project.name || '未命名项目',
-    width: project.width || 0,
-    height: project.height || 0,
-    paddedWidth: project.paddedWidth || project.width || 0,
-    paddedHeight: project.paddedHeight || project.height || 0,
-    palette: JSON.stringify(project.palette || []),
-    thumbnail: project.thumbnail || '',
-    progress: project.progress || 0,
-    status: project.status || 'draft',
-    description: project.description || '',
-    tags: JSON.stringify(project.tags || []),
+    name: project.name,
+    width: project.width,
+    height: project.height,
+    paddedWidth: hasOwnProperty(project, 'paddedWidth') ? project.paddedWidth : null,
+    paddedHeight: hasOwnProperty(project, 'paddedHeight') ? project.paddedHeight : null,
+    palette: JSON.stringify(project.palette),
+    thumbnail: project.thumbnail,
+    progress: project.progress,
+    status: project.status,
+    description: hasOwnProperty(project, 'description') ? project.description : null,
+    tags: hasOwnProperty(project, 'tags') ? JSON.stringify(project.tags) : null,
   };
 }
 
@@ -35,8 +39,8 @@ async function listProjects(userId, page = 1, limit = 20) {
 }
 
 async function syncProject(userId, project, pixels) {
-  const normalized = normalizeProjectPayload(project);
-  const pixelBuffer = pixels ? Buffer.from(JSON.stringify(pixels)) : null;
+  const record = buildProjectRecord(project);
+  const pixelBuffer = pixels === null ? null : Buffer.from(JSON.stringify(pixels));
 
   await db.query(
     `INSERT INTO projects (
@@ -60,24 +64,24 @@ async function syncProject(userId, project, pixels) {
        deleted_at = NULL,
        updated_at = NOW()`,
     [
-      normalized.id,
+      record.id,
       userId,
-      normalized.name,
-      normalized.width,
-      normalized.height,
-      normalized.paddedWidth,
-      normalized.paddedHeight,
-      normalized.palette,
-      normalized.thumbnail,
-      normalized.progress,
-      normalized.status,
-      normalized.description,
-      normalized.tags,
+      record.name,
+      record.width,
+      record.height,
+      record.paddedWidth,
+      record.paddedHeight,
+      record.palette,
+      record.thumbnail,
+      record.progress,
+      record.status,
+      record.description,
+      record.tags,
       pixelBuffer,
     ]
   );
 
-  return { projectId: normalized.id };
+  return { projectId: record.id };
 }
 
 async function getProjectDetail(userId, projectId) {

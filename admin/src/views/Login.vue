@@ -21,6 +21,7 @@
             v-model:value="form.password"
             placeholder="密码"
             size="large"
+            autocomplete="current-password"
           />
         </a-form-item>
         <a-form-item>

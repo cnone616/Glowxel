@@ -320,14 +320,6 @@ export default {
           type: "mode",
           bucket: "migration",
         },
-        {
-          key: "countdown",
-          name: "沙漏倒计时",
-          icon: "history",
-          variant: "red",
-          type: "mode",
-          bucket: "migration",
-        },
       ];
     },
   },
@@ -404,8 +396,6 @@ export default {
         this.openSpiritScreen();
       } else if (mode === "clock" || mode === "animation" || mode === "theme") {
         this.editClockWithMode(mode);
-      } else if (mode === "countdown") {
-        this.openCountdownBoard();
       } else if (mode === "ambient_effect" || mode === "led_matrix_showcase") {
         this.openLedMatrixShowcase();
       } else if (mode === "tetris") {
@@ -446,12 +436,6 @@ export default {
     openLedMatrixShowcase() {
       uni.navigateTo({
         url: "/pages/led-matrix/led-matrix",
-      });
-    },
-
-    openCountdownBoard() {
-      uni.navigateTo({
-        url: "/pages/countdown-board/countdown-board",
       });
     },
 

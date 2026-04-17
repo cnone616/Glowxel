@@ -3,8 +3,71 @@ const db = require('../config/db');
 const { auth, optionalAuth } = require('../middleware/auth');
 const artworkService = require('../services/artworkService');
 
+function hasOwnProperty(target, key) {
+  return Object.prototype.hasOwnProperty.call(target, key);
+}
+
+function validatePublishPayload(payload) {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    return '发布作品参数无效';
+  }
+
+  const requiredStringFields = ['title', 'thumbnail'];
+  for (const field of requiredStringFields) {
+    if (!hasOwnProperty(payload, field) || typeof payload[field] !== 'string') {
+      return `缺少作品字段 ${field}`;
+    }
+  }
+
+  const requiredNumberFields = ['width', 'height'];
+  for (const field of requiredNumberFields) {
+    if (!hasOwnProperty(payload, field) || !Number.isFinite(payload[field])) {
+      return `缺少作品字段 ${field}`;
+    }
+  }
+
+  if (!hasOwnProperty(payload, 'pixelData') || payload.pixelData === null) {
+    return '缺少作品字段 pixelData';
+  }
+
+  if (hasOwnProperty(payload, 'description') && typeof payload.description !== 'string') {
+    return '作品字段 description 无效';
+  }
+
+  if (hasOwnProperty(payload, 'tags') && !Array.isArray(payload.tags)) {
+    return '作品字段 tags 无效';
+  }
+
+  if (hasOwnProperty(payload, 'colorCount') && !Number.isFinite(payload.colorCount)) {
+    return '作品字段 colorCount 无效';
+  }
+
+  if (hasOwnProperty(payload, 'boardCount') && !Number.isFinite(payload.boardCount)) {
+    return '作品字段 boardCount 无效';
+  }
+
+  if (hasOwnProperty(payload, 'difficulty') && typeof payload.difficulty !== 'string') {
+    return '作品字段 difficulty 无效';
+  }
+
+  if (
+    hasOwnProperty(payload, 'projectId') &&
+    payload.projectId !== null &&
+    typeof payload.projectId !== 'string'
+  ) {
+    return '作品字段 projectId 无效';
+  }
+
+  return null;
+}
+
 // 发布作品
 router.post('/publish', auth, async (req, res) => {
+  const validationError = validatePublishPayload(req.body);
+  if (validationError) {
+    return res.json({ code: 400, message: validationError });
+  }
+
   try {
     const data = await artworkService.publishArtwork(req.user.id, req.body);
     res.json({ code: 0, data });

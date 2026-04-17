@@ -62,7 +62,7 @@
           <h2 class="card-title">屏幕操作</h2>
           <div class="brightness-row">
             <label>亮度：{{ brightness }}</label>
-            <input v-model.number="brightness" type="range" min="0" max="255" />
+            <input v-model.number="brightness" type="range" min="0" max="178" />
           </div>
           <div class="actions">
             <button class="btn btn-primary" :disabled="!deviceStore.connected" @click="handleBrightness">应用亮度</button>
@@ -135,7 +135,12 @@ async function handleBrightness() {
   message.value = "";
   try {
     const value = Number(brightness.value);
-    await deviceStore.setBrightness(value);
+    if (!Number.isFinite(value)) {
+      throw new Error("亮度值无效");
+    }
+    const boundedValue = Math.max(0, Math.min(178, Math.round(value)));
+    brightness.value = boundedValue;
+    await deviceStore.setBrightness(boundedValue);
     message.value = "亮度设置成功";
   } catch (error) {
     message.value = error.message || "亮度设置失败";
