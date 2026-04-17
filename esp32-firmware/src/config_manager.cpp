@@ -1,5 +1,7 @@
 #include "config_manager.h"
 #include "display_manager.h"
+#include "device_mode_tag_codec.h"
+#include "mode_tags.h"
 
 // 静态成员初始化
 Preferences ConfigManager::preferences;
@@ -342,24 +344,20 @@ void ConfigManager::loadClockConfig() {
   int savedMode = preferences.getInt("dispMode", (int)MODE_CLOCK);
   String savedBusinessMode = preferences.getString("bizMode", "");
   if (savedBusinessMode.length() == 0) {
-    if (savedMode == MODE_CLOCK) {
-      savedBusinessMode = "clock";
-    } else if (savedMode == MODE_CANVAS) {
-      savedBusinessMode = "canvas";
-    } else if (savedMode == MODE_ANIMATION) {
-      savedBusinessMode = "animation";
-    } else if (savedMode == MODE_THEME) {
-      savedBusinessMode = "theme";
+    const char* restoredModeTag =
+      DeviceModeTagCodec::toTagOrEmpty(static_cast<DeviceMode>(savedMode));
+    if (restoredModeTag[0] != '\0') {
+      savedBusinessMode = restoredModeTag;
     } else {
-      savedBusinessMode = "clock";
+      savedBusinessMode = ModeTags::CLOCK;
     }
   }
   String savedLastBusinessMode = preferences.getString("lastBizMode", "");
   if (savedLastBusinessMode.length() == 0) {
-    if (savedBusinessMode == "clock") {
-      savedLastBusinessMode = "clock";
-    } else if (savedBusinessMode == "canvas") {
-      savedLastBusinessMode = "clock";
+    if (savedBusinessMode == ModeTags::CLOCK) {
+      savedLastBusinessMode = ModeTags::CLOCK;
+    } else if (savedBusinessMode == ModeTags::CANVAS) {
+      savedLastBusinessMode = ModeTags::CLOCK;
     } else {
       savedLastBusinessMode = savedBusinessMode;
     }
@@ -367,15 +365,15 @@ void ConfigManager::loadClockConfig() {
 
   // 传输模式是临时态，重启后不应停留在该模式
   if (savedMode == MODE_TRANSFERRING) {
-    if (savedLastBusinessMode == "clock") {
+    if (savedLastBusinessMode == ModeTags::CLOCK) {
       savedMode = MODE_CLOCK;
-      savedBusinessMode = "clock";
-    } else if (savedLastBusinessMode == "theme") {
+      savedBusinessMode = ModeTags::CLOCK;
+    } else if (savedLastBusinessMode == ModeTags::THEME) {
       savedMode = MODE_THEME;
-      savedBusinessMode = "theme";
-    } else if (savedLastBusinessMode == "canvas") {
+      savedBusinessMode = ModeTags::THEME;
+    } else if (savedLastBusinessMode == ModeTags::CANVAS) {
       savedMode = MODE_CANVAS;
-      savedBusinessMode = "canvas";
+      savedBusinessMode = ModeTags::CANVAS;
     } else {
       savedMode = MODE_ANIMATION;
       savedBusinessMode = savedLastBusinessMode;
@@ -386,9 +384,9 @@ void ConfigManager::loadClockConfig() {
   DisplayManager::currentMode = (DeviceMode)savedMode;
   DisplayManager::currentBusinessModeTag = savedBusinessMode;
   DisplayManager::lastBusinessModeTag = savedLastBusinessMode;
-  if (savedLastBusinessMode == "clock") {
+  if (savedLastBusinessMode == ModeTags::CLOCK) {
     DisplayManager::lastBusinessMode = MODE_CLOCK;
-  } else if (savedLastBusinessMode == "theme") {
+  } else if (savedLastBusinessMode == ModeTags::THEME) {
     DisplayManager::lastBusinessMode = MODE_THEME;
   } else {
     DisplayManager::lastBusinessMode = MODE_ANIMATION;

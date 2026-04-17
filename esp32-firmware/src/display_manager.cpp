@@ -1,6 +1,7 @@
 #include "display_manager.h"
 #include "clock_font_renderer.h"
 #include "eyes_effect.h"
+#include "mode_tags.h"
 #include "theme_renderer.h"
 #include "wifi_manager.h"
 #include <time.h>
@@ -10,8 +11,8 @@
 CaptureMatrixPanel* DisplayManager::dma_display = nullptr;
 DeviceMode DisplayManager::currentMode = MODE_CANVAS;
 DeviceMode DisplayManager::lastBusinessMode = MODE_CLOCK;
-String DisplayManager::currentBusinessModeTag = "clock";
-String DisplayManager::lastBusinessModeTag = "clock";
+String DisplayManager::currentBusinessModeTag = ModeTags::CLOCK;
+String DisplayManager::lastBusinessModeTag = ModeTags::CLOCK;
 NativeEffectType DisplayManager::nativeEffectType = NATIVE_EFFECT_NONE;
 BreathEffectConfig DisplayManager::breathEffectConfig = {
   5,

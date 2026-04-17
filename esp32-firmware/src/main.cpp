@@ -5,6 +5,7 @@
 #include "display_manager.h"
 #include "animation_manager.h"
 #include "board_native_effect.h"
+#include "mode_tags.h"
 #include "websocket_handler.h"
 #include "web_server.h"
 #include "ota_manager.h"
@@ -67,14 +68,14 @@ void renderStartupRestoredFrame() {
   }
 
   if (DisplayManager::currentMode == MODE_ANIMATION &&
-      DisplayManager::currentBusinessModeTag == "game_screensaver") {
+      DisplayManager::currentBusinessModeTag == ModeTags::GAME_SCREENSAVER) {
     GameScreensaverEffect::applyConfig(ConfigManager::gameScreensaverConfig);
     GameScreensaverEffect::render();
     return;
   }
 
   if (DisplayManager::currentMode == MODE_ANIMATION &&
-      DisplayManager::currentBusinessModeTag == "gif_player") {
+      DisplayManager::currentBusinessModeTag == ModeTags::GIF_PLAYER) {
     if (AnimationManager::currentGIF != nullptr) {
       AnimationManager::currentGIF->isPlaying = true;
       AnimationManager::currentGIF->currentFrame = 0;
@@ -87,11 +88,11 @@ void renderStartupRestoredFrame() {
   }
 
   if (DisplayManager::currentMode == MODE_ANIMATION &&
-      (DisplayManager::currentBusinessModeTag == "text_display" ||
-       DisplayManager::currentBusinessModeTag == "weather" ||
-       DisplayManager::currentBusinessModeTag == "countdown" ||
-       DisplayManager::currentBusinessModeTag == "stopwatch" ||
-       DisplayManager::currentBusinessModeTag == "notification")) {
+      (DisplayManager::currentBusinessModeTag == ModeTags::TEXT_DISPLAY ||
+       DisplayManager::currentBusinessModeTag == ModeTags::WEATHER ||
+       DisplayManager::currentBusinessModeTag == ModeTags::COUNTDOWN ||
+       DisplayManager::currentBusinessModeTag == ModeTags::STOPWATCH ||
+       DisplayManager::currentBusinessModeTag == ModeTags::NOTIFICATION)) {
     if (BoardNativeEffect::isActive()) {
       BoardNativeEffect::render();
       return;
@@ -99,7 +100,7 @@ void renderStartupRestoredFrame() {
   }
 
   if (DisplayManager::currentMode == MODE_ANIMATION &&
-      DisplayManager::currentBusinessModeTag == "planet_screensaver") {
+      DisplayManager::currentBusinessModeTag == ModeTags::PLANET_SCREENSAVER) {
     BoardNativeEffect::applyPlanetScreensaverConfig(
       BoardNativeEffect::getPlanetScreensaverConfig()
     );
@@ -108,29 +109,29 @@ void renderStartupRestoredFrame() {
   }
 
   if (DisplayManager::currentMode == MODE_ANIMATION &&
-      DisplayManager::currentBusinessModeTag == "eyes") {
+      DisplayManager::currentBusinessModeTag == ModeTags::EYES) {
     DisplayManager::activateEyesEffect(ConfigManager::eyesConfig);
     DisplayManager::renderNativeEffect();
     return;
   }
 
   if (DisplayManager::currentMode == MODE_ANIMATION &&
-      (DisplayManager::currentBusinessModeTag == "ambient_effect" ||
-       DisplayManager::currentBusinessModeTag == "led_matrix_showcase")) {
+      (DisplayManager::currentBusinessModeTag == ModeTags::AMBIENT_EFFECT ||
+       DisplayManager::currentBusinessModeTag == ModeTags::LED_MATRIX_SHOWCASE)) {
     DisplayManager::activateAmbientEffect(DisplayManager::ambientEffectConfig);
     DisplayManager::renderNativeEffect();
     return;
   }
 
   if (DisplayManager::currentMode == MODE_ANIMATION &&
-      DisplayManager::currentBusinessModeTag == "breath_effect") {
+      DisplayManager::currentBusinessModeTag == ModeTags::BREATH_EFFECT) {
     DisplayManager::activateBreathEffect(DisplayManager::breathEffectConfig);
     DisplayManager::renderNativeEffect();
     return;
   }
 
   if (DisplayManager::currentMode == MODE_ANIMATION &&
-      DisplayManager::currentBusinessModeTag == "rhythm_effect") {
+      DisplayManager::currentBusinessModeTag == ModeTags::RHYTHM_EFFECT) {
     DisplayManager::activateRhythmEffect(DisplayManager::rhythmEffectConfig);
     DisplayManager::renderNativeEffect();
     return;
@@ -328,16 +329,16 @@ void loop() {
     }
   } else if (DisplayManager::currentMode == MODE_ANIMATION) {
     // 动画模式
-    if (DisplayManager::currentBusinessModeTag == "game_screensaver" &&
+    if (DisplayManager::currentBusinessModeTag == ModeTags::GAME_SCREENSAVER &&
                GameScreensaverEffect::isActive()) {
       GameScreensaverEffect::update();
       GameScreensaverEffect::render();
-    } else if ((DisplayManager::currentBusinessModeTag == "text_display" ||
-                DisplayManager::currentBusinessModeTag == "weather" ||
-                DisplayManager::currentBusinessModeTag == "countdown" ||
-                DisplayManager::currentBusinessModeTag == "stopwatch" ||
-                DisplayManager::currentBusinessModeTag == "notification" ||
-                DisplayManager::currentBusinessModeTag == "planet_screensaver") &&
+    } else if ((DisplayManager::currentBusinessModeTag == ModeTags::TEXT_DISPLAY ||
+                DisplayManager::currentBusinessModeTag == ModeTags::WEATHER ||
+                DisplayManager::currentBusinessModeTag == ModeTags::COUNTDOWN ||
+                DisplayManager::currentBusinessModeTag == ModeTags::STOPWATCH ||
+                DisplayManager::currentBusinessModeTag == ModeTags::NOTIFICATION ||
+                DisplayManager::currentBusinessModeTag == ModeTags::PLANET_SCREENSAVER) &&
                BoardNativeEffect::isActive()) {
       BoardNativeEffect::update();
       BoardNativeEffect::render();
