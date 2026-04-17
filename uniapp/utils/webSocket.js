@@ -5,11 +5,11 @@
 
 function normalizeHexColor(value) {
   if (typeof value !== "string") {
-    return "#64c8ff";
+    throw new Error("颜色值无效");
   }
   const body = value.trim().replace(/^#/, "");
   if (!/^[0-9a-fA-F]{6}$/.test(body)) {
-    return "#64c8ff";
+    throw new Error("颜色值无效");
   }
   return `#${body.toLowerCase()}`;
 }
@@ -56,6 +56,9 @@ function getSetModeSuccessMessage(mode) {
   if (mode === "animation") {
     return "switched to animation mode";
   }
+  if (mode === "gif_player") {
+    return "switched to gif player mode";
+  }
   if (mode === "theme") {
     return "switched to theme mode";
   }
@@ -70,6 +73,9 @@ function getSetModeSuccessMessage(mode) {
   }
   if (mode === "ambient_effect") {
     return "switched to ambient effect mode";
+  }
+  if (mode === "led_matrix_showcase") {
+    return "switched to led matrix showcase mode";
   }
   if (mode === "transferring") {
     return "entered transferring mode";

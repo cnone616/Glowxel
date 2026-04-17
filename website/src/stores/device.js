@@ -181,7 +181,13 @@ export const useDeviceStore = defineStore("device", {
     },
 
     async setBrightness(value) {
-      return this.sendAndWait({ cmd: "brightness", value });
+      const brightness = Number(value);
+      if (!Number.isFinite(brightness)) {
+        throw new Error("亮度值无效");
+      }
+
+      const boundedValue = Math.max(0, Math.min(178, Math.round(brightness)));
+      return this.sendAndWait({ cmd: "brightness", value: boundedValue });
     },
 
     async clearScreen() {

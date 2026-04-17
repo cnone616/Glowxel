@@ -1,0 +1,17 @@
+{
+  "name": "Glowxel Cleanroom",
+  "appid": "__UNI__GLOWXEL_CLEANROOM",
+  "description": "Glowxel uniapp cleanroom scaffold",
+  "versionName": "0.1.0",
+  "versionCode": "100",
+  "transformPx": false,
+  "mp-weixin": {
+    "appid": "",
+    "setting": {
+      "urlCheck": false
+    }
+  },
+  "h5": {
+    "title": "Glowxel Cleanroom"
+  }
+}

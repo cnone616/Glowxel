@@ -74,7 +74,7 @@
           </div>
           <div class="brightness-row">
             <label>亮度：{{ brightness }}</label>
-            <input v-model.number="brightness" type="range" min="0" max="255" />
+            <input v-model.number="brightness" type="range" min="0" max="178" />
           </div>
           <div class="actions">
             <button class="btn btn-outline" :disabled="!deviceStore.connected" @click="applyBrightness">应用亮度</button>
@@ -715,7 +715,8 @@ async function switchMode(mode) {
 async function applyBrightness() {
   message.value = "";
   try {
-    await deviceStore.setBrightness(normalizeInt(brightness.value, 0, 255));
+    brightness.value = normalizeInt(brightness.value, 0, 178);
+    await deviceStore.setBrightness(brightness.value);
     message.value = "亮度设置成功";
   } catch (error) {
     message.value = error.message || "亮度设置失败";

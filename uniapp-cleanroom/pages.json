@@ -1,0 +1,65 @@
+{
+  "easycom": {
+    "autoscan": true
+  },
+  "globalStyle": {
+    "navigationStyle": "custom",
+    "backgroundColor": "#EEF7F7"
+  },
+  "pages": [
+    {
+      "path": "pages/tab-home/index",
+      "style": {
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/tab-community/index",
+      "style": {
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/tab-create/index",
+      "style": {
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/tab-device/index",
+      "style": {
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/tab-profile/index",
+      "style": {
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/project-works/index",
+      "style": {
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/project-boards/index",
+      "style": {
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/community-users/index",
+      "style": {
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/device-params/index",
+      "style": {
+        "navigationStyle": "custom"
+      }
+    }
+  ]
+}

@@ -534,8 +534,10 @@ export default {
           throw new Error("LED 演示集仅支持板载原生命令");
         }
         await ws.waitForCommand(sendPlan.command, "ambient effect applied", 5000);
+        await ws.setMode(sendPlan.deviceMode);
         const status = await ws.getStatus();
         if (
+          status.businessMode !== sendPlan.deviceMode ||
           status.effectMode !== "ambient_effect" ||
           status.effectPreset !== sendPlan.command.preset
         ) {

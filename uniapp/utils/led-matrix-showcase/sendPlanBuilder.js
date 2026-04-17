@@ -12,11 +12,11 @@ function normalizeDensity(value) {
 
 function normalizeHexColor(value) {
   if (typeof value !== "string") {
-    return "#64c8ff";
+    throw new Error("颜色值无效");
   }
   const body = value.trim().replace(/^#/, "");
   if (!/^[0-9a-fA-F]{6}$/.test(body)) {
-    return "#64c8ff";
+    throw new Error("颜色值无效");
   }
   return `#${body.toLowerCase()}`;
 }
@@ -72,7 +72,7 @@ function buildLedMatrixSendPlan(options) {
     if (demo.id === "rain") {
       return {
         type: "command",
-        deviceMode: "ambient_effect",
+        deviceMode: "led_matrix_showcase",
         command: {
           cmd: "set_ambient_effect",
           preset: demo.ambientPreset,
@@ -86,7 +86,7 @@ function buildLedMatrixSendPlan(options) {
 
     return {
       type: "command",
-      deviceMode: "ambient_effect",
+      deviceMode: "led_matrix_showcase",
       command: {
         cmd: "set_ambient_effect",
         preset: demo.ambientPreset,

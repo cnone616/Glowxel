@@ -297,3 +297,86 @@ test('POST /api/upload 按当前请求地址返回上传文件 URL', async () =>
     fs.unlinkSync(filePath);
   }
 });
+
+test('POST /api/upload 非法 type 会返回 400', async () => {
+  const token = jwt.sign({ id: 7 }, process.env.JWT_SECRET);
+
+  const response = await request(app)
+    .post('/api/upload?type=../../evil')
+    .set('Authorization', `Bearer ${token}`)
+    .attach('file', Buffer.from('avatar-binary'), 'avatar.png');
+
+  assert.equal(response.status, 200);
+  assert.equal(response.body.code, 400);
+  assert.equal(response.body.message, '上传类型无效');
+});
+
+test('POST /api/project/sync 缺少必填字段会返回 400', async () => {
+  const token = jwt.sign({ id: 7 }, process.env.JWT_SECRET);
+
+  const response = await request(app)
+    .post('/api/project/sync')
+    .set('Authorization', `Bearer ${token}`)
+    .send({
+      project: {
+        id: 'project-1',
+        name: '测试项目',
+        width: 32,
+        height: 32,
+        palette: ['#ffffff'],
+        thumbnail: 'data:image/png;base64,abc',
+        progress: 0,
+      },
+      pixels: null
+    });
+
+  assert.equal(response.status, 200);
+  assert.equal(response.body.code, 400);
+  assert.equal(response.body.message, '缺少项目字段 status');
+});
+
+test('POST /api/project/batch-sync 任一项目缺少必填字段会返回 400', async () => {
+  const token = jwt.sign({ id: 7 }, process.env.JWT_SECRET);
+
+  const response = await request(app)
+    .post('/api/project/batch-sync')
+    .set('Authorization', `Bearer ${token}`)
+    .send({
+      projects: [
+        {
+          project: {
+            id: 'project-1',
+            name: '测试项目',
+            width: 32,
+            height: 32,
+            palette: ['#ffffff'],
+            thumbnail: 'data:image/png;base64,abc',
+            progress: 0,
+          },
+          pixels: null
+        }
+      ]
+    });
+
+  assert.equal(response.status, 200);
+  assert.equal(response.body.code, 400);
+  assert.equal(response.body.message, '缺少项目字段 status');
+});
+
+test('POST /api/artwork/publish 缺少必填字段会返回 400', async () => {
+  const token = jwt.sign({ id: 7 }, process.env.JWT_SECRET);
+
+  const response = await request(app)
+    .post('/api/artwork/publish')
+    .set('Authorization', `Bearer ${token}`)
+    .send({
+      title: '测试作品',
+      thumbnail: 'data:image/png;base64,abc',
+      width: 64,
+      height: 64,
+    });
+
+  assert.equal(response.status, 200);
+  assert.equal(response.body.code, 400);
+  assert.equal(response.body.message, '缺少作品字段 pixelData');
+});

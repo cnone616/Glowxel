@@ -1,0 +1,74 @@
+- generic [ref=e3]:
+  - navigation [ref=e4]:
+    - generic [ref=e5]:
+      - link "光格像素工坊 Logo 光格像素工坊 PIXEL STUDIO" [ref=e6] [cursor=pointer]:
+        - /url: /
+        - generic [ref=e7]:
+          - img "光格像素工坊 Logo" [ref=e8]
+          - generic [ref=e9]:
+            - generic [ref=e10]: 光格像素工坊
+            - generic [ref=e11]: PIXEL STUDIO
+      - generic [ref=e12]:
+        - link "首页" [ref=e13] [cursor=pointer]:
+          - /url: /
+        - link "工作台" [ref=e14] [cursor=pointer]:
+          - /url: /workspace
+        - link "设备" [ref=e15] [cursor=pointer]:
+          - /url: /device-control
+        - link "社区" [ref=e16] [cursor=pointer]:
+          - /url: /community
+        - link "模板" [ref=e17] [cursor=pointer]:
+          - /url: /templates
+        - link "挑战" [ref=e18] [cursor=pointer]:
+          - /url: /challenges
+      - generic [ref=e19]:
+        - link "新建" [ref=e20] [cursor=pointer]:
+          - /url: /create
+          - img [ref=e21]
+          - text: 新建
+        - link "登录" [ref=e22] [cursor=pointer]:
+          - /url: /login
+  - main [ref=e23]:
+    - generic [ref=e25]:
+      - generic [ref=e26]:
+        - heading "设备控制" [level=1] [ref=e27]
+        - paragraph [ref=e28]: 适用于已经完成配网的设备，在网页中直接连接并进行基础控制。
+      - generic [ref=e29]:
+        - generic [ref=e30]:
+          - strong [ref=e31]: 首次使用先完成热点配网
+          - generic [ref=e32]: "网页端目前不直接提供 WiFi 配网表单。请先连接设备热点，在浏览器中打开 `192.168.4.1` 完成 WiFi 配置，再回到这里输入设备 IP 连接。"
+        - link "查看连接说明" [ref=e33] [cursor=pointer]:
+          - /url: /hardware-guide.html
+      - generic [ref=e34]:
+        - heading "设备连接" [level=2] [ref=e35]
+        - generic [ref=e36]:
+          - generic [ref=e37]:
+            - generic [ref=e38]: 设备地址
+            - textbox "设备地址" [ref=e39]:
+              - /placeholder: 例如 192.168.1.88
+          - generic [ref=e40]:
+            - generic [ref=e41]: 端口
+            - spinbutton "端口" [ref=e42]: "80"
+          - generic [ref=e43]:
+            - 'checkbox "使用 `wss`" [ref=e44]'
+            - generic [ref=e45]: "使用 `wss`"
+        - generic [ref=e46]:
+          - button "连接设备" [ref=e47] [cursor=pointer]
+          - button "断开连接" [disabled] [ref=e48] [cursor=pointer]
+          - button "刷新状态" [disabled] [ref=e49] [cursor=pointer]
+        - generic [ref=e52]: 未连接
+      - generic [ref=e53]:
+        - generic [ref=e54]:
+          - heading "模式切换" [level=2] [ref=e55]
+          - generic [ref=e56]:
+            - button "静态时钟" [disabled] [ref=e57]
+            - button "动态时钟" [disabled] [ref=e58]
+            - button "画板模式" [disabled] [ref=e59]
+        - generic [ref=e60]:
+          - heading "屏幕操作" [level=2] [ref=e61]
+          - generic [ref=e62]:
+            - generic [ref=e63]: 亮度：50
+            - slider [ref=e64]: "50"
+          - generic [ref=e65]:
+            - button "应用亮度" [disabled] [ref=e66] [cursor=pointer]
+            - button "清屏" [disabled] [ref=e67] [cursor=pointer]

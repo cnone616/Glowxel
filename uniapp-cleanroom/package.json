@@ -1,0 +1,14 @@
+{
+  "name": "glowxel-uniapp-cleanroom",
+  "version": "0.1.0",
+  "main": "main.js",
+  "scripts": {
+    "test": "node -e \"console.log('uniapp-cleanroom scaffold check: ok')\""
+  },
+  "keywords": [
+    "uniapp",
+    "glowxel",
+    "cleanroom"
+  ],
+  "license": "ISC"
+}
