@@ -8,6 +8,8 @@
 #include "tetris_effect.h"
 #include "game_screensaver_effect.h"
 #include "clock_font_renderer.h"
+#include "device_mode_tag_codec.h"
+#include "mode_tags.h"
 #include "websocket_command_handlers.h"
 
 namespace {
@@ -55,22 +57,7 @@ void clearClientTextState(uint32_t clientId) {
 }
 
 const char* modeToString(DeviceMode mode) {
-  if (mode == MODE_CLOCK) {
-    return "clock";
-  }
-  if (mode == MODE_CANVAS) {
-    return "canvas";
-  }
-  if (mode == MODE_ANIMATION) {
-    return "animation";
-  }
-  if (mode == MODE_THEME) {
-    return "theme";
-  }
-  if (mode == MODE_TRANSFERRING) {
-    return "transferring";
-  }
-  return "unknown";
+  return DeviceModeTagCodec::toTagOrUnknown(mode);
 }
 }
 
@@ -87,22 +74,7 @@ const char* WebSocketHandler::getCurrentModeString() {
   if (DisplayManager::currentBusinessModeTag.length() > 0) {
     return DisplayManager::currentBusinessModeTag.c_str();
   }
-  if (DisplayManager::currentMode == MODE_CLOCK) {
-    return "clock";
-  }
-  if (DisplayManager::currentMode == MODE_CANVAS) {
-    return "canvas";
-  }
-  if (DisplayManager::currentMode == MODE_ANIMATION) {
-    return "animation";
-  }
-  if (DisplayManager::currentMode == MODE_THEME) {
-    return "theme";
-  }
-  if (DisplayManager::currentMode == MODE_TRANSFERRING) {
-    return "transferring";
-  }
-  return "";
+  return DeviceModeTagCodec::toTagOrEmpty(DisplayManager::currentMode);
 }
 
 void WebSocketHandler::init() {
@@ -163,7 +135,7 @@ void WebSocketHandler::restoreDisplayForCurrentMode() {
     return;
   }
 
-  if (DisplayManager::currentBusinessModeTag == "tetris") {
+  if (DisplayManager::currentBusinessModeTag == ModeTags::TETRIS) {
     TetrisEffect::init(
       TetrisEffect::doClearLines,
       TetrisEffect::cellSize,
@@ -175,13 +147,13 @@ void WebSocketHandler::restoreDisplayForCurrentMode() {
     return;
   }
 
-  if (DisplayManager::currentBusinessModeTag == "game_screensaver") {
+  if (DisplayManager::currentBusinessModeTag == ModeTags::GAME_SCREENSAVER) {
     GameScreensaverEffect::applyConfig(ConfigManager::gameScreensaverConfig);
     GameScreensaverEffect::render();
     return;
   }
 
-  if (DisplayManager::currentBusinessModeTag == "gif_player") {
+  if (DisplayManager::currentBusinessModeTag == ModeTags::GIF_PLAYER) {
     if (AnimationManager::currentGIF != nullptr) {
       AnimationManager::currentGIF->isPlaying = true;
       AnimationManager::currentGIF->currentFrame = 0;
@@ -193,18 +165,14 @@ void WebSocketHandler::restoreDisplayForCurrentMode() {
     return;
   }
 
-  if (DisplayManager::currentBusinessModeTag == "text_display" ||
-      DisplayManager::currentBusinessModeTag == "weather" ||
-      DisplayManager::currentBusinessModeTag == "countdown" ||
-      DisplayManager::currentBusinessModeTag == "stopwatch" ||
-      DisplayManager::currentBusinessModeTag == "notification") {
+  if (ModeTags::isBoardNativeModeTag(DisplayManager::currentBusinessModeTag)) {
     if (BoardNativeEffect::isActive()) {
       BoardNativeEffect::render();
       return;
     }
   }
 
-  if (DisplayManager::currentBusinessModeTag == "planet_screensaver") {
+  if (DisplayManager::currentBusinessModeTag == ModeTags::PLANET_SCREENSAVER) {
     if (!BoardNativeEffect::isActive()) {
       BoardNativeEffect::applyPlanetScreensaverConfig(
         BoardNativeEffect::getPlanetScreensaverConfig()
@@ -214,26 +182,25 @@ void WebSocketHandler::restoreDisplayForCurrentMode() {
     return;
   }
 
-  if (DisplayManager::currentBusinessModeTag == "eyes") {
+  if (DisplayManager::currentBusinessModeTag == ModeTags::EYES) {
     DisplayManager::activateEyesEffect(ConfigManager::eyesConfig);
     DisplayManager::renderNativeEffect();
     return;
   }
 
-  if (DisplayManager::currentBusinessModeTag == "ambient_effect" ||
-      DisplayManager::currentBusinessModeTag == "led_matrix_showcase") {
+  if (ModeTags::isAmbientModeTag(DisplayManager::currentBusinessModeTag)) {
     DisplayManager::activateAmbientEffect(DisplayManager::ambientEffectConfig);
     DisplayManager::renderNativeEffect();
     return;
   }
 
-  if (DisplayManager::currentBusinessModeTag == "breath_effect") {
+  if (DisplayManager::currentBusinessModeTag == ModeTags::BREATH_EFFECT) {
     DisplayManager::activateBreathEffect(DisplayManager::breathEffectConfig);
     DisplayManager::renderNativeEffect();
     return;
   }
 
-  if (DisplayManager::currentBusinessModeTag == "rhythm_effect") {
+  if (DisplayManager::currentBusinessModeTag == ModeTags::RHYTHM_EFFECT) {
     DisplayManager::activateRhythmEffect(DisplayManager::rhythmEffectConfig);
     DisplayManager::renderNativeEffect();
     return;

@@ -5,6 +5,9 @@
 #include "config_manager.h"
 #include "ota_manager.h"
 #include "theme_renderer.h"
+#include "device_mode_tag_codec.h"
+#include "ambient_preset_codec.h"
+#include "mode_tags.h"
 
 namespace {
 struct ThemePageItem {
@@ -47,73 +50,6 @@ const AmbientPageItem kAmbientPageItems[] = {
   {"julia_set", "Julia Set", "分形纹理持续变化"},
   {"reaction_diffusion", "Reaction Diffusion", "类似细胞生长的纹理扩散"}
 };
-
-const char* ambientPresetToString(uint8_t preset) {
-  if (preset == AMBIENT_PRESET_AURORA) {
-    return "digital_rain";
-  }
-  if (preset == AMBIENT_PRESET_PLASMA) {
-    return "starfield";
-  }
-  if (preset == AMBIENT_PRESET_MATRIX_RAIN) {
-    return "neon_tunnel";
-  }
-  if (preset == AMBIENT_PRESET_FIREFLY_SWARM) {
-    return "metablob";
-  }
-  if (preset == AMBIENT_PRESET_METEOR_SHOWER) {
-    return "falling_sand";
-  }
-  if (preset == AMBIENT_PRESET_OCEAN_CURRENT) {
-    return "sparks";
-  }
-  if (preset == AMBIENT_PRESET_NEON_GRID) {
-    return "wave_pattern";
-  }
-  if (preset == AMBIENT_PRESET_SUNSET_BLUSH) {
-    return "rain_scene";
-  }
-  if (preset == AMBIENT_PRESET_STARFIELD_DRIFT) {
-    return "watermelon_plasma";
-  }
-  if (preset == AMBIENT_PRESET_BOIDS) {
-    return "boids";
-  }
-  if (preset == AMBIENT_PRESET_BOUNCING_LOGO) {
-    return "bouncing_logo";
-  }
-  if (preset == AMBIENT_PRESET_SORTING_VISUALIZER) {
-    return "sorting_visualizer";
-  }
-  if (preset == AMBIENT_PRESET_CLOCK_SCENE) {
-    return "clock_scene";
-  }
-  if (preset == AMBIENT_PRESET_COUNTDOWN_SCENE) {
-    return "countdown_scene";
-  }
-  if (preset == AMBIENT_PRESET_WEATHER_SCENE) {
-    return "weather_scene";
-  }
-  if (preset == AMBIENT_PRESET_GAME_OF_LIFE) {
-    return "game_of_life";
-  }
-  if (preset == AMBIENT_PRESET_JULIA_SET) {
-    return "julia_set";
-  }
-  if (preset == AMBIENT_PRESET_REACTION_DIFFUSION) {
-    return "reaction_diffusion";
-  }
-  if (preset == AMBIENT_PRESET_COSMIC_KALE) {
-    return "cosmic_kale";
-  }
-  if (preset == AMBIENT_PRESET_VOID_FIRE) {
-    return "void_fire";
-  }
-  if (preset == AMBIENT_PRESET_DEEP_SPACE_NEBULA) {
-    return "deep_space_nebula";
-  }
-  return "";
-}
 
 bool parseUnsignedValue(const String& text, uint32_t minValue, uint32_t maxValue, uint32_t& outValue) {
   if (text.length() == 0) {
@@ -1256,7 +1192,7 @@ String buildAmbientEffectsPage() {
   html += presetsJson;
   html += R"HTML(;
     let activePresetId = ")HTML";
-  html += ambientPresetToString(DisplayManager::ambientEffectConfig.preset);
+  html += AmbientPresetCodec::toString(DisplayManager::ambientEffectConfig.preset);
   html += R"HTML(";
     let ws = null;
     let frameTimer = null;
@@ -2334,18 +2270,7 @@ void WebServer::setupAPIRoutes() {
   server.on("/status", HTTP_GET, [](AsyncWebServerRequest *request){
     Serial.println("收到状态查询请求");
     StaticJsonDocument<640> doc;
-    const char* mode = "unknown";
-    if (DisplayManager::currentMode == MODE_CLOCK) {
-      mode = "clock";
-    } else if (DisplayManager::currentMode == MODE_CANVAS) {
-      mode = "canvas";
-    } else if (DisplayManager::currentMode == MODE_ANIMATION) {
-      mode = "animation";
-    } else if (DisplayManager::currentMode == MODE_THEME) {
-      mode = "theme";
-    } else if (DisplayManager::currentMode == MODE_TRANSFERRING) {
-      mode = "transferring";
-    }
+    const char* mode = DeviceModeTagCodec::toTagOrUnknown(DisplayManager::currentMode);
 
     doc["status"] = "ok";
     doc["ip"] = WiFiManager::getDeviceIP();
@@ -2373,17 +2298,17 @@ void WebServer::setupAPIRoutes() {
     doc["mode"] = mode;
     doc["businessMode"] = DisplayManager::currentBusinessModeTag;
     if (DisplayManager::nativeEffectType == NATIVE_EFFECT_BREATH) {
-      doc["effectMode"] = "breath_effect";
+      doc["effectMode"] = ModeTags::BREATH_EFFECT;
     } else if (DisplayManager::nativeEffectType == NATIVE_EFFECT_RHYTHM) {
-      doc["effectMode"] = "rhythm_effect";
+      doc["effectMode"] = ModeTags::RHYTHM_EFFECT;
     } else if (DisplayManager::nativeEffectType == NATIVE_EFFECT_EYES) {
-      doc["effectMode"] = "eyes";
+      doc["effectMode"] = ModeTags::EYES;
     } else if (DisplayManager::nativeEffectType == NATIVE_EFFECT_AMBIENT) {
-      doc["effectMode"] = "ambient_effect";
+      doc["effectMode"] = ModeTags::AMBIENT_EFFECT;
     } else {
       doc["effectMode"] = "none";
     }
-    doc["effectPreset"] = ambientPresetToString(DisplayManager::ambientEffectConfig.preset);
+    doc["effectPreset"] = AmbientPresetCodec::toString(DisplayManager::ambientEffectConfig.preset);
     doc["effectSpeed"] = DisplayManager::ambientEffectConfig.speed;
     doc["effectIntensity"] = DisplayManager::ambientEffectConfig.intensity;
     doc["effectDensity"] = DisplayManager::ambientEffectConfig.density;

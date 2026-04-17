@@ -148,6 +148,15 @@ struct WeightedExpression {
   float weight;
 };
 
+struct PetPose {
+  int headShiftX;
+  int headShiftY;
+  int bodyShiftY;
+  int handPressY;
+  int earShakeX;
+  int tailSwingX;
+};
+
 static const EyeShapePreset kEyePresets[EYE_EXPRESSION_COUNT] = {
   {0.0f, 0.0f, 20.0f, 20.0f, 0.0f, 0.0f, 4.0f, 4.0f},   // Normal
   {-2.0f, 0.0f, 10.0f, 20.0f, 0.3f, 0.0f, 1.0f, 6.0f},  // Angry
@@ -174,6 +183,51 @@ static const EyeShapePreset kEyePresets[EYE_EXPRESSION_COUNT] = {
 static const float kReferenceEyeSize = 20.0f;
 static const unsigned long kBlinkDurationMs = 150;
 static const unsigned long kEyesFrameIntervalMs = 42;
+static const unsigned long kPetBreathingPeriodMs = 2200;
+static const unsigned long kPetEarShakeWindowMs = 120;
+static const unsigned long kPetTailSwingPeriodMs = 1400;
+
+static const int kPetHeadMinX = 12;
+static const int kPetHeadMaxX = 51;
+static const int kPetHeadMinY = 14;
+static const int kPetHeadMaxY = 43;
+static const int kPetBodyMinX = 18;
+static const int kPetBodyMaxX = 45;
+static const int kPetBodyMinY = 34;
+static const int kPetBodyMaxY = 55;
+static const int kPetLeftHandMinX = 8;
+static const int kPetLeftHandMaxX = 23;
+static const int kPetLeftHandMinY = 42;
+static const int kPetLeftHandMaxY = 58;
+static const int kPetRightHandMinX = 40;
+static const int kPetRightHandMaxX = 55;
+static const int kPetRightHandMinY = 42;
+static const int kPetRightHandMaxY = 58;
+static const int kPetLeftEarAnchorX = 18;
+static const int kPetLeftEarAnchorY = 12;
+static const int kPetRightEarAnchorX = 45;
+static const int kPetRightEarAnchorY = 12;
+static const int kPetTailAnchorX = 51;
+static const int kPetTailAnchorY = 46;
+
+static const uint8_t kPetColorBaseR = 255;
+static const uint8_t kPetColorBaseG = 215;
+static const uint8_t kPetColorBaseB = 119;
+static const uint8_t kPetColorShadowR = 241;
+static const uint8_t kPetColorShadowG = 178;
+static const uint8_t kPetColorShadowB = 92;
+static const uint8_t kPetColorPawR = 255;
+static const uint8_t kPetColorPawG = 236;
+static const uint8_t kPetColorPawB = 207;
+static const uint8_t kPetColorAccentR = 242;
+static const uint8_t kPetColorAccentG = 151;
+static const uint8_t kPetColorAccentB = 74;
+static const uint8_t kPetColorTailR = 225;
+static const uint8_t kPetColorTailG = 127;
+static const uint8_t kPetColorTailB = 69;
+static const uint8_t kPetColorOutlineR = 95;
+static const uint8_t kPetColorOutlineG = 58;
+static const uint8_t kPetColorOutlineB = 27;
 
 EyesRuntimeState s_state = {};
 unsigned long s_lastEyesRenderAt = 0;
@@ -1048,6 +1102,350 @@ static bool pointInQuarterEllipse(
   return dx * dx + dy * dy <= 1.0f;
 }
 
+static int roundToInt(float value) {
+  return (int)lroundf(value);
+}
+
+static void drawFilledRect(
+  MatrixPanel_I2S_DMA* display,
+  int x0,
+  int y0,
+  int x1,
+  int y1,
+  uint16_t color
+) {
+  int startX = clampInt(x0 < x1 ? x0 : x1, 0, DisplayManager::PANEL_RES_X - 1);
+  int endX = clampInt(x0 > x1 ? x0 : x1, 0, DisplayManager::PANEL_RES_X - 1);
+  int startY = clampInt(y0 < y1 ? y0 : y1, 0, DisplayManager::PANEL_RES_Y - 1);
+  int endY = clampInt(y0 > y1 ? y0 : y1, 0, DisplayManager::PANEL_RES_Y - 1);
+  for (int y = startY; y <= endY; y++) {
+    for (int x = startX; x <= endX; x++) {
+      display->drawPixel(x, y, color);
+    }
+  }
+}
+
+static void drawFilledCircle(
+  MatrixPanel_I2S_DMA* display,
+  float centerX,
+  float centerY,
+  float radius,
+  uint16_t color
+) {
+  if (radius <= 0.0f) {
+    return;
+  }
+  int startX = clampInt((int)floorf(centerX - radius), 0, DisplayManager::PANEL_RES_X - 1);
+  int endX = clampInt((int)ceilf(centerX + radius), 0, DisplayManager::PANEL_RES_X - 1);
+  int startY = clampInt((int)floorf(centerY - radius), 0, DisplayManager::PANEL_RES_Y - 1);
+  int endY = clampInt((int)ceilf(centerY + radius), 0, DisplayManager::PANEL_RES_Y - 1);
+  float radiusSq = radius * radius;
+  for (int y = startY; y <= endY; y++) {
+    for (int x = startX; x <= endX; x++) {
+      float dx = ((float)x + 0.5f) - centerX;
+      float dy = ((float)y + 0.5f) - centerY;
+      if (dx * dx + dy * dy <= radiusSq) {
+        display->drawPixel(x, y, color);
+      }
+    }
+  }
+}
+
+static void drawFilledEllipse(
+  MatrixPanel_I2S_DMA* display,
+  float centerX,
+  float centerY,
+  float radiusX,
+  float radiusY,
+  uint16_t color
+) {
+  if (radiusX <= 0.0f || radiusY <= 0.0f) {
+    return;
+  }
+  int startX = clampInt((int)floorf(centerX - radiusX), 0, DisplayManager::PANEL_RES_X - 1);
+  int endX = clampInt((int)ceilf(centerX + radiusX), 0, DisplayManager::PANEL_RES_X - 1);
+  int startY = clampInt((int)floorf(centerY - radiusY), 0, DisplayManager::PANEL_RES_Y - 1);
+  int endY = clampInt((int)ceilf(centerY + radiusY), 0, DisplayManager::PANEL_RES_Y - 1);
+  for (int y = startY; y <= endY; y++) {
+    for (int x = startX; x <= endX; x++) {
+      float nx = (((float)x + 0.5f) - centerX) / radiusX;
+      float ny = (((float)y + 0.5f) - centerY) / radiusY;
+      if (nx * nx + ny * ny <= 1.0f) {
+        display->drawPixel(x, y, color);
+      }
+    }
+  }
+}
+
+static void drawEllipseOutline(
+  MatrixPanel_I2S_DMA* display,
+  float centerX,
+  float centerY,
+  float radiusX,
+  float radiusY,
+  float thickness,
+  uint16_t color
+) {
+  if (radiusX <= 0.0f || radiusY <= 0.0f) {
+    return;
+  }
+  float innerRadiusX = radiusX - thickness;
+  float innerRadiusY = radiusY - thickness;
+  if (innerRadiusX < 0.1f) innerRadiusX = 0.1f;
+  if (innerRadiusY < 0.1f) innerRadiusY = 0.1f;
+
+  int startX = clampInt((int)floorf(centerX - radiusX), 0, DisplayManager::PANEL_RES_X - 1);
+  int endX = clampInt((int)ceilf(centerX + radiusX), 0, DisplayManager::PANEL_RES_X - 1);
+  int startY = clampInt((int)floorf(centerY - radiusY), 0, DisplayManager::PANEL_RES_Y - 1);
+  int endY = clampInt((int)ceilf(centerY + radiusY), 0, DisplayManager::PANEL_RES_Y - 1);
+  for (int y = startY; y <= endY; y++) {
+    for (int x = startX; x <= endX; x++) {
+      float ox = (((float)x + 0.5f) - centerX) / radiusX;
+      float oy = (((float)y + 0.5f) - centerY) / radiusY;
+      if (ox * ox + oy * oy > 1.0f) {
+        continue;
+      }
+      float ix = (((float)x + 0.5f) - centerX) / innerRadiusX;
+      float iy = (((float)y + 0.5f) - centerY) / innerRadiusY;
+      if (ix * ix + iy * iy > 1.0f) {
+        display->drawPixel(x, y, color);
+      }
+    }
+  }
+}
+
+static void drawFilledTriangle(
+  MatrixPanel_I2S_DMA* display,
+  float ax,
+  float ay,
+  float bx,
+  float by,
+  float cx,
+  float cy,
+  uint16_t color
+) {
+  int startX = clampInt((int)floorf(fminf(ax, fminf(bx, cx))), 0, DisplayManager::PANEL_RES_X - 1);
+  int endX = clampInt((int)ceilf(fmaxf(ax, fmaxf(bx, cx))), 0, DisplayManager::PANEL_RES_X - 1);
+  int startY = clampInt((int)floorf(fminf(ay, fminf(by, cy))), 0, DisplayManager::PANEL_RES_Y - 1);
+  int endY = clampInt((int)ceilf(fmaxf(ay, fmaxf(by, cy))), 0, DisplayManager::PANEL_RES_Y - 1);
+  for (int y = startY; y <= endY; y++) {
+    for (int x = startX; x <= endX; x++) {
+      if (pointInTriangle((float)x + 0.5f, (float)y + 0.5f, ax, ay, bx, by, cx, cy)) {
+        display->drawPixel(x, y, color);
+      }
+    }
+  }
+}
+
+static void drawFilledRoundedRect(
+  MatrixPanel_I2S_DMA* display,
+  int x0,
+  int y0,
+  int x1,
+  int y1,
+  int radius,
+  uint16_t color
+) {
+  int left = x0 < x1 ? x0 : x1;
+  int right = x0 > x1 ? x0 : x1;
+  int top = y0 < y1 ? y0 : y1;
+  int bottom = y0 > y1 ? y0 : y1;
+  int halfWidth = (right - left + 1) / 2;
+  int halfHeight = (bottom - top + 1) / 2;
+  int maxCorner = halfWidth < halfHeight ? halfWidth : halfHeight;
+  int corner = clampInt(radius, 0, maxCorner);
+
+  drawFilledRect(display, left + corner, top, right - corner, bottom, color);
+  drawFilledRect(display, left, top + corner, right, bottom - corner, color);
+  drawFilledCircle(display, (float)(left + corner), (float)(top + corner), (float)corner, color);
+  drawFilledCircle(display, (float)(right - corner), (float)(top + corner), (float)corner, color);
+  drawFilledCircle(display, (float)(left + corner), (float)(bottom - corner), (float)corner, color);
+  drawFilledCircle(display, (float)(right - corner), (float)(bottom - corner), (float)corner, color);
+}
+
+static PetPose buildPetPose(unsigned long now) {
+  PetPose pose;
+  float breathing = signedTrianglePulse(now, kPetBreathingPeriodMs, 0.0f);
+  int breathingOffset = roundToInt(breathing * 1.0f);
+  int lookOffsetX = roundToInt(clampFloat(s_state.lookX, -1.0f, 1.0f));
+  int lookOffsetY = roundToInt(clampFloat(s_state.lookY, -1.0f, 1.0f));
+  pose.headShiftX = lookOffsetX;
+  pose.headShiftY = breathingOffset + lookOffsetY;
+  pose.bodyShiftY = breathingOffset;
+  pose.handPressY = s_state.blinkActive ? 1 : 0;
+  pose.earShakeX = 0;
+  if (s_state.blinkActive) {
+    unsigned long elapsed = now - s_state.blinkStartAt;
+    unsigned long phase = elapsed % kPetEarShakeWindowMs;
+    pose.earShakeX = phase < (kPetEarShakeWindowMs / 2) ? 1 : -1;
+  }
+  float tailSwing = signedTrianglePulse(now, kPetTailSwingPeriodMs, 0.25f);
+  pose.tailSwingX = roundToInt(tailSwing * 2.0f);
+  return pose;
+}
+
+static void drawPetBodyLayer(
+  MatrixPanel_I2S_DMA* display,
+  const PetPose& pose,
+  uint16_t baseColor,
+  uint16_t shadowColor,
+  uint16_t outlineColor
+) {
+  int bodyTop = kPetBodyMinY + pose.bodyShiftY;
+  int bodyBottom = kPetBodyMaxY + pose.bodyShiftY;
+  drawFilledRoundedRect(
+    display,
+    kPetBodyMinX,
+    bodyTop,
+    kPetBodyMaxX,
+    bodyBottom,
+    4,
+    outlineColor
+  );
+  drawFilledRoundedRect(
+    display,
+    kPetBodyMinX + 1,
+    bodyTop + 1,
+    kPetBodyMaxX - 1,
+    bodyBottom - 1,
+    3,
+    baseColor
+  );
+  drawFilledRoundedRect(
+    display,
+    kPetBodyMinX + 1,
+    bodyTop + 10,
+    kPetBodyMaxX - 1,
+    bodyBottom - 1,
+    3,
+    shadowColor
+  );
+
+  int headLeft = kPetHeadMinX + pose.headShiftX;
+  int headRight = kPetHeadMaxX + pose.headShiftX;
+  int headTop = kPetHeadMinY + pose.headShiftY;
+  int headBottom = kPetHeadMaxY + pose.headShiftY;
+  float centerX = ((float)headLeft + (float)headRight) * 0.5f;
+  float centerY = ((float)headTop + (float)headBottom) * 0.5f;
+  float radiusX = ((float)(headRight - headLeft + 1)) * 0.5f;
+  float radiusY = ((float)(headBottom - headTop + 1)) * 0.5f;
+  drawFilledEllipse(display, centerX, centerY, radiusX, radiusY, baseColor);
+  drawFilledEllipse(
+    display,
+    centerX,
+    centerY + 5.0f,
+    radiusX > 1.0f ? radiusX - 1.0f : radiusX,
+    radiusY > 6.0f ? radiusY - 6.0f : 1.0f,
+    shadowColor
+  );
+  drawEllipseOutline(display, centerX, centerY, radiusX, radiusY, 1.2f, outlineColor);
+}
+
+static void drawPetHandsLayer(
+  MatrixPanel_I2S_DMA* display,
+  const PetPose& pose,
+  uint16_t pawColor,
+  uint16_t shadowColor,
+  uint16_t outlineColor
+) {
+  int leftTop = kPetLeftHandMinY + pose.bodyShiftY + pose.handPressY;
+  int leftBottom = kPetLeftHandMaxY + pose.bodyShiftY + pose.handPressY;
+  int rightTop = kPetRightHandMinY + pose.bodyShiftY + pose.handPressY;
+  int rightBottom = kPetRightHandMaxY + pose.bodyShiftY + pose.handPressY;
+
+  drawFilledRoundedRect(display, kPetLeftHandMinX, leftTop, kPetLeftHandMaxX, leftBottom, 4, outlineColor);
+  drawFilledRoundedRect(display, kPetLeftHandMinX + 1, leftTop + 1, kPetLeftHandMaxX - 1, leftBottom - 1, 3, pawColor);
+  drawFilledRoundedRect(display, kPetLeftHandMinX + 1, leftTop + 7, kPetLeftHandMaxX - 1, leftBottom - 1, 3, shadowColor);
+
+  drawFilledRoundedRect(display, kPetRightHandMinX, rightTop, kPetRightHandMaxX, rightBottom, 4, outlineColor);
+  drawFilledRoundedRect(display, kPetRightHandMinX + 1, rightTop + 1, kPetRightHandMaxX - 1, rightBottom - 1, 3, pawColor);
+  drawFilledRoundedRect(display, kPetRightHandMinX + 1, rightTop + 7, kPetRightHandMaxX - 1, rightBottom - 1, 3, shadowColor);
+}
+
+static void drawPetEarsTailLayer(
+  MatrixPanel_I2S_DMA* display,
+  const PetPose& pose,
+  uint16_t accentColor,
+  uint16_t tailColor,
+  uint16_t shadowColor,
+  uint16_t outlineColor
+) {
+  int leftAnchorX = kPetLeftEarAnchorX + pose.headShiftX;
+  int leftAnchorY = kPetLeftEarAnchorY + pose.headShiftY;
+  int rightAnchorX = kPetRightEarAnchorX + pose.headShiftX;
+  int rightAnchorY = kPetRightEarAnchorY + pose.headShiftY;
+
+  drawFilledTriangle(
+    display,
+    (float)(leftAnchorX - 5 + pose.earShakeX),
+    (float)(leftAnchorY + 9),
+    (float)leftAnchorX,
+    (float)(leftAnchorY - 3),
+    (float)(leftAnchorX + 5 + pose.earShakeX),
+    (float)(leftAnchorY + 9),
+    outlineColor
+  );
+  drawFilledTriangle(
+    display,
+    (float)(leftAnchorX - 4 + pose.earShakeX),
+    (float)(leftAnchorY + 8),
+    (float)leftAnchorX,
+    (float)(leftAnchorY - 2),
+    (float)(leftAnchorX + 4 + pose.earShakeX),
+    (float)(leftAnchorY + 8),
+    accentColor
+  );
+  drawFilledTriangle(
+    display,
+    (float)(rightAnchorX - 5 - pose.earShakeX),
+    (float)(rightAnchorY + 9),
+    (float)rightAnchorX,
+    (float)(rightAnchorY - 3),
+    (float)(rightAnchorX + 5 - pose.earShakeX),
+    (float)(rightAnchorY + 9),
+    outlineColor
+  );
+  drawFilledTriangle(
+    display,
+    (float)(rightAnchorX - 4 - pose.earShakeX),
+    (float)(rightAnchorY + 8),
+    (float)rightAnchorX,
+    (float)(rightAnchorY - 2),
+    (float)(rightAnchorX + 4 - pose.earShakeX),
+    (float)(rightAnchorY + 8),
+    accentColor
+  );
+
+  int tailBaseX = kPetTailAnchorX + pose.tailSwingX;
+  int tailBaseY = kPetTailAnchorY + pose.bodyShiftY;
+  for (int i = 0; i <= 5; i++) {
+    float centerX = (float)(tailBaseX + i);
+    float centerY = (float)(tailBaseY - (i / 2));
+    drawFilledCircle(display, centerX, centerY, 2.0f, outlineColor);
+    drawFilledCircle(display, centerX, centerY, 1.0f, tailColor);
+  }
+  drawFilledCircle(display, (float)(tailBaseX + 6), (float)(tailBaseY - 3), 1.5f, accentColor);
+  display->drawPixel(
+    clampInt(kPetTailAnchorX - 1, 0, DisplayManager::PANEL_RES_X - 1),
+    clampInt(tailBaseY + 1, 0, DisplayManager::PANEL_RES_Y - 1),
+    shadowColor
+  );
+}
+
+static void drawPetBody(MatrixPanel_I2S_DMA* display, unsigned long now) {
+  PetPose pose = buildPetPose(now);
+  uint16_t baseColor = display->color565(kPetColorBaseR, kPetColorBaseG, kPetColorBaseB);
+  uint16_t shadowColor = display->color565(kPetColorShadowR, kPetColorShadowG, kPetColorShadowB);
+  uint16_t pawColor = display->color565(kPetColorPawR, kPetColorPawG, kPetColorPawB);
+  uint16_t accentColor = display->color565(kPetColorAccentR, kPetColorAccentG, kPetColorAccentB);
+  uint16_t tailColor = display->color565(kPetColorTailR, kPetColorTailG, kPetColorTailB);
+  uint16_t outlineColor = display->color565(kPetColorOutlineR, kPetColorOutlineG, kPetColorOutlineB);
+
+  drawPetBodyLayer(display, pose, baseColor, shadowColor, outlineColor);
+  drawPetHandsLayer(display, pose, pawColor, shadowColor, outlineColor);
+  drawPetEarsTailLayer(display, pose, accentColor, tailColor, shadowColor, outlineColor);
+}
+
 static RasterEyeShape buildRasterEyeShape(
   float centerX,
   float centerY,
@@ -1638,6 +2036,8 @@ void render() {
   if (offscreen == nullptr) {
     return;
   }
+
+  drawPetBody(offscreen, now);
 
   float totalWidth = (float)config.layout.eyeWidth * 2.0f + (float)config.layout.eyeSpacing;
   float leftCenterX = ((float)DisplayManager::PANEL_RES_X - totalWidth) * 0.5f +
