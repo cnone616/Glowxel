@@ -58,14 +58,14 @@ defineProps({
 .brand-copy {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 7px;
   min-width: 0;
 }
 
 .brand-name {
   color: var(--nb-ink);
   font-size: 18px;
-  font-weight: 700;
+  font-weight: 800;
   letter-spacing: 0.02em;
   line-height: 1;
   white-space: nowrap;
@@ -75,16 +75,36 @@ defineProps({
   display: inline-flex;
   align-items: center;
   width: fit-content;
-  padding: 4px 9px 3px;
+  min-height: 26px;
+  padding: 0 10px;
   color: var(--nb-ink);
-  font-size: 10px;
-  font-weight: 700;
+  font-size: 12px;
+  font-weight: 900;
   letter-spacing: 0.16em;
   line-height: 1;
-  border: 1px solid rgba(215, 178, 109, 0.28);
-  border-radius: 999px;
-  background: rgba(215, 178, 109, 0.18);
+  border: 2px solid var(--nb-ink);
+  background: var(--nb-yellow);
+  box-shadow: 2px 2px 0 #111111;
   white-space: nowrap;
+}
+
+.brand-logo--page {
+  gap: 16px;
+}
+
+.brand-logo--page .brand-mark {
+  width: 54px;
+  height: 54px;
+}
+
+.brand-logo--page .brand-name {
+  font-size: 22px;
+}
+
+.brand-logo--page .brand-tagline {
+  min-height: 30px;
+  padding: 0 12px;
+  font-size: 13px;
 }
 
 .brand-logo--footer {
@@ -112,7 +132,24 @@ defineProps({
   }
 
   .brand-tagline {
-    display: none;
+    min-height: 24px;
+    padding: 0 8px;
+    font-size: 10px;
+    border-width: 2px;
+    box-shadow: 1px 1px 0 #111111;
+  }
+
+  .brand-logo--page {
+    gap: 12px;
+  }
+
+  .brand-logo--page .brand-mark {
+    width: 42px;
+    height: 42px;
+  }
+
+  .brand-logo--page .brand-name {
+    font-size: 18px;
   }
 }
 

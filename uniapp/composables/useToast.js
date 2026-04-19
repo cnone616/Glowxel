@@ -88,10 +88,10 @@ export function useToast() {
     showToast(message, 'info')
   }
 
-  const showLoading = (message = '加载中...') => {
+  const showLoading = (message = '加载中...', options = {}) => {
     const loadingInstance = getActiveInstance(loadingInstances)
     if (loadingInstance && typeof loadingInstance.show === 'function') {
-      loadingInstance.show(message)
+      loadingInstance.show(message, options)
       return
     }
 

@@ -6,18 +6,15 @@
       </router-link>
 
       <div class="nav-links" :class="{ active: mobileMenuOpen }">
-        <router-link to="/" @click="closeMobileMenu">首页</router-link>
-        <router-link to="/workspace" @click="closeMobileMenu"
-          >工作台</router-link
+        <router-link
+          v-for="item in navItems"
+          :key="item.key"
+          :to="item.to"
+          :class="{ 'is-active': activeNavKey === item.key }"
+          @click="closeMobileMenu"
         >
-        <router-link to="/device-control" @click="closeMobileMenu"
-          >设备</router-link
-        >
-        <router-link to="/community" @click="closeMobileMenu">社区</router-link>
-        <router-link to="/templates" @click="closeMobileMenu">模板</router-link>
-        <router-link to="/challenges" @click="closeMobileMenu"
-          >挑战</router-link
-        >
+          {{ item.label }}
+        </router-link>
       </div>
 
       <div class="nav-actions">
@@ -39,9 +36,15 @@
           <router-link to="/profile" class="btn-login" @click="closeMobileMenu"
             >我的</router-link
           >
-          <button class="btn-login btn-logout" @click="handleLogout">退出</button>
+          <button class="btn-login btn-logout" @click="handleLogout">
+            退出
+          </button>
         </template>
-        <router-link v-else to="/login" class="btn-login" @click="closeMobileMenu"
+        <router-link
+          v-else
+          to="/login"
+          class="btn-login"
+          @click="closeMobileMenu"
           >登录</router-link
         >
       </div>
@@ -84,12 +87,52 @@
 
 <script setup>
 import { computed, ref } from "vue";
-import { useRouter } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import BrandLogo from "@/components/BrandLogo.vue";
 
 const router = useRouter();
+const route = useRoute();
 const mobileMenuOpen = ref(false);
 const isLoggedIn = computed(() => !!localStorage.getItem("auth_token"));
+const navItems = [
+  { key: "home", label: "首页", to: "/" },
+  { key: "workspace", label: "工作台", to: "/workspace" },
+  { key: "device", label: "设备", to: "/device-control" },
+  { key: "community", label: "社区", to: "/community" },
+  { key: "design-system", label: "控件库", to: "/design-system" },
+  { key: "templates", label: "模板", to: "/templates" },
+  { key: "challenges", label: "挑战", to: "/challenges" },
+];
+
+const activeNavKey = computed(() => {
+  const path = route.path;
+  if (path === "/") return "home";
+  if (
+    path.startsWith("/workspace") ||
+    path.startsWith("/create") ||
+    path.startsWith("/pattern-workbench") ||
+    path.startsWith("/clock-editor") ||
+    path.startsWith("/editor")
+  ) {
+    return "workspace";
+  }
+  if (path.startsWith("/device-control")) return "device";
+  if (path.startsWith("/design-system")) return "design-system";
+  if (path.startsWith("/templates")) return "templates";
+  if (path.startsWith("/challenges") || path.startsWith("/challenge/")) {
+    return "challenges";
+  }
+  if (
+    path.startsWith("/community") ||
+    path.startsWith("/artwork/") ||
+    path.startsWith("/user/") ||
+    path === "/followers" ||
+    path === "/following"
+  ) {
+    return "community";
+  }
+  return "";
+});
 const toggleMobileMenu = () => {
   mobileMenuOpen.value = !mobileMenuOpen.value;
 };
@@ -106,9 +149,8 @@ const handleLogout = () => {
 
 <style scoped>
 .navbar {
-  background: rgba(243, 238, 230, 0.78);
-  border-bottom: 1px solid rgba(36, 49, 66, 0.08);
-  backdrop-filter: blur(18px);
+  background: var(--nb-paper);
+  border-bottom: var(--nb-border-width) solid var(--nb-ink);
   position: sticky;
   top: 0;
   z-index: 1000;
@@ -120,8 +162,8 @@ const handleLogout = () => {
   padding: 0 24px;
   display: flex;
   align-items: center;
-  min-height: var(--navbar-height);
-  gap: 24px;
+  min-height: 88px;
+  gap: 28px;
 }
 
 .logo {
@@ -129,39 +171,48 @@ const handleLogout = () => {
   align-items: center;
   text-decoration: none;
   flex-shrink: 0;
-  padding: 6px 2px;
+  padding: 0;
 }
 
 .nav-links {
   display: flex;
-  gap: 8px;
+  align-items: center;
+  gap: 28px;
   flex: 1;
   flex-wrap: wrap;
 }
 
 .nav-links a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   color: var(--text-secondary);
   text-decoration: none;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 700;
-  min-height: 38px;
-  padding: 8px 14px;
-  border: 1px solid transparent;
-  border-radius: 999px;
-  transition: background-color 0.18s ease, color 0.18s ease,
-    border-color 0.18s ease;
+  min-height: 42px;
+  padding: 0 14px;
+  line-height: 1;
+  border: var(--nb-border-width) solid transparent;
+  box-shadow: none;
+  transition:
+    color 0.15s ease,
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
 .nav-links a:hover {
   color: var(--nb-ink);
-  background: rgba(255, 255, 255, 0.72);
-  border-color: rgba(36, 49, 66, 0.08);
+  background: #f4f4f4;
 }
 
-.nav-links a.router-link-exact-active {
+.nav-links a.is-active {
   color: var(--nb-ink);
-  background: rgba(136, 161, 186, 0.18);
-  border-color: rgba(136, 161, 186, 0.22);
+  font-weight: 900;
+  background: var(--nb-yellow);
+  border-color: var(--nb-ink);
+  box-shadow: var(--nb-shadow-soft);
 }
 
 .nav-actions {
@@ -180,19 +231,16 @@ const handleLogout = () => {
   padding: 8px 16px;
   background: var(--nb-yellow);
   color: var(--nb-ink);
-  border: 1px solid rgba(215, 178, 109, 0.4);
-  border-radius: 999px;
+  border: var(--nb-border-width) solid var(--nb-ink);
   box-shadow: var(--nb-shadow-soft);
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 800;
   text-decoration: none;
-  transition: transform 0.18s ease, background-color 0.18s ease,
-    box-shadow 0.18s ease;
+  transition: background-color 0.15s ease;
 }
 
 .btn-create:hover {
   background: var(--color-primary-hover);
-  transform: translateY(-1px);
 }
 
 .btn-login {
@@ -202,22 +250,20 @@ const handleLogout = () => {
   min-height: 40px;
   padding: 8px 16px;
   color: var(--text-secondary);
-  border: 1px solid rgba(36, 49, 66, 0.1);
-  background: rgba(255, 255, 255, 0.74);
-  border-radius: 999px;
+  border: var(--nb-border-width) solid var(--nb-ink);
+  background: var(--tone-paper-soft);
   box-shadow: var(--nb-shadow-soft);
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 800;
   text-decoration: none;
-  transition: transform 0.18s ease, background-color 0.18s ease,
-    color 0.18s ease, border-color 0.18s ease;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
 }
 
 .btn-login:hover {
   color: var(--nb-ink);
-  background: rgba(255, 255, 255, 0.92);
-  border-color: rgba(36, 49, 66, 0.16);
-  transform: translateY(-1px);
+  background: var(--nb-muted);
 }
 
 .btn-logout {
@@ -231,22 +277,21 @@ const handleLogout = () => {
   justify-content: center;
   width: 44px;
   height: 44px;
-  background: rgba(255, 255, 255, 0.74);
-  border: 1px solid rgba(36, 49, 66, 0.12);
-  border-radius: 14px;
-  box-shadow: var(--nb-shadow-soft);
+  background: var(--tone-paper-soft);
+  border: var(--nb-border-width) solid var(--nb-ink);
+  box-shadow: 3px 3px 0 #000000;
   cursor: pointer;
   padding: 0;
   color: var(--nb-text-primary);
 }
 
 .mobile-menu-btn:hover {
-  background: rgba(255, 255, 255, 0.96);
+  background: var(--nb-muted);
 }
 
 @media (max-width: 768px) {
   .nav-container {
-    min-height: 64px;
+    min-height: 72px;
     gap: 0;
   }
 
@@ -265,17 +310,15 @@ const handleLogout = () => {
   .nav-links {
     display: none;
     position: fixed;
-    top: 64px;
+    top: 72px;
     left: 12px;
     right: 12px;
-    background: rgba(255, 255, 255, 0.92);
+    background: var(--nb-paper);
     flex-direction: column;
     padding: 14px;
     gap: 8px;
-    border: 1px solid rgba(36, 49, 66, 0.08);
-    border-radius: 22px;
+    border: var(--nb-border-width) solid var(--nb-ink);
     box-shadow: var(--nb-shadow-strong);
-    backdrop-filter: blur(20px);
   }
 
   .nav-links.active {
@@ -285,8 +328,16 @@ const handleLogout = () => {
   .nav-links a {
     width: 100%;
     justify-content: center;
-    padding: 10px 12px;
+    min-height: 42px;
+    padding: 0 12px;
     font-size: 15px;
+    border: var(--nb-border-width) solid var(--nb-ink);
+    background: #ffffff;
+    box-shadow: var(--nb-shadow-soft);
+  }
+
+  .nav-links a.is-active {
+    background: var(--nb-yellow);
   }
 }
 </style>
