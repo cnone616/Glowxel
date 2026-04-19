@@ -8,6 +8,7 @@ const routes = [
   { path: '/pattern-workbench', name: 'PatternWorkbench', component: () => import('@/views/PatternWorkbench.vue') },
   { path: '/clock-editor', name: 'ClockEditor', component: () => import('@/views/ClockEditor.vue') },
   { path: '/device-control', name: 'DeviceControl', component: () => import('@/views/DeviceControl.vue') },
+  { path: '/design-system', name: 'DesignSystem', component: () => import('@/views/DesignSystem.vue') },
   { path: '/editor/:id?', name: 'Editor', component: () => import('@/views/Editor.vue'), meta: { auth: true } },
   { path: '/templates', name: 'Templates', component: () => import('@/views/Templates.vue') },
   { path: '/challenges', name: 'Challenges', component: () => import('@/views/Challenges.vue') },
