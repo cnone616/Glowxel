@@ -166,11 +166,10 @@ async function handleClear() {
 .page-header {
   margin-bottom: 20px;
   padding: 24px 24px 20px;
-  border: 1px solid rgba(36, 49, 66, 0.08);
-  border-radius: 30px;
+  border: 3px solid var(--nb-ink);
+  border-radius: 0;
   background:
-    radial-gradient(circle at top right, rgba(215, 178, 109, 0.18), transparent 32%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.9) 0%, rgba(251, 247, 241, 0.82) 100%);
+    linear-gradient(90deg, rgba(255, 243, 196, 0.7), rgba(255, 255, 255, 0.98) 56%, rgba(220, 235, 255, 0.62));
   box-shadow: var(--nb-shadow-card);
 }
 
@@ -197,9 +196,9 @@ async function handleClear() {
   gap: 16px;
   margin-bottom: 16px;
   padding: 20px 22px;
-  border: 1px solid rgba(36, 49, 66, 0.08);
-  border-radius: 24px;
-  background: rgba(255, 255, 255, 0.78);
+  border: 3px solid var(--nb-ink);
+  border-radius: 0;
+  background: var(--tone-paper-soft);
   box-shadow: var(--nb-shadow-soft);
 }
 
@@ -226,23 +225,24 @@ async function handleClear() {
   justify-content: center;
   min-height: 42px;
   padding: 0 16px;
-  border: 1px solid rgba(136, 161, 186, 0.22);
-  border-radius: 999px;
-  background: rgba(136, 161, 186, 0.14);
+  border: 2px solid var(--nb-ink);
+  border-radius: 0;
+  background: var(--tone-blue-soft);
   color: var(--nb-ink);
   font-size: 14px;
-  font-weight: 700;
+  font-weight: 800;
   text-decoration: none;
   white-space: nowrap;
+  box-shadow: var(--nb-shadow-soft);
 }
 
 .card {
   position: relative;
   margin-bottom: 16px;
   padding: 22px;
-  border: 1px solid rgba(36, 49, 66, 0.08);
-  border-radius: 28px;
-  background: rgba(255, 255, 255, 0.8);
+  border: 3px solid var(--nb-ink);
+  border-radius: 0;
+  background: var(--tone-paper-soft);
   box-shadow: var(--nb-shadow-card);
 }
 
@@ -252,12 +252,14 @@ async function handleClear() {
   min-height: 40px;
   margin-bottom: 16px;
   padding: 6px 14px;
-  border-radius: 999px;
-  background: rgba(136, 161, 186, 0.16);
+  border: 2px solid var(--nb-ink);
+  border-radius: 0;
+  background: var(--tone-yellow-soft);
   color: var(--nb-ink);
   font-size: 18px;
-  font-weight: 700;
+  font-weight: 800;
   letter-spacing: 0.01em;
+  box-shadow: var(--nb-shadow-soft);
 }
 
 .connection-form {
@@ -299,9 +301,9 @@ async function handleClear() {
   align-items: center;
   gap: 10px;
   padding: 0 14px;
-  border: 1px solid rgba(36, 49, 66, 0.08);
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.72);
+  border: 2px solid var(--nb-ink);
+  border-radius: 0;
+  background: var(--tone-paper-soft);
   color: var(--nb-ink);
   font-size: 13px;
   font-weight: 700;
@@ -335,10 +337,10 @@ async function handleClear() {
 .dot {
   width: 14px;
   height: 14px;
-  border: 2px solid rgba(255, 255, 255, 0.85);
+  border: 2px solid var(--nb-ink);
   background: var(--text-tertiary);
   flex: 0 0 auto;
-  border-radius: 999px;
+  border-radius: 0;
 }
 
 .dot.online {
@@ -350,22 +352,24 @@ async function handleClear() {
   align-items: center;
   min-height: 34px;
   padding: 6px 12px;
-  border: 1px solid rgba(36, 49, 66, 0.08);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.74);
+  border: 2px solid var(--nb-ink);
+  border-radius: 0;
+  background: var(--tone-paper-soft);
   color: var(--nb-ink);
   white-space: nowrap;
+  box-shadow: var(--nb-shadow-soft);
 }
 
 .msg {
   margin-top: 14px;
   padding: 10px 12px;
-  border: 1px solid rgba(36, 49, 66, 0.08);
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.74);
+  border: 2px solid var(--nb-ink);
+  border-radius: 0;
+  background: var(--tone-paper-soft);
   font-size: 13px;
   font-weight: 700;
   color: var(--text-secondary);
+  box-shadow: var(--nb-shadow-soft);
 }
 
 .msg.error {
@@ -388,9 +392,9 @@ async function handleClear() {
 .mode-btn {
   min-height: 54px;
   padding: 10px 14px;
-  border: 1px solid rgba(36, 49, 66, 0.08);
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.76);
+  border: 2px solid var(--nb-ink);
+  border-radius: 0;
+  background: var(--tone-paper-soft);
   cursor: pointer;
   font-size: 14px;
   font-weight: 700;
@@ -406,7 +410,7 @@ async function handleClear() {
 }
 
 .mode-btn.active {
-  background: rgba(136, 161, 186, 0.18);
+  background: var(--tone-blue-soft);
   color: var(--nb-ink);
 }
 
@@ -420,9 +424,10 @@ async function handleClear() {
 .brightness-row {
   margin-bottom: 14px;
   padding: 14px;
-  border: 1px solid rgba(36, 49, 66, 0.08);
-  border-radius: 20px;
-  background: rgba(255, 255, 255, 0.72);
+  border: 2px solid var(--nb-ink);
+  border-radius: 0;
+  background: var(--tone-paper-soft);
+  box-shadow: var(--nb-shadow-soft);
 }
 
 .brightness-row label {

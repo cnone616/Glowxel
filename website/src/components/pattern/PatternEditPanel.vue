@@ -199,7 +199,7 @@ const toolLabel = computed(() => {
 .tool-btn.active {
   background: linear-gradient(135deg, #2f6dff, #55c4ff);
   border-color: transparent;
-  color: #fff;
+  color: var(--nb-ink);
 }
 
 .selected-color {
@@ -315,7 +315,7 @@ const toolLabel = computed(() => {
 .action-btn.primary {
   background: linear-gradient(135deg, #2f6dff, #55c4ff);
   border-color: transparent;
-  color: #fff;
+  color: var(--nb-ink);
 }
 
 .action-btn:disabled {

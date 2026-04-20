@@ -1562,11 +1562,11 @@ async function handleFileChange(event, type) {
   gap: 24px;
   align-items: flex-start;
   padding: 28px 32px;
-  border: 1px solid #dbe4f2;
-  border-radius: 28px;
+  border: 3px solid var(--nb-ink);
+  border-radius: 0;
   background:
-    linear-gradient(135deg, rgba(80, 140, 255, 0.08), rgba(84, 216, 255, 0.14)),
-    #f8fbff;
+    linear-gradient(90deg, rgba(255, 243, 196, 0.62), rgba(255, 255, 255, 0.98) 56%, rgba(220, 235, 255, 0.62));
+  box-shadow: var(--nb-shadow-card);
 }
 
 .starter-hub {
@@ -1578,21 +1578,22 @@ async function handleFileChange(event, type) {
 
 .starter-card {
   padding: 24px;
-  border-radius: 28px;
-  border: 1px solid #dbe4f2;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(244, 249, 255, 0.98));
-  box-shadow: 0 18px 50px rgba(18, 32, 51, 0.05);
+  border-radius: 0;
+  border: 3px solid var(--nb-ink);
+  background: var(--tone-paper-soft);
+  box-shadow: var(--nb-shadow-card);
 }
 
 .starter-tag {
   display: inline-flex;
   padding: 6px 10px;
-  border-radius: 999px;
-  background: #eef4fb;
-  color: #2f6dff;
+  border: 2px solid var(--nb-ink);
+  border-radius: 0;
+  background: var(--tone-blue-soft);
+  color: var(--nb-ink);
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 800;
+  box-shadow: var(--nb-shadow-soft);
 }
 
 .starter-card h2 {
@@ -1657,9 +1658,10 @@ async function handleFileChange(event, type) {
 .blank-dialog {
   width: min(520px, 100%);
   padding: 24px;
-  border-radius: 28px;
+  border: 3px solid var(--nb-ink);
+  border-radius: 0;
   background: #ffffff;
-  box-shadow: 0 24px 60px rgba(18, 32, 51, 0.24);
+  box-shadow: var(--nb-shadow-card);
 }
 
 .blank-size-grid {
@@ -1671,19 +1673,20 @@ async function handleFileChange(event, type) {
 
 .size-preset {
   height: 42px;
-  border: 1px solid #dbe4f2;
-  border-radius: 14px;
-  background: #f7fbff;
-  color: #27405f;
+  border: 2px solid var(--nb-ink);
+  border-radius: 0;
+  background: var(--tone-paper-soft);
+  color: var(--nb-ink);
   font-size: 13px;
   font-weight: 700;
   cursor: pointer;
+  box-shadow: var(--nb-shadow-soft);
 }
 
 .size-preset.active {
   background: linear-gradient(135deg, #2f6dff, #46b9ff);
   border-color: transparent;
-  color: #fff;
+  color: var(--nb-ink);
 }
 
 .blank-fields {
@@ -1708,10 +1711,10 @@ async function handleFileChange(event, type) {
   width: 100%;
   height: 42px;
   padding: 0 12px;
-  border: 1px solid #dbe4f2;
-  border-radius: 14px;
+  border: 2px solid var(--nb-ink);
+  border-radius: 0;
   background: #fff;
-  color: #18304f;
+  color: var(--nb-ink);
 }
 
 .primary-btn,
@@ -1729,21 +1732,22 @@ async function handleFileChange(event, type) {
 .secondary-btn {
   height: 44px;
   padding: 0 18px;
-  border-radius: 14px;
+  border: 2px solid var(--nb-ink);
+  border-radius: 0;
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 800;
+  box-shadow: var(--nb-shadow-soft);
 }
 
 .primary-btn {
-  color: #fff;
+  color: var(--nb-ink);
   background: linear-gradient(135deg, #2f6dff, #46b9ff);
   box-shadow: 0 10px 24px rgba(70, 120, 255, 0.24);
 }
 
 .secondary-btn {
-  color: #1f3554;
-  background: rgba(255, 255, 255, 0.8);
-  border: 1px solid #d7e3f4;
+  color: var(--nb-ink);
+  background: var(--tone-paper-soft);
 }
 
 .mode-strip {
@@ -1762,11 +1766,10 @@ async function handleFileChange(event, type) {
 
 .overview-card {
   padding: 18px 18px 16px;
-  border-radius: 22px;
-  border: 1px solid #dbe4f2;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(244, 249, 255, 0.98));
-  box-shadow: 0 14px 36px rgba(18, 32, 51, 0.05);
+  border-radius: 0;
+  border: 3px solid var(--nb-ink);
+  background: var(--tone-paper-soft);
+  box-shadow: var(--nb-shadow-card);
 }
 
 .overview-card span {
@@ -1797,17 +1800,18 @@ async function handleFileChange(event, type) {
   gap: 6px;
   align-items: flex-start;
   padding: 18px 18px 16px;
-  border-radius: 20px;
-  border: 1px solid #dbe4f2;
+  border-radius: 0;
+  border: 3px solid var(--nb-ink);
   background: #fff;
   text-align: left;
   transition: 0.2s ease;
+  box-shadow: var(--nb-shadow-soft);
 }
 
 .mode-btn.active {
-  border-color: #79b7ff;
-  background: linear-gradient(180deg, #ffffff, #eff7ff);
-  box-shadow: 0 12px 24px rgba(49, 109, 255, 0.08);
+  border-color: var(--nb-ink);
+  background: var(--tone-blue-soft);
+  box-shadow: var(--nb-shadow-card);
 }
 
 .mode-name {
@@ -1830,10 +1834,10 @@ async function handleFileChange(event, type) {
 
 .panel {
   min-height: 720px;
-  border: 1px solid #dbe4f2;
-  border-radius: 28px;
+  border: 3px solid var(--nb-ink);
+  border-radius: 0;
   background: #ffffff;
-  box-shadow: 0 18px 50px rgba(18, 32, 51, 0.05);
+  box-shadow: var(--nb-shadow-card);
 }
 
 .left-panel,
@@ -1858,9 +1862,10 @@ async function handleFileChange(event, type) {
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
   padding: 8px;
-  border-radius: 20px;
-  background: #f4f8fd;
-  border: 1px solid #dbe4f2;
+  border-radius: 0;
+  background: var(--tone-paper-soft);
+  border: 2px solid var(--nb-ink);
+  box-shadow: var(--nb-shadow-soft);
 }
 
 .right-tab {
@@ -1870,12 +1875,13 @@ async function handleFileChange(event, type) {
   gap: 4px;
   min-height: 58px;
   padding: 10px 12px;
-  border: 0;
-  border-radius: 14px;
-  background: transparent;
+  border: 2px solid var(--nb-ink);
+  border-radius: 0;
+  background: var(--tone-paper-soft);
   color: #62728a;
   cursor: pointer;
   text-align: left;
+  box-shadow: var(--nb-shadow-soft);
 }
 
 .right-tab span {
@@ -1890,12 +1896,12 @@ async function handleFileChange(event, type) {
 
 .right-tab.active {
   background: linear-gradient(135deg, #2f6dff, #58c0ff);
-  color: #fff;
+  color: var(--nb-ink);
   box-shadow: 0 10px 22px rgba(49, 109, 255, 0.22);
 }
 
 .right-tab.active strong {
-  color: #fff;
+  color: var(--nb-ink);
 }
 
 .panel-stack {
@@ -1944,14 +1950,16 @@ async function handleFileChange(event, type) {
 
 .chip {
   padding: 9px 12px;
-  border-radius: 999px;
-  background: #eef4fb;
-  color: #375374;
+  border: 2px solid var(--nb-ink);
+  border-radius: 0;
+  background: var(--tone-paper-soft);
+  color: var(--nb-ink);
   font-size: 13px;
+  box-shadow: var(--nb-shadow-soft);
 }
 
 .chip.action {
-  border: 1px solid #d7e3f4;
+  border: 2px solid var(--nb-ink);
 }
 
 .chip.action.danger {
@@ -1967,9 +1975,10 @@ async function handleFileChange(event, type) {
 .source-summary {
   margin-top: 14px;
   padding: 14px;
-  border-radius: 16px;
-  background: #f7fbff;
-  border: 1px solid #dbe4f2;
+  border-radius: 0;
+  background: var(--tone-paper-soft);
+  border: 2px solid var(--nb-ink);
+  box-shadow: var(--nb-shadow-soft);
 }
 
 .summary-row {
@@ -2022,9 +2031,10 @@ async function handleFileChange(event, type) {
 
 .stat-card {
   padding: 12px;
-  border-radius: 16px;
-  background: #f7fbff;
-  border: 1px solid #dbe4f2;
+  border-radius: 0;
+  background: var(--tone-paper-soft);
+  border: 2px solid var(--nb-ink);
+  box-shadow: var(--nb-shadow-soft);
 }
 
 .stat-card span {
@@ -2062,8 +2072,8 @@ async function handleFileChange(event, type) {
 .color-dot {
   width: 14px;
   height: 14px;
-  border-radius: 50%;
-  border: 1px solid rgba(9, 19, 33, 0.15);
+  border-radius: 0;
+  border: 2px solid var(--nb-ink);
 }
 
 .canvas-toolbar {
@@ -2084,16 +2094,18 @@ async function handleFileChange(event, type) {
 .toolbar-btn {
   height: 38px;
   padding: 0 14px;
-  border-radius: 12px;
-  background: #eff4fb;
-  color: #27405f;
+  border: 2px solid var(--nb-ink);
+  border-radius: 0;
+  background: var(--tone-paper-soft);
+  color: var(--nb-ink);
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 700;
+  box-shadow: var(--nb-shadow-soft);
 }
 
 .view-tab.active {
   background: #1d68ff;
-  color: #fff;
+  color: var(--nb-ink);
 }
 
 .canvas-stage {
@@ -2112,10 +2124,11 @@ async function handleFileChange(event, type) {
 .stage-card {
   min-height: 280px;
   padding: 16px;
-  border-radius: 22px;
+  border-radius: 0;
   background: #0e1624;
   color: #fff;
-  border: 1px solid rgba(132, 180, 255, 0.18);
+  border: 3px solid var(--nb-ink);
+  box-shadow: var(--nb-shadow-card);
 }
 
 .stage-card.ghost {
@@ -2126,7 +2139,8 @@ async function handleFileChange(event, type) {
   display: inline-flex;
   margin-bottom: 14px;
   padding: 6px 10px;
-  border-radius: 999px;
+  border: 2px solid currentColor;
+  border-radius: 0;
   background: rgba(120, 181, 255, 0.16);
   color: #d9ebff;
   font-size: 12px;
@@ -2151,7 +2165,7 @@ async function handleFileChange(event, type) {
 
 .stage-pixel {
   aspect-ratio: 1;
-  border-radius: 2px;
+  border-radius: 0;
 }
 
 .stage-pixel.real.empty {
@@ -2188,15 +2202,15 @@ async function handleFileChange(event, type) {
 .magnifier-pixel {
   width: 20px;
   height: 20px;
-  border-radius: 4px;
+  border-radius: 0;
 }
 
 .stage-focus {
   margin-top: 14px;
   padding: 12px 14px;
-  border-radius: 16px;
+  border-radius: 0;
   background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(132, 180, 255, 0.18);
+  border: 2px solid rgba(132, 180, 255, 0.5);
 }
 
 .focus-row {
@@ -2242,9 +2256,10 @@ async function handleFileChange(event, type) {
 .compare-summary {
   margin-bottom: 12px;
   padding: 12px 14px;
-  border-radius: 16px;
-  background: #f7fbff;
-  border: 1px solid #dbe4f2;
+  border-radius: 0;
+  background: var(--tone-paper-soft);
+  border: 2px solid var(--nb-ink);
+  box-shadow: var(--nb-shadow-soft);
 }
 
 .compare-row {
@@ -2265,9 +2280,9 @@ async function handleFileChange(event, type) {
 
 .empty-side-note {
   padding: 14px;
-  border-radius: 16px;
+  border-radius: 0;
   background: #f8fafc;
-  border: 1px dashed #cfdceb;
+  border: 2px dashed var(--nb-ink);
   color: #6d7c92;
   font-size: 13px;
   line-height: 1.7;
@@ -2279,9 +2294,10 @@ async function handleFileChange(event, type) {
   align-items: center;
   gap: 12px;
   padding: 10px 12px;
-  border-radius: 14px;
-  background: #f7fbff;
-  border: 1px solid #dbe4f2;
+  border-radius: 0;
+  background: var(--tone-paper-soft);
+  border: 2px solid var(--nb-ink);
+  box-shadow: var(--nb-shadow-soft);
 }
 
 .version-copy {
@@ -2307,13 +2323,14 @@ async function handleFileChange(event, type) {
 .version-btn {
   height: 32px;
   padding: 0 12px;
-  border: 1px solid #d7e3f4;
-  border-radius: 10px;
+  border: 2px solid var(--nb-ink);
+  border-radius: 0;
   background: #fff;
-  color: #27405f;
+  color: var(--nb-ink);
   font-size: 12px;
   font-weight: 700;
   cursor: pointer;
+  box-shadow: var(--nb-shadow-soft);
 }
 
 .hidden-input {
@@ -2325,10 +2342,11 @@ async function handleFileChange(event, type) {
   right: 24px;
   bottom: 24px;
   padding: 12px 16px;
-  border-radius: 14px;
+  border: 2px solid var(--nb-ink);
+  border-radius: 0;
   background: #18304f;
   color: #fff;
-  box-shadow: 0 16px 40px rgba(18, 32, 51, 0.22);
+  box-shadow: var(--nb-shadow-card);
   z-index: 30;
 }
 
@@ -2371,7 +2389,6 @@ async function handleFileChange(event, type) {
     flex-direction: column;
     gap: 16px;
     padding: 18px 16px;
-    border-radius: 20px;
   }
 
   .blank-size-grid,
@@ -2402,7 +2419,6 @@ async function handleFileChange(event, type) {
 
   .starter-card {
     padding: 16px;
-    border-radius: 18px;
   }
 
   .starter-card h2 {

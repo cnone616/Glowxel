@@ -157,7 +157,8 @@ canvas {
 input[type="time"],
 input[type="date"],
 input[type="number"],
-input[type="text"] {
+input[type="text"],
+select {
   width: 100%;
   padding: 10px;
   background: #1a1a1a;
@@ -166,6 +167,39 @@ input[type="text"] {
   border-radius: 4px;
   font-family: 'Courier New', monospace;
   font-size: 13px;
+}
+
+.split-layout-panel {
+  border: 1px solid #444;
+  border-radius: 8px;
+  padding: 10px;
+  background: #202020;
+  margin-bottom: 12px;
+}
+
+.split-layout-item {
+  border: 1px solid #3a3a3a;
+  border-radius: 6px;
+  padding: 10px;
+  background: #171717;
+}
+
+.split-layout-item + .split-layout-item {
+  margin-top: 10px;
+}
+
+.split-layout-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.split-layout-row .number-input-group {
+  flex: 1;
+}
+
+.split-layout-row .number-input-group input {
+  min-width: 0;
 }
 
 input[type="number"].warning {

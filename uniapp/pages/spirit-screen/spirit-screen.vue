@@ -246,12 +246,15 @@ const EYES_TIME_FONT_IDS = new Set(
 );
 const BLINK_DURATION_MS = 150;
 const REFERENCE_EYE_SIZE = 20;
+const HEART_EXPRESSION_VALUE = "Heart";
+const HEART_EYE_COLOR = "#ff6fb3";
 
 const EXPRESSION_OPTIONS = [
   { label: "正常", value: "Normal" },
   { label: "生气", value: "Angry" },
   { label: "偷笑", value: "Glee" },
   { label: "开心", value: "Happy" },
+  { label: "爱心", value: HEART_EXPRESSION_VALUE },
   { label: "难过", value: "Sad" },
   { label: "担忧", value: "Worried" },
   { label: "专注", value: "Focused" },
@@ -1455,6 +1458,10 @@ export default {
       this.previewRuntime.leftBlinkScale = 1;
       this.previewRuntime.rightBlinkScale = 1;
 
+      if (this.previewRuntime.expression === HEART_EXPRESSION_VALUE) {
+        return;
+      }
+
       if (Math.random() < 0.42) {
         const skew = Math.floor(Math.random() * 37) - 18;
         if (skew > 0) {
@@ -1884,6 +1891,17 @@ export default {
     },
 
     drawEye(pixelMap, centerX, centerY, expression, isLeftEye, blinkAmount, now) {
+      if (expression === HEART_EXPRESSION_VALUE) {
+        this.drawHeartEye(
+          pixelMap,
+          centerX,
+          centerY,
+          isLeftEye,
+          blinkAmount,
+          now,
+        );
+        return;
+      }
       const preset = this.presetForEye(expression, isLeftEye, now);
       const transform = this.buildLookTransform(isLeftEye);
       const shape = this.buildRasterEyeShape(centerX, centerY, preset, transform, blinkAmount);
@@ -1904,6 +1922,44 @@ export default {
           }
           if (this.containsShapePoint(shape, sampleX, sampleY)) {
             pixelMap.set(`${x},${y}`, this.eyesConfig.style.eyeColor);
+          }
+        }
+      }
+    },
+
+    drawHeartEye(pixelMap, centerX, centerY, isLeftEye, blinkAmount, now) {
+      const scaleX = this.eyesConfig.layout.eyeWidth / REFERENCE_EYE_SIZE;
+      const scaleY = this.eyesConfig.layout.eyeHeight / REFERENCE_EYE_SIZE;
+      const normalizedLookX = clamp(this.previewRuntime.lookX, -1, 1);
+      const normalizedLookY = clamp(this.previewRuntime.lookY, -1, 1);
+      const moveX = this.eyesConfig.behavior.idleMove * 0.85 * normalizedLookX;
+      const moveY = this.eyesConfig.behavior.idleMove * 0.65 * normalizedLookY;
+      const blinkScale = clamp(1 - blinkAmount * 0.9, 0.2, 1);
+      const radiusX = Math.max(2.6, 9.1 * scaleX);
+      const radiusY = Math.max(2.4, 8.7 * scaleY * blinkScale);
+      const heartCenterX = centerX + moveX * scaleX;
+      const heartCenterY = centerY - 0.7 * scaleY - moveY * scaleY;
+      const startX = clamp(Math.floor(heartCenterX - radiusX) - 1, 0, 63);
+      const endX = clamp(Math.ceil(heartCenterX + radiusX) + 1, 0, 63);
+      const startY = clamp(Math.floor(heartCenterY - radiusY) - 1, 0, 63);
+      const endY = clamp(Math.ceil(heartCenterY + radiusY) + 1, 0, 63);
+
+      for (let y = startY; y <= endY; y++) {
+        for (let x = startX; x <= endX; x++) {
+          const normalizedX = (x + 0.5 - heartCenterX) / radiusX;
+          const normalizedY = (heartCenterY - (y + 0.5)) / radiusY;
+          const equation =
+            Math.pow(
+              normalizedX * normalizedX + normalizedY * normalizedY - 1,
+              3,
+            ) -
+            normalizedX *
+              normalizedX *
+              normalizedY *
+              normalizedY *
+              normalizedY;
+          if (equation <= 0) {
+            pixelMap.set(`${x},${y}`, HEART_EYE_COLOR);
           }
         }
       }
@@ -1944,6 +2000,12 @@ export default {
       const rightCenterX =
         leftCenterX + this.eyesConfig.layout.eyeWidth + this.eyesConfig.layout.eyeSpacing;
       const centerY = this.eyesConfig.layout.eyeY;
+      const isHeartExpression =
+        this.previewRuntime.expression === HEART_EXPRESSION_VALUE;
+      const leftBlinkAmount = this.blinkAmountForEye(now, true);
+      const rightBlinkAmount = isHeartExpression
+        ? leftBlinkAmount
+        : this.blinkAmountForEye(now, false);
 
       this.drawEye(
         pixelMap,
@@ -1951,7 +2013,7 @@ export default {
         centerY,
         this.previewRuntime.expression,
         true,
-        this.blinkAmountForEye(now, true),
+        leftBlinkAmount,
         now,
       );
       this.drawEye(
@@ -1960,7 +2022,7 @@ export default {
         centerY,
         this.previewRuntime.expression,
         false,
-        this.blinkAmountForEye(now, false),
+        rightBlinkAmount,
         now,
       );
 

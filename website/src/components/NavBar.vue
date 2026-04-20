@@ -100,7 +100,7 @@ const navItems = [
   { key: "device", label: "设备", to: "/device-control" },
   { key: "community", label: "社区", to: "/community" },
   { key: "design-system", label: "控件库", to: "/design-system" },
-  { key: "templates", label: "模板", to: "/templates" },
+  { key: "templates", label: "边框", to: "/templates" },
   { key: "challenges", label: "挑战", to: "/challenges" },
 ];
 

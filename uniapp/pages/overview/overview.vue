@@ -125,10 +125,10 @@
       <view class="footer-actions">
         <view
           v-if="isExportable"
-          class="export-button"
+          class="export-button export-button--utility"
           @click="handleBatchExport"
         >
-          <Icon name="download" :size="32" color="var(--nb-ink)" />
+          <Icon name="download" :size="32" color="currentColor" />
           <text class="export-text">导出完整图纸</text>
         </view>
         <view class="footer-action-group">
@@ -196,21 +196,21 @@
 
         <view class="modal-actions">
           <view class="modal-action-btn primary" @click="goToEditor">
-            <Icon name="edit" :size="36" color="var(--nb-ink)" />
+            <Icon name="edit" :size="36" color="currentColor" />
             <text class="modal-action-text">编辑 (绘图模式)</text>
           </view>
 
-          <view class="modal-action-btn secondary" @click="goToAssist">
-            <Icon name="work" :size="36" color="var(--nb-ink)" />
+          <view class="modal-action-btn modal-action-btn--assist" @click="goToAssist">
+            <Icon name="work" :size="36" color="currentColor" />
             <text class="modal-action-text">辅助拼豆模式</text>
           </view>
 
           <view
             v-if="isExportable"
-            class="modal-action-btn tertiary"
+            class="modal-action-btn modal-action-btn--export"
             @click="exportBoard"
           >
-            <Icon name="download" :size="36" color="var(--nb-ink)" />
+            <Icon name="download" :size="36" color="currentColor" />
             <text class="modal-action-text">导出此画布</text>
           </view>
         </view>
@@ -1038,6 +1038,11 @@ export default {
   transition: opacity 0.2s;
 }
 
+.export-button--utility {
+  background-color: var(--nb-blue);
+  color: var(--nb-ink);
+}
+
 .export-button:active {
   opacity: 0.9;
   box-shadow: none;
@@ -1046,7 +1051,7 @@ export default {
 .export-text {
   font-size: 28rpx;
   font-weight: bold;
-  color: #000000;
+  color: currentColor;
 }
 
 .footer-action-group {
@@ -1066,17 +1071,17 @@ export default {
   border-radius: 0;
   box-shadow: 2rpx 2rpx 0 #000000;
   box-sizing: border-box;
-  color: #ffffff;
+  color: var(--nb-ink);
 }
 
 .footer-mini-btn--edit {
   background: var(--nb-blue);
-  color: #ffffff;
+  color: var(--nb-ink);
 }
 
 .footer-mini-btn--danger {
   background: var(--nb-coral);
-  color: #ffffff;
+  color: var(--nb-ink);
 }
 
 .footer-mini-btn:active {
@@ -1254,18 +1259,12 @@ export default {
   color: inherit;
 }
 
-/* 次级按钮：白底黑字，黄边强调 */
-.modal-action-btn.secondary {
-  background-color: var(--tone-blue-soft);
+/* 工具/导出按钮：蓝底深色字深色图标 */
+.modal-action-btn--assist,
+.modal-action-btn--export {
+  background-color: var(--nb-blue);
   border: 2rpx solid var(--nb-ink);
-  color: #000000;
-  box-shadow: var(--nb-shadow-soft);
-}
-
-.modal-action-btn.tertiary {
-  background-color: var(--tone-green-soft);
-  border: 2rpx solid var(--nb-ink);
-  color: #000000;
+  color: var(--nb-ink);
   box-shadow: var(--nb-shadow-soft);
 }
 
@@ -1278,8 +1277,8 @@ export default {
   font-weight: bold;
 }
 
-.modal-action-btn.secondary .modal-action-text,
-.modal-action-btn.tertiary .modal-action-text {
+.modal-action-btn--assist .modal-action-text,
+.modal-action-btn--export .modal-action-text {
   color: inherit;
 }
 

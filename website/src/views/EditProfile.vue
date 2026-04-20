@@ -61,23 +61,22 @@ async function handleSave() {
 </script>
 
 <style scoped>
-.container { max-width: 600px; margin: 0 auto; padding: 0 20px; }
-.back-btn { background: none; border: none; font-size: 14px; color: #666; cursor: pointer; padding: 20px 0; display: block; }
-.back-btn:hover { color: #1a1a1a; }
-.page-title { font-size: 22px; font-weight: 700; color: #1a1a1a; margin-bottom: 24px; }
-.form-card { background: #fafafa; border: 1px solid #f0f0f0; border-radius: 16px; padding: 32px; }
+.container { max-width: 600px; margin: 0 auto; padding: 24px 20px 48px; }
+.back-btn { min-height: 42px; padding: 0 16px; border: 2px solid var(--nb-ink); background: var(--tone-paper-soft); box-shadow: var(--nb-shadow-soft); font-size: 14px; font-weight: 800; color: var(--nb-ink); cursor: pointer; display: inline-flex; align-items: center; margin-bottom: 18px; }
+.back-btn:hover { background: #f6f6f6; }
+.page-title { font-size: 28px; font-weight: 800; color: var(--nb-ink); margin-bottom: 20px; }
+.form-card { background: var(--tone-paper-soft); border: 3px solid var(--nb-ink); border-radius: 0; padding: 32px; box-shadow: var(--nb-shadow-card); }
 .avatar-section { display: flex; flex-direction: column; align-items: center; margin-bottom: 28px; gap: 8px; }
-.avatar { width: 72px; height: 72px; border-radius: 50%; background: #e0e0e0; display: flex; align-items: center; justify-content: center; font-size: 28px; font-weight: 700; color: #999; }
-.avatar-tip { font-size: 12px; color: #bbb; }
+.avatar { width: 72px; height: 72px; border: 3px solid var(--nb-ink); border-radius: 0; background: var(--tone-blue-soft); display: flex; align-items: center; justify-content: center; font-size: 28px; font-weight: 800; color: var(--nb-ink); box-shadow: var(--nb-shadow-soft); }
+.avatar-tip { font-size: 12px; color: var(--text-secondary); }
 .form-group { margin-bottom: 20px; position: relative; }
-.form-group label { display: block; font-size: 13px; font-weight: 500; color: #555; margin-bottom: 6px; }
-.form-group input, .form-group textarea { width: 100%; padding: 10px 12px; border: 1px solid #e0e0e0; border-radius: 8px; font-size: 14px; outline: none; box-sizing: border-box; background: #fff; }
-.form-group input:focus, .form-group textarea:focus { border-color: #1a1a1a; }
+.form-group label { display: block; font-size: 12px; font-weight: 800; color: var(--text-secondary); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.04em; }
+.form-group input, .form-group textarea { width: 100%; padding: 10px 12px; border: 2px solid var(--nb-ink); border-radius: 0; font-size: 14px; outline: none; box-sizing: border-box; background: var(--tone-paper-soft); color: var(--nb-ink); }
+.form-group input:focus, .form-group textarea:focus { border-color: var(--nb-ink); }
 .form-group textarea { min-height: 80px; resize: vertical; }
-.char-count { position: absolute; right: 10px; bottom: 10px; font-size: 11px; color: #bbb; }
-.btn-save { width: 100%; padding: 12px; border: none; border-radius: 8px; background: var(--color-primary); color: #fff; font-size: 15px; font-weight: 600; cursor: pointer; margin-top: 8px; }
+.char-count { position: absolute; right: 10px; bottom: 10px; font-size: 11px; color: var(--text-secondary); }
+.btn-save { width: 100%; padding: 12px; border: 2px solid var(--nb-ink); border-radius: 0; background: var(--nb-yellow); color: var(--nb-ink); font-size: 15px; font-weight: 800; cursor: pointer; margin-top: 8px; box-shadow: var(--nb-shadow-soft); }
 .btn-save:hover { background: var(--color-primary-hover); }
 .btn-save:disabled { background: #ccc; cursor: not-allowed; }
-.msg { text-align: center; font-size: 13px; margin-top: 12px; color: #2e7d32; }
+.msg { text-align: center; font-size: 13px; margin-top: 12px; color: var(--nb-green); font-weight: 700; }
 </style>
-

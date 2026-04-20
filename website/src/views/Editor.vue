@@ -1,5 +1,5 @@
 <template>
-  <div class="editor-page">
+  <div class="editor-page" :class="{ 'editor-page--template': isTemplateMode }">
     <div class="editor-header">
       <div class="header-left">
         <button class="icon-btn" @click="$router.back()">
@@ -138,6 +138,8 @@ const filteredColors = computed(() => {
   return ARTKAL_COLORS.filter(c => c.code.toLowerCase().includes(q) || c.name.toLowerCase().includes(q))
 })
 
+const isTemplateMode = computed(() => Boolean(route.query.templateId))
+
 // ---- canvas rendering ----
 function render() {
   const canvas = canvasRef.value
@@ -147,8 +149,10 @@ function render() {
   const H = height.value * cellSize.value
   canvas.width = W; canvas.height = H
   ctx.clearRect(0, 0, W, H)
-  ctx.fillStyle = '#fff'
-  ctx.fillRect(0, 0, W, H)
+  if (!isTemplateMode.value) {
+    ctx.fillStyle = '#fff'
+    ctx.fillRect(0, 0, W, H)
+  }
   pixels.value.forEach((color, key) => {
     const [x, y] = key.split(',').map(Number)
     ctx.fillStyle = color
@@ -369,7 +373,7 @@ onMounted(() => {
       if (res.success) {
         const template = res.data?.template || {}
         const size = `${template.size || ''}`.match(/^(\d+)x(\d+)$/i)
-        projectName.value = template.name || '未命名模板'
+        projectName.value = template.name || '未命名边框'
         if (size) {
           width.value = parseInt(size[1], 10) || width.value
           height.value = parseInt(size[2], 10) || height.value

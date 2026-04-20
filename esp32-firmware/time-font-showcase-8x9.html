@@ -1,0 +1,1255 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>时间字体总览与生成器 (8x9约束)</title>
+    <style>
+      :root {
+        --bg: #060607;
+        --panel: #121215;
+        --line: rgba(255, 255, 255, 0.12);
+        --text: #f4f4f7;
+        --muted: #9da0ad;
+        --accent: #d31d8a;
+        --on: #f2f2f5;
+        --off: #0a0a0d;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: "IBM Plex Mono", "Menlo", "Consolas", monospace;
+        background:
+          radial-gradient(circle at 10% 8%, rgba(211, 29, 138, 0.2), transparent 42%),
+          radial-gradient(circle at 88% 88%, rgba(133, 138, 154, 0.18), transparent 44%),
+          var(--bg);
+        color: var(--text);
+      }
+
+      .page {
+        width: min(1420px, calc(100% - 24px));
+        margin: 0 auto;
+        padding: 20px 0 32px;
+        display: grid;
+        gap: 16px;
+      }
+
+      .hero {
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: linear-gradient(180deg, rgba(18, 18, 22, 0.9), rgba(9, 9, 12, 0.96));
+        padding: 16px;
+      }
+
+      .hero h1 {
+        margin: 0;
+        font-size: clamp(22px, 3vw, 34px);
+        line-height: 1.1;
+      }
+
+      .hero p {
+        margin: 8px 0 0;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .accent {
+        color: var(--accent);
+      }
+
+      .toolbar {
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: var(--panel);
+        padding: 12px;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .control {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      input[type='range'] {
+        width: 180px;
+      }
+
+      button {
+        border: 1px solid #6a2452;
+        background: #220916;
+        color: var(--text);
+        border-radius: 8px;
+        font: inherit;
+        padding: 8px 12px;
+        cursor: pointer;
+      }
+
+      button:hover {
+        border-color: #bf4b94;
+      }
+
+      .stats {
+        font-size: 12px;
+        color: var(--muted);
+      }
+
+      .section {
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: rgba(17, 17, 21, 0.9);
+        padding: 12px;
+      }
+
+      .section h2 {
+        margin: 0 0 10px;
+        font-size: 15px;
+        color: var(--accent);
+      }
+
+      .cards {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .font-card {
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        border-radius: 10px;
+        background: #0d0d10;
+        padding: 10px;
+        display: grid;
+        grid-template-columns: minmax(220px, 320px) minmax(0, 1fr);
+        gap: 10px;
+        align-items: center;
+      }
+
+      .font-card.fail {
+        border-color: rgba(255, 99, 99, 0.65);
+      }
+
+      .font-head {
+        display: grid;
+        gap: 6px;
+      }
+
+      .font-name {
+        font-size: 13px;
+        color: #f7f7f8;
+      }
+
+      .font-meta {
+        font-size: 11px;
+        color: var(--muted);
+      }
+
+      .preview-line {
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 8px;
+        background: #000;
+        padding: 6px;
+        overflow-x: auto;
+      }
+
+      .preview-line canvas {
+        image-rendering: pixelated;
+        image-rendering: crisp-edges;
+        display: block;
+      }
+
+      pre {
+        margin: 0;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 10px;
+        max-height: 260px;
+        overflow: auto;
+        background: #040406;
+        color: #cdd0d7;
+        font-size: 11px;
+        line-height: 1.45;
+      }
+
+      @media (max-width: 760px) {
+        .font-card {
+          grid-template-columns: minmax(0, 1fr);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <section class="hero">
+        <h1>时间字体总览与生成器 <span class="accent">(宽≤8, 高≤9)</span></h1>
+        <p>页面会一次性展示每套字体的 <code>0-9</code> 和 <code>:</code>。上半区是固件已存在字体，下半区是基于现有字形生成的新字体。</p>
+      </section>
+
+      <section class="toolbar">
+        <div class="control">
+          <span>像素放大</span>
+          <input id="pixelScale" type="range" min="4" max="18" step="1" value="8" />
+          <strong id="pixelScaleText">8</strong>
+        </div>
+        <div class="control">
+          <span>字间距</span>
+          <input id="previewSpacing" type="range" min="1" max="4" step="1" value="1" />
+          <strong id="previewSpacingText">1</strong>
+        </div>
+        <button id="copyJsonBtn" type="button">复制全部字体 JSON</button>
+        <span class="stats" id="fontStats"></span>
+      </section>
+
+      <section class="section">
+        <h2>已有时间字体（固件同款）</h2>
+        <div class="cards" id="existingCards"></div>
+      </section>
+
+      <section class="section">
+        <h2>新生成时间字体（基于已有字形）</h2>
+        <div class="cards" id="generatedCards"></div>
+      </section>
+
+      <section class="section">
+        <h2>导出预览</h2>
+        <pre id="jsonOutput"></pre>
+      </section>
+    </main>
+
+    <script>
+      const LIMIT_WIDTH = 8;
+      const LIMIT_HEIGHT = 9;
+      const GLYPH_LABELS = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', ':'];
+
+      const EXISTING_FONTS = [
+        {
+          id: 'classic_5x7',
+          displayName: 'classic_5x7',
+          source: 'clock_font_renderer.cpp',
+          category: 'existing',
+          width: 5,
+          height: 7,
+          spacing: 1,
+          glyphs: [
+            [14, 17, 19, 21, 25, 17, 14, 0, 0],
+            [4, 12, 4, 4, 4, 4, 14, 0, 0],
+            [14, 17, 1, 2, 4, 8, 31, 0, 0],
+            [30, 1, 1, 14, 1, 1, 30, 0, 0],
+            [2, 6, 10, 18, 31, 2, 2, 0, 0],
+            [31, 16, 30, 1, 1, 17, 14, 0, 0],
+            [6, 8, 16, 30, 17, 17, 14, 0, 0],
+            [31, 1, 2, 4, 8, 8, 8, 0, 0],
+            [14, 17, 17, 14, 17, 17, 14, 0, 0],
+            [14, 17, 17, 15, 1, 2, 12, 0, 0],
+            [0, 12, 12, 0, 12, 12, 0, 0, 0]
+          ]
+        },
+        {
+          id: 'minimal_3x5',
+          displayName: 'minimal_3x5',
+          source: 'clock_font_renderer.cpp',
+          category: 'existing',
+          width: 3,
+          height: 5,
+          spacing: 1,
+          glyphs: [
+            [7, 5, 5, 5, 7, 0, 0, 0, 0],
+            [2, 6, 2, 2, 7, 0, 0, 0, 0],
+            [7, 1, 7, 4, 7, 0, 0, 0, 0],
+            [7, 1, 7, 1, 7, 0, 0, 0, 0],
+            [5, 5, 7, 1, 1, 0, 0, 0, 0],
+            [7, 4, 7, 1, 7, 0, 0, 0, 0],
+            [7, 4, 7, 5, 7, 0, 0, 0, 0],
+            [7, 1, 2, 2, 2, 0, 0, 0, 0],
+            [7, 5, 7, 5, 7, 0, 0, 0, 0],
+            [7, 5, 7, 1, 7, 0, 0, 0, 0],
+            [0, 2, 0, 2, 0, 0, 0, 0, 0]
+          ]
+        },
+        {
+          id: 'rounded_4x6',
+          displayName: 'rounded_4x6',
+          source: 'clock_font_renderer.cpp',
+          category: 'existing',
+          width: 4,
+          height: 6,
+          spacing: 1,
+          glyphs: [
+            [6, 9, 9, 9, 9, 6, 0, 0, 0],
+            [4, 12, 4, 4, 4, 14, 0, 0, 0],
+            [6, 9, 1, 2, 4, 15, 0, 0, 0],
+            [14, 1, 6, 1, 1, 14, 0, 0, 0],
+            [2, 6, 10, 15, 2, 2, 0, 0, 0],
+            [15, 8, 14, 1, 9, 6, 0, 0, 0],
+            [6, 8, 14, 9, 9, 6, 0, 0, 0],
+            [15, 1, 2, 4, 4, 4, 0, 0, 0],
+            [6, 9, 6, 9, 9, 6, 0, 0, 0],
+            [6, 9, 9, 7, 1, 6, 0, 0, 0],
+            [0, 4, 0, 0, 4, 0, 0, 0, 0]
+          ]
+        },
+        {
+          id: 'lcd_6x8',
+          displayName: 'lcd_6x8',
+          source: 'clock_font_renderer.cpp',
+          category: 'existing',
+          width: 6,
+          height: 8,
+          spacing: 1,
+          glyphs: [
+            [30, 51, 33, 33, 33, 33, 51, 30, 0],
+            [12, 28, 12, 12, 12, 12, 12, 63, 0],
+            [30, 51, 3, 6, 12, 24, 48, 63, 0],
+            [62, 3, 3, 14, 3, 3, 3, 62, 0],
+            [6, 14, 22, 38, 63, 6, 6, 6, 0],
+            [63, 48, 48, 62, 3, 3, 51, 30, 0],
+            [14, 24, 48, 62, 51, 51, 51, 30, 0],
+            [63, 3, 6, 12, 24, 24, 24, 24, 0],
+            [30, 51, 51, 30, 51, 51, 51, 30, 0],
+            [30, 51, 51, 31, 3, 6, 12, 56, 0],
+            [0, 12, 12, 0, 0, 12, 12, 0, 0]
+          ]
+        },
+        {
+          id: 'hollow_5x7',
+          displayName: 'hollow_5x7',
+          source: 'clock_font_renderer.cpp',
+          category: 'existing',
+          width: 5,
+          height: 7,
+          spacing: 1,
+          glyphs: [
+            [14, 17, 17, 17, 17, 17, 14, 0, 0],
+            [4, 12, 4, 4, 4, 4, 4, 0, 0],
+            [14, 17, 1, 2, 4, 8, 31, 0, 0],
+            [30, 1, 1, 14, 1, 1, 30, 0, 0],
+            [2, 6, 10, 18, 31, 2, 2, 0, 0],
+            [31, 16, 30, 1, 1, 17, 14, 0, 0],
+            [6, 8, 16, 30, 17, 17, 14, 0, 0],
+            [31, 1, 2, 4, 8, 8, 8, 0, 0],
+            [14, 17, 17, 14, 17, 17, 14, 0, 0],
+            [14, 17, 17, 15, 1, 2, 12, 0, 0],
+            [0, 8, 0, 0, 0, 8, 0, 0, 0]
+          ]
+        },
+        {
+          id: 'seven_seg_5x7',
+          displayName: 'seven_seg_5x7',
+          source: 'clock_font_renderer.cpp',
+          category: 'existing',
+          width: 5,
+          height: 7,
+          spacing: 1,
+          glyphs: [
+            [31, 17, 17, 17, 17, 17, 31, 0, 0],
+            [1, 1, 1, 1, 1, 1, 1, 0, 0],
+            [31, 1, 1, 31, 16, 16, 31, 0, 0],
+            [31, 1, 1, 31, 1, 1, 31, 0, 0],
+            [17, 17, 17, 31, 1, 1, 1, 0, 0],
+            [31, 16, 16, 31, 1, 1, 31, 0, 0],
+            [31, 16, 16, 31, 17, 17, 31, 0, 0],
+            [31, 1, 1, 1, 1, 1, 1, 0, 0],
+            [31, 17, 17, 31, 17, 17, 31, 0, 0],
+            [31, 17, 17, 31, 1, 1, 31, 0, 0],
+            [0, 4, 0, 0, 0, 4, 0, 0, 0]
+          ]
+        },
+        {
+          id: 'italic_6x7',
+          displayName: 'italic_6x7',
+          source: 'clock_font_renderer.cpp',
+          category: 'existing',
+          width: 6,
+          height: 7,
+          spacing: 1,
+          glyphs: [
+            [15, 17, 18, 18, 34, 60, 0, 0, 0],
+            [4, 12, 4, 4, 8, 8, 28, 0, 0],
+            [14, 17, 2, 4, 8, 16, 62, 0, 0],
+            [30, 1, 2, 12, 2, 1, 30, 0, 0],
+            [2, 6, 10, 18, 31, 4, 4, 0, 0],
+            [31, 16, 30, 1, 1, 18, 12, 0, 0],
+            [6, 8, 16, 30, 17, 18, 12, 0, 0],
+            [31, 1, 2, 4, 8, 8, 16, 0, 0],
+            [14, 17, 18, 12, 18, 33, 30, 0, 0],
+            [14, 17, 18, 15, 2, 4, 24, 0, 0],
+            [0, 8, 0, 0, 16, 0, 0, 0, 0]
+          ]
+        },
+        {
+          id: 'retro_5x7',
+          displayName: 'retro_5x7',
+          source: 'clock_font_renderer.cpp',
+          category: 'existing',
+          width: 5,
+          height: 7,
+          spacing: 1,
+          glyphs: [
+            [31, 17, 19, 21, 25, 17, 31, 0, 0],
+            [6, 14, 6, 6, 6, 6, 31, 0, 0],
+            [31, 1, 1, 31, 16, 16, 31, 0, 0],
+            [31, 1, 1, 31, 1, 1, 31, 0, 0],
+            [17, 17, 17, 31, 1, 1, 1, 0, 0],
+            [31, 16, 16, 31, 1, 1, 31, 0, 0],
+            [31, 16, 16, 31, 17, 17, 31, 0, 0],
+            [31, 1, 1, 1, 1, 1, 1, 0, 0],
+            [31, 17, 17, 31, 17, 17, 31, 0, 0],
+            [31, 17, 17, 31, 1, 1, 31, 0, 0],
+            [0, 12, 0, 0, 0, 12, 0, 0, 0]
+          ]
+        }
+      ];
+
+      function createMatrix(width, height, value) {
+        const matrix = [];
+        for (let y = 0; y < height; y += 1) {
+          const row = [];
+          for (let x = 0; x < width; x += 1) {
+            row.push(value);
+          }
+          matrix.push(row);
+        }
+        return matrix;
+      }
+
+      function rowsToMatrix(rows, width, height) {
+        const matrix = createMatrix(width, height, false);
+        for (let y = 0; y < height; y += 1) {
+          const bits = rows[y];
+          for (let x = 0; x < width; x += 1) {
+            const mask = 1 << (width - x - 1);
+            if ((bits & mask) !== 0) {
+              matrix[y][x] = true;
+            }
+          }
+        }
+        return matrix;
+      }
+
+      function matrixToRows(matrix, width, height) {
+        const rows = [];
+        for (let y = 0; y < height; y += 1) {
+          let bits = 0;
+          for (let x = 0; x < width; x += 1) {
+            if (matrix[y][x]) {
+              bits |= 1 << (width - x - 1);
+            }
+          }
+          rows.push(bits);
+        }
+        while (rows.length < 9) {
+          rows.push(0);
+        }
+        return rows;
+      }
+
+      function setPixel(matrix, x, y) {
+        const height = matrix.length;
+        const width = matrix[0].length;
+        if (x < 0) {
+          return;
+        }
+        if (y < 0) {
+          return;
+        }
+        if (x >= width) {
+          return;
+        }
+        if (y >= height) {
+          return;
+        }
+        matrix[y][x] = true;
+      }
+
+      function countOnPixels(matrix) {
+        let count = 0;
+        for (let y = 0; y < matrix.length; y += 1) {
+          for (let x = 0; x < matrix[0].length; x += 1) {
+            if (matrix[y][x]) {
+              count += 1;
+            }
+          }
+        }
+        return count;
+      }
+
+      function copyBaseRows(baseRows) {
+        const copy = [];
+        for (let i = 0; i < baseRows.length; i += 1) {
+          copy.push(baseRows[i]);
+        }
+        while (copy.length < 9) {
+          copy.push(0);
+        }
+        return copy;
+      }
+
+      function buildSeparatedColonRows(width, height) {
+        const matrix = createMatrix(width, height, false);
+
+        let dotWidth = 1;
+        if (width >= 6) {
+          dotWidth = 2;
+        }
+
+        const dotX = Math.floor((width - dotWidth) / 2);
+        let topY = Math.floor((height - 4) / 3);
+        if (topY < 1) {
+          topY = 1;
+        }
+
+        let bottomY = height - topY - 1;
+        if (bottomY - topY < 2) {
+          bottomY = topY + 2;
+        }
+        if (bottomY >= height) {
+          bottomY = height - 1;
+        }
+
+        for (let x = dotX; x < dotX + dotWidth; x += 1) {
+          setPixel(matrix, x, topY);
+          setPixel(matrix, x, bottomY);
+        }
+
+        return matrixToRows(matrix, width, height);
+      }
+
+      function applySeparatedColonGlyph(glyphs, width, height) {
+        if (glyphs.length <= 10) {
+          return;
+        }
+        glyphs[10] = buildSeparatedColonRows(width, height);
+      }
+
+      function findFontById(fonts, id) {
+        for (let i = 0; i < fonts.length; i += 1) {
+          if (fonts[i].id === id) {
+            return fonts[i];
+          }
+        }
+        return null;
+      }
+
+      function generateNeoBoldFont(baseFont) {
+        const width = 6;
+        const height = 8;
+        const glyphs = [];
+
+        for (let i = 0; i < baseFont.glyphs.length; i += 1) {
+          const source = rowsToMatrix(baseFont.glyphs[i], baseFont.width, baseFont.height);
+          const target = createMatrix(width, height, false);
+          for (let y = 0; y < baseFont.height; y += 1) {
+            for (let x = 0; x < baseFont.width; x += 1) {
+              if (!source[y][x]) {
+                continue;
+              }
+              setPixel(target, x, y);
+              setPixel(target, x + 1, y);
+              if (y % 2 === 0) {
+                setPixel(target, x, y + 1);
+              }
+            }
+          }
+          glyphs.push(matrixToRows(target, width, height));
+        }
+
+        applySeparatedColonGlyph(glyphs, width, height);
+
+        return {
+          id: 'neo_bold_6x8',
+          displayName: 'neo_bold_6x8',
+          source: 'classic_5x7',
+          category: 'generated',
+          width,
+          height,
+          spacing: 1,
+          glyphs
+        };
+      }
+
+      function generateWireLcdFont(baseFont) {
+        const width = 6;
+        const height = 8;
+        const glyphs = [];
+
+        for (let i = 0; i < baseFont.glyphs.length; i += 1) {
+          const source = rowsToMatrix(baseFont.glyphs[i], baseFont.width, baseFont.height);
+          const target = createMatrix(width, height, false);
+
+          for (let y = 0; y < height; y += 1) {
+            for (let x = 0; x < width; x += 1) {
+              if (!source[y][x]) {
+                continue;
+              }
+              const neighbors = [
+                { x: x - 1, y },
+                { x: x + 1, y },
+                { x, y: y - 1 },
+                { x, y: y + 1 }
+              ];
+              let isEdge = false;
+              for (let j = 0; j < neighbors.length; j += 1) {
+                const nx = neighbors[j].x;
+                const ny = neighbors[j].y;
+                if (nx < 0 || nx >= width || ny < 0 || ny >= height) {
+                  isEdge = true;
+                  break;
+                }
+                if (!source[ny][nx]) {
+                  isEdge = true;
+                  break;
+                }
+              }
+              if (isEdge) {
+                target[y][x] = true;
+              }
+            }
+          }
+
+          if (countOnPixels(target) === 0) {
+            glyphs.push(copyBaseRows(baseFont.glyphs[i]));
+          } else {
+            glyphs.push(matrixToRows(target, width, height));
+          }
+        }
+
+        applySeparatedColonGlyph(glyphs, width, height);
+
+        return {
+          id: 'wire_lcd_6x8',
+          displayName: 'wire_lcd_6x8',
+          source: 'lcd_6x8',
+          category: 'generated',
+          width,
+          height,
+          spacing: 1,
+          glyphs
+        };
+      }
+
+      function generateSlantRetroFont(baseFont) {
+        const width = 7;
+        const height = 7;
+        const glyphs = [];
+
+        for (let i = 0; i < baseFont.glyphs.length; i += 1) {
+          const source = rowsToMatrix(baseFont.glyphs[i], baseFont.width, baseFont.height);
+          const target = createMatrix(width, height, false);
+
+          for (let y = 0; y < baseFont.height; y += 1) {
+            const shift = Math.floor((baseFont.height - 1 - y) / 3);
+            for (let x = 0; x < baseFont.width; x += 1) {
+              if (!source[y][x]) {
+                continue;
+              }
+              setPixel(target, x + shift, y);
+            }
+          }
+
+          glyphs.push(matrixToRows(target, width, height));
+        }
+
+        applySeparatedColonGlyph(glyphs, width, height);
+
+        return {
+          id: 'slant_retro_7x7',
+          displayName: 'slant_retro_7x7',
+          source: 'retro_5x7',
+          category: 'generated',
+          width,
+          height,
+          spacing: 1,
+          glyphs
+        };
+      }
+
+      function generatePrismSegFont(baseFont) {
+        const width = 6;
+        const height = 8;
+        const glyphs = [];
+
+        for (let i = 0; i < baseFont.glyphs.length; i += 1) {
+          const source = rowsToMatrix(baseFont.glyphs[i], baseFont.width, baseFont.height);
+          const target = createMatrix(width, height, false);
+
+          for (let y = 0; y < baseFont.height; y += 1) {
+            let shift = 0;
+            if (y < 3) {
+              shift = 1;
+            }
+            for (let x = 0; x < baseFont.width; x += 1) {
+              if (!source[y][x]) {
+                continue;
+              }
+
+              setPixel(target, x + shift, y);
+              if (x > 0 && x < baseFont.width - 1) {
+                setPixel(target, x + shift, y + 1);
+              }
+            }
+          }
+
+          if (i !== 10) {
+            const centerY = Math.floor(height / 2);
+            const centerX = Math.floor(width / 2);
+            setPixel(target, centerX - 1, centerY);
+            target[centerY][centerX] = false;
+
+            if (i % 2 === 0) {
+              if (centerY + 1 < height) {
+                target[centerY + 1][centerX] = false;
+              }
+            } else {
+              if (centerY - 1 >= 0) {
+                target[centerY - 1][centerX - 1] = false;
+              }
+            }
+          }
+
+          if (countOnPixels(target) === 0) {
+            glyphs.push(copyBaseRows(baseFont.glyphs[i]));
+          } else {
+            glyphs.push(matrixToRows(target, width, height));
+          }
+        }
+
+        applySeparatedColonGlyph(glyphs, width, height);
+
+        return {
+          id: 'prism_seg_6x8',
+          displayName: 'prism_seg_6x8',
+          source: 'seven_seg_5x7',
+          category: 'generated',
+          width,
+          height,
+          spacing: 1,
+          glyphs
+        };
+      }
+
+      function generateArcRoundedFont(baseFont) {
+        const width = 5;
+        const height = 7;
+        const glyphs = [];
+
+        for (let i = 0; i < baseFont.glyphs.length; i += 1) {
+          const source = rowsToMatrix(baseFont.glyphs[i], baseFont.width, baseFont.height);
+          const target = createMatrix(width, height, false);
+
+          for (let y = 0; y < baseFont.height; y += 1) {
+            for (let x = 0; x < baseFont.width; x += 1) {
+              if (!source[y][x]) {
+                continue;
+              }
+
+              setPixel(target, x, y);
+              if (y === 0 || y === baseFont.height - 1) {
+                setPixel(target, x + 1, y);
+              }
+              if (x === 0 || x === baseFont.width - 1) {
+                setPixel(target, x, y + 1);
+              }
+              if (y >= baseFont.height - 2) {
+                setPixel(target, x, y + 1);
+              }
+            }
+          }
+
+          glyphs.push(matrixToRows(target, width, height));
+        }
+
+        applySeparatedColonGlyph(glyphs, width, height);
+
+        return {
+          id: 'arc_round_5x7',
+          displayName: 'arc_round_5x7',
+          source: 'rounded_4x6',
+          category: 'generated',
+          width,
+          height,
+          spacing: 1,
+          glyphs
+        };
+      }
+
+      function generateCompactMinimalFont(baseFont) {
+        const width = 4;
+        const height = 6;
+        const glyphs = [];
+
+        for (let i = 0; i < baseFont.glyphs.length; i += 1) {
+          const source = rowsToMatrix(baseFont.glyphs[i], baseFont.width, baseFont.height);
+          const target = createMatrix(width, height, false);
+
+          for (let y = 0; y < height; y += 1) {
+            const sourceY = Math.floor((y * baseFont.height) / height);
+            for (let x = 0; x < width; x += 1) {
+              const sourceX = Math.floor((x * baseFont.width) / width);
+              if (source[sourceY][sourceX]) {
+                target[y][x] = true;
+              }
+            }
+          }
+
+          glyphs.push(matrixToRows(target, width, height));
+        }
+
+        applySeparatedColonGlyph(glyphs, width, height);
+
+        return {
+          id: 'compact_minimal_4x6',
+          displayName: 'compact_minimal_4x6',
+          source: 'minimal_3x5',
+          category: 'generated',
+          width,
+          height,
+          spacing: 1,
+          glyphs
+        };
+      }
+
+      function resampleMatrix(source, targetWidth, targetHeight) {
+        const sourceHeight = source.length;
+        const sourceWidth = source[0].length;
+        const target = createMatrix(targetWidth, targetHeight, false);
+
+        for (let y = 0; y < targetHeight; y += 1) {
+          const sourceY = Math.floor((y * sourceHeight) / targetHeight);
+          for (let x = 0; x < targetWidth; x += 1) {
+            const sourceX = Math.floor((x * sourceWidth) / targetWidth);
+            if (source[sourceY][sourceX]) {
+              target[y][x] = true;
+            }
+          }
+        }
+
+        return target;
+      }
+
+      function generateStencilClassicFont(baseFont) {
+        const width = 6;
+        const height = 8;
+        const glyphs = [];
+
+        for (let i = 0; i < baseFont.glyphs.length; i += 1) {
+          const source = rowsToMatrix(baseFont.glyphs[i], baseFont.width, baseFont.height);
+          const target = createMatrix(width, height, false);
+
+          for (let y = 0; y < baseFont.height; y += 1) {
+            for (let x = 0; x < baseFont.width; x += 1) {
+              if (!source[y][x]) {
+                continue;
+              }
+              setPixel(target, x, y);
+              setPixel(target, x + 1, y);
+            }
+          }
+
+          if (i !== 10) {
+            const slitX = Math.floor(width / 2);
+            for (let y = 1; y < height - 1; y += 1) {
+              if ((y + i) % 2 === 0) {
+                target[y][slitX] = false;
+              }
+            }
+            if (i % 3 === 0) {
+              target[1][1] = false;
+            }
+          }
+
+          glyphs.push(matrixToRows(target, width, height));
+        }
+
+        applySeparatedColonGlyph(glyphs, width, height);
+
+        return {
+          id: 'stencil_classic_6x8',
+          displayName: 'stencil_classic_6x8',
+          source: 'classic_5x7',
+          category: 'generated',
+          width,
+          height,
+          spacing: 1,
+          glyphs
+        };
+      }
+
+      function generatePixelRailFont(baseFont) {
+        const width = 5;
+        const height = 8;
+        const glyphs = [];
+
+        for (let i = 0; i < baseFont.glyphs.length; i += 1) {
+          const source = rowsToMatrix(baseFont.glyphs[i], baseFont.width, baseFont.height);
+          const scaled = resampleMatrix(source, width, height);
+          const target = createMatrix(width, height, false);
+
+          for (let y = 0; y < height; y += 1) {
+            for (let x = 0; x < width; x += 1) {
+              if (!scaled[y][x]) {
+                continue;
+              }
+              setPixel(target, x, y);
+              if (x === 0 || x === width - 1) {
+                setPixel(target, x, y + 1);
+              }
+            }
+          }
+
+          if (i !== 10) {
+            const railY = 2 + (i % 3);
+            for (let x = 1; x < width - 1; x += 1) {
+              target[railY][x] = true;
+            }
+          }
+
+          glyphs.push(matrixToRows(target, width, height));
+        }
+
+        applySeparatedColonGlyph(glyphs, width, height);
+
+        return {
+          id: 'pixel_rail_5x8',
+          displayName: 'pixel_rail_5x8',
+          source: 'minimal_3x5',
+          category: 'generated',
+          width,
+          height,
+          spacing: 1,
+          glyphs
+        };
+      }
+
+      function generateFrameLcdFont(baseFont) {
+        const width = 7;
+        const height = 9;
+        const glyphs = [];
+
+        for (let i = 0; i < baseFont.glyphs.length; i += 1) {
+          const source = rowsToMatrix(baseFont.glyphs[i], baseFont.width, baseFont.height);
+          const scaled = resampleMatrix(source, width, height);
+          const target = createMatrix(width, height, false);
+
+          for (let y = 0; y < height; y += 1) {
+            for (let x = 0; x < width; x += 1) {
+              if (!scaled[y][x]) {
+                continue;
+              }
+
+              const neighbors = [
+                { x: x - 1, y },
+                { x: x + 1, y },
+                { x, y: y - 1 },
+                { x, y: y + 1 }
+              ];
+              let edge = false;
+              for (let j = 0; j < neighbors.length; j += 1) {
+                const nx = neighbors[j].x;
+                const ny = neighbors[j].y;
+                if (nx < 0 || nx >= width || ny < 0 || ny >= height) {
+                  edge = true;
+                  break;
+                }
+                if (!scaled[ny][nx]) {
+                  edge = true;
+                  break;
+                }
+              }
+
+              if (edge) {
+                target[y][x] = true;
+              }
+            }
+          }
+
+          if (i !== 10) {
+            const midY = Math.floor(height / 2);
+            for (let x = 1; x < width - 1; x += 1) {
+              if ((x + i) % 2 === 0) {
+                target[midY][x] = true;
+              }
+            }
+          }
+
+          glyphs.push(matrixToRows(target, width, height));
+        }
+
+        applySeparatedColonGlyph(glyphs, width, height);
+
+        return {
+          id: 'frame_lcd_7x9',
+          displayName: 'frame_lcd_7x9',
+          source: 'lcd_6x8',
+          category: 'generated',
+          width,
+          height,
+          spacing: 1,
+          glyphs
+        };
+      }
+
+      function buildGeneratedFonts(existingFonts) {
+        const generated = [];
+
+        const classic = findFontById(existingFonts, 'classic_5x7');
+        if (classic !== null) {
+          generated.push(generateNeoBoldFont(classic));
+          generated.push(generateStencilClassicFont(classic));
+        }
+
+        const lcd = findFontById(existingFonts, 'lcd_6x8');
+        if (lcd !== null) {
+          generated.push(generateWireLcdFont(lcd));
+          generated.push(generateFrameLcdFont(lcd));
+        }
+
+        const retro = findFontById(existingFonts, 'retro_5x7');
+        if (retro !== null) {
+          generated.push(generateSlantRetroFont(retro));
+        }
+
+        const seg = findFontById(existingFonts, 'seven_seg_5x7');
+        if (seg !== null) {
+          generated.push(generatePrismSegFont(seg));
+        }
+
+        const rounded = findFontById(existingFonts, 'rounded_4x6');
+        if (rounded !== null) {
+          generated.push(generateArcRoundedFont(rounded));
+        }
+
+        const minimal = findFontById(existingFonts, 'minimal_3x5');
+        if (minimal !== null) {
+          generated.push(generateCompactMinimalFont(minimal));
+          generated.push(generatePixelRailFont(minimal));
+        }
+
+        return generated;
+      }
+
+      function isWithinLimit(font) {
+        if (font.width > LIMIT_WIDTH) {
+          return false;
+        }
+        if (font.height > LIMIT_HEIGHT) {
+          return false;
+        }
+        return true;
+      }
+
+      function glyphIndexFromLabel(label) {
+        if (label === ':') {
+          return 10;
+        }
+        if (label === '0') {
+          return 0;
+        }
+        if (label === '1') {
+          return 1;
+        }
+        if (label === '2') {
+          return 2;
+        }
+        if (label === '3') {
+          return 3;
+        }
+        if (label === '4') {
+          return 4;
+        }
+        if (label === '5') {
+          return 5;
+        }
+        if (label === '6') {
+          return 6;
+        }
+        if (label === '7') {
+          return 7;
+        }
+        if (label === '8') {
+          return 8;
+        }
+        if (label === '9') {
+          return 9;
+        }
+        return -1;
+      }
+
+      function drawPreviewLine(canvas, font, scale, spacing) {
+        const glyphCount = GLYPH_LABELS.length;
+        const contentWidth = glyphCount * font.width + (glyphCount - 1) * spacing;
+        canvas.width = contentWidth * scale;
+        canvas.height = font.height * scale;
+
+        const context = canvas.getContext('2d');
+        context.fillStyle = '#000000';
+        context.fillRect(0, 0, canvas.width, canvas.height);
+
+        let cursor = 0;
+        for (let i = 0; i < GLYPH_LABELS.length; i += 1) {
+          const index = glyphIndexFromLabel(GLYPH_LABELS[i]);
+          if (index < 0) {
+            continue;
+          }
+          const matrix = rowsToMatrix(font.glyphs[index], font.width, font.height);
+          for (let y = 0; y < font.height; y += 1) {
+            for (let x = 0; x < font.width; x += 1) {
+              if (!matrix[y][x]) {
+                continue;
+              }
+              context.fillStyle = '#f3f3f6';
+              context.fillRect((cursor + x) * scale, y * scale, scale, scale);
+            }
+          }
+          cursor += font.width + spacing;
+        }
+      }
+
+      function renderFontCard(container, font, scale, spacing) {
+        const card = document.createElement('article');
+        card.className = 'font-card';
+        if (!isWithinLimit(font)) {
+          card.classList.add('fail');
+        }
+
+        const head = document.createElement('div');
+        head.className = 'font-head';
+
+        const name = document.createElement('div');
+        name.className = 'font-name';
+        name.textContent = font.displayName;
+
+        const meta = document.createElement('div');
+        meta.className = 'font-meta';
+        const passText = isWithinLimit(font) ? '通过 8x9' : '超出 8x9';
+        const sourceText = font.category === 'existing' ? '固件内置' : `生成自 ${font.source}`;
+        meta.textContent = `${font.width}x${font.height} · ${sourceText} · ${passText}`;
+
+        head.appendChild(name);
+        head.appendChild(meta);
+
+        const previewWrap = document.createElement('div');
+        previewWrap.className = 'preview-line';
+        const previewCanvas = document.createElement('canvas');
+        drawPreviewLine(previewCanvas, font, scale, spacing);
+        previewWrap.appendChild(previewCanvas);
+
+        card.appendChild(head);
+        card.appendChild(previewWrap);
+        container.appendChild(card);
+      }
+
+      function buildPayload(existingFonts, generatedFonts) {
+        const payload = {
+          constraints: {
+            maxWidth: LIMIT_WIDTH,
+            maxHeight: LIMIT_HEIGHT,
+            glyphSet: '0123456789:'
+          },
+          existing: [],
+          generated: []
+        };
+
+        for (let i = 0; i < existingFonts.length; i += 1) {
+          payload.existing.push({
+            id: existingFonts[i].id,
+            width: existingFonts[i].width,
+            height: existingFonts[i].height,
+            spacing: existingFonts[i].spacing,
+            glyphs: existingFonts[i].glyphs
+          });
+        }
+
+        for (let i = 0; i < generatedFonts.length; i += 1) {
+          payload.generated.push({
+            id: generatedFonts[i].id,
+            source: generatedFonts[i].source,
+            width: generatedFonts[i].width,
+            height: generatedFonts[i].height,
+            spacing: generatedFonts[i].spacing,
+            glyphs: generatedFonts[i].glyphs
+          });
+        }
+
+        return payload;
+      }
+
+      const generatedFonts = buildGeneratedFonts(EXISTING_FONTS);
+      const pixelScaleInput = document.getElementById('pixelScale');
+      const pixelScaleText = document.getElementById('pixelScaleText');
+      const previewSpacingInput = document.getElementById('previewSpacing');
+      const previewSpacingText = document.getElementById('previewSpacingText');
+      const existingCards = document.getElementById('existingCards');
+      const generatedCards = document.getElementById('generatedCards');
+      const jsonOutput = document.getElementById('jsonOutput');
+      const fontStats = document.getElementById('fontStats');
+      const copyJsonBtn = document.getElementById('copyJsonBtn');
+
+      function rerender() {
+        const scale = Number(pixelScaleInput.value);
+        const spacing = Number(previewSpacingInput.value);
+        pixelScaleText.textContent = String(scale);
+        previewSpacingText.textContent = String(spacing);
+
+        existingCards.innerHTML = '';
+        generatedCards.innerHTML = '';
+
+        for (let i = 0; i < EXISTING_FONTS.length; i += 1) {
+          renderFontCard(existingCards, EXISTING_FONTS[i], scale, spacing);
+        }
+
+        for (let i = 0; i < generatedFonts.length; i += 1) {
+          renderFontCard(generatedCards, generatedFonts[i], scale, spacing);
+        }
+
+        const payload = buildPayload(EXISTING_FONTS, generatedFonts);
+        jsonOutput.textContent = JSON.stringify(payload, null, 2);
+
+        let passCount = 0;
+        const totalCount = EXISTING_FONTS.length + generatedFonts.length;
+        for (let i = 0; i < EXISTING_FONTS.length; i += 1) {
+          if (isWithinLimit(EXISTING_FONTS[i])) {
+            passCount += 1;
+          }
+        }
+        for (let i = 0; i < generatedFonts.length; i += 1) {
+          if (isWithinLimit(generatedFonts[i])) {
+            passCount += 1;
+          }
+        }
+
+        fontStats.textContent = `总字体 ${totalCount} 套，满足 8x9 约束 ${passCount} 套`;
+      }
+
+      pixelScaleInput.addEventListener('input', rerender);
+      previewSpacingInput.addEventListener('input', rerender);
+
+      copyJsonBtn.addEventListener('click', async function() {
+        if (navigator.clipboard === undefined) {
+          copyJsonBtn.textContent = '复制失败';
+          return;
+        }
+
+        try {
+          await navigator.clipboard.writeText(jsonOutput.textContent);
+          copyJsonBtn.textContent = '已复制 JSON';
+          window.setTimeout(function() {
+            copyJsonBtn.textContent = '复制全部字体 JSON';
+          }, 1200);
+        } catch (error) {
+          copyJsonBtn.textContent = '复制失败';
+        }
+      });
+
+      rerender();
+    </script>
+  </body>
+</html>

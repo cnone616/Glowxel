@@ -1,0 +1,14 @@
+folder,category,priority,source_name,url,usage,note
+01-official-reference,manual_pdf,P0,Gaming Alexandria Manual PDF,https://www.gamingalexandria.com/highquality/fc/Battle%20City/Battle%20City%20-%20Manual.pdf,官方说明书 PDF,已落地为 battle-city-manual-jp.pdf
+01-official-reference,hires_scan_bundle,P0,Internet Archive Hi-Res Scans,https://archive.org/details/battle-city-fc-hiresscans,盒面卡带说明书高精扫描,已落地盒面卡带 PNG 与手册压缩包
+02-official-screenshots,ingame_screenshot,P0,Games Database In-Game Artwork,https://www.gamesdatabase.org/media/nintendo-nes/artwork-in-game/battle-city,正式游戏内画面参考,已落地一张正式游戏画面 JPG
+02-official-screenshots,screens_index,P2,GameFAQs Images,https://gamefaqs.gamespot.com/nes/562966-battle-city/images,补充截图索引,当前抓取受 Cloudflare 限制
+03-sprites-tanks-items,sprites_index,P0,The Spriters Resource Index,https://www.spriters-resource.com/nes/batcity/index.html,总素材入口,当前索引显示 40 张素材表
+03-sprites-tanks-items,general_sprites,P0,The Spriters Resource General Sprites,https://www.spriters-resource.com/nes/batcity/sheet/60016/,坦克基地道具核心 sprite,已落地为 battle-city-general-sprites.png
+03-sprites-tanks-items,misc_sprites,P1,The Spriters Resource Miscellaneous,https://www.spriters-resource.com/nes/batcity/sheet/11756,补充杂项 sprite,已落地为 battle-city-misc-sprites.png
+04-stage-tiles-maps,stage_sheet_pack,P0,The Spriters Resource Background Sheets,https://www.spriters-resource.com/nes/batcity/index.html,整套关卡素材表,已落地 Demo Stage Stage00-35 Stage71 共 38 张
+04-stage-tiles-maps,stage_map_pack,P0,VGMaps Battle City Maps,https://www.vgmaps.com/Atlas/NES/index.htm,单关地图与布局,已落地 Stage01-35 共 35 张
+05-audio,sound_pack,P1,The Sounds Resource Sound Effects,https://www.sounds-resource.com/nes/battlecity/sound/3710/,音效参考,已落地音效 ZIP
+06-tech-notes,tech_index,P1,Data Crystal Overview,https://datacrystal.tcrf.net/wiki/Battle_City,机制与 ROM 补充资料,已写入 tech note 入口
+06-tech-notes,ram_map,P1,Data Crystal RAM Map,https://datacrystal.tcrf.net/wiki/Battle_City:RAM_map,RAM 与状态分析,已写入 tech note 入口
+06-tech-notes,unused_content,P2,VGFacts Trivia,https://www.vgfacts.com/game/battlecity/trivia-11553/,未使用内容补充,已写入 tech note 入口

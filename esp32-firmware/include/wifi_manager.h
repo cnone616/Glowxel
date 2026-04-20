@@ -48,6 +48,7 @@ private:
   static size_t scanned_network_count;
   static bool scan_requested;
   static bool scan_in_progress;
+  static unsigned long scan_started_at;
   static void finalizeNetworkScan(int networkCount);
 };
 

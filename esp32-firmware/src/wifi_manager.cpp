@@ -10,6 +10,7 @@ const char* kNtpServerFallback = "pool.ntp.org";
 const long kGmtOffsetSec = 8 * 3600;
 const int kDaylightOffsetSec = 0;
 const unsigned long kNtpRetryIntervalMs = 15000;
+const unsigned long kWifiScanTimeoutMs = 15000;
 const time_t kUnixTimeSyncedThreshold = 1700000000;
 const IPAddress kConfigPortalIp(192, 168, 4, 1);
 const IPAddress kConfigPortalGateway(192, 168, 4, 1);
@@ -142,6 +143,7 @@ bool WiFiManager::ntp_sync_logged = false;
 bool WiFiManager::time_synced_once = false;
 bool WiFiManager::scan_requested = false;
 bool WiFiManager::scan_in_progress = false;
+unsigned long WiFiManager::scan_started_at = 0;
 
 void WiFiManager::init() {
   Serial.println("3. 连接WiFi...");
@@ -214,6 +216,7 @@ void WiFiManager::startConfigPortal() {
   scanned_network_count = 0;
   scan_requested = false;
   scan_in_progress = false;
+  scan_started_at = 0;
 
   WiFi.disconnect();
   WiFi.mode(WIFI_AP_STA);
@@ -251,6 +254,7 @@ void WiFiManager::stopConfigPortal() {
   dns_server.stop();
   scan_requested = false;
   scan_in_progress = false;
+  scan_started_at = 0;
   WiFi.scanDelete();
   WiFi.softAPdisconnect(true);
 }
@@ -446,15 +450,18 @@ void WiFiManager::tick() {
     if (scan_requested && !scan_in_progress) {
       scan_requested = false;
       scan_in_progress = true;
+      scan_started_at = millis();
       scanned_network_count = 0;
       WiFi.scanDelete();
       Serial.printf("[WiFi] 开始异步扫描附近热点，当前可用堆内存: %u bytes\n", ESP.getFreeHeap());
       int result = WiFi.scanNetworks(true);
       if (result == WIFI_SCAN_FAILED) {
         scan_in_progress = false;
+        scan_started_at = 0;
         Serial.println("[WiFi] 异步扫描启动失败");
       } else if (result >= 0 && result != WIFI_SCAN_RUNNING) {
         scan_in_progress = false;
+        scan_started_at = 0;
         finalizeNetworkScan(result);
       }
     }
@@ -463,7 +470,14 @@ void WiFiManager::tick() {
       int result = WiFi.scanComplete();
       if (result != WIFI_SCAN_RUNNING) {
         scan_in_progress = false;
+        scan_started_at = 0;
         finalizeNetworkScan(result);
+      } else if (scan_started_at != 0 && millis() - scan_started_at > kWifiScanTimeoutMs) {
+        scan_in_progress = false;
+        scan_started_at = 0;
+        scanned_network_count = 0;
+        WiFi.scanDelete();
+        Serial.println("[WiFi] 扫描超时，已中止本次扫描请求");
       }
     }
 

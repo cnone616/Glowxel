@@ -701,7 +701,7 @@ watch(
   display: grid;
   place-items: center;
   background: #4f7fff;
-  color: #ffffff;
+  color: var(--nb-ink);
   font-weight: 700;
 }
 
@@ -891,7 +891,7 @@ watch(
 .primary-btn {
   border: none;
   background: #4f7fff;
-  color: #ffffff;
+  color: var(--nb-ink);
   font-weight: 700;
 }
 

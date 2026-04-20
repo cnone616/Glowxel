@@ -101,7 +101,7 @@ defineEmits(["select", "change-filter"]);
 
 .filter-chip.active {
   background: #1d68ff;
-  color: #fff;
+  color: var(--nb-ink);
 }
 
 .issue-list {

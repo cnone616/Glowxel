@@ -1886,7 +1886,7 @@ watch(
 .primary-btn {
   border-color: #2f7fff;
   background: linear-gradient(180deg, #4b97ff, #2f7fff);
-  color: #ffffff;
+  color: var(--nb-ink);
   box-shadow: 0 14px 28px rgba(47, 127, 255, 0.28);
 }
 

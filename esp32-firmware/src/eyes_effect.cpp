@@ -1743,7 +1743,7 @@ static void drawTimeOverlay(MatrixPanel_I2S_DMA* display, const EyesConfig& conf
   }
 
   uint8_t fontId = config.time.font;
-  if (fontId > CLOCK_FONT_RETRO_5X7) {
+  if (fontId > CLOCK_FONT_PIXEL_RAIL_5X8) {
     fontId = CLOCK_FONT_MINIMAL_3X5;
   }
 

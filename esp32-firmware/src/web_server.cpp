@@ -405,9 +405,9 @@ String buildWifiConfigPortalPage() {
         <label for="password-input">WiFi 密码</label>
         <input id="password-input" name="password" maxlength="64" type="password" autocomplete="off" placeholder="输入 WiFi 密码，开放网络可留空">
         <div class="actions">
-          <a class="btn btn-secondary" href="/scan-wifi">)HTML";
+          <button class="btn btn-secondary" type="button" id="scan-btn">)HTML";
   html += scanButtonText;
-  html += R"HTML(</a>
+  html += R"HTML(</button>
           <button class="btn" type="submit">保存并连接</button>
         </div>
       </form>
@@ -427,6 +427,22 @@ String buildWifiConfigPortalPage() {
             ssidInput.value = ssid;
             ssidInput.focus();
           }
+        });
+      }
+
+      var scanBtn = document.getElementById("scan-btn");
+      if (scanBtn) {
+        scanBtn.addEventListener("click", function () {
+          if (scanBtn.disabled) {
+            return;
+          }
+          scanBtn.disabled = true;
+          scanBtn.textContent = "正在扫描...";
+          fetch("/scan-wifi", { cache: "no-store" })
+            .catch(function () {})
+            .finally(function () {
+              window.location.href = "/";
+            });
         });
       }
     })();
@@ -524,12 +540,6 @@ String buildWifiConfigSuccessPage(const String& ssid) {
 
 String buildConfigPortalRootUrl() {
   return "http://" + WiFiManager::getConfigPortalIP() + "/";
-}
-
-bool isConfigPortalHostRequest(AsyncWebServerRequest* request) {
-  String requestHost = request->host();
-  String portalHost = WiFiManager::getConfigPortalIP();
-  return requestHost == portalHost || requestHost == (portalHost + ":80");
 }
 
 void addConfigPortalNoCacheHeaders(AsyncWebServerResponse* response) {
@@ -2040,10 +2050,6 @@ void WebServer::setupRoutes() {
 
   server.on("/", HTTP_ANY, [](AsyncWebServerRequest *request){
     if (WiFiManager::isConfigMode()) {
-      if (!isConfigPortalHostRequest(request)) {
-        redirectToConfigPortalRoot(request);
-        return;
-      }
       sendConfigPortalPage(request);
       return;
     }
@@ -2057,7 +2063,7 @@ void WebServer::setupRoutes() {
     }
 
     WiFiManager::scanNearbyNetworks();
-    redirectToConfigPortalRoot(request);
+    sendConfigPortalPage(request);
   });
 
   server.on("/configure-wifi", HTTP_POST, [](AsyncWebServerRequest *request){

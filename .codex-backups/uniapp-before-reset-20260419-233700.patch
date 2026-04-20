@@ -1,0 +1,4401 @@
+diff --git a/uniapp/App.vue b/uniapp/App.vue
+index f49c22d..544f67d 100644
+--- a/uniapp/App.vue
++++ b/uniapp/App.vue
+@@ -65,12 +65,24 @@ page {
+   /* #endif */
+ }
+ 
+-/* 小程序全局 view 元素也需要 box-sizing */
+-/* #ifdef MP-WEIXIN */
+-view, scroll-view, swiper, text, input, textarea, button, image {
+-  box-sizing: border-box;
+-}
+-/* #endif */
++/* 小程序全局 view 元素也需要 box-sizing */
++/* #ifdef MP-WEIXIN */
++view, scroll-view, swiper, text, input, textarea, button, image {
++  box-sizing: border-box;
++}
++
++button,
++button::after,
++.button-hover {
++  transition: none !important;
++  transform: none !important;
++}
++
++.button-hover {
++  opacity: 1 !important;
++  background-color: inherit !important;
++}
++/* #endif */
+ 
+ /* 禁用橡皮筋效果 */
+ /* #ifndef MP-WEIXIN */
+diff --git a/uniapp/components/ArtworkCard.vue b/uniapp/components/ArtworkCard.vue
+index 7522caa..ff4f1e6 100644
+--- a/uniapp/components/ArtworkCard.vue
++++ b/uniapp/components/ArtworkCard.vue
+@@ -130,9 +130,13 @@ export default {
+ .artwork-card {
+   background-color: var(--nb-surface);
+   border-radius: 0;
+-  box-shadow: var(--nb-shadow-strong);
++  box-shadow: 0 4rpx 0 #000000;
++  width: 100%;
++  max-width: 100%;
++  min-width: 0;
++  box-sizing: border-box;
+   overflow: hidden;
+-  transition: all 0.2s ease;
++  transition: none;
+ }
+ 
+ 
+@@ -202,7 +206,7 @@ export default {
+   display: flex;
+   align-items: center;
+   gap: 8rpx;
+-  transition: all 0.2s ease;
++  transition: none;
+   color: #4a4a4a;
+ }
+ 
+diff --git a/uniapp/components/ChallengeCard.vue b/uniapp/components/ChallengeCard.vue
+index c1c9b04..59c1b79 100644
+--- a/uniapp/components/ChallengeCard.vue
++++ b/uniapp/components/ChallengeCard.vue
+@@ -215,9 +215,13 @@ export default {
+ .challenge-card {
+   background-color: var(--nb-surface);
+   border-radius: 0;
+-  box-shadow: var(--nb-shadow-strong);
++  box-shadow: 0 4rpx 0 #000000;
++  width: 100%;
++  max-width: 100%;
++  min-width: 0;
++  box-sizing: border-box;
+   overflow: hidden;
+-  transition: all 0.2s ease;
++  transition: none;
+ }
+ 
+ 
+@@ -377,7 +381,7 @@ export default {
+   gap: 12rpx;
+   padding: 16rpx 24rpx;
+   border-radius: 0;
+-  transition: all 0.2s ease;
++  transition: none;
+ }
+ 
+ .button-active {
+diff --git a/uniapp/components/ConnectModal.vue b/uniapp/components/ConnectModal.vue
+index 4519da6..23842b8 100644
+--- a/uniapp/components/ConnectModal.vue
++++ b/uniapp/components/ConnectModal.vue
+@@ -25,8 +25,7 @@
+ 
+         <!-- 连接状态 -->
+         <view v-if="connecting" class="status-box connecting">
+-          <view class="loading-spinner"></view>
+-          <text class="status-text">连接中...</text>
++          <GlxInlineLoader label="连接中..." :size="34" compact />
+         </view>
+ 
+         <view v-if="error" class="status-box error">
+@@ -52,10 +51,12 @@
+ </template>
+ 
+ <script>
++import GlxInlineLoader from "./GlxInlineLoader.vue";
+ import Icon from "./Icon.vue";
+ 
+ export default {
+   components: {
++    GlxInlineLoader,
+     Icon,
+   },
+ 
+@@ -300,21 +301,6 @@ export default {
+   background-color: #f8dede;
+ }
+ 
+-.loading-spinner {
+-  width: 32rpx;
+-  height: 32rpx;
+-  border: 3rpx solid rgba(0, 0, 0, 0.16);
+-  border-top-color: var(--nb-ink);
+-  border-radius: 50%;
+-  animation: spin 0.8s linear infinite;
+-}
+-
+-@keyframes spin {
+-  to {
+-    transform: rotate(360deg);
+-  }
+-}
+-
+ .status-text {
+   font-size: 24rpx;
+   font-weight: 800;
+diff --git a/uniapp/components/LoadingOverlay.vue b/uniapp/components/LoadingOverlay.vue
+index 141b5e8..27c6f03 100644
+--- a/uniapp/components/LoadingOverlay.vue
++++ b/uniapp/components/LoadingOverlay.vue
+@@ -1,10 +1,8 @@
+ <template>
+   <view v-if="visible" class="glx-loading-overlay">
+     <view class="glx-loading-card">
+-      <view class="glx-loading-indicator">
+-        <view class="glx-loading-dot glx-loading-dot--1"></view>
+-        <view class="glx-loading-dot glx-loading-dot--2"></view>
+-        <view class="glx-loading-dot glx-loading-dot--3"></view>
++      <view class="glx-loading-logo-stage">
++        <GlxLogoLoader :variant="activeVariant" :size="108" />
+       </view>
+       <text class="glx-loading-text">{{ message }}</text>
+     </view>
+@@ -12,13 +10,23 @@
+ </template>
+ 
+ <script>
++import GlxLogoLoader from "./GlxLogoLoader.vue";
+ import { bindLoadingInstance, unbindLoadingInstance } from '../composables/useToast.js'
+ 
++const LOADING_VARIANTS = ['chase', 'flip', 'stamp']
++const TRANSPORT_VARIANT = 'chase'
++const TRANSPORT_MESSAGE_KEYWORDS = ['发送', '传输', '上传', '下发']
++
+ export default {
++  components: {
++    GlxLogoLoader,
++  },
++
+   data() {
+     return {
+       visible: false,
+-      message: '加载中...'
++      message: '加载中...',
++      activeVariant: LOADING_VARIANTS[0]
+     }
+   },
+ 
+@@ -31,13 +39,41 @@ export default {
+   },
+ 
+   methods: {
+-    show(message = '加载中...') {
++    show(message = '加载中...', options = {}) {
+       this.message = message
++      this.activeVariant = this.resolveVariant(message, options)
+       this.visible = true
+     },
+ 
+     hide() {
+       this.visible = false
++    },
++
++    resolveVariant(message, options) {
++      if (options && typeof options.variant === 'string' && LOADING_VARIANTS.includes(options.variant)) {
++        return options.variant
++      }
++
++      if (this.isTransportMessage(message)) {
++        return TRANSPORT_VARIANT
++      }
++
++      return this.pickRandomVariant()
++    },
++
++    isTransportMessage(message = '') {
++      return TRANSPORT_MESSAGE_KEYWORDS.some((keyword) => message.includes(keyword))
++    },
++
++    pickRandomVariant() {
++      const randomIndex = Math.floor(Math.random() * LOADING_VARIANTS.length)
++      const randomVariant = LOADING_VARIANTS[randomIndex]
++      if (LOADING_VARIANTS.length > 1 && randomVariant === this.activeVariant) {
++        const nextIndex = (randomIndex + 1) % LOADING_VARIANTS.length
++        return LOADING_VARIANTS[nextIndex]
++      }
++
++      return randomVariant
+     }
+   }
+ }
+@@ -51,66 +87,42 @@ export default {
+   display: flex;
+   align-items: center;
+   justify-content: center;
+-  padding: 32rpx;
++  padding: 120rpx 32rpx 168rpx;
+   box-sizing: border-box;
+-  background: rgba(255, 255, 255, 0.72);
++  background: rgba(255, 255, 255, 0.08);
+ }
+ 
+ .glx-loading-card {
+   width: 100%;
+-  max-width: 420rpx;
+-  padding: 36rpx 32rpx;
+-  border: 4rpx solid #000000;
+-  box-shadow: 10rpx 10rpx 0 #000000;
+-  background: #ffffff;
++  max-width: 360rpx;
++  padding: 24rpx;
++  border: 2rpx solid #000000;
++  box-shadow: 4rpx 4rpx 0 #000000;
++  background: rgba(255, 255, 255, 0.97);
+   display: flex;
+   flex-direction: column;
+   align-items: center;
+-  gap: 22rpx;
++  gap: 18rpx;
+   box-sizing: border-box;
+ }
+ 
+-.glx-loading-indicator {
++.glx-loading-logo-stage {
++  width: 164rpx;
++  height: 164rpx;
++  border: 2rpx solid #000000;
++  background: linear-gradient(160deg, #141b29 0%, #090d15 100%);
+   display: flex;
+   align-items: center;
+-  gap: 16rpx;
+-}
+-
+-.glx-loading-dot {
+-  width: 24rpx;
+-  height: 24rpx;
+-  border: 3rpx solid #000000;
+-  background: #f2cf4a;
+-  animation: glxLoadingBounce 0.9s ease-in-out infinite;
+-}
+-
+-.glx-loading-dot--2 {
+-  animation-delay: 0.12s;
+-}
+-
+-.glx-loading-dot--3 {
+-  animation-delay: 0.24s;
++  justify-content: center;
++  overflow: hidden;
++  position: relative;
+ }
+ 
+ .glx-loading-text {
+-  font-size: 28rpx;
++  font-size: 26rpx;
+   font-weight: 900;
+   line-height: 1.4;
+   color: #000000;
+   text-align: center;
+ }
+-
+-@keyframes glxLoadingBounce {
+-  0%,
+-  80%,
+-  100% {
+-    transform: translateY(0);
+-    opacity: 0.45;
+-  }
+-
+-  40% {
+-    transform: translateY(-8rpx);
+-    opacity: 1;
+-  }
+-}
+ </style>
+diff --git a/uniapp/components/ProjectCard.vue b/uniapp/components/ProjectCard.vue
+index b45f996..2112ee1 100644
+--- a/uniapp/components/ProjectCard.vue
++++ b/uniapp/components/ProjectCard.vue
+@@ -157,10 +157,14 @@ export default {
+   flex-direction: column;
+   background-color: var(--nb-surface);
+   border-radius: 0;
++  width: 100%;
++  max-width: 100%;
++  min-width: 0;
++  box-sizing: border-box;
+   overflow: hidden;
+   border: var(--nb-border-width-panel) solid var(--nb-ink);
+-  box-shadow: var(--nb-shadow-strong);
+-  transition: var(--transition-base);
++  box-shadow: 0 4rpx 0 #000000;
++  transition: none;
+   height: 100%;
+ }
+ 
+@@ -228,7 +232,7 @@ export default {
+   justify-content: center;
+   color: #ffffff;
+   opacity: 0.8;
+-  transition: var(--transition-base);
++  transition: none;
+   z-index: 10;
+ }
+ 
+diff --git a/uniapp/components/TemplateCard.vue b/uniapp/components/TemplateCard.vue
+index 42c7cee..2563506 100644
+--- a/uniapp/components/TemplateCard.vue
++++ b/uniapp/components/TemplateCard.vue
+@@ -103,9 +103,13 @@ export default {
+ .template-card {
+   background-color: var(--nb-surface);
+   border-radius: 0;
+-  box-shadow: var(--nb-shadow-strong);
++  box-shadow: 0 4rpx 0 #000000;
++  width: 100%;
++  max-width: 100%;
++  min-width: 0;
++  box-sizing: border-box;
+   overflow: hidden;
+-  transition: all 0.2s ease;
++  transition: none;
+ }
+ 
+ 
+diff --git a/uniapp/composables/useToast.js b/uniapp/composables/useToast.js
+index 97504c6..dc93baf 100644
+--- a/uniapp/composables/useToast.js
++++ b/uniapp/composables/useToast.js
+@@ -88,10 +88,10 @@ export function useToast() {
+     showToast(message, 'info')
+   }
+ 
+-  const showLoading = (message = '加载中...') => {
++  const showLoading = (message = '加载中...', options = {}) => {
+     const loadingInstance = getActiveInstance(loadingInstances)
+     if (loadingInstance && typeof loadingInstance.show === 'function') {
+-      loadingInstance.show(message)
++      loadingInstance.show(message, options)
+       return
+     }
+ 
+diff --git a/uniapp/docs/development-guardrails.md b/uniapp/docs/development-guardrails.md
+index 0e4c3c3..469212c 100644
+--- a/uniapp/docs/development-guardrails.md
++++ b/uniapp/docs/development-guardrails.md
+@@ -38,6 +38,7 @@
+ 用户新增确认：
+ 
+ - `游戏屏保 / 像素场景集 / GIF播放器 / 沙漏倒计时` 的发送反馈必须对齐 `静态时钟` 已定板流程：点击发送后先进入明确的“发送中”锁定弹窗，发送结束或失败后再显示 `Toast` 结果提示；不允许继续只有按钮文案变化、没有中间传输态
++- 用户已最新确认：所有“发送中/传输中”流程的正式 Loading 动画统一固定为 `5`（`chase`），与板载程序保持一致；传输流程禁止随机切换其他动效
+ - `游戏屏保` 的 uniapp 页面当前已基本调顺，后续推进迁移时不允许顺手改坏已确认好的页面布局、参数分组、预览交互和发送链路
+ - 后续如果要继续推进 `游戏屏保`，优先补板载程序实现、协议一致性和运行闭环，不把已稳定的 uniapp 页面再次当作试验场
+ - `游戏屏保 / LED演示集 / 像素屏保` 这类功能的最终完成标准，必须是“板载程序自己实现逻辑”；uniapp 只负责预览、参数编辑、开关控制和数据传递
+@@ -73,6 +74,10 @@
+ - 用户已新增确认：`桌面宠物` 不需要瞳孔独立设置；后续只保留眼睛主体颜色与时间颜色，不再提供 `瞳孔颜色 / pupilColor` 之类的页面入口、协议字段、固件存储字段或调试工具输入项
+ - 用户已新增确认：`桌面宠物` 的时间样式位置必须按设备真实可持久化坐标保存；用户在页面里调好的时间位置，发送后与设备重启后都必须保持一致，不允许出现预览可见但重启后被洗回其他位置的情况
+ - 用户已新增确认：`桌面宠物` 的时间字体选择必须和 `time.font` 持久化字段一一对应；只要用户已经发送成功，设备重启后仍必须保持同一字体，不允许在恢复配置时把非默认字体误判成非法值再洗回默认字体
++- 用户已最新确认：`桌面宠物` 的开发顺序固定为“先 `uniapp` 完成 `64x64` 本地模拟闭环并验收，再进入板载程序开发”；在 `uniapp` 验收通过前，禁止提前改动该功能的板载渲染逻辑与协议字段
++- 用户已最新确认：`control` 设备控制页必须提供“桌面宠物预览”独立直达入口；该入口与模式切换入口分离，点击后直接进入 `/pages/spirit-screen/spirit-screen`
++- 用户已最新确认：此前为 `桌面宠物` 临时加上的独立辅助入口、文案、路由、页面与素材数据文件都不是正式产品需求；当前已定板为全部移除，不保留任何可达残留
++- 用户已最新纠正：`桌面宠物` 预览里不允许出现与来源素材无关的“中心白块补丁”或失真大眼横条；眼睛渲染必须受单眼尺寸约束，不能继续覆盖整张脸
+ - 用户已新增确认：`主题模式` 不再保留 `画布主题 / clockwise_canvas`，也不再提供“上传主题图片”相关页面入口、预览分支或发送链路；主题模式只保留本地板载主题选择与 `themeId` 下发
+ - 用户已新增确认：`设备参数` 页中的亮度上限固定为 `178`，这是为了避免亮度过高导致供电不足；即使固件接口支持 `255`，前端页面的亮度滑杆、回显范围与提交流程也不得擅自改成 `255`
+ - 用户已新增确认：`set_game_screensaver` 的命令语义就是“设置并切换到对应游戏屏保”；前端只要收到该命令的成功回包，就应视为设置成功，不允许再额外用二次 `status` 查询里的 `effectMode/game` 匹配作为成功前置条件
+@@ -123,6 +128,9 @@
+ - 不允许为了统一视觉、复用代码、迁移仓库效果而顺手改动这些模式
+ - 若确实需要改上述模式的结构、渲染、配置项或交互，必须先得到用户确认
+ - 其他尚未满意、允许重做的功能，才可以按新参考仓库路线推倒重来
++- 用户已最新确认：当前项目的核心是 `WebSocket` 通讯链路；后续所有 cleanroom 页面迁移、样式重构、组件收口都不得顺手改动 `utils/webSocket.js`、`store/device.js`、发送命令组装、回包成功判定、连接状态同步与断线重连语义
++- 用户已最新确认：只要本轮目标不是“明确修 WS / 通讯问题”，就必须把通讯链路视为冻结边界；允许复用现有 store / API / 页面状态，但不允许借 cleanroom 重构之名重写通讯状态机、发送时序、回包处理或设备模式回放
++- 用户已最新确认：若后续某个 cleanroom 页面需要接入真实设备能力，优先做“UI 壳接现有通讯接口”，不改协议、不改字段、不改发送语义；发现必须触碰 WS 链路时，必须先停下并单独说明变更边界与回归范围
+ 
+ ### 2.1 外接依赖剔除规则（新增）
+ 
+@@ -231,6 +239,85 @@
+ - `countdown-board` 漏砂节奏必须为细流连续下落，不允许一次性大量喷出造成“整块坠落”观感。
+ - `countdown-board` 禁止退化成“隔一段时间只在下仓补一个像素点”的假漏砂；必须能持续看到颗粒从颈口向下仓运动的过程。
+ - `countdown-board` 颗粒运动禁止“全局乱飘”漂移；必须以重力主导并维持明确方向性：上仓向颈口汇聚、颈口单粒漏出、下仓向两侧稳定堆积。
++
++### 2.6 HBuilderX 模板兼容规则（新增）
++
++用户已明确确认：`uniapp-rebuild` 的完成标准不能只看终端静态脚本通过，必须同时满足 `HBuilderX` 真实编译可通过；凡是会触发 `uni-template-compiler` 异常的模板写法，必须直接清理。
++
++执行规则：
++
++- `template` 内禁止使用反引号模板字符串表达式，例如 ``:class="`foo-${bar}`"``、``:value="`数量 ${count}`"``、样式对象里的 ```${value}%```。
++- `template` 内禁止直接使用可选链 `?.`，例如 `project?.name`；必须改成 `computed / methods / 预处理数据`。
++- 非 `H5` 平台下，`:key` 禁止使用拼接表达式、模板字符串或其他不稳定表达式；必须使用预先整理好的稳定字符串字段。
++- `template` 内禁止放可能触发编译器成员表达式异常的复杂表达式；优先提前收敛到 `computed / methods / data`。
++- 非事件处理器场景下，`template` 内禁止直接调用方法、成员方法或构造辅助，例如 `foo(bar)`、`list.includes(x)`、`map.get(k)`、`String(value)`；必须先在 `computed / data` 中整理成稳定字段后再绑定。
++- `:class / :style / :value / v-if / v-for / 插值` 都按同一口径处理，不允许继续把运行时函数调用塞进模板表达式里。
++- 若同一页面既要兼顾 `HBuilderX` 与微信开发者工具，默认以更严格的 `HBuilderX` 模板兼容口径实现，不允许保留“CLI 能过、HBuilderX 会炸”的写法。
++
++### 2.7 微信小程序官方规范优先规则（新增）
++
++用户已最新确认：后续 cleanroom 的样式、资源、字体与页面兼容处理，不能只靠本地经验和 HBuilderX 试错；涉及微信小程序运行约束时，必须先核对微信小程序官方文档，再落代码。
++
++### 2.8 uniapp 全量页面收口执行规则（新增）
++
++用户已最新确认：当前重新推进时，正式改造落点固定回到 `uniapp/` 主工程，不再继续拆到并行新工程；本轮必须按“公共层先收口、正式页面全覆盖、未做完不停”的方式推进。
++
++执行规则：
++
++- 本轮改造的唯一正式落点固定为 `uniapp/`；不再把样式减负、tabBar 改造、loading 收口拆到新的并行工程后再回填。
++- 本轮完成定义固定为：`pages.json` 中所有正式可达页面都已纳入审计并完成对应收口；只要仍有正式页未排查、未处理或仍保留明显风格漂移，就不能宣称“已完成”。
++- 推进顺序固定为：`公共层（tabBar / loading / token / 公共控件）` -> `一级页` -> `同家族二级页` -> `模式/编辑页`；不得只改少数容易页面后提前结束。
++- 若用户明确要求“全面推进直到所有页面完成”，执行中不得把剩余页面留给用户手工点名；必须由开发阶段主动列出全量页面清单、逐批推进并自证覆盖范围。
++- 本轮样式减负默认目标是“减少污染、统一壳层、保持旧布局结构”，不是“顺手重设计页面”；若某页要改结构，必须先证明这是修兼容或复刻原结构所必需，而非主观优化。
++- 任何公共层改动若会同时影响多个正式页面，必须把受影响页面全部回归排查后再继续下一批；不能只在当前页看着正常就提交。
++- 用户已最新改板：当前 `uniapp/` 一级页底部导航不再继续使用微信原生 `custom-tab-bar` 方案；若该方案出现首切左挪、选中态错乱或生命周期不稳，必须直接废弃，不得继续在原生 `custom-tab-bar` 上反复补丁。
++- 一级页底部导航当前正式实现固定为“页面内共享底部组件”；5 个一级页必须共用同一组件、同一图标资源、同一选中态语义，不允许各页手写一版。
++- 一级页之间的底部导航切换必须保持稳定，不允许出现首帧左挪、选中态对不上、点击后高亮错位或二次回弹；若出现上述现象，视为未完成。
++- 用户已最新确认：若一级页首次点击底部导航后仍然出现“目标页先向左挪一下再回正”，禁止继续靠骨架屏、延时刷新、占位切换或额外 loading 掩盖；必须直接切换实现路线并消除首帧横向位移。
++- 用户已最新确认：当前问题已扩大为“任意点击屏幕都会出现横向移动感”；后续必须按全局交互抖动处理，优先排查共享 `:active`、阴影切换、过渡动画与根容器布局变化，不得再只盯底部导航单点修补。
++- 用户已最新确认：页面内共享底部导航若仍需负责一级页切换，禁止继续使用会带明显横向切页感的根页跳转实现；应优先采用不会产生左右滑动观感的根页切换语义，并保持当前页重进后选中态稳定。
++- 用户已最新再次纠正：任意一级页只要用户每次点击屏幕仍感觉整页有轻微左右偏移，就按未修复处理；根页切换工具、共享卡片、菜单项、按钮和公共样式里的缓动都必须继续清理，直到页面点击时整体观感完全静止。
++- 用户已最新改板：页面内共享底部组件方案已被否决；当前 `uniapp/` 一级页底部导航正式实现重新固定回原生 `tabBar`，不得继续在 `RootTabBar`、页面内共享底栏或其他自定义根页导航方案上追加补丁。
++- 用户已最新再次确认：当前 `tabBar` 本身已经不偏移，剩余问题明确收敛为“页面内容区点击会偏移”；后续排查必须优先聚焦一级页内容层、共享卡片、按钮、原生 `button` 默认反馈与公共交互样式，不能再把问题归因到 `tabBar`。
++- 用户已最新再次纠正：所谓“还原”不能只把底部导航切回原生；如果一级页内容壳层仍保留后来新增的骨架包裹层、额外滚动区属性、共享页面壳改造或其他偏离已提交稳定版本的公共结构，就不算真正还原。后续必须先把一级页内容壳层回到稳定基线，再继续排查剩余偏移。
++- 用户已最新再次确认：只要微信开发者工具/HBuilderX 运行态里仍能肉眼看到内容区点击后横向偏移，就不得再用“源码已经还原”“结构已经切回原生”作为结论；必须继续对照历史稳定版本，把一级页根节点、顶部栏、滚动区和公共壳层追到真正一致为止。
++- 用户已最新再次确认：当前这种“点击时仍会有 1 像素级别横移”的问题，也按未修复处理；后续排查必须直接从原版稳定页面结构、全局样式污染和微信/uniapp 原生点击反馈三条线同时倒查，不得继续靠零散局部补丁猜原因。
++- 用户已最新再次确认：当前偏移已进一步收敛为“点击可跳转入口后，正式跳转前页面会先偏移一下”；后续必须把所有 `navigateTo / redirectTo / switchTab / reLaunch` 相关入口视为同一类问题排查，优先清理跳转前按压态、入口级 hover 反馈、导航前过渡和组件级默认点击态，不得只盯页面静态容器。
++- 用户已最新再次确认：在正式根因未钉死前，允许先复制问题页面到独立调试路径做 A/B 对照；调试页必须只保留最简单的边框线和基础布局，不叠加正式阴影、共享视觉壳或复杂交互样式，用于直接验证偏移是否来自样式层。
++- 用户已最新再次纠正：新增调试页不能只看 `pages.json` 注册成功；所有相对 `import` 路径也必须逐个校对到真实文件，至少保证静态引用可解析，不能出现“调试页刚加上就编译报 Could not resolve”的低级错误。
++- 用户已最新再次纠正：新增调试页还必须同步提供一个用户可见的临时访问入口；如果页面只能靠手输路径或编译模式切页访问，视为调试闭环未完成。
++- 用户已最新再次纠正：调试入口不允许只藏在二级菜单尾部或需要滚动后才看到；至少要在一个一级页首屏显眼可见，并明确告诉用户从哪里点进去。
++- 用户已最新改板：当前不再保留任何 `pages-debug` 临时调试页、调试聚合页或一级页内调试入口；这类页面和入口必须全部删除，后续排查优先走源码审计与正式页面直接修复，不再把临时调试路由暴露给用户。
++
++执行规则：
++
++- 涉及 `WXSS`、`@import`、字体资源、静态资源路径、页面结构兼容时，优先按微信小程序官方文档实现，不允许继续写“浏览器能过、HBuilderX 偶尔能过、微信小程序会炸”的灰色写法。
++- 按微信官方 `WXSS` 文档口径，样式导入使用明确路径；cleanroom 中共享字体、图标字体这类基础资源，不允许继续通过页面/组件局部样式层层 `@import` 转引，导致资源路径在打包时按组件目录重写。
++- 图标字体、基础字体注册属于应用基础设施层，不属于页面业务视觉；这类注册应在应用级基础入口统一接入，不能在多个组件里重复各自引入一份。
++- 若后续确实需要动态加载网络字体，必须按微信官方 `wx.loadFontFace` 文档执行，只允许使用文档允许的资源来源与格式约束，不得自行发明非官方兼容路径。
++- cleanroom 新增第三方样式资源前，先确认其资源文件、引用路径和小程序打包产物一致；缺文件、错路径、靠查询串撞运气的写法，直接视为不合规。
++
++### 2.8 cleanroom 依赖本地闭环规则（新增）
++
++用户已最新确认：当前有效的新工程目录固定为 `uniapp-rebuild`，不能假设 `HBuilderX` 会自动继承兄弟目录或外层工程的 `node_modules`；只要源码里引入了第三方依赖，就必须保证当前新工程本地可解析。
++
++执行规则：
++
++- `uniapp-rebuild` 中新增或复用第三方依赖时，必须先确认依赖已在当前工程目录本地安装，或以仓库内可追踪方式随工程提供；不允许依赖兄弟工程的 `node_modules` 碰运气解析。
++- 若 `main.js`、`store/*`、`components/*` 等 cleanroom 源码已引用依赖，但当前工程本地不存在该包，视为未完成，不得宣称可在 `HBuilderX` 直接运行。
++- 依赖接入优先走“当前工程 `package.json` + 当前工程本地安装”的单工程闭环，不额外发明跨目录 alias、软依赖或隐藏继承路径。
++- 每次新增依赖后，至少完成一次“当前工程内存在可解析包目录”的本地核对；若用户反馈 `文件查找失败`，优先排查 cleanroom 本地依赖是否缺失，再考虑其他兼容问题。
++
++### 2.9 cleanroom 运行态闭环闸门（新增）
++
++用户已最新确认：这轮目标不是“把样式框架文件堆出来”，而是把 `uniapp-rebuild` 做到可启动、可注册页面、可进入首屏；只要 `app.js` 启动报错、首页未注册、首屏打不开，就不能宣称框架搭建完成。
++
++执行规则：
++
++- `uniapp-rebuild` 的完成判定至少包含 3 层运行态闸门：`app.js` 无启动异常、首页根页可注册可进入、基础公共组件不会在首屏初始化阶段连环报错。
++- 任何影响 `main.js`、状态管理注入、全局资源接入、首页路由注册的改动，都不能只做静态检查；必须额外按运行态口径复核其是否会阻断页面注册。
++- 若用户反馈 `Page "... has not been registered yet"`，优先把它视为“上游启动链异常导致页面未完成注册”的信号，先排查 `main.js / App.vue / 全局插件 / 全局组件`，不要只盯 `pages.json`。
++- `uniapp-rebuild` 的样式重构、组件迁移、资源接入，只要会影响首屏启动链，就必须优先保证“先能启动再继续迁移”，不允许继续在启动链未稳定时叠加更多页面改动。
+ - `countdown-board` 的颗粒更新逻辑必须可追溯到 `MaxDYi/eHorglass` 源码（`Sand_UpdateScreen`、`Sand_GetTarget`、`Sand_TargetIsEmpty`），禁止按“看起来像”去拼随机漂移动画。
+ - `countdown-board` 的漏砂总时长必须与倒计时总时长一致：设置 `hours / minutes / seconds` 后，预览与设备表现都应在倒计时结束时完成漏砂，不允许出现“时间到但沙还没漏完”或“沙先漏完但时间未到”。
+ - `countdown-board` 本轮不再提供“剩余进度”说明与手动进度调节入口；页面展示与预览速度以倒计时总时长为唯一主语义。
+@@ -239,6 +326,32 @@
+ - `countdown-board` 禁止叠加“玻璃高光/玻璃质感”渲染层（如高光斜线、盖帽渐层、软描边等）；保留简洁像素轮廓即可。
+ - `countdown-board` 预览动画必须连续可读，禁止出现明显“按帧跳格”的断续运动观感。
+ 
++### 2.10 微信小程序运行时优先的状态注入规则（新增）
++
++用户已最新纠正：`uniapp-rebuild` 虽然使用 Vue 语法开发，但实际交付基线必须以微信小程序运行时为主，不能按通用 Vue Web / SPA 的默认初始化时机来假设 `store`、插件和页面 `data` 的执行顺序。
++
++执行规则：
++
++- cleanroom 中涉及 `main.js`、全局插件、`pinia`、页面首屏 `data/computed/onLoad` 的实现，默认以微信小程序页面实例化时机为准，不按浏览器单页应用的注入顺序想当然实现。
++- 若页面会在 `data()`、`computed` 初始化阶段读取 `store`，必须先保证当前运行时里 `pinia` 已处于激活状态；不能依赖“标准 Vue 里通常已经注入完成”的经验判断。
++- 只要用户在微信开发者工具中复测到 `getActivePinia()`、`Page has not been registered yet`、首页首屏组件初始化连锁报错，就视为 cleanroom 启动链未闭环；不得继续把问题解释成“只是 Vue 写法”或“页面本身已迁完”。
++- 状态管理接入方案必须优先兼容 `mp-weixin` 真机/开发者工具，其次才是通用 Vue 语义；若两者存在差异，以微信小程序运行稳定为最高优先级。
++- 后续凡是接入新的全局插件、运行时资源或状态层，都必须先验证它在微信小程序页面 `data -> computed -> 生命周期` 这条初始化链上不会抢跑、不会阻断页面注册。
++
++### 2.11 `uniapp-rebuild` 原版复刻与语法保守规则（新增）
++
++用户已最新确认：`uniapp-rebuild` 这轮不是自由重写，而是以当前可运行的 `uniapp` 为真值源，先做“页面继续可跑、样式污染变少、原版结构不变”的保守重建。
++
++执行规则：
++
++- `uniapp` 当前可运行实现是 `uniapp-rebuild` 的功能与结构真值源；只要旧页能跑，`uniapp-rebuild` 就不得凭感觉改交互路径、页面层级或组件调用时机。
++- `uniapp-rebuild` 首阶段仅允许对以下内容做结构性调整：公共样式去污染、公共组件抽取、自定义 `tabBar` 替换原生实现、页面内部样式去重；不允许顺手扩成页面重排或视觉重设计。
++- 除自定义 `tabBar` 外，其他页面骨架默认保持与 `uniapp` 一致；任何会改变标题/搜索/内容区顺序的改动，都按越界处理。
++- 后续迁移页面时优先采用“旧页逻辑和结构搬运 + 样式层减负”的方式，不允许先写一版新的页面再去猜旧功能是否对齐。
++- 微信小程序不支持或 `HBuilderX` 高风险的写法默认一律禁用；包括但不限于模板字符串类名、模板内函数调用、可选链、复杂表达式 `:key`、依赖浏览器行为的样式/脚本语义。
++- 页面和组件如果只是为了样式抽取，不得改动 `WS / store / API / 命令字段 / 页面状态语义`；这类链路继续视为冻结边界。
++- 本轮完成标准优先级固定为：`能启动` > `页面可达` > `结构对齐原版` > `样式减负`；只要运行链或页面可达性被破坏，就不能以“样式更干净”作为理由继续推进。
++
+ 以下改动不是绝对不能做，但在动手前必须先向用户确认：
+ 
+ - 重写 `WS` 连接流程。
+@@ -657,3 +770,23 @@
+ - 项目确认新的图标导出与使用规范
+ - 项目确认新的页面层级与信息密度规则
+ - 项目确认新的动效限制与交互反馈标准
++
++### 8.7 本地素材编辑擦除语义（新增）
++
++用户已最新纠正：素材库编辑页的“擦除”必须直接修改素材像素数据本体，不允许继续在固定 `64×64` 面板上叠加黑色遮罩像素来伪装擦除效果。
++
++执行约束：
++
++- 擦除路径必须按当前 `宽/高/X/Y` 映射到素材坐标后写回源像素
++- 擦除后的保存、导出、回显必须基于已修改的素材像素数据
++- “清空擦除/还原”只能恢复素材源像素，不得仅移除遮罩层
++
++### 8.8 本地素材编辑坐标范围（新增）
++
++用户已最新纠正：本地素材编辑页的 `X/Y` 偏移不允许再固定限制在 `±64`；该限制会导致裁剪与取局部素材时操作异常。
++
++执行约束：
++
++- `X/Y` 输入与步进按钮不设置固定 `±64` 上下限
++- 偏移可超出 `64×64` 预览区域，用于截取素材局部
++- 回显、保存、导出统一按当前偏移值处理，不得私自夹断到固定区间
+diff --git a/uniapp/docs/neubrutalism-style-system.md b/uniapp/docs/neubrutalism-style-system.md
+index 307520f..5daedfc 100644
+--- a/uniapp/docs/neubrutalism-style-system.md
++++ b/uniapp/docs/neubrutalism-style-system.md
+@@ -16,26 +16,36 @@
+ - 编辑页、拼豆模式、画板模式、功能区页面只改风格，不重排布局
+ - 同一语义的结构只允许保留一套正式样式结构和一套正式类名体系；禁止在不同页面为同一种标题栏、搜索栏、列表入口、工具条各写一套近似实现
+ - 同一语义组件后续优先通过统一组件或局部 mixin 收口，不允许继续靠页面各自复制粘贴一份样式再微调
++- 当前阶段固定为“组件库先行”：网站换肤、`uniapp-rebuild` 新版样式、后续公共控件替换，都必须先以官网组件库定板为唯一基线，再批量映射到页面；不允许继续边改页面边猜规范
++- 官网组件库不是展示海报，而是正式样式基线页：每个组件组都必须提供真实交互、尺寸 modifier、阴影 modifier、语义色和关键状态覆盖，保证后续网站与 uniapp 可以直接对照替换
++- `uniapp` 与 `uniapp-rebuild` 中凡是已经做过风格改动、视觉重整或交互定板的控件、卡片、弹窗、选择器、预览壳、图标资源，都必须回收进官网组件库展示；不允许只在业务页面里存在、组件库里却缺席
++- 组件库必须承担“冻结视觉资产”的职责：一旦某个控件、图标族或状态块在组件库定板，后续页面实现只能照着映射，不允许开发时再各自发挥一版相似样式
++- cleanroom 新工程的控件建设顺序固定为：先抽正式内用组件，再接页面；不允许为了赶页面进度先在页面里手搓临时按钮、输入框、开关、滑块、步进器，后面再回头统一
++- 旧工程中已经成熟且确有复用价值的组件，允许先做“复刻 + 去污染 + 视觉重整”后接入 cleanroom；不要求所有控件都从零新写，但必须去掉旧的全局依赖和历史样式包袱
+ - 功能页面的预览区域必须统一留边；黑色预览底板内的像素画布四周可视边距必须使用同一套基准，不允许不同页面一会儿更宽一会儿更窄
+ - 统一预览留边时，不只看缩放系数，缩放取整规则也必须一致；同样写成 0.96 的页面若一页用整数缩放、一页用浮点缩放，视觉留边仍视为不一致
+ - 不新增无意义标题、副标题、英文说明
+ - 标题栏右侧默认不放内容，避免被微信小程序系统区域遮挡
+ - 不再写轻飘圆角卡片、柔光阴影、玻璃拟态、无来源渐变
+ - 禁止再通过全局样式、标签级选择器或 `!important` 强行把页面压成统一效果；页面表现必须主要来自页面自身和正式组件自身
++- 一级页切换时禁止出现白屏闪烁；顶部栏、底部 `tabBar` 与页面框架必须稳定存在，内容区只允许用骨架屏或局部 loading 过渡。
++- 一级页首屏不得把空白页当成“加载中”；至少要保留与旧页面结构对应的骨架占位，避免 tab 切换后用户先看到一整块白屏。
+ 
+ ## 2. 视觉主系统
+ 
+ 当前定板方向：
+ 
++- 正式风格名：`Glowxel Clean Pixel Brutal`
+ - 背景主色：`#FFFFFF`
+ - 卡片背景：`#FFFFFF`
+ - 主文字：`#000000`
+-- 次文字：`#444444`
+-- 主强调色：`#FFD23F`
+-- 次强调色：`#74B9FF`
+-- 成功色：`#88D498`
+-- 危险色：`#FF6B6B`
+-- 警示色：`#FFA552`
++- 次文字：`#374151`
++- 主强调色：`#FFCB45`
++- 次强调色：`#5EA8FF`
++- 信息色：`#909399`
++- 成功色：`#67C23A`
++- 警示色：`#E6A23C`
++- 危险色：`#F56C6C`
+ 
+ 统一结构规则：
+ 
+@@ -47,11 +57,15 @@
+ - 重点块上色，基础骨架保持白底黑边
+ - 禁止再把整页、整组表单、整组设置面板铺成淡黄底
+ - 页面底色统一用白色，只有强调按钮、选中态、状态块才允许上色
++- 用户已最新确认：样式预览页、组件规范页、正式页面都禁止再使用大面积淡黄色、米黄色、奶油黄背景制造氛围；黄色只保留给小面积高纯度强调，不再承担整块铺底
+ - 用户新定板：整体观感要“清新、清晰、干净”，不能把图标底板、入口块和状态块一律做成发灰发淡的浅色片
+ - 高频页的图标壳必须有明确存在感：要么白底黑边配高对比图标，要么直接使用清晰的强调色底板，不允许再出现“底板像没上色、图标像浮在空气里”的效果
+ - 帮助弹窗、操作指南、说明卡片里的图标必须和底板形成明确对比；禁止再出现黄底上叠黄图标、结果视觉上像“没有图标”的情况
+ - 黄色、蓝色、绿色、珊瑚色允许继续使用，但必须更聚焦地服务于主操作、图标底板、状态提示；不允许把整块内容区大面积铺成稀薄彩雾
+ - “清新”不等于“发白发灰”：次级文字可以弱，但图标、操作入口、筛选选中态、弹窗主按钮必须一眼能识别
++- 用户已最新确认：新版正式风格的关键词固定为“清爽、专业、像素工业感”，不是营销化大视觉，也不是软糯圆角卡片风
++- 用户已最新确认：状态色必须按标准语义固定为 `info / success / warning / danger` 四类；后续按钮、Toast、状态标签、图标底板、反馈条都按这套语义对齐，不再每页各自猜色
++- 用户已最新确认：多选框选中态必须是明确的“色块 + 中心勾号”语法，不接受只有整行轻微变色却看不清是否选中的弱状态；当前正式基线固定为黄底黑勾 checkbox
+ 
+ ## 3. 公共类命名规则
+ 
+@@ -147,14 +161,19 @@
+ - 同一组卡片如果使用外部硬阴影，阴影方向和强度必须一致
+ - 如果栅格边缘导致外部阴影看起来像被裁掉，优先减弱或移除该组卡片阴影，改靠完整边框表达
+ - 不允许同一行左卡和右卡出现明显不同的阴影视觉
++- 官网与规范站的阴影必须只使用统一分级 token；同层级容器、卡片、弹窗、导航不允许一处 2px 一处 8px 地各写一套
++- 当页面要求“轻量化一点”时，默认先减弱阴影扩散和偏移量，不通过临时改圆角、改背景色去冒充轻量化
++- 当前轻量版正式基线固定为 `2px` 黑边与 `2px / 3px / 4px` 三档硬阴影；官网、组件库和后续 `uniapp-rebuild` 统一按这套 token 收口，不再页面各自调粗细
+ 
+ ## 4.2.2 图标系统规则
+ 
+-图标系统后续统一按 `IconPark + 项目资产映射` 方向推进，禁止继续混搭多套随手找来的图标。
++图标系统后续统一按“单族粗线图标 + 项目资产映射”方向推进，禁止继续混搭多套随手找来的图标。
+ 
+ 统一要求：
+ 
+-- `uniapp` 侧图标优先使用已经确认风格的 `IconPark` 资源
++- `uniapp-rebuild` 当前标准预演阶段，运行态唯一图标来源固定为 `components/Icon.vue + static/iconfont/*`；未确认新资源前，不继续混入第二套运行态图标库
++- 官网组件库必须单独展示当前正式图标库与图标语义映射，不允许只在页面里零散使用图标而不回收到组件库总览
++- 当前图标观感目标固定为“粗线、清晰、居中、和文字同色”，即使后续替换底层资源，也必须保持这一套语义和线重
+ - 用户已最新确认：`pixelarticons` 这类单色像素图标库当前不适合作为 Glowxel 项目的最终页面图标语言；可以借鉴其“图标跟随文字色、语义命名、成组管理”的方法，但不作为正式整包接入方向
+ - 底部导航、设备控制入口、功能入口、设置入口等高频图标必须同一风格族
+ - 不允许自行重画一个“差不多”的图标去替代成熟图标
+@@ -190,21 +209,25 @@
+ - 用户已再次纠正：同一行按钮允许按语义使用黄底、蓝底、红底等不同底色；真正禁止的是“按钮内部图标和文字不同步”。每个按钮内部都必须保证图标色与文字色完全一致
+ - 用户已明确当前常用语义：主操作可用黄底黑字黑图标，编辑类可用蓝底白字白图标，删除类可用红底白字白图标；只要按钮内部图标和文字同步，就不视为颜色不统一
+ - 用户已再次强调：特殊操作按钮不能被“统一按钮”粗暴抹平；像编辑、删除、分享、排序这类动作可以共享结构基线，但必须保留独立语义色和独立状态表达
+-- 删除/清空这类不可逆确认弹窗里的危险确认按钮默认按“红底白字白图标”收口；不允许再出现红底却配黑字黑图标，或按钮文字和图标各走一套颜色
++- 删除/清空这类不可逆确认弹窗里的危险确认按钮默认按 Element 风格 `danger` 红 `#F56C6C` + 白字白图标收口；不允许再出现红底却配黑字黑图标，或按钮文字和图标各走一套颜色
+ - 设备控制页这类外层功能入口不做选中态高亮，不允许点击后把文字放大、加粗到换行或改变排版稳定性
+ - 返回按钮、更多按钮、顶部左右导航按钮不做任何按压反馈，不允许出现缩放、位移、背景跳变或“抖一下”的感觉
+ 
+-## 4.2.4 Cleanroom 结构收口规则
++## 4.2.4 新工程结构收口规则
+ 
+-面向后续 `uniapp-cleanroom` 重构，新增以下硬约束：
++面向当前 `uniapp-rebuild` 重构，新增以下硬约束：
+ 
+ - 全局样式层只允许保留 design token、基础 reset、safe-area 变量和交互禁令，不承载业务视觉类
+ - 禁止在全局层定义 `.header`、`.navbar`、`.search-btn`、`.section-title`、`.card-title` 这类业务语义类名
+ - 禁止用 `page view text button` 之类标签级覆盖把页面压成统一风格
+ - 标题栏、返回按钮、搜索栏、搜索工具条、自定义 `tabBar` 必须走正式组件，不再允许页面各写一版
++- 按钮、卡片外壳、分组标题、状态胶囊、输入框、开关、滑块、步进器也优先走内用组件层；同语义控件不再让页面自己定义第二套
+ - 搜索统一为“标题栏下固定工具层”，不再把搜索入口放到标题栏右侧
+ - 一级页标题栏允许业务特例，但必须服从同一 safe-area、同一垂直节奏、同一中轴对齐、右侧留空规则
+ - 所有加载中的首屏态必须使用项目自定义 loading，不再露出系统默认 loading；当前占位方案固定为 `Glowxel Logo + 自定义文案`
++- 用户已最新确认：`uniapp-rebuild` 的正式 loading 不再长期停留在“静态 logo 占位”阶段；必须正式承接旧 `uniapp/components/LoadingOverlay.vue` 中新增的 3 个九宫格 Logo 动画变体 `chase / flip / stamp`
++- 用户已最新确认：`uniapp-rebuild` 里的首屏遮罩 loading 与业务链路里的 `showLoading / hideLoading` 必须共用同一套正式组件视觉，不允许页面首屏是一套、程序化调用又是另一套
++- loading 家族来源必须可追溯：官网组件库需要先盘清现存 `logo-loading-showcase.html` 方案集，再从中明确“正式采用”和“保留备选”；当前正式采用固定为 `chase / flip / stamp`，不允许后续又临时冒出一套新 loader
+ - 页面局部样式必须使用组件内部类名或页面自己的 `page-*` 局部类名，不允许继续依赖外层全局类兜底
+ 
+ ## 4.3 页面骨架规则
+@@ -233,6 +256,67 @@
+ 
+ - 新增页面必须优先沿用同组既有页面的骨架、标题栏、分组头、卡片和入口语法，不允许自己重新发明一套页面语言
+ - 如果页面属于现有业务分支的子页，视觉上必须直接向上对齐该业务的主页面，而不是额外做 `hero`、大圆角、整页渐变、独立徽标区
++
++## 4.5 新并行工程重建规则（新增）
++
++用户已最新确认：当前 `uniapp-cleanroom` 的方向已经正式废弃并准备移除，不再作为后续正式重构的视觉和布局基线；新的并行工程必须重新建立，但首阶段目标不是“重新设计一个新产品”，而是先把旧 `uniapp` 已经被用户接受的页面结构、信息顺序和 tabBar 观感稳定复刻出来。
++
++执行规则：
++
++- `uniapp-cleanroom` 必须从仓库工作目录中移除，不再保留双轨并行开发；后续新工程唯一落点固定为 `uniapp-rebuild`。
++- `uniapp-rebuild` 是当前唯一有效的新工程目录；后续重构、组件收口、自定义 `tabBar`、迁移验证都只允许继续落在 `uniapp-rebuild`。
++- `uniapp-cleanroom` 若仍在历史记录、文档或讨论中出现，只能作为失败方案说明，不再作为视觉、布局和组件语言的直接来源。
++- 新工程首阶段默认以旧 `uniapp` 为唯一布局参照：标题结构、信息块顺序、分区密度、页面首屏节奏、搜索区位置、列表区顺序，都不得擅自改动。
++- 用户未明确允许前，禁止借“重构”名义把一级页、二级页、详情页改成另一套排版；如果新工程页面肉眼看上去不像旧页面家族，视为不合规。
++- 页面复刻优先级固定为“先结构保真，再组件收口，再视觉微调”；不允许反过来先换整体风格、再回头猜原布局。
++- 旧页面中已经被用户接受的布局骨架、头部留白、分区顺序、操作路径，默认视为设计输入；后续若要改变，必须等旧骨架复刻完成并经用户确认。
++
++### 4.5.1 自定义 tabBar 首阶段保真规则（新增）
++
++用户已最新确认：新工程虽然要改成自定义 `tabBar`，但第一阶段必须先复刻旧工程原生 `tabBar` 的样子，不能一上来就换成另一套视觉。
++
++执行规则：
++
++- 自定义 `tabBar` 首阶段必须严格沿用旧 `uniapp/pages.json` 里的 5 个一级入口顺序：
++  - `首页`
++  - `社区`
++  - `创作`
++  - `设备`
++  - `我的`
++- 首阶段图标资源必须直接复用旧工程 `static/tabbar/*` 正式资源，不允许先用临时图标、占位图标或重新画的近似图标顶替。
++- 首阶段文字、颜色、背景和尺寸必须先对齐旧原生 `tabBar` 口径：
++  - 默认文字色：`#8A8A8A`
++  - 选中文字色：`#333333`
++  - 背景色：`#FFFFFF`
++  - 边框语义：黑色分隔
++  - 高度：`58px`
++  - 图标宽度：`34px`
++  - 图标与文字间距：`6px`
++- 用户已最新改板：`uniapp/` 当前不再继续使用微信原生 `custom-tab-bar`；底部导航改为页面内共享组件实现，但视觉仍必须对齐旧原生底栏观感。
++- 页面内共享底部导航组件必须保持旧原生底栏的紧凑感：图标不能过大，图标与文字间距不能过松，文字字重可以略高，但不允许因为加粗导致选中前后排版跳动。
++- 页面内共享底部导航点击切换时不允许出现页面整体位移、滑入、弹入这类“页面在动”的观感；若仍有移动感，优先排查页面切换动画和按压反馈，而不是继续靠视觉遮掩。
++- 在用户明确允许前，禁止把底部导航先做成圆角浮岛、彩色胶囊、厚投影卡片或其他与旧原生样式明显不同的造型。
++- 当前底部导航的目标只有一个：用户第一眼看到时，仍然会觉得“这就是原先那套底部导航，被收成了页面组件”，而不是换了一套新设计。
++- 用户已最新确认：不仅底部导航，页面内任意可点击区域都不允许让整页产生“被推一下、横向挪一下”的观感；共享按钮、卡片、列表项、顶部按钮、输入壳和内容容器都必须避免通过阴影位移、外边距变化、宽度变化或过渡联动制造整页抖动。
++- 用户已最新确认：一级页及其首屏卡片组当前不再接受“按下时阴影变浅、背景突变、整体缓动”这类拟物按压反馈；在根页家族里，点击态默认宁可静止，也不允许制造整页被推动的错觉。
++- 用户已最新再次定板：这条“静止”规则同样约束公共样式层；共享类、公共按钮组、列表卡片、底部导航和页面局部样式里都不允许继续保留会让整页产生横移错觉的 `transition` 或 `:active` 反馈。
++- 用户已最新改板：底部导航当前不再采用页面内共享组件；视觉基线重新回到原生 `tabBar`，后续只允许在原生 `tabBar` 的图标、文案和官方支持配置范围内对齐旧观感，不再继续维护自定义底栏外观。
++- 用户已最新再次确认：既然当前剩余偏移发生在页面内容区，一级页内容层里的可点击卡片、菜单项、入口块和原生按钮都必须默认无按压位移、无阴影跳变、无背景闪变、无额外 hover 反馈；只要点击内容区仍让肉眼感觉整页晃动，就视为样式未收口。
++- 用户已最新再次纠正：一级页内容区若要宣称“已还原旧版”，不仅外观要像旧版，公共结构也必须接近旧版稳定实现；后来新增的整页骨架包裹层、额外内容包装节点、滚动区临时属性和试错式页面壳补丁，都不能继续挂在正式一级页上冒充还原完成。
++- 用户已最新再次定板：一级页若仍存在点击后整页轻微横移，优先判定为“页面骨架未真正回旧”，而不是继续堆交互补丁；后续必须优先清掉后来新增的共享页面壳类、固定层包装和滚动区公共壳，直到根节点结构接近历史稳定实现。
++- 用户已最新再次定板：如果已经回退掉明显的页面壳补丁后仍存在 1 像素级别横移，就必须继续审计全局样式层和原生点击反馈语义；任何共享 `box-shadow`、边框、hover 背景、按钮默认态或广域 `!important` 只要会让一级页点击时产生整页错位感，都必须继续清理，直到运行态完全静止。
++- 用户已最新再次定板：凡是承担页面跳转的入口，点击后到真正 `navigateTo/switchTab` 生效前这一小段时间也必须保持完全静止；不允许出现“先偏一下、再进入下一页”的导航前位移观感。后续排查时，卡片、列表项、更多按钮、入口块、菜单项和作品/模板卡都必须按“跳转入口”单独核查其默认按压态与 hover 反馈。
++- 用户已最新再次定板：为定位偏移问题而新增的调试页，不走正式视觉系统复杂样式；只允许保留白底、黑线边框、基础留白和必要文字层级，不加阴影、不加彩色块、不加共享按钮壳，用于隔离视觉层变量。
++- 用户已最新再次改板：`uniapp` 正式运行页里的全局硬阴影 token 不允许再向右扩展；对跳转入口、一级页卡片、菜单项、按钮和共享容器，默认只允许“向下投影”或取消外扩阴影，避免把导航瞬间的任何轻微位移放大成“整页先左挪一下”的错觉。
++- 用户已最新再次补充：既然当前难以稳定复现具体触发点，正式页外层布局必须先收成硬约束；一级页根节点、顶栏、主滚动区和主内容壳统一要求 `width: 100%`、`max-width: 100%`、`min-width: 0`、`box-sizing: border-box`、`overflow-x: hidden`，禁止在点击或跳转前因为外层宽度回弹、阴影外扩或内容自动撑宽造成整页横向晃动。
++- 用户已最新改板：如果当前 `uniapp` 这一轮风格方向被明确否决，不允许继续在现状上叠加修补；必须优先回退到最近一次可接受基线，再从该基线重新推进，避免把被否决的样式继续当成后续改造起点。
++
++### 4.5.2 旧布局保真禁令（新增）
++
++- 禁止在新工程首阶段擅自调整旧页面的核心信息架构位置，例如把原本在顶部的内容移到底部、把原本成组的入口拆散重组、把原本单列区块改成另一种完全不同的布局语法。
++- 禁止为了追求“更现代”或“更设计感”给旧页面额外叠加大块装饰背景、营销型 banner、悬浮卡组、渐变头图。
++- 禁止把旧页面中本来稳定的白底黑边、直角、清晰分区语法替换成另一种完全不同的 UI 风格后再说是“优化”。
++- 新工程若需要抽组件，组件职责是减少重复维护，不是改变旧页面的视觉骨架；组件抽象后页面看上去仍必须像旧版页面本身。
+ - `设备参数页` 必须与 `设备控制页` 保持同体系：统一使用同一套 `glx-page-shell`、`glx-topbar`、区块标题、`glx-panel-card`、行内操作卡语法
+ - `热点配网页 / 配网说明页` 必须保持“简单明了、信息直接”的结构，不允许直接暴露粗糙默认门户样式，也不允许额外做营销化主视觉
+ - `热点配网页 / 配网说明页` 必须把“连接设备热点 -> 打开 192.168.4.1 -> 选择 2.4GHz WiFi 并保存”放在首屏主信息层，不能把关键提示埋进次级文案
+@@ -263,6 +347,100 @@
+ - 用户已最新纠正：`星球屏保` 这类独立功能页的页面骨架必须直接跟随现有 `ambient-editor / game-screensaver / gif-player` 同组页面；不允许单页保留另一套卡片外壳、标题留白或预览栏节奏
+ - 用户已最新纠正：功能页内的发送按钮、随机按钮等操作控件默认复用现有 `action-btn-sm / glx-primary-action` 尺寸基线；未获明确确认，不允许单页额外写固定宽高覆盖，导致按钮与同组页面或同页其他按钮尺寸不一致
+ 
++### 4.5.3 视觉选型与标准预演闸门（新增）
++
++用户已最新确认：在继续推进 `uniapp-rebuild` 迁移前，必须先明确新版正式视觉选型，并提供一份可直接预览的标准样板页；没有预演样板时，不允许继续把控件和页面散着往前迁。
++
++执行规则：
++
++- `uniapp-rebuild` 必须先提供一份“标准预演页”或等价的开发态样板页，用于集中展示这轮确认后的正式风格，不拿业务页充当样板。
++- 标准预演页必须先把以下内容完整列出并给用户确认：
++  - 图标语言与图标底板语法
++  - 一级页/二级页头部标题样式
++  - 主按钮、次按钮、编辑按钮、删除按钮、危险确认按钮
++  - 输入框、搜索框、选择框、开关、滑块、步进器
++  - 卡片标题、分组标题、列表入口、空状态
++  - 弹窗标题、弹窗正文、弹窗按钮区
++  - loading、toast、确认弹窗三类反馈组件
++- 标准预演页必须以“正式页面可直接复用”的组件语法输出，不允许只做概念海报、静态拼图或脱离运行态的视觉板。
++- 标准预演体系除 `uniapp-rebuild` 内的运行态样板页外，还必须补一份独立静态 HTML 预演页，作为后续官网与组件规范站的基础展示载体。
++- 静态 HTML 预演页必须只使用原生 `HTML + CSS` 实现，不接入外部 UI 框架、不依赖 Tailwind 一类工具类体系、不依赖 CDN 图标库或运行时组件库。
++- 静态 HTML 预演页的类名必须保持语义化和可迁移性，优先沿用 `glx-` 前缀与 design token 变量；禁止写一堆只适合网页演示、不适合 `uniapp / 微信小程序` 继续映射的奇怪类名。
++- 官网后续若要建设组件规范站，默认直接承接这份静态 HTML 预演页的视觉语言与 token，不再另起一套官网专用风格。
++- 静态 HTML 预演页默认按“组件官网 / 规范站”方式组织，不做单纯概念海报；至少应包含左侧导航、章节锚点、组件示例区和规则说明区。
++- 预演页里的正式组件块必须把“预览样式 / 用途 / 语义 / 禁止事项”标准列出来，避免只给效果图、不写边界。
++- 预演页必须显式展示页面骨架和加载语义，不只展示单个按钮或控件；一级页头部、二级页头部、搜索工具条、列表入口、空状态、骨架屏、toast、dialog 标题都要能一页看到。
++- 用户已最新纠正：组件规范站里的下拉框、开关、滑块、步进器等表单控件不能只做静态摆拍；默认必须提供可实际操作的基础交互演示，至少能看见状态切换与当前值变化。
++- 静态预演页允许使用少量原生 `JavaScript` 或等价的轻量数据绑定来驱动交互演示，但仍不得引入外部 UI 框架、工具类体系或只适合网页端的重型状态库。
++- 交互演示的实现方式必须优先选择后续可直接映射到 `uniapp / Vue` 的基础语义，例如原生输入框、选择框、复选/开关、范围滑杆、按钮步进和显式状态文本；禁止做只适合网页花式动效、不利于小程序复刻的交互壳。
++- 用户已最新确认：下一轮重做组件规范站前，必须先补“风格路线规划”章节，明确参考基线、候选路线、推荐路线和不采纳原因；不能一边改站，一边临时猜方向。
++- 风格路线默认先回看 `uniapp` 中已经做过的样式审查页 / 双列对比页等真实改版基线；若历史里已有较成熟的轻量化方向，优先从中提炼，不再凭空发明另一套产品语言。
++- 当用户要求“风格做轻一点”时，默认含义是：继续保留白底、黑边、直角、清晰分区和旧布局顺序，只减轻边框厚度、阴影强度、装饰密度与大面积色块占比；不是把项目改成另一套轻飘圆角风格。
++- 组件规范站必须直接回答“当前是否全面”：显式列出已覆盖组件组、未覆盖项和下一轮补齐顺序，不让用户自行猜测完成度。
++- 图标系统必须先选定统一方向后再继续扩页面；选型一旦确认，同一组页面内不得继续混搭多套图标风格。
++- 特殊按钮必须单独标准化列出，不能被“统一按钮”一刀切抹平：
++  - 主操作：黄底黑字黑图标
++  - 编辑类：蓝底白字白图标
++  - 删除/清空/退出/危险确认：红底白字白图标
++  - 次级普通操作：白底黑边黑字黑图标
++- 弹窗标题必须单独作为规范项展示；标题层级、左右结构、语义色和按钮区都要在标准预演页里明确，不允许页面各写一版。
++- 用户未确认标准预演前，正式业务页只允许修兼容性和阻塞性 bug；不继续批量推进视觉迁移。
++- 用户已最新确认：官网中的“控件库 / 组件规范站”属于官网正式信息架构的一部分，必须作为 `website` 站内页面接入现有导航与路由，不再以孤立静态 HTML 作为唯一正式落点。
++- 官网中的控件库页必须拆成可维护的 `Vue view + tabs + 子组件` 结构；禁止继续把全部内容堆进一个超长纯原生 HTML 文件，导致后续难以维护。
++- 官网控件库页允许使用简单 `Vue` 状态、`v-for`、基础激活态切换等轻量交互，但实现必须保持可迁移性，避免依赖只适合网页端的复杂模板表达式和重型状态管理。
++- 官网控件库页必须继续作为 `website` 站内页面存在，但视觉基线不再按“官网柔和风”自由发挥；本轮开始统一以上一版真实官网结构和用户最新口头修正为准，不能继续拿上一轮带底部黄线的截图当正式参照。
++- 官网导航、站内 tabs、控件库 tabs 的选中态禁止再使用底部黄线、下划线或额外装饰条；默认只允许通过文字颜色、字重和必要的轻量底色表达，不得制造新的视觉语法。
++- 官网导航、标题区、控件区、说明块、按钮和标签禁止再做圆角胶囊、圆角外框或一排排大圆角矩形；除头像等天然圆形语义外，统一保持直角块面或纯文字链接。
++- 后续若继续扩充官网控件库，只允许在“上一版官网真实语法”里补内容和拆组件，不允许借机新增额外卡片、芯片、胶囊标签和装饰框去重新设计一套新站。
++- 用户已最新纠正：官网组件库首页里右上角那类额外标签框、横向说明条、重复定位块属于多余信息块，默认直接删除；首屏不要再堆“概念说明 + 三条预览条 + 多个标签框”的展示语法。
++- 官网组件库的主布局从当前纵向堆叠改为左右布局：左侧承担导航/分组切换，右侧承担正式内容预演与规则说明；不再用一整列从上往下堆 sections 的方式冒充规范站。
++- 官网与组件库页的阴影要再轻一档；默认优先减小偏移量和扩散感，不允许继续使用过重的黑色投影把每个块都压成厚盒子。
++- 用户已最新确认：官网品牌 Logo 必须回到旧锁定样式，即“九宫格图标 + 中文名 + 黄底黑边 `PIXEL STUDIO` 条”；不再把副标隐藏、改成胶囊、改成细弱小字，或另起一套新的品牌排法。
++- 用户已最新纠正：官网组件库不是说明文档页，优先级必须改成“组件覆盖 > 解释文字”；每个分组默认先把组件样式、状态、尺寸和变体摆完整，再决定是否保留必要的极简说明。
++- 官网组件库里的按钮、输入框、卡片、弹窗、阴影等正式组件，必须提供可维护的类名 modifier 体系，例如尺寸类、阴影类、语义类；不允许每个示例自己写死一份 `padding / font-size / box-shadow`。
++- 官网组件库后续可以借鉴成熟的 neubrutalism 类组件库做覆盖结构和分组方式，但禁止直接复用对方品牌名、文案、图标、Logo、截图和站点识别性内容；参考的是语法与组织方式，不是整站原样照搬。
++- 用户已最新纠正：官网组件库中的正式色板必须和当前项目 token 完全一致，不允许继续残留旧版棕黄、灰蓝这类历史试色；主操作黄、编辑蓝、`info / success / warning / danger` 都必须直接对齐当前正式 token。
++- 官网顶部导航的选中态必须按“当前业务分组”正确激活，不能只靠精确路由命中；进入某个一级业务的详情页、列表页、子页时，对应顶栏入口仍要保持选中。
++- 用户已最新确认：官网顶部导航栏的当前项与组件库顶部 tabs 统一使用同一套黄底按钮态；不再保留轻量文字高亮的旧口径，也不允许出现底部黄线、下划线或额外装饰条。
++- 官网组件库内部使用的“顶部 tabs / 左侧分组 tabs / 章节切换 tabs”继续保持黄底按钮态，官网最顶层导航也与之对齐；两者都保留黑边、直角和轻量阴影，不再做两套不同选中规则。
++- 官网组件目录点击必须一项对应一组真实内容切换；不允许多个目录项只修改标题和描述，却继续复用同一块主体内容冒充“已经切换”。
++- 官网组件库里的 loading 颜色必须直接对齐品牌 Logo 九宫格配色，使用 `#F97316 / #EF4444 / #FBBF24 / #3B82F6` 这组正式品牌色；不允许继续使用近似但对不上的橙黄蓝。
++- 官网组件库里的 `warning` 当前正式收口为与主操作黄同色；按钮、图标底板、Toast、状态块和色板展示都必须同步，不再单独保留一套偏橙 warning。
++- 官网组件库里的搜索框、下拉框等单行表单控件必须保持紧凑高度，不能因为错误的 `flex` 伸缩或固定 basis 被拉成整块大白盒。
++- 官网组件库里的开关卡内部上下留白必须一致，不能出现文案区和拨杆区在竖向上看起来头重脚轻或上下贴边不均。
++- 官网组件库里的大标题与下方小说明之间的垂直间距需要再收紧一档；规范站标题区默认紧凑，不做过松的标题说明排版。
++- 官网组件库必须把 `uniapp` 已锁定的正式样式约束直接整理成可视规范块，不允许只停留在文档文字里；至少要显式覆盖：直角块面、禁止按压位移/缩放、功能页底部 tabs 不是黄底整块选中、loading 采用“内容骨架 + 动作轻遮罩”、状态色统一为 `info / success / warning / danger`。
++- 官网组件库必须显式给出“已覆盖 / 继续补齐 / 当前结论”的覆盖盘点，直接回答“是不是已经全部做完”；若仍未全量覆盖，必须诚实标注缺口，不允许让用户自行猜。
++- 官网组件库未覆盖完的组继续补齐，但新增覆盖默认优先放真实组件、状态和 modifier 示例，不再优先添加路线说明、设计阐述和大段解释。
++- 用户已再次明确：不只是官网控件库页，`website` 整站都不要当前这套柔和米色/半透明/blur 风格；官网整体视觉必须回到上一版硬朗基线，再在这条线上继续补页面与规范站。
++- `website` 的公共样式、导航、首页、控件库以及后续新增页面，统一按“白底、黑边、硬阴影、直角、黄底强调”收口；不允许出现“控件库是硬朗版，官网其他页还是柔和风”的双轨状态。
++- 用户已再次纠正：官网与控件库的回归目标必须按“上一版真实页面结构”对齐，不允许根据文字描述自行抽象出更多圆角矩形、胶囊块、额外卡片和装饰框。
++- 若上一版某处本来就是直角、扁平、少块面结构，重做时必须继续保持；不能用“统一风格”名义把整个页面堆成一排排圆角矩形。
++- 用户已最新确认：`website` 当前已经定板的官网组件库是全站唯一正式视觉基线；后续调整官网任何页面时，只允许页面向组件库对齐，不允许反过来为了迁就旧页面去修改组件库定板结果。
++- `website` 的公共组件、导航、首页、列表页、详情页、登录页、工作台页、设备页、社区页、模板页、挑战页以及后续新增页面，都必须逐页对齐现有组件库的直角、黑边、轻量硬阴影和黄底强调语法；不能只改首页或局部模块就宣称“网站已回归”。
++- 官网全站收口时，圆角矩形视为阻塞级风格偏差：除头像、状态点、原生系统控件等天然圆形语义外，其余容器、按钮、标签、导航项、表单外框、统计块、列表卡片一律不得保留大圆角或胶囊化外观。
++- 当组件库与现有官网页面发生风格冲突时，默认处理顺序固定为“先保组件库定板、再重构页面实现”；禁止为了省事保留页面旧圆角结构，再对组件库做妥协式改动。
++- 本轮官网改造的完成定义固定为“网站所有正式页面按组件库基线全量收口后才停止”；若仍存在未对齐页面、残留圆角矩形、双轨导航样式或局部柔和风残留，都按未完成处理，不得提前收尾。
++- 用户已最新纠正：`uniapp` 与官网后续样式收口，禁止继续依赖大范围 `!important` 强制覆盖和“一次选一串页面/组件类名”的全局压制写法；这种做法会破坏真实优先级、降低检索准确性，并增加后续维护成本。
++- 公共样式统一优先采用“同语义同类名”的方式收口：如果多个页面需要同一种壳层、按钮、标题栏、列表卡或输入框表现，应抽成稳定公共类名或组件，而不是在全局样式里列出一长串选择器逐个硬压。
++- 只有在修第三方组件或历史遗留无法直接改类名的极少数场景下，才允许使用局部 `!important`；若能通过更准确的类名层级、组件封装或页面局部样式解决，就禁止使用 `!important` 兜底。
++- 后续清理样式污染时，默认处理顺序固定为：`统一语义类名 / 组件封装` -> `正常优先级样式` -> `极少数必要覆盖`；不允许先写全局强制覆盖，再靠人工记忆去分辨究竟是谁生效。
++
++### 4.5.4 `uniapp-rebuild` 回退重建与原版保真规则（新增）
++
++用户已最新确认：当前 `uniapp-rebuild` 里已经做出的那套“新风格”不作为正式基线，后续必须先移除其自创视觉语言，再按原 `uniapp` 当前可运行页面做保真重建。
++
++执行规则：
++
++- `uniapp` 当前可运行页面是唯一正式运行基线；`uniapp-rebuild` 不允许再把自己当前那套偏离原版的头部、卡片、间距、配色和页面骨架当成设计来源。
++- 组件库现在承担的是“提纯旧样式、减少污染、抽公共语法”的职责，不承担“发明新版页面长相”的职责；后续 `uniapp-rebuild` 只能按组件库去收干净旧页面，不能按组件库再造另一套新页面。
++- `uniapp-rebuild` 的首阶段目标固定为“减负旧样式结构”，不是“重设计产品界面”；允许抽公共 token、公共壳层、公共表单和公共状态块，但页面肉眼结构必须继续像原 `uniapp`。
++- 除底部 `tabBar` 改为自定义实现外，其余一级页和二级页默认不得改核心布局结构；标题位置、搜索栏位置、信息顺序、功能入口密度、列表区顺序和操作路径都继续对齐原 `uniapp`。
++- 自定义 `tabBar` 的职责只限“把原生 `tabBar` 实现方式替换成自定义组件”；它不授权顺手改页面头部、页面留白、页面背景或整页分区结构。
++- 若旧页面当前已经可稳定运行，`uniapp-rebuild` 重写时必须优先复用旧页面结构和样式语义，再做样式去污染；不允许因为“想更干净”就把成熟结构拆散重排。
++- `uniapp-rebuild` 后续页面若看起来像“另一套产品”，即使代码更干净，也视为不合规；页面风格目标是“原版 Glowxel 的减负版”，不是“新品牌试验版”。
++- 本轮如果某页还没有完成按原版保真重建，就宁可先保持和旧页一致，也不允许拿一套半成品新设计顶上去冒充完成。
++
+ ## 5. 编辑页特殊规则
+ 
+ 适用页面：
+@@ -500,3 +678,11 @@
+ - 禁止使用“同一旋转逻辑换方向/换速度/换角度”凑数量
+ - 每种加载方式都必须显式绑定项目 Logo，不允许脱离 Logo 做通用占位动画
+ - 本项目 Logo 在加载演示页里固定按“3×3 九宫格方块”表达，不使用其他替代轮廓
++- 九宫格每个方块必须按真实 Logo 的固定配色与位置渲染；禁止把九块统一成同一种颜色后再用动画冒充 Logo
++- 用户已最新反馈：Logo 加载演示页不采用“重遮挡扫描 / 闸门遮挡 / 雷达扇扫”这类把主体压暗的效果，优先主体方块始终清晰可见
++- 用户已最新反馈：演示卡片下方不加解释注释文案；展示页以动画本体和简短标题为主，不再追加底部说明块
++- 用户已最新反馈：展示数量收口到最多 10 个，且用户明确满意的编号（如 `1/4/5/6/7/9`）必须优先保留
++- 用户已最新确认：uniapp 与官网正式 Loading 动效只使用 `5/6/9` 三个方案，并在常规加载场景随机选择其一
++- 用户已最新确认：凡是“发送中/传输中”流程，Loading 动效固定使用 `5`（`chase`），不参与随机池
++- 用户已最新确认：`logo-loading-showcase.html` 的 10 个演示方案继续保留用于对比，不因正式采用池收口而删除页面或移除卡片
++- 用户已最新确认：Logo Loading 方案必须严格只由“九个方块本体”构成；禁止新增任何额外视觉元素（含伪元素轨道/连线/扫描层、额外 SVG 滤镜层等）
+diff --git a/uniapp/docs/spirit-pet-source-first-plan.md b/uniapp/docs/spirit-pet-source-first-plan.md
+new file mode 100644
+index 0000000..df41d0f
+--- /dev/null
++++ b/uniapp/docs/spirit-pet-source-first-plan.md
+@@ -0,0 +1,221 @@
++# 桌面宠物（64x64）来源优先开发计划（A 路线）
++
++## 1. 目标与硬约束
++
++- 目标：在现有 `eyes` 模式上实现“大头趴手宠物”效果（眼神可动、可眨眼、耳朵/尾巴有节奏动画），先做单宠打磨版，再扩展生肖皮肤。
++- 硬约束：
++  - 只复用或移植“现成已实现”方案，不做猜测式原创算法。
++  - 开发顺序固定：先完成 `uniapp 64x64` 模拟闭环并验收，再进入板载程序开发。
++  - 不新增协议字段，不改现有命令语义（第一阶段）。
++  - 严格沿用当前仓库字段名，禁止别名、兼容键、兜底键。
++
++## 2. 锁定借鉴来源（只用现成）
++
++### 2.1 仓库内现成来源（主来源，优先级最高）
++
++1. 眼睛运行时与动作系统  
++   - `esp32-firmware/src/eyes_effect.cpp`  
++   - 已有：眨眼、看左/右/中、表情切换、时段权重、互动动作。
++2. 配置协议与持久化  
++   - `esp32-firmware/src/websocket_command_handlers.cpp`  
++   - `esp32-firmware/include/config_manager.h`  
++   - 已有：`set_eyes_config`、`eyes_interact`、`EyesConfig` 持久化。
++3. 前端配置页面与预览  
++   - `uniapp/pages/spirit-screen/spirit-screen.vue`  
++   - `uniapp/utils/webSocket.js`  
++   - 已有：配置编辑、预览循环、发送链路。
++
++### 2.2 外部现成来源（辅助来源，仅做“按源码复用/映射”）
++
++1. Adafruit Uncanny Eyes（眼动与眨眼成熟实现）  
++   - <https://github.com/adafruit/Uncanny_Eyes>
++2. eSheep/desktopPet（精灵表与动画状态组织方式）  
++   - <https://github.com/Adrianotiger/desktopPet>  
++   - <https://esheep.petrucci.ch/Help/Manual%20-%20online%20editor.pdf>
++3. Kenney Animal Pack（可商用 CC0 素材基底）  
++   - <https://www.kenney.nl/assets/animal-pack>  
++   - <https://opengameart.org/content/animal-pack>
++
++说明：外部来源只做“可验证映射”，不做“看起来像”的主观复刻。
++
++## 3. 范围边界（本轮）
++
++### 3.1 In Scope
++
++- 在 `eyes` 模式内增加宠物身体层（头/手/耳/尾）渲染。
++- 复用现有眼睛系统作为“脸部核心动画”。
++- 复用现有 `spirit-screen` 页面作为配置与发送入口。
++- 输出 1 个可演示宠物（单角色），可稳定运行在 `64x64`。
++
++### 3.2 Out of Scope
++
++- 不新增模式入口，不新增 `businessMode`。
++- 不重写 WebSocket、设备状态同步、模式切换主链路。
++- 不新增协议字段（第一阶段）。
++- 不做 12 生肖全量资产生产（放到第二阶段皮肤扩展）。
++
++## 4. 协议字段冻结与映射表（第一阶段不改协议）
++
++> 本阶段仅复用现有字段，不新增字段。
++
++| 字段 | 来源 | 去向 |
++| --- | --- | --- |
++| `cmd=set_mode` | `uniapp/utils/webSocket.js#setMode` | 固件模式切换 |
++| `mode=eyes` | `uniapp/pages/spirit-screen/spirit-screen.vue` | `DisplayManager::activateEyesEffect` |
++| `cmd=set_eyes_config` | `uniapp/utils/webSocket.js#setEyesConfig` | `handleEyesCommand` |
++| `config.layout.eyeY` | `buildEyesConfigPayload()` | `EyesConfig.layout.eyeY` |
++| `config.layout.eyeSpacing` | `buildEyesConfigPayload()` | `EyesConfig.layout.eyeSpacing` |
++| `config.layout.eyeWidth` | `buildEyesConfigPayload()` | `EyesConfig.layout.eyeWidth` |
++| `config.layout.eyeHeight` | `buildEyesConfigPayload()` | `EyesConfig.layout.eyeHeight` |
++| `config.layout.timeX` | `buildEyesConfigPayload()` | `EyesConfig.layout.timeX` |
++| `config.layout.timeY` | `buildEyesConfigPayload()` | `EyesConfig.layout.timeY` |
++| `config.behavior.autoSwitch` | `buildEyesConfigPayload()` | `EyesConfig.behavior.autoSwitch` |
++| `config.behavior.blinkIntervalMs` | `buildEyesConfigPayload()` | `EyesConfig.behavior.blinkIntervalMs` |
++| `config.behavior.lookIntervalMs` | `buildEyesConfigPayload()` | `EyesConfig.behavior.lookIntervalMs` |
++| `config.behavior.idleMove` | `buildEyesConfigPayload()` | `EyesConfig.behavior.idleMove` |
++| `config.behavior.sleepyAfterMs` | `buildEyesConfigPayload()` | `EyesConfig.behavior.sleepyAfterMs` |
++| `config.interaction.lookHoldMs` | `buildEyesConfigPayload()` | `EyesConfig.interaction.lookHoldMs` |
++| `config.interaction.moodHoldMs` | `buildEyesConfigPayload()` | `EyesConfig.interaction.moodHoldMs` |
++| `config.time.show` | `buildEyesConfigPayload()` | `EyesConfig.time.show` |
++| `config.time.showSeconds` | `buildEyesConfigPayload()` | `EyesConfig.time.showSeconds` |
++| `config.time.font` | `buildEyesConfigPayload()` | `EyesConfig.time.font` |
++| `config.time.fontSize` | `buildEyesConfigPayload()` | `EyesConfig.time.fontSize` |
++| `config.style.eyeColor` | `buildEyesConfigPayload()` | `EyesConfig.style.eyeColor` |
++| `config.style.timeColor` | `buildEyesConfigPayload()` | `EyesConfig.style.timeColor` |
++| `cmd=eyes_interact` | `uniapp/utils/webSocket.js#eyesInteract` | `EyesEffect::triggerAction` |
++| `action=blink/look_left/look_center/look_right/happy/sleepy/set_expression:*` | `spirit-screen` 交互 | 固件即时动作 |
++
++## 5. 技术路线（来源驱动，不猜）
++
++## 5.1 Uniapp 阶段（必须先完成）
++
++1. 保持 `spirit-screen` 页面结构不重做，仅补充“宠物预览层”与说明文案。
++2. 发送流程保持：
++   - `setMode("eyes") -> setEyesConfig(config) -> eyesInteract(...)`。
++3. 不新增接口字段，仅利用现有控件区间映射到宠物默认参数推荐值。
++4. `64x64` 模拟目标：
++   - 大头趴手主体轮廓；
++   - 眼神游走与眨眼可见；
++   - 耳朵/尾巴至少一项具备稳定动画；
++   - 预览可连续运行并支持互动动作触发。
++
++## 5.2 板载阶段（仅在 Uniapp 验收后启动）
++
++1. 在 `eyes_effect.cpp` 增加“宠物身体层”绘制函数，放在现有眼睛绘制前后固定层级。
++2. 身体层动画只使用现有运行时节奏信号：
++   - `lookX/lookY`：驱动头部微偏移；
++   - `blinkActive`：驱动耳朵轻抖/手部按压；
++   - `expression`：切换少量姿态变体；
++   - `millis` 周期：尾巴低频摆动。
++3. 宠物外形实现方式：
++   - 先用“像素模板 + 程序位移”方案（无需新增配置字段）。
++   - 模板来源优先使用已确认素材（CC0）或仓内固定模板。
++4. 眼睛尺寸按现有字段收敛（不新增字段）：
++   - 通过 `layout.eyeWidth/eyeHeight` 设为较小，满足“半身比例”。
++
++## 5.3 资源侧（现成素材接入）
++
++1. 资产来源只允许：
++   - 已授权 CC0 包（推荐 Kenney）。
++   - 仓内已有素材或团队自有素材。
++2. 资源处理流程：
++   - 统一切到 `64x64`；
++   - 保留 4~6 色；
++   - 导出固定帧序与命名清单；
++   - 不做“临场手绘推断补帧”。
++
++## 6. 分阶段排期（可执行）
++
++### 阶段 U0（0.5 天）：来源冻结与资产选型
++
++- 产出：
++  - 《来源冻结清单》：每个动作对应哪个现成实现/素材。
++  - 《素材授权记录》：链接、许可、版本。
++- Gate：
++  - 来源不明或许可不清，直接阻断后续开发。
++
++### 阶段 U1（1 天）：Uniapp 64x64 宠物预览闭环
++
++- 任务：
++  - 在 `spirit-screen` 本地预览中接入头/手/耳/尾基础层。
++  - 复用当前眼睛预览逻辑，不改协议。
++- 验收：
++  - `64x64` 预览可稳定显示“趴趴宠物”。
++  - 不影响现有 `blink/look/expression/time` 行为。
++
++### 阶段 U2（1 天）：Uniapp 交互与一致性验收
++
++- 任务：
++  - 耳朵/尾巴与 `look/blink/expression` 联动。
++  - 完成 `HBuilderX` 下的预览连续性与互动验收。
++- 验收：
++  - 连续运行 30 分钟无明显抖动/卡顿/状态乱跳。
++  - 互动动作触发后可回归待机，不滞留。
++
++### 阶段 G1（门槛）：Uniapp 先行验收结论
++
++- 通过条件：
++  - U0/U1/U2 全部通过；
++  - 你确认“Uniapp 模拟效果可进入板载阶段”。
++- 未通过处理：
++  - 不进入板载开发，只继续修 Uniapp。
++
++### 阶段 F1（1 天）：板载身体层最小闭环（G1 后）
++
++- 任务：
++  - 在 `eyes_effect.cpp` 接入头/手/耳/尾基础层。
++  - 保持现有 eyes 行为逻辑不改语义。
++- 验收：
++  - `eyes` 模式下可稳定显示“趴趴宠物”。
++  - 不影响现有 `blink/look/expression/time` 行为。
++
++### 阶段 F2（1 天）：板载联动打磨（G1 后）
++
++- 任务：
++  - 板载侧耳朵/尾巴联动与节奏收敛。
++  - 对齐 Uniapp 已通过的动作节奏。
++- 验收：
++  - 实机连续运行稳定；
++  - 动作与 Uniapp 验收版本保持同语义。
++
++### 阶段 F3（0.5 天）：回归与封板（G1 后）
++
++- 回归范围：
++  - `control -> spirit-screen -> send -> reboot -> status` 全链路。
++  - 其它已定板模式仅做冒烟，不做改造。
++- 产出：
++  - 验收记录、问题清单、下一阶段（生肖皮肤）入口条件。
++
++## 7. 验收标准（硬性）
++
++1. 视觉：
++   - `64x64` 下一眼可识别“大头趴手”轮廓；
++   - 眼睛明显小于头部主体比例；
++   - 至少存在耳朵或尾巴动态。
++2. 动画：
++   - 待机、眨眼、眼神游走、互动动作均可触发且可回归。
++3. 协议：
++   - Uniapp 阶段无新增字段；
++   - 板载阶段若需要新增字段，必须先补参数映射表并获确认；
++   - 所有发送字段与当前 `EyesConfig` 一一对应。
++4. 稳定性：
++   - 不影响现有 `clock/animation/theme/canvas` 基础链路。
++
++## 8. 风险与闸门
++
++1. 风险：素材授权不清。  
++   - 处理：只用 CC0 或自有资产；未确认禁止合入。
++2. 风险：为实现宠物而扩协议。  
++   - 处理：第一阶段协议冻结；若必须扩字段，先出映射表再改。
++3. 风险：误伤 WS 或模式切换。  
++   - 处理：禁止改 `webSocket.js` 核心状态机与 `store/device.js` 主流程。
++4. 风险：预览和实机分叉。  
++   - 处理：按同一节奏参数驱动，优先以固件表现为基准校准。
++
++## 9. 下一阶段（B 路线预告，不在本轮）
++
++- 目标：在同骨架上扩展“生肖皮肤包”。
++- 前提：
++  - A 路线验收通过；
++  - 资产来源和许可全部明确；
++  - 如需协议扩展，先提交字段映射表并获得确认。
+diff --git "a/uniapp/docs/\350\256\276\345\244\207\346\230\276\347\244\272\350\277\201\347\247\273\345\217\202\350\200\203.md" "b/uniapp/docs/\350\256\276\345\244\207\346\230\276\347\244\272\350\277\201\347\247\273\345\217\202\350\200\203.md"
+index 7b24350..c95acdb 100644
+--- "a/uniapp/docs/\350\256\276\345\244\207\346\230\276\347\244\272\350\277\201\347\247\273\345\217\202\350\200\203.md"
++++ "b/uniapp/docs/\350\256\276\345\244\207\346\230\276\347\244\272\350\277\201\347\247\273\345\217\202\350\200\203.md"
+@@ -1,6 +1,6 @@
+ # 设备显示迁移参考
+ 
+-更新日期：2026-04-14
++更新日期：2026-04-19
+ 
+ ## 文档目的
+ 
+@@ -630,6 +630,7 @@
+ ### 本轮审计结论
+ 
+ - 未发现“无来源映射且未开始”的入口模式。
++- `control` 页此前临时加入的独立辅助入口已按最新定板移除；对应文案、路由、页面与素材数据文件不再保留。
+ - `weather / stopwatch / notification` 已按最新定板直接删除对应 uniapp 页面，不再纳入当前可用入口。
+ - `countdown` 已按最新确认恢复为独立入口，走 `set_countdown_board` 合同与沙漏倒计时表现，不再沿用旧 AWTRIX 倒数看板语义。
+ - `ambient_effect` 已并入 `led_matrix_showcase`，不再保留独立外层入口。
+diff --git a/uniapp/logo-loading-showcase.html b/uniapp/logo-loading-showcase.html
+index d36112d..192d8d5 100644
+--- a/uniapp/logo-loading-showcase.html
++++ b/uniapp/logo-loading-showcase.html
+@@ -14,6 +14,10 @@
+       --brand-green: #88d498;
+       --brand-coral: #ff6b6b;
+       --brand-orange: #ffa552;
++      --logo-orange: #f97316;
++      --logo-red: #ef4444;
++      --logo-yellow: #fbbf24;
++      --logo-blue: #3b82f6;
+       --stage-top: #141b29;
+       --stage-bottom: #090d15;
+     }
+@@ -85,7 +89,7 @@
+       display: flex;
+       flex-direction: column;
+       gap: 10px;
+-      min-height: 300px;
++      min-height: 242px;
+     }
+ 
+     .loader-card h2 {
+@@ -94,13 +98,6 @@
+       line-height: 1.3;
+     }
+ 
+-    .loader-card p {
+-      margin: 0;
+-      font-size: 13px;
+-      color: #3a4458;
+-      line-height: 1.45;
+-    }
+-
+     .logo-stage {
+       position: relative;
+       border: 3px solid var(--ink);
+@@ -129,21 +126,11 @@
+       display: block;
+       border: 2px solid #111;
+       border-radius: 8px;
+-      background: var(--brand-yellow);
++      background: var(--tile-color);
+       box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.15);
+       will-change: transform, opacity, background, filter, border-radius;
+     }
+ 
+-    .footer-note {
+-      margin-top: 20px;
+-      border: 3px solid var(--ink);
+-      background: #ffffff;
+-      box-shadow: 4px 4px 0 var(--ink);
+-      padding: 12px 14px;
+-      font-size: 13px;
+-      color: #2f3850;
+-    }
+-
+     .loader-wave .logo-grid span {
+       animation: wavePulse 1.65s ease-in-out infinite;
+       animation-delay: calc(var(--dist) * 0.14s);
+@@ -162,165 +149,136 @@
+       }
+     }
+ 
+-    .loader-scanner .logo-grid span {
+-      background: #1b2438;
+-      opacity: 0.4;
+-      animation: rowScan 1.95s steps(1, end) infinite;
+-      animation-delay: calc(var(--row) * 0.21s);
+-    }
+-
+-    .loader-scanner .logo-grid::after {
+-      content: "";
+-      position: absolute;
+-      left: -16%;
+-      right: -16%;
+-      height: 38%;
+-      background: linear-gradient(
+-        180deg,
+-        rgba(116, 185, 255, 0) 0%,
+-        rgba(116, 185, 255, 0.88) 50%,
+-        rgba(116, 185, 255, 0) 100%
+-      );
+-      filter: blur(2px);
+-      animation: scannerLine 1.95s linear infinite;
+-      pointer-events: none;
+-      z-index: 3;
++    .loader-column .logo-grid span {
++      transform-origin: center bottom;
++      animation: columnRelay 1.95s cubic-bezier(0.22, 0.78, 0.32, 1) infinite;
++      animation-delay: calc(var(--col) * 0.14s + var(--row) * 0.05s);
+     }
+ 
+-    @keyframes rowScan {
+-      0%, 24% {
+-        background: #182036;
+-        opacity: 0.4;
++    @keyframes columnRelay {
++      0%, 16% {
++        transform: translateY(12px) scale(0.72);
++        opacity: 0.52;
++        filter: brightness(0.7) saturate(0.82);
+       }
+-      25%, 56% {
+-        background: var(--brand-blue);
++      38% {
++        transform: translateY(-3px) scale(1.1);
+         opacity: 1;
++        filter: brightness(1.22) saturate(1.3);
+       }
+-      57%, 100% {
+-        background: #172235;
+-        opacity: 0.42;
++      62% {
++        transform: translateY(0) scale(0.98);
++        opacity: 0.95;
++        filter: brightness(1.04) saturate(1.1);
++      }
++      100% {
++        transform: translateY(0) scale(1);
++        opacity: 1;
++        filter: none;
+       }
+-    }
+-
+-    @keyframes scannerLine {
+-      0% { top: -35%; }
+-      100% { top: 100%; }
+-    }
+-
+-    .loader-glitch .logo-stage::after {
+-      content: "";
+-      position: absolute;
+-      inset: 0;
+-      background: repeating-linear-gradient(
+-        180deg,
+-        rgba(255, 255, 255, 0.08) 0 2px,
+-        rgba(255, 255, 255, 0) 2px 6px
+-      );
+-      mix-blend-mode: screen;
+-      animation: glitchStripes 0.24s steps(2, end) infinite;
+-      pointer-events: none;
+-      z-index: 1;
+     }
+ 
+     .loader-glitch .logo-grid span {
+-      animation: glitchBlock 1.7s steps(2, end) infinite;
++      animation: matrixJolt 1.8s steps(1, end) infinite;
+       animation-delay: calc(var(--i) * 0.06s);
+     }
+ 
+-    @keyframes glitchBlock {
+-      0%, 14% {
++    @keyframes matrixJolt {
++      0%, 20% {
+         transform: translate(0, 0);
+-        background: var(--brand-yellow);
++        opacity: 1;
++        filter: none;
+       }
+-      15% {
+-        transform: translate(-3px, 2px);
+-        background: var(--brand-coral);
++      21% {
++        transform: translate(calc(var(--x) * 3px), calc(var(--y) * -2px));
++        filter: brightness(1.25) saturate(1.36) hue-rotate(-14deg);
+       }
+-      16% {
+-        transform: translate(3px, -2px);
+-        background: var(--brand-blue);
++      24% {
++        transform: translate(calc(var(--x) * -3px), calc(var(--y) * 2px));
++        filter: brightness(1.2) saturate(1.28) hue-rotate(16deg);
+       }
+-      17%, 46% {
++      28%, 56% {
+         transform: translate(0, 0);
+-        background: var(--brand-yellow);
++        opacity: 1;
++        filter: none;
+       }
+-      47% {
+-        transform: translate(-2px, -2px) skewX(7deg);
+-        opacity: 0.68;
++      57% {
++        transform: scale(0.84);
++        opacity: 0.64;
++        filter: brightness(0.84) saturate(0.88);
+       }
+-      48%, 100% {
+-        transform: translate(0, 0);
++      68% {
++        transform: scale(1.08);
+         opacity: 1;
++        filter: brightness(1.12) saturate(1.2);
++      }
++      100% {
++        transform: translate(0, 0) scale(1);
++        opacity: 1;
++        filter: none;
+       }
+-    }
+-
+-    @keyframes glitchStripes {
+-      from { transform: translateY(0); }
+-      to { transform: translateY(6px); }
+     }
+ 
+     .loader-collapse .logo-grid span {
+-      animation: collapseRebuild 2.35s cubic-bezier(0.62, 0.01, 0.27, 1) infinite;
++      animation: collapseOrbit 2.3s cubic-bezier(0.58, 0.04, 0.3, 1) infinite;
++      animation-delay: calc(var(--dist) * 0.06s);
+     }
+ 
+-    @keyframes collapseRebuild {
+-      0%, 16% {
++    @keyframes collapseOrbit {
++      0%, 14% {
+         transform: translate(0, 0) scale(1);
+-        border-radius: 8px;
+-        background: var(--brand-yellow);
++        filter: none;
+       }
+-      34% {
+-        transform: translate(calc(var(--x) * -28px), calc(var(--y) * -28px)) scale(0.24);
+-        border-radius: 50%;
+-        background: var(--brand-blue);
++      36% {
++        transform: translate(calc(var(--x) * -24px), calc(var(--y) * -24px)) scale(0.34);
++        filter: brightness(1.16) saturate(1.24);
+       }
+-      56% {
+-        transform: translate(calc(var(--x) * 10px), calc(var(--y) * 10px)) scale(1.12);
+-        background: var(--brand-orange);
++      60% {
++        transform: translate(calc(var(--x) * 8px), calc(var(--y) * 8px)) scale(1.1);
++        filter: brightness(1.22) saturate(1.26);
+       }
+       100% {
+         transform: translate(0, 0) scale(1);
+-        border-radius: 8px;
+-        background: var(--brand-yellow);
++        filter: none;
+       }
+     }
+ 
+     .loader-chase .logo-grid span {
+-      background: #1f283b;
+       opacity: 0.36;
++      filter: brightness(0.32) saturate(0.45);
+       animation: borderChase 1.55s steps(1, end) infinite;
+       animation-delay: calc(var(--ring) * 0.12s);
+     }
+ 
+     .loader-chase .logo-grid span[data-center="1"] {
+       animation: centerBeat 1.55s ease-in-out infinite;
+-      background: var(--brand-yellow);
+       opacity: 1;
++      filter: brightness(0.9);
+     }
+ 
+     @keyframes borderChase {
+       0%, 22% {
+-        background: #1f283b;
+         opacity: 0.35;
++        filter: brightness(0.32) saturate(0.45);
+       }
+       23%, 58% {
+-        background: var(--brand-green);
+         opacity: 1;
++        filter: brightness(1.18) saturate(1.28);
+       }
+       59%, 100% {
+-        background: #1f283b;
+         opacity: 0.35;
++        filter: brightness(0.32) saturate(0.45);
+       }
+     }
+ 
+     @keyframes centerBeat {
+       0%, 100% {
+         transform: scale(0.9);
+-        background: var(--brand-yellow);
++        filter: brightness(0.9);
+       }
+       45% {
+         transform: scale(1.16);
+-        background: var(--brand-coral);
++        filter: brightness(1.28) saturate(1.4);
+       }
+     }
+ 
+@@ -338,19 +296,19 @@
+     @keyframes tileFlip {
+       0%, 15% {
+         transform: rotateX(0deg) rotateY(0deg);
+-        background: var(--brand-yellow);
++        filter: none;
+       }
+       35% {
+         transform: rotateX(180deg);
+-        background: var(--brand-blue);
++        filter: brightness(1.18) saturate(1.28);
+       }
+       58% {
+         transform: rotateY(180deg);
+-        background: var(--brand-green);
++        filter: brightness(0.76) saturate(0.66);
+       }
+       100% {
+         transform: rotateX(360deg) rotateY(360deg);
+-        background: var(--brand-yellow);
++        filter: none;
+       }
+     }
+ 
+@@ -374,195 +332,85 @@
+       }
+     }
+ 
+-    .loader-liquid .logo-grid {
+-      filter: url(#gooey-filter);
+-    }
+-
+     .loader-liquid .logo-grid span {
+-      border-radius: 45%;
+-      animation: liquidMorph 1.45s ease-in-out infinite;
++      animation: liquidBreath 1.5s ease-in-out infinite;
+       animation-delay: calc(var(--dist) * 0.11s + var(--col) * 0.05s);
+     }
+ 
+-    @keyframes liquidMorph {
+-      0%, 100% {
+-        transform: scale(0.82);
+-        background: var(--brand-blue);
+-      }
+-      50% {
+-        transform: scale(1.18) translateY(-2px);
+-        border-radius: 34%;
+-        background: var(--brand-yellow);
+-      }
+-    }
+-
+-    .loader-shutter .logo-grid span {
+-      animation: shutterGlow 1.9s ease-in-out infinite;
+-      animation-delay: calc(var(--dist) * 0.1s);
+-    }
+-
+-    .loader-shutter .logo-stage::before,
+-    .loader-shutter .logo-stage::after {
+-      content: "";
+-      position: absolute;
+-      top: -2px;
+-      bottom: -2px;
+-      width: 56%;
+-      background: linear-gradient(160deg, #0b111a 0%, #1f2a3d 100%);
+-      z-index: 4;
+-      pointer-events: none;
+-    }
+-
+-    .loader-shutter .logo-stage::before {
+-      left: -2px;
+-      border-right: 3px solid #111;
+-      animation: shutterLeft 2.05s cubic-bezier(0.5, 0, 0.2, 1) infinite;
+-    }
+-
+-    .loader-shutter .logo-stage::after {
+-      right: -2px;
+-      border-left: 3px solid #111;
+-      animation: shutterRight 2.05s cubic-bezier(0.5, 0, 0.2, 1) infinite;
+-    }
+-
+-    @keyframes shutterLeft {
+-      0%, 20% { transform: translateX(0%); }
+-      42%, 70% { transform: translateX(-96%); }
+-      100% { transform: translateX(0%); }
+-    }
+-
+-    @keyframes shutterRight {
+-      0%, 20% { transform: translateX(0%); }
+-      42%, 70% { transform: translateX(96%); }
+-      100% { transform: translateX(0%); }
+-    }
+-
+-    @keyframes shutterGlow {
++    @keyframes liquidBreath {
+       0%, 100% {
+-        background: #243146;
+-        opacity: 0.52;
++        transform: scale(0.78) translateY(2px);
++        opacity: 0.66;
++        filter: brightness(0.84) saturate(0.9);
+       }
+-      56% {
+-        background: var(--brand-yellow);
++      46% {
++        transform: scale(1.16) translateY(-3px);
+         opacity: 1;
++        filter: brightness(1.2) saturate(1.28);
++      }
++      72% {
++        transform: scale(0.96) translateY(0);
++        opacity: 0.92;
++        filter: brightness(1.02) saturate(1.08);
+       }
+     }
+ 
+-    .loader-radar .logo-grid span {
+-      background: #1e2737;
+-      opacity: 0.46;
+-      animation: radarPulse 1.8s ease-in-out infinite;
+-      animation-delay: calc(var(--dist) * 0.12s);
+-    }
+-
+-    .loader-radar .logo-stage::after {
+-      content: "";
+-      position: absolute;
+-      inset: -45%;
+-      background: conic-gradient(
+-        from 0deg,
+-        rgba(136, 212, 152, 0) 0%,
+-        rgba(136, 212, 152, 0) 68%,
+-        rgba(136, 212, 152, 0.82) 78%,
+-        rgba(136, 212, 152, 0) 90%,
+-        rgba(136, 212, 152, 0) 100%
+-      );
+-      mix-blend-mode: screen;
+-      animation: radarSpin 1.8s linear infinite;
+-      z-index: 3;
+-      pointer-events: none;
++    .loader-stamp .logo-grid span {
++      animation: stampCascade 2.2s cubic-bezier(0.2, 0.78, 0.26, 1) infinite;
++      animation-delay: calc(var(--ring) * 0.14s);
+     }
+ 
+-    @keyframes radarPulse {
+-      0%, 100% {
+-        opacity: 0.42;
++    @keyframes stampCascade {
++      0%, 18% {
++        transform: translateY(-16px) scale(0.66);
++        opacity: 0.34;
++        filter: brightness(0.58) saturate(0.8);
+       }
+-      48% {
+-        background: var(--brand-green);
++      40% {
++        transform: translateY(4px) scale(1.1);
+         opacity: 1;
++        filter: brightness(1.24) saturate(1.3);
+       }
+-    }
+-
+-    @keyframes radarSpin {
+-      from { transform: rotate(0deg); }
+-      to { transform: rotate(360deg); }
+-    }
+-
+-    .loader-depth .logo-stage {
+-      perspective: 900px;
+-    }
+-
+-    .loader-depth .logo-grid span {
+-      animation: depthFloat 1.85s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+-      animation-delay: calc(var(--i) * 0.07s);
+-    }
+-
+-    @keyframes depthFloat {
+-      0%, 100% {
+-        transform: translateZ(0) rotateX(0deg);
+-        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.15);
++      62% {
++        transform: translateY(0) scale(0.96);
++        opacity: 0.9;
++        filter: brightness(0.96) saturate(1);
+       }
+-      45% {
+-        transform: translateZ(34px) rotateX(-14deg);
+-        background: var(--brand-orange);
+-        box-shadow: 0 12px 16px rgba(0, 0, 0, 0.35);
++      100% {
++        transform: translateY(0) scale(1);
++        opacity: 1;
++        filter: none;
+       }
+     }
+ 
+-    .loader-decode .logo-stage::before {
+-      content: "010011001110100101100101011001100101011001010011";
+-      position: absolute;
+-      top: -6px;
+-      left: 0;
+-      right: 0;
+-      bottom: -6px;
+-      display: flex;
+-      align-items: flex-start;
+-      justify-content: center;
+-      padding-top: 6px;
+-      font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+-      font-size: 15px;
+-      font-weight: 700;
+-      letter-spacing: 2px;
+-      line-height: 1.3;
+-      color: rgba(116, 185, 255, 0.45);
+-      mix-blend-mode: screen;
+-      animation: codeRain 1.3s linear infinite;
+-      z-index: 1;
+-      pointer-events: none;
+-    }
+-
+-    .loader-decode .logo-grid span {
+-      background: #101726;
+-      opacity: 0.35;
+-      animation: decodeTile 2.2s steps(1, end) infinite;
+-      animation-delay: calc(var(--i) * 0.09s);
++    .loader-link .logo-grid span {
++      animation: chainPulse 1.95s ease-in-out infinite;
++      animation-delay: calc(var(--dist) * 0.14s + var(--col) * 0.05s);
+     }
+ 
+-    @keyframes decodeTile {
+-      0%, 22% {
+-        background: #101726;
+-        opacity: 0.35;
++    @keyframes chainPulse {
++      0%, 20% {
++        transform: scale(0.64);
++        opacity: 0.58;
++        filter: brightness(0.78) saturate(0.9);
+       }
+-      23%, 42% {
+-        background: var(--brand-blue);
+-        opacity: 0.92;
++      42% {
++        transform: scale(1.12);
++        opacity: 1;
++        filter: brightness(1.22) saturate(1.3);
+       }
+-      43%, 64% {
+-        background: var(--brand-green);
+-        opacity: 0.88;
++      66% {
++        transform: scale(0.9);
++        opacity: 0.82;
++        filter: brightness(0.92) saturate(0.98);
+       }
+-      65%, 100% {
+-        background: var(--brand-yellow);
++      100% {
++        transform: scale(1);
+         opacity: 1;
++        filter: none;
+       }
+     }
+ 
+-    @keyframes codeRain {
+-      from { transform: translateY(-34%); }
+-      to { transform: translateY(36%); }
+-    }
+-
+     @media (max-width: 620px) {
+       .page {
+         padding: 20px 14px 30px;
+@@ -585,107 +433,64 @@
+   </style>
+ </head>
+ <body>
+-  <svg width="0" height="0" aria-hidden="true" style="position: absolute;">
+-    <filter id="gooey-filter">
+-      <feGaussianBlur in="SourceGraphic" stdDeviation="3.2" result="blur" />
+-      <feColorMatrix
+-        in="blur"
+-        mode="matrix"
+-        values="
+-          1 0 0 0 0
+-          0 1 0 0 0
+-          0 0 1 0 0
+-          0 0 0 22 -10"
+-        result="goo"
+-      />
+-      <feComposite in="SourceGraphic" in2="goo" operator="atop" />
+-    </filter>
+-  </svg>
+-
+   <main class="page">
+     <section class="hero">
+       <h1>Glowxel 九宫格 Logo Loading Showcase</h1>
+-      <p>基于“3×3 九个方块”Logo 设计的 12 种加载动画，每种都用不同的运动机制和视觉逻辑，避免同类变体。</p>
+-      <span class="badge">12 种独立方案 · 可直接用于启动页/设备连接态/发送进度态</span>
++      <p>基于“3×3 九个方块”Logo 设计的 10 种加载动画，并严格使用真实方块配色矩阵（橙橙红 / 橙黄黄 / 橙蓝蓝）。</p>
++      <span class="badge">10 种筛选方案 · 可直接用于启动页/设备连接态/发送进度态</span>
+     </section>
+ 
+     <section class="loader-grid">
+       <article class="loader-card loader-wave">
+         <div class="logo-stage"><div class="logo-grid"></div></div>
+         <h2>01. 中心波纹</h2>
+-        <p>由中心向外层层脉冲，强调“能量启动”的节奏感。</p>
+       </article>
+ 
+-      <article class="loader-card loader-scanner">
++      <article class="loader-card loader-column">
+         <div class="logo-stage"><div class="logo-grid"></div></div>
+-        <h2>02. 扫描解锁</h2>
+-        <p>扫描线自上而下穿透九宫格，适合“设备握手中”语义。</p>
++        <h2>02. 列阵接力</h2>
+       </article>
+ 
+       <article class="loader-card loader-glitch">
+         <div class="logo-stage"><div class="logo-grid"></div></div>
+-        <h2>03. 故障脉冲</h2>
+-        <p>切片抖动与色偏跳帧，表达“信号校准与修复”状态。</p>
++        <h2>03. 矩阵抖频</h2>
+       </article>
+ 
+       <article class="loader-card loader-collapse">
+         <div class="logo-stage"><div class="logo-grid"></div></div>
+-        <h2>04. 汇聚重组</h2>
+-        <p>九块先坍缩到中心后重建，体现“初始化编排”的过程感。</p>
++        <h2>04. 回缩复位</h2>
+       </article>
+ 
+       <article class="loader-card loader-chase">
+         <div class="logo-stage"><div class="logo-grid"></div></div>
+         <h2>05. 边缘追光</h2>
+-        <p>外围方块按路径追逐点亮，中心块保持心跳式响应。</p>
+       </article>
+ 
+       <article class="loader-card loader-flip">
+         <div class="logo-stage"><div class="logo-grid"></div></div>
+         <h2>06. 瓦片翻转</h2>
+-        <p>每块独立翻面，适合“模块逐项加载”的叙事风格。</p>
+       </article>
+ 
+       <article class="loader-card loader-slide">
+         <div class="logo-stage"><div class="logo-grid"></div></div>
+         <h2>07. 轨道拼装</h2>
+-        <p>九块从外部轨道回归到固定阵列，强调“拼合完成”的方向性。</p>
+       </article>
+ 
+       <article class="loader-card loader-liquid">
+         <div class="logo-stage"><div class="logo-grid"></div></div>
+-        <h2>08. 液化融合</h2>
+-        <p>利用粘连滤镜让方块像液滴互相拉扯，视觉更有实验感。</p>
+-      </article>
+-
+-      <article class="loader-card loader-shutter">
+-        <div class="logo-stage"><div class="logo-grid"></div></div>
+-        <h2>09. 闸门开合</h2>
+-        <p>双侧闸门重复启闭，适合“加载通道打开/关闭”的反馈语义。</p>
+-      </article>
+-
+-      <article class="loader-card loader-radar">
+-        <div class="logo-stage"><div class="logo-grid"></div></div>
+-        <h2>10. 雷达巡检</h2>
+-        <p>扇形扫描围绕九宫格旋转，适合“状态探测中”界面。</p>
++        <h2>08. 呼吸扩散</h2>
+       </article>
+ 
+-      <article class="loader-card loader-depth">
++      <article class="loader-card loader-stamp">
+         <div class="logo-stage"><div class="logo-grid"></div></div>
+-        <h2>11. 纵深抬升</h2>
+-        <p>方块在 Z 轴前后浮动，表达“数据堆栈推进”质感。</p>
++        <h2>09. 落点装配</h2>
+       </article>
+ 
+-      <article class="loader-card loader-decode">
++      <article class="loader-card loader-link">
+         <div class="logo-stage"><div class="logo-grid"></div></div>
+-        <h2>12. 二进制解码</h2>
+-        <p>数字雨覆盖下逐格完成解码，从冷色状态过渡到品牌亮色。</p>
++        <h2>10. 连锁点亮</h2>
+       </article>
+     </section>
+-
+-    <section class="footer-note">
+-      所有动画都严格基于同一枚九宫格 Logo（九个方块）。可以把任意一张卡片的 `.loader-*` 类提取到业务页面直接复用。
+-    </section>
+   </main>
+ 
+   <script>
+@@ -702,9 +507,22 @@
+         ["-1,1", 6], ["-1,0", 7], ["0,0", 8]
+       ]);
+ 
++      const tileColorByCoord = new Map([
++        ["-1,-1", "#f97316"],
++        ["0,-1", "#f97316"],
++        ["1,-1", "#ef4444"],
++        ["-1,0", "#f97316"],
++        ["0,0", "#fbbf24"],
++        ["1,0", "#fbbf24"],
++        ["-1,1", "#f97316"],
++        ["0,1", "#3b82f6"],
++        ["1,1", "#3b82f6"]
++      ]);
++
+       const grids = document.querySelectorAll(".logo-grid");
+       grids.forEach((grid) => {
+         coords.forEach(([x, y], i) => {
++          const coordKey = `${x},${y}`;
+           const cell = document.createElement("span");
+           cell.style.setProperty("--x", String(x));
+           cell.style.setProperty("--y", String(y));
+@@ -712,7 +530,8 @@
+           cell.style.setProperty("--row", String(y + 1));
+           cell.style.setProperty("--col", String(x + 1));
+           cell.style.setProperty("--dist", String(Math.abs(x) + Math.abs(y)));
+-          cell.style.setProperty("--ring", String(ringOrder.get(`${x},${y}`)));
++          cell.style.setProperty("--ring", String(ringOrder.get(coordKey)));
++          cell.style.setProperty("--tile-color", String(tileColorByCoord.get(coordKey)));
+           if (x === 0 && y === 0) {
+             cell.dataset.center = "1";
+           }
+diff --git a/uniapp/pages.json b/uniapp/pages.json
+index cd80527..31d2506 100644
+--- a/uniapp/pages.json
++++ b/uniapp/pages.json
+@@ -71,18 +71,18 @@
+     },
+     {
+       "path": "pages/profile/profile",
+-      "style": {
+-        "navigationStyle": "custom",
+-        "navigationBarTextStyle": "black",
+-        "backgroundColor": "#FFFFFF",
+-        "enablePullDownRefresh": false
+-      }
+-    },
+-    {
+-      "path": "pages/editor/editor",
+-      "style": {
+-        "navigationStyle": "custom",
+-        "navigationBarTextStyle": "white",
++      "style": {
++        "navigationStyle": "custom",
++        "navigationBarTextStyle": "black",
++        "backgroundColor": "#FFFFFF",
++        "enablePullDownRefresh": false
++      }
++    },
++    {
++      "path": "pages/editor/editor",
++      "style": {
++        "navigationStyle": "custom",
++        "navigationBarTextStyle": "white",
+         "backgroundColor": "#1a1a1a",
+         "enablePullDownRefresh": false
+       }
+@@ -340,17 +340,17 @@
+       }
+     }
+   ],
+-  "globalStyle": {
+-    "navigationStyle": "custom",
+-    "navigationBarTextStyle": "black",
+-    "navigationBarTitleText": "RenLight",
+-    "navigationBarBackgroundColor": "#FFFFFF",
+-    "backgroundColor": "#FFFFFF",
+-    "backgroundTextStyle": "light",
+-    "animationType": "pop-in",
+-    "animationDuration": 200,
+-    "enablePullDownRefresh": false
+-  },
++  "globalStyle": {
++    "navigationStyle": "custom",
++    "navigationBarTextStyle": "black",
++    "navigationBarTitleText": "RenLight",
++    "navigationBarBackgroundColor": "#FFFFFF",
++    "backgroundColor": "#FFFFFF",
++    "backgroundTextStyle": "light",
++    "animationType": "none",
++    "animationDuration": 0,
++    "enablePullDownRefresh": false
++  },
+   "tabBar": {
+     "color": "#8A8A8A",
+     "selectedColor": "#333333",
+@@ -360,37 +360,37 @@
+     "fontSize": "14px",
+     "iconWidth": "34px",
+     "spacing": "6px",
+-    "list": [
+-      {
+-        "pagePath": "pages/library/library",
+-        "iconPath": "static/tabbar/home.png",
+-        "selectedIconPath": "static/tabbar/home-active.png",
+-        "text": "首页"
+-      },
+-      {
+-        "pagePath": "pages/community/community",
+-        "iconPath": "static/tabbar/community.png",
+-        "selectedIconPath": "static/tabbar/community-active.png",
+-        "text": "社区"
+-      },
+-      {
+-        "pagePath": "pages/workspace/workspace",
+-        "iconPath": "static/tabbar/create.png",
+-        "selectedIconPath": "static/tabbar/create-active.png",
+-        "text": "创作"
+-      },
+-      {
+-        "pagePath": "pages/control/control",
+-        "iconPath": "static/tabbar/device.png",
+-        "selectedIconPath": "static/tabbar/device-active.png",
+-        "text": "设备"
+-      },
+-      {
+-        "pagePath": "pages/profile/profile",
+-        "iconPath": "static/tabbar/profile.png",
+-        "selectedIconPath": "static/tabbar/profile-active.png",
+-        "text": "我的"
+-      }
+-    ]
+-  }
++    "list": [
++      {
++        "pagePath": "pages/library/library",
++        "iconPath": "static/tabbar/home.png",
++        "selectedIconPath": "static/tabbar/home-active.png",
++        "text": "首页"
++      },
++      {
++        "pagePath": "pages/community/community",
++        "iconPath": "static/tabbar/community.png",
++        "selectedIconPath": "static/tabbar/community-active.png",
++        "text": "社区"
++      },
++      {
++        "pagePath": "pages/workspace/workspace",
++        "iconPath": "static/tabbar/create.png",
++        "selectedIconPath": "static/tabbar/create-active.png",
++        "text": "创作"
++      },
++      {
++        "pagePath": "pages/control/control",
++        "iconPath": "static/tabbar/device.png",
++        "selectedIconPath": "static/tabbar/device-active.png",
++        "text": "设备"
++      },
++      {
++        "pagePath": "pages/profile/profile",
++        "iconPath": "static/tabbar/profile.png",
++        "selectedIconPath": "static/tabbar/profile-active.png",
++        "text": "我的"
++      }
++    ]
++  }
+ }
+diff --git a/uniapp/pages/assist/assist.vue b/uniapp/pages/assist/assist.vue
+index 9de5972..95989e8 100644
+--- a/uniapp/pages/assist/assist.vue
++++ b/uniapp/pages/assist/assist.vue
+@@ -403,6 +403,7 @@ import { useDeviceStore } from "../../store/device.js";
+ import { useToast } from "../../composables/useToast.js";
+ import { ARTKAL_COLORS_FULL } from "../../data/artkal-colors-full.js";
+ import statusBarMixin from "../../mixins/statusBar.js";
++import { switchTabCompat } from "../../utils/customTabBar.js";
+ import PixelCanvas from "../../components/PixelCanvas.vue";
+ import HelpModal from "../../components/HelpModal.vue";
+ import ConnectModal from "../../components/ConnectModal.vue";
+@@ -650,7 +651,7 @@ export default {
+     if (!this.project) {
+       this.toast.showError("项目不存在");
+       setTimeout(() => {
+-        uni.switchTab({
++        switchTabCompat({
+           url: "/pages/workspace/workspace",
+         });
+       }, 1000);
+diff --git a/uniapp/pages/ble-config/ble-config.vue b/uniapp/pages/ble-config/ble-config.vue
+index 2b246cc..22dbc11 100644
+--- a/uniapp/pages/ble-config/ble-config.vue
++++ b/uniapp/pages/ble-config/ble-config.vue
+@@ -107,6 +107,7 @@
+ 
+ <script>
+ import statusBarMixin from "../../mixins/statusBar.js";
++import { switchTabCompat } from "../../utils/customTabBar.js";
+ import Icon from "../../components/Icon.vue";
+ 
+ export default {
+@@ -114,7 +115,7 @@ export default {
+   components: { Icon },
+   methods: {
+     goToControl() {
+-      uni.switchTab({ url: "/pages/control/control" });
++      switchTabCompat({ url: "/pages/control/control" });
+     },
+ 
+     handleBack() {
+diff --git a/uniapp/pages/cloud-sync/cloud-sync.vue b/uniapp/pages/cloud-sync/cloud-sync.vue
+index 242152f..b2e609b 100644
+--- a/uniapp/pages/cloud-sync/cloud-sync.vue
++++ b/uniapp/pages/cloud-sync/cloud-sync.vue
+@@ -324,10 +324,15 @@ export default {
+   mixins: [statusBarMixin],
+   components: { Icon, Toast, ConfirmDialogHost, GlxSwitch, LoadingOverlay },
+ 
++  created() {
++    this.userStore = useUserStore();
++    this.projectStore = useProjectStore();
++  },
++
+   data() {
+     return {
+-      userStore: useUserStore(),
+-      projectStore: useProjectStore(),
++      userStore: null,
++      projectStore: null,
+       toast: null,
+       dialog: null,
+       syncStatus: {
+@@ -388,6 +393,7 @@ export default {
+     },
+ 
+     getStatusDescription() {
++      if (!this.userStore) return "";
+       if (!this.userStore.isLoggedIn) return "请先登录以使用云同步";
+       if (!this.syncStatus.enabled) return "开启后可在多设备间同步数据";
+       if (this.syncStatus.syncing) return "正在同步数据...";
+diff --git a/uniapp/pages/community/community.vue b/uniapp/pages/community/community.vue
+index a6422c2..9c74be8 100644
+--- a/uniapp/pages/community/community.vue
++++ b/uniapp/pages/community/community.vue
+@@ -1,15 +1,15 @@
+ <template>
+-  <view class="community-page glx-page-shell">
++  <view class="community-page">
+     <!-- 状态栏占位 -->
+     <!-- #ifdef MP-WEIXIN -->
+     <view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
+     <!-- #endif -->
+ 
+     <!-- 顶部导航 -->
+-    <view class="header glx-topbar glx-page-shell__fixed">
++    <view class="header">
+       <view class="header-content">
+         <view class="header-placeholder"></view>
+-        <text class="header-title glx-topbar__title">社区</text>
++        <text class="header-title">社区</text>
+         <view class="header-placeholder"></view>
+       </view>
+ 
+@@ -33,7 +33,7 @@
+     <!-- 主要内容 -->
+     <scroll-view
+       scroll-y
+-      class="main-content glx-scroll-region glx-page-shell__content"
++      class="main-content"
+       @scrolltolower="loadMore"
+       :refresher-enabled="true"
+       :refresher-triggered="isRefreshing"
+@@ -110,13 +110,7 @@
+ 
+         <!-- 加载更多 -->
+         <view v-if="isLoading" class="loading-more">
+-          <Icon
+-            name="loading"
+-            :size="48"
+-            color="currentColor"
+-            class="loading-icon"
+-          />
+-          <text class="loading-text">加载中...</text>
++          <GlxInlineLoader label="加载中..." :size="44" />
+         </view>
+ 
+         <view
+@@ -132,7 +126,6 @@
+         </view>
+       </view>
+     </scroll-view>
+-
+     <Toast />
+   </view>
+ </template>
+@@ -207,7 +200,6 @@ export default {
+   },
+ 
+   onShow() {
+-    // 刷新数据
+     this.handleRefresh();
+   },
+ 
+@@ -448,10 +440,14 @@ export default {
+ 
+ <style scoped>
+ .community-page {
++  width: 100%;
++  max-width: 100%;
++  min-width: 0;
+   height: 100vh;
+   display: flex;
+   flex-direction: column;
+   background-color: var(--nb-paper);
++  box-sizing: border-box;
+   overflow: hidden;
+ }
+ 
+@@ -466,6 +462,11 @@ export default {
+   background-color: var(--nb-surface);
+   border-bottom: 1rpx solid var(--nb-ink);
+   flex-shrink: 0;
++  width: 100%;
++  max-width: 100%;
++  min-width: 0;
++  box-sizing: border-box;
++  overflow-x: hidden;
+ }
+ 
+ .header-content {
+@@ -473,6 +474,10 @@ export default {
+   align-items: center;
+   justify-content: center;
+   padding: 24rpx 32rpx;
++  width: 100%;
++  max-width: 100%;
++  min-width: 0;
++  box-sizing: border-box;
+ }
+ 
+ .header-title {
+@@ -495,16 +500,17 @@ export default {
+   justify-content: center;
+   border-radius: 0;
+   background-color: var(--nb-paper);
+-  transition: all 0.2s ease;
+-}
+-
+-.search-btn:active {
+-  background-color: var(--nb-yellow);
++  transition: none;
+ }
+ 
+ /* 分类标签 */
+ .category-tabs {
+   padding: 0 32rpx 24rpx;
++  width: 100%;
++  max-width: 100%;
++  min-width: 0;
++  box-sizing: border-box;
++  overflow-x: hidden;
+ }
+ 
+ .tabs-scroll {
+@@ -522,7 +528,7 @@ export default {
+   border-radius: 0;
+   background-color: var(--nb-paper);
+   border: 2rpx solid var(--nb-ink);
+-  transition: all 0.2s ease;
++  transition: none;
+ }
+ 
+ .tab-item.active {
+@@ -552,7 +558,11 @@ export default {
+ /* 主要内容 */
+ .main-content {
+   flex: 1;
+-  overflow-y: auto;
++  width: 100%;
++  max-width: 100%;
++  min-width: 0;
++  box-sizing: border-box;
++  overflow-x: hidden;
+ }
+ 
+ /* 搜索输入框 */
+@@ -584,13 +594,15 @@ export default {
+   border-radius: 0;
+   background-color: var(--nb-paper);
+   border: 2rpx solid var(--nb-ink);
+-  transition: all 0.2s ease;
++  transition: none;
+ }
+ 
+ /* 主要内容 */
+ .main-content {
+   flex: 1;
+-  overflow-y: auto;
++  width: 100%;
++  box-sizing: border-box;
++  overflow-x: hidden;
+ }
+ 
+ /* 通用区块样式 */
+@@ -611,7 +623,8 @@ export default {
+   display: inline-flex;
+   align-items: center;
+   justify-content: center;
+-  transition: all 0.2s ease;
++  box-shadow: 0 2rpx 0 #000000;
++  transition: none;
+ }
+ 
+ .more-text {
+@@ -623,6 +636,9 @@ export default {
+ /* 推荐用户 */
+ .recommended-users {
+   margin: 32rpx 0 48rpx;
++  max-width: 100%;
++  min-width: 0;
++  overflow-x: hidden;
+ }
+ 
+ .recommended-users .section-header {
+@@ -648,12 +664,8 @@ export default {
+   padding: 32rpx 24rpx;
+   background-color: var(--nb-surface);
+   border-radius: 0;
+-  box-shadow: var(--nb-shadow-strong);
+-  transition: all 0.2s ease;
+-}
+-
+-.user-card:active {
+-  box-shadow: 2rpx 2rpx 0 var(--nb-ink);
++  box-shadow: 0 4rpx 0 #000000;
++  transition: none;
+ }
+ 
+ .user-name {
+@@ -679,7 +691,7 @@ export default {
+   border-radius: 0;
+   background-color: var(--nb-yellow);
+   border: 2rpx solid var(--nb-ink);
+-  transition: all 0.2s ease;
++  transition: none;
+ }
+ 
+ .follow-btn.following {
+@@ -699,6 +711,10 @@ export default {
+ /* 作品区域 */
+ .artworks-section {
+   margin: 0 32rpx;
++  max-width: 100%;
++  min-width: 0;
++  box-sizing: border-box;
++  overflow-x: hidden;
+ }
+ 
+ .artworks-grid {
+@@ -771,11 +787,8 @@ export default {
+   background-color: var(--nb-surface);
+   border-radius: 0;
+   border: 2rpx solid var(--nb-ink);
+-  transition: all 0.2s ease;
+-}
+-
+-.load-more-btn:active {
+-  background-color: var(--nb-paper);
++  box-shadow: 0 2rpx 0 #000000;
++  transition: none;
+ }
+ 
+ .load-more-text {
+diff --git a/uniapp/pages/control/control.vue b/uniapp/pages/control/control.vue
+index 881762b..d107457 100644
+--- a/uniapp/pages/control/control.vue
++++ b/uniapp/pages/control/control.vue
+@@ -1,18 +1,18 @@
+ <template>
+-  <view class="control-page glx-page-shell">
++  <view class="control-page">
+     <!-- #ifdef MP-WEIXIN -->
+     <view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
+     <!-- #endif -->
+-    <view class="header glx-topbar glx-page-shell__fixed">
++    <view class="header">
+       <view class="header-content">
+         <view class="header-placeholder"></view>
+-        <text class="header-title glx-topbar__title">设备控制</text>
++        <text class="header-title">设备控制</text>
+         <view class="header-placeholder"></view>
+       </view>
+     </view>
+     <scroll-view
+       scroll-y
+-      class="content glx-scroll-region glx-page-shell__content"
++      class="content"
+     >
+       <view class="console-card glx-panel-card">
+         <view class="console-card-header">
+@@ -121,8 +121,6 @@
+           </view>
+         </view>
+       </view>
+-
+-      <view style="height: 120rpx"></view>
+     </scroll-view>
+     <Toast ref="toastRef" />
+     <ConnectModal
+@@ -214,6 +212,7 @@ export default {
+         businessMode: false,
+       });
+     }
++
+   },
+ 
+   onReady() {
+@@ -223,20 +222,35 @@ export default {
+   },
+ 
+   async onShow() {
+-    this.deviceIp = this.deviceStore?.deviceIp || this.deviceIp;
+-    this.deviceMode = this.deviceStore?.deviceMode || this.deviceMode;
+-    const status = this.deviceStore?.deviceInfo;
++    if (this.deviceStore && typeof this.deviceStore.deviceIp === "string") {
++      this.deviceIp = this.deviceStore.deviceIp;
++    }
++
++    if (this.deviceStore && typeof this.deviceStore.deviceMode === "string") {
++      this.deviceMode = this.deviceStore.deviceMode;
++    }
++
++    const status = this.deviceStore ? this.deviceStore.deviceInfo : null;
+     if (status && typeof status.mode === "string") {
+-      this.deviceMode =
+-        this.deviceStore.resolveDeviceModeFromStatus(status) ||
+-        this.deviceStore.deviceMode ||
+-        this.deviceMode;
++      const resolvedMode = this.deviceStore.resolveDeviceModeFromStatus(status);
++      if (typeof resolvedMode === "string") {
++        this.deviceMode = resolvedMode;
++      } else if (
++        this.deviceStore &&
++        typeof this.deviceStore.deviceMode === "string"
++      ) {
++        this.deviceMode = this.deviceStore.deviceMode;
++      }
+     }
+   },
+ 
+   computed: {
+     isDeviceConnected() {
+-      return this.deviceStore?.connected || false;
++      if (!this.deviceStore) {
++        return false;
++      }
++
++      return this.deviceStore.connected === true;
+     },
+     modeCatalog() {
+       return [
+@@ -792,10 +806,14 @@ export default {
+ 
+ <style scoped>
+ .control-page {
++  width: 100%;
++  max-width: 100%;
++  min-width: 0;
+   height: 100vh;
+   display: flex;
+   flex-direction: column;
+   background: var(--nb-paper);
++  box-sizing: border-box;
+   overflow: hidden;
+ }
+ 
+@@ -803,6 +821,11 @@ export default {
+   background: var(--nb-surface);
+   border-bottom: 2rpx solid var(--nb-ink);
+   padding: 0;
++  width: 100%;
++  max-width: 100%;
++  min-width: 0;
++  box-sizing: border-box;
++  overflow-x: hidden;
+ }
+ 
+ .header-content {
+@@ -810,6 +833,10 @@ export default {
+   display: flex;
+   align-items: center;
+   justify-content: center;
++  width: 100%;
++  max-width: 100%;
++  min-width: 0;
++  box-sizing: border-box;
+ }
+ 
+ .header-title {
+@@ -820,9 +847,21 @@ export default {
+ 
+ .content {
+   flex: 1;
++  width: 100%;
++  max-width: 100%;
++  min-width: 0;
+   padding: 16rpx 20rpx 0;
+   box-sizing: border-box;
+-  overflow-y: scroll;
++  overflow-x: hidden;
++}
++
++.section-block,
++.mode-badge-grid,
++.connect-entry-grid {
++  max-width: 100%;
++  min-width: 0;
++  box-sizing: border-box;
++  overflow-x: hidden;
+ }
+ 
+ .console-card {
+@@ -976,7 +1015,7 @@ export default {
+ .connect-entry-card {
+   border-radius: 0;
+   background: var(--nb-surface);
+-  box-shadow: var(--nb-shadow-soft);
++  box-shadow: 0 2rpx 0 #000000;
+   padding: 20rpx;
+   display: flex;
+   align-items: center;
+@@ -1069,7 +1108,7 @@ export default {
+   padding: 16rpx 8rpx 14rpx;
+   border: 2rpx solid var(--nb-ink);
+   background: var(--nb-surface);
+-  box-shadow: var(--nb-shadow-soft);
++  box-shadow: 0 2rpx 0 #000000;
+   display: flex;
+   flex-direction: column;
+   align-items: center;
+diff --git a/uniapp/pages/device-params/device-params.vue b/uniapp/pages/device-params/device-params.vue
+index f7594a8..998185d 100644
+--- a/uniapp/pages/device-params/device-params.vue
++++ b/uniapp/pages/device-params/device-params.vue
+@@ -360,6 +360,7 @@ import { useDeviceStore } from "../../store/device.js";
+ import { useToast } from "../../composables/useToast.js";
+ import { useDialog } from "../../composables/useDialog.js";
+ import statusBarMixin from "../../mixins/statusBar.js";
++import { switchTabCompat } from "../../utils/customTabBar.js";
+ import ConfirmDialogHost from "../../components/ConfirmDialogHost.vue";
+ import Icon from "../../components/Icon.vue";
+ import LoadingOverlay from "../../components/LoadingOverlay.vue";
+@@ -609,7 +610,7 @@ export default {
+           uni.navigateBack();
+           return;
+         }
+-        uni.switchTab({
++        switchTabCompat({
+           url: "/pages/control/control",
+         });
+       }, 0);
+diff --git a/uniapp/pages/edit-profile/edit-profile.vue b/uniapp/pages/edit-profile/edit-profile.vue
+index 2bee2e4..495d42d 100644
+--- a/uniapp/pages/edit-profile/edit-profile.vue
++++ b/uniapp/pages/edit-profile/edit-profile.vue
+@@ -158,7 +158,7 @@ export default {
+ 
+   data() {
+     return {
+-      userStore: useUserStore(),
++      userStore: null,
+       toast: null,
+       form: {
+         avatar: "",
+@@ -195,6 +195,7 @@ export default {
+   },
+ 
+   onLoad() {
++    this.userStore = useUserStore();
+     this.toast = useToast();
+     this.loadUserData();
+ 
+diff --git a/uniapp/pages/editor/editor.vue b/uniapp/pages/editor/editor.vue
+index 04640c8..a09b4f8 100644
+--- a/uniapp/pages/editor/editor.vue
++++ b/uniapp/pages/editor/editor.vue
+@@ -262,6 +262,7 @@ import { useProjectStore } from "../../store/project.js";
+ import { useToast } from "../../composables/useToast.js";
+ import { getColorByCode } from "../../data/artkal-colors-full.js";
+ import statusBarMixin from "../../mixins/statusBar.js";
++import { switchTabCompat } from "../../utils/customTabBar.js";
+ import PixelCanvas from "../../components/PixelCanvas.vue";
+ import ColorPalette from "../../components/ColorPalette.vue";
+ import HelpModal from "../../components/HelpModal.vue";
+@@ -468,7 +469,7 @@ export default {
+     if (!this.project) {
+       this.toast.showError("项目不存在");
+       setTimeout(() => {
+-        uni.switchTab({
++        switchTabCompat({
+           url: "/pages/workspace/workspace",
+         });
+       }, 1000);
+diff --git a/uniapp/pages/gallery/gallery.vue b/uniapp/pages/gallery/gallery.vue
+index 90bf0a2..eb9a007 100644
+--- a/uniapp/pages/gallery/gallery.vue
++++ b/uniapp/pages/gallery/gallery.vue
+@@ -108,8 +108,7 @@
+         
+         <!-- 加载更多 -->
+         <view v-if="isLoading" class="loading-more">
+-          <Icon name="loading" :size="48" color="currentColor" class="loading-icon" />
+-          <text class="loading-text">加载中...</text>
++          <GlxInlineLoader label="加载中..." :size="44" />
+         </view>
+         
+         <view v-if="hasMore && !isLoading && filteredContent.length > 0" class="load-more-btn" @click="loadMore">
+diff --git a/uniapp/pages/library/library.vue b/uniapp/pages/library/library.vue
+index 78b4884..00af81d 100644
+--- a/uniapp/pages/library/library.vue
++++ b/uniapp/pages/library/library.vue
+@@ -1,121 +1,144 @@
+ <template>
+-  <view class="home-page glx-page-shell">
++  <view class="home-page">
+     <!-- 状态栏占位 -->
+     <!-- #ifdef MP-WEIXIN -->
+     <view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
+     <!-- #endif -->
+-    
++
+     <!-- 顶部导航 -->
+-    <view class="header glx-topbar glx-page-shell__fixed">
++    <view class="header">
+       <view class="header-content">
+         <Logo :size="88" :show-text="true" />
+-        <view class="header-actions">
+-        </view>
++        <view class="header-actions"> </view>
+       </view>
+     </view>
+-    
++
+     <!-- 主要内容 -->
+-    <scroll-view scroll-y class="main-content glx-scroll-region glx-page-shell__content">
+-      <!-- 横幅轮播 -->
+-      <view class="banner-section">
+-        <swiper 
+-          class="banner-swiper" 
+-          indicator-dots 
+-          autoplay 
+-          interval="5000"
+-          indicator-color="rgba(255,255,255,0.3)"
+-          indicator-active-color="#FFFFFF"
+-        >
+-          <swiper-item v-for="(banner, index) in banners" :key="index">
+-            <view class="banner-item" :style="{ background: banner.gradient }">
+-              <view class="banner-content">
+-                <text class="banner-title">{{ banner.title }}</text>
+-                <text class="banner-subtitle">{{ banner.subtitle }}</text>
+-                <view class="banner-btn" @click="handleBannerClick(banner)">
+-                  <text class="banner-btn-text">{{ banner.buttonText }}</text>
++    <scroll-view
++      scroll-y
++      class="main-content"
++    >
++        <!-- 横幅轮播 -->
++        <view class="banner-section">
++          <swiper
++            class="banner-swiper"
++            indicator-dots
++            autoplay
++            interval="5000"
++            indicator-color="rgba(255,255,255,0.3)"
++            indicator-active-color="#FFFFFF"
++          >
++            <swiper-item v-for="(banner, index) in banners" :key="index">
++              <view
++                class="banner-item"
++                :style="{ background: banner.gradient }"
++              >
++                <view class="banner-content">
++                  <text class="banner-title">{{ banner.title }}</text>
++                  <text class="banner-subtitle">{{ banner.subtitle }}</text>
++                  <view class="banner-btn" @click="handleBannerClick(banner)">
++                    <text class="banner-btn-text">{{ banner.buttonText }}</text>
++                  </view>
++                </view>
++                <view class="banner-icon">
++                  <Icon
++                    :name="banner.icon"
++                    :size="120"
++                    color="rgba(255,255,255,0.8)"
++                  />
+                 </view>
+               </view>
+-              <view class="banner-icon">
+-                <Icon :name="banner.icon" :size="120" color="rgba(255,255,255,0.8)" />
+-              </view>
++            </swiper-item>
++          </swiper>
++        </view>
++
++        <!-- 推荐作品 -->
++        <view class="recommended-artworks">
++          <view class="section-header glx-section-head">
++            <text class="section-title glx-section-title">推荐作品</text>
++            <view
++              class="more-btn glx-inline-cta"
++              @click="goToRecommendedArtworks"
++            >
++              <text class="more-text">查看更多</text>
++              <Icon
++                name="arrow-right"
++                :size="24"
++                class="glx-inline-cta__icon"
++              />
+             </view>
+-          </swiper-item>
+-        </swiper>
+-      </view>
+-      
+-
+-      
+-      <!-- 推荐作品 -->
+-      <view class="recommended-artworks">
+-        <view class="section-header glx-section-head">
+-          <text class="section-title glx-section-title">推荐作品</text>
+-          <view class="more-btn glx-inline-cta" @click="goToRecommendedArtworks">
+-            <text class="more-text">查看更多</text>
+-            <Icon name="arrow-right" :size="24" class="glx-inline-cta__icon" />
+           </view>
++
++          <scroll-view scroll-x class="artworks-scroll">
++            <view class="artworks-list">
++              <ArtworkCard
++                v-for="artwork in recommendedArtworks"
++                :key="artwork.id"
++                :artwork="artwork"
++                @click="handleArtworkClick"
++                @like="handleArtworkLike"
++              />
++            </view>
++          </scroll-view>
+         </view>
+-        
+-        <scroll-view scroll-x class="artworks-scroll">
+-          <view class="artworks-list">
+-            <ArtworkCard 
+-              v-for="artwork in recommendedArtworks" 
+-              :key="artwork.id"
+-              :artwork="artwork"
+-              @click="handleArtworkClick"
+-              @like="handleArtworkLike"
+-            />
++
++        <!-- 官方模板 -->
++        <view class="official-templates">
++          <view class="section-header glx-section-head">
++            <text class="section-title glx-section-title">官方模板</text>
++            <view class="more-btn glx-inline-cta" @click="goToTemplates">
++              <text class="more-text">查看全部</text>
++              <Icon
++                name="arrow-right"
++                :size="24"
++                class="glx-inline-cta__icon"
++              />
++            </view>
+           </view>
+-        </scroll-view>
+-      </view>
+-      
+-      <!-- 官方模板 -->
+-      <view class="official-templates">
+-        <view class="section-header glx-section-head">
+-          <text class="section-title glx-section-title">官方模板</text>
+-          <view class="more-btn glx-inline-cta" @click="goToTemplates">
+-            <text class="more-text">查看全部</text>
+-            <Icon name="arrow-right" :size="24" class="glx-inline-cta__icon" />
++
++          <view class="templates-grid">
++            <TemplateCard
++              v-for="template in officialTemplates"
++              :key="template.id"
++              :template="template"
++              @click="handleTemplateClick"
++            />
+           </view>
+         </view>
+-        
+-        <view class="templates-grid">
+-          <TemplateCard 
+-            v-for="template in officialTemplates" 
+-            :key="template.id"
+-            :template="template"
+-            @click="handleTemplateClick"
++
++        <!-- 每周挑战 -->
++        <view class="weekly-challenge">
++          <text class="section-title glx-section-title">每周挑战</text>
++          <ChallengeCard
++            v-if="weeklyChallenge"
++            :challenge="weeklyChallenge"
++            @click="handleChallengeClick"
++            @join="handleChallengeJoin"
+           />
+         </view>
+-      </view>
+-      
+-      <!-- 每周挑战 -->
+-      <view class="weekly-challenge">
+-        <text class="section-title glx-section-title">每周挑战</text>
+-        <ChallengeCard 
+-          v-if="weeklyChallenge"
+-          :challenge="weeklyChallenge"
+-          @click="handleChallengeClick"
+-          @join="handleChallengeJoin"
+-        />
+-      </view>
+     </scroll-view>
+-
+     <Toast />
+   </view>
+ </template>
+ 
+ <script>
+-import { artworkAPI, challengeAPI, likeAPI, templateAPI } from '../../api/index.js'
+-import { useToast } from '../../composables/useToast.js'
+-import statusBarMixin from '../../mixins/statusBar.js'
+-import Logo from '../../components/Logo.vue'
+-import ArtworkCard from '../../components/ArtworkCard.vue'
+-import TemplateCard from '../../components/TemplateCard.vue'
+-import ChallengeCard from '../../components/ChallengeCard.vue'
+-import Icon from '../../components/Icon.vue'
+-import Toast from '../../components/Toast.vue'
+-
+-const toast = useToast()
++import {
++  artworkAPI,
++  challengeAPI,
++  likeAPI,
++  templateAPI,
++} from "../../api/index.js";
++import { useToast } from "../../composables/useToast.js";
++import { switchTabCompat } from "../../utils/customTabBar.js";
++import statusBarMixin from "../../mixins/statusBar.js";
++import Logo from "../../components/Logo.vue";
++import ArtworkCard from "../../components/ArtworkCard.vue";
++import TemplateCard from "../../components/TemplateCard.vue";
++import ChallengeCard from "../../components/ChallengeCard.vue";
++import Icon from "../../components/Icon.vue";
++import Toast from "../../components/Toast.vue";
++
++const toast = useToast();
+ 
+ export default {
+   mixins: [statusBarMixin],
+@@ -125,228 +148,233 @@ export default {
+     TemplateCard,
+     ChallengeCard,
+     Icon,
+-    Toast
++    Toast,
+   },
+-  
++
+   data() {
+     return {
+-      searchTerm: '',
++      searchTerm: "",
+       showSearch: false,
+       recommendedArtworks: [],
+       officialTemplates: [],
+       weeklyChallenge: null,
+       banners: [
+         {
+-          title: '创意无限',
+-          subtitle: '用像素点亮想象',
+-          buttonText: '开始创作',
+-          icon: 'picture',
+-          gradient: 'linear-gradient(135deg, #4F7FFF, #FF7A45)',
+-          action: 'create'
++          title: "创意无限",
++          subtitle: "用像素点亮想象",
++          buttonText: "开始创作",
++          icon: "picture",
++          gradient: "linear-gradient(135deg, #4F7FFF, #FF7A45)",
++          action: "create",
+         },
+         {
+-          title: '社区精选',
+-          subtitle: '发现优秀作品',
+-          buttonText: '立即探索',
+-          icon: 'browse',
+-          gradient: 'linear-gradient(135deg, #2ECC71, #4F7FFF)',
+-          action: 'community'
++          title: "社区精选",
++          subtitle: "发现优秀作品",
++          buttonText: "立即探索",
++          icon: "browse",
++          gradient: "linear-gradient(135deg, #2ECC71, #4F7FFF)",
++          action: "community",
+         },
+         {
+-          title: '每周挑战',
+-          subtitle: '参与创作比赛',
+-          buttonText: '查看挑战',
+-          icon: 'work',
+-          gradient: 'linear-gradient(135deg, #FF7A45, #E74C3C)',
+-          action: 'challenge'
+-        }
+-      ]
+-    }
+-  },
+-  
+-  computed: {
++          title: "每周挑战",
++          subtitle: "参与创作比赛",
++          buttonText: "查看挑战",
++          icon: "work",
++          gradient: "linear-gradient(135deg, #FF7A45, #E74C3C)",
++          action: "challenge",
++        },
++      ],
++    };
+   },
+ 
++  computed: {},
++
+   onLoad() {
+     // 加载推荐内容
+-    this.loadRecommendedContent()
+-  },
+-
+-  onShow() {
+-    // 页面显示时刷新数据
++    this.loadRecommendedContent();
+   },
+ 
+   methods: {
+     async loadRecommendedContent() {
+       try {
+-        const artRes = await artworkAPI.getPopularArtworks(1, 6)
++        const artRes = await artworkAPI.getPopularArtworks(1, 6);
+         if (artRes.success && artRes.data) {
+-          this.recommendedArtworks = artRes.data.list
++          this.recommendedArtworks = artRes.data.list;
+         }
+ 
+-        const tplRes = await templateAPI.getPopularTemplates(4)
++        const tplRes = await templateAPI.getPopularTemplates(4);
+         if (tplRes.success && tplRes.data) {
+-          this.officialTemplates = tplRes.data.list
++          this.officialTemplates = tplRes.data.list;
+         }
+ 
+-        const chRes = await challengeAPI.getActiveChallenges()
++        const chRes = await challengeAPI.getActiveChallenges();
+         if (chRes.success && chRes.data) {
+-          const challenges = chRes.data.list
++          const challenges = chRes.data.list;
+           if (Array.isArray(challenges) && challenges.length > 0) {
+-            this.weeklyChallenge = challenges[0]
++            this.weeklyChallenge = challenges[0];
+           }
+         }
+       } catch (error) {
+-        console.error('加载推荐内容失败:', error)
++        console.error("加载推荐内容失败:", error);
+       }
+     },
+-    
++
+     cleanupInvalidThumbnails() {
+       // 清理所有非 Base64 的缩略图（临时文件路径）
+-      if (!this.projectStore || !this.projectStore.projects) return
+-      
+-      let cleaned = false
+-      this.projectStore.projects.forEach(project => {
+-        if (project.thumbnail && !project.thumbnail.startsWith('data:image')) {
++      if (!this.projectStore || !this.projectStore.projects) return;
++
++      let cleaned = false;
++      this.projectStore.projects.forEach((project) => {
++        if (project.thumbnail && !project.thumbnail.startsWith("data:image")) {
+           // 这是临时文件路径，清除它
+-          project.thumbnail = ''
+-          cleaned = true
++          project.thumbnail = "";
++          cleaned = true;
+         }
+-      })
+-      
++      });
++
+       if (cleaned) {
+-        console.log('已清理无效的缩略图路径')
+-        this.projectStore.saveProjects()
++        console.log("已清理无效的缩略图路径");
++        this.projectStore.saveProjects();
+       }
+     },
+-    
++
+     toggleSearch() {
+-      this.showSearch = !this.showSearch
++      this.showSearch = !this.showSearch;
+       if (!this.showSearch) {
+-        this.searchTerm = ''
++        this.searchTerm = "";
+       }
+     },
+-    
++
+     handleSearchBlur() {
+       if (!this.searchTerm) {
+-        this.showSearch = false
++        this.showSearch = false;
+       }
+     },
+-    
++
+     clearSearch() {
+-      this.searchTerm = ''
++      this.searchTerm = "";
+     },
+-    
++
+     handleBannerClick(banner) {
+       switch (banner.action) {
+-        case 'create':
+-          this.goToCreate()
+-          break
+-        case 'community':
+-          this.goToCommunity()
+-          break
+-        case 'challenge':
+-          this.goToChallenges()
+-          break
++        case "create":
++          this.goToCreate();
++          break;
++        case "community":
++          this.goToCommunity();
++          break;
++        case "challenge":
++          this.goToChallenges();
++          break;
+       }
+     },
+-    
++
+     goToCreate() {
+       uni.navigateTo({
+-        url: '/pages/create/create'
+-      })
++        url: "/pages/create/create",
++      });
+     },
+-    
++
+     goToTemplates() {
+       uni.navigateTo({
+-        url: '/pages/gallery/gallery?type=templates&title=' + encodeURIComponent('官方模板')
+-      })
++        url:
++          "/pages/gallery/gallery?type=templates&title=" +
++          encodeURIComponent("官方模板"),
++      });
+     },
+-    
++
+     goToImport() {
+       uni.navigateTo({
+-        url: '/pages/create/create?mode=image'
+-      })
++        url: "/pages/create/create?mode=image",
++      });
+     },
+-    
++
+     goToCommunity() {
+-      uni.switchTab({
+-        url: '/pages/community/community'
+-      })
++      switchTabCompat({
++        url: "/pages/community/community",
++      });
+     },
+-    
++
+     goToRecommendedArtworks() {
+       uni.navigateTo({
+-        url: '/pages/gallery/gallery?type=artworks&title=' + encodeURIComponent('推荐作品')
+-      })
++        url:
++          "/pages/gallery/gallery?type=artworks&title=" +
++          encodeURIComponent("推荐作品"),
++      });
+     },
+-    
++
+     goToChallenges() {
+       uni.navigateTo({
+-        url: '/pages/gallery/gallery?type=challenges&title=' + encodeURIComponent('热门挑战')
+-      })
++        url:
++          "/pages/gallery/gallery?type=challenges&title=" +
++          encodeURIComponent("热门挑战"),
++      });
+     },
+-    
++
+     handleArtworkClick(artwork) {
+       // 跳转到作品详情页
+       uni.navigateTo({
+-        url: `/pages/artwork-detail/artwork-detail?id=${artwork.id}`
+-      })
++        url: `/pages/artwork-detail/artwork-detail?id=${artwork.id}`,
++      });
+     },
+-    
++
+     async handleArtworkLike(data) {
+       try {
+         if (data.liked) {
+-          await likeAPI.likeArtwork(data.artwork.id)
+-          data.artwork.likes += 1
++          await likeAPI.likeArtwork(data.artwork.id);
++          data.artwork.likes += 1;
+         } else {
+-          await likeAPI.unlikeArtwork(data.artwork.id)
+-          data.artwork.likes -= 1
++          await likeAPI.unlikeArtwork(data.artwork.id);
++          data.artwork.likes -= 1;
+         }
+       } catch (error) {
+-        toast.showError('操作失败')
++        toast.showError("操作失败");
+       }
+     },
+-    
++
+     handleTemplateClick(template) {
+       // 使用模板创建画布
+       uni.navigateTo({
+-        url: `/pages/create/create?templateId=${template.id}`
+-      })
++        url: `/pages/create/create?templateId=${template.id}`,
++      });
+     },
+-    
++
+     handleChallengeClick(challenge) {
+       // 跳转到挑战详情页
+       uni.navigateTo({
+-        url: `/pages/challenge-detail/challenge-detail?id=${challenge.id}`
+-      })
++        url: `/pages/challenge-detail/challenge-detail?id=${challenge.id}`,
++      });
+     },
+-    
++
+     async handleChallengeJoin(challenge) {
+       try {
+-        const res = await challengeAPI.joinChallenge(challenge.id)
++        const res = await challengeAPI.joinChallenge(challenge.id);
+         if (!(res.success && res.data)) {
+-          throw new Error('join failed')
++          throw new Error("join failed");
+         }
+-        challenge.joined = res.data.joined
++        challenge.joined = res.data.joined;
+         if (res.data.changed) {
+-          challenge.participants += 1
++          challenge.participants += 1;
+         }
+-        toast.showSuccess('已参与挑战')
++        toast.showSuccess("已参与挑战");
+       } catch (error) {
+-        toast.showError('参与失败')
++        toast.showError("参与失败");
+       }
+-    }
+-  }
+-}
++    },
++  },
++};
+ </script>
+ 
+ <style scoped>
+ .home-page {
++  width: 100%;
++  max-width: 100%;
++  min-width: 0;
+   height: 100vh;
+   display: flex;
+   flex-direction: column;
+   background-color: var(--nb-paper);
++  box-sizing: border-box;
+   overflow: hidden;
+ }
+ 
+@@ -361,6 +389,11 @@ export default {
+   background-color: var(--nb-surface);
+   border-bottom: 1rpx solid var(--nb-ink);
+   flex-shrink: 0;
++  width: 100%;
++  max-width: 100%;
++  min-width: 0;
++  box-sizing: border-box;
++  overflow-x: hidden;
+ }
+ 
+ .header-content {
+@@ -368,6 +401,10 @@ export default {
+   align-items: center;
+   justify-content: space-between;
+   padding: 24rpx 32rpx;
++  width: 100%;
++  max-width: 100%;
++  min-width: 0;
++  box-sizing: border-box;
+ }
+ 
+ .header-actions {
+@@ -384,11 +421,7 @@ export default {
+   justify-content: center;
+   border-radius: 0;
+   background-color: var(--nb-paper);
+-  transition: all 0.2s ease;
+-}
+-
+-.search-btn:active {
+-  background-color: var(--nb-yellow);
++  transition: none;
+ }
+ 
+ /* 搜索栏 */
+@@ -421,19 +454,27 @@ export default {
+   background-color: var(--nb-paper);
+   border: 2rpx solid var(--nb-ink);
+   box-shadow: var(--nb-shadow-soft);
+-  transition: all 0.2s ease;
++  transition: none;
+ }
+ 
+ /* 主要内容 */
+ .main-content {
+   flex: 1;
+-  overflow-y: auto;
++  width: 100%;
++  max-width: 100%;
++  min-width: 0;
++  box-sizing: border-box;
++  overflow-x: hidden;
+ }
+ 
+ /* 横幅轮播 */
+ .banner-section {
+   margin: 32rpx;
+   margin-bottom: 48rpx;
++  max-width: 100%;
++  min-width: 0;
++  box-sizing: border-box;
++  overflow: hidden;
+ }
+ 
+ .banner-swiper {
+@@ -460,7 +501,7 @@ export default {
+ .banner-title {
+   font-size: 48rpx;
+   font-weight: 700;
+-  color: #FFFFFF;
++  color: #ffffff;
+   line-height: 1.2;
+   margin-bottom: 12rpx;
+ }
+@@ -479,17 +520,13 @@ export default {
+   background-color: rgba(255, 255, 255, 0.2);
+   border-radius: 0;
+   backdrop-filter: none;
+-  transition: all 0.2s ease;
+-}
+-
+-.banner-btn:active {
+-  background-color: rgba(255, 255, 255, 0.3);
++  transition: none;
+ }
+ 
+ .banner-btn-text {
+   font-size: 28rpx;
+   font-weight: 600;
+-  color: #FFFFFF;
++  color: #ffffff;
+ }
+ 
+ .banner-icon {
+@@ -503,7 +540,7 @@ export default {
+ 
+ /* 通用区块样式 */
+ .section-title {
+-  font-size: 36rpx;
++  font-size: 28rpx;
+   font-weight: 700;
+   color: var(--nb-ink);
+   margin-bottom: 24rpx;
+@@ -526,7 +563,8 @@ export default {
+   display: inline-flex;
+   align-items: center;
+   justify-content: center;
+-  transition: all 0.2s ease;
++  box-shadow: 0 2rpx 0 #000000;
++  transition: none;
+ }
+ 
+ .more-text {
+@@ -580,7 +618,8 @@ export default {
+   background-color: var(--nb-yellow);
+   border-radius: 0;
+   border: 3rpx solid #000000;
+-  transition: all 0.2s ease;
++  box-shadow: 0 2rpx 0 #000000;
++  transition: none;
+ }
+ 
+ .empty-btn-text {
+@@ -592,6 +631,9 @@ export default {
+ /* 推荐作品 */
+ .recommended-artworks {
+   margin: 0 0 48rpx;
++  max-width: 100%;
++  min-width: 0;
++  overflow-x: hidden;
+ }
+ 
+ .recommended-artworks .section-header {
+@@ -616,6 +658,10 @@ export default {
+ /* 官方模板 */
+ .official-templates {
+   margin: 0 32rpx 48rpx;
++  max-width: 100%;
++  min-width: 0;
++  box-sizing: border-box;
++  overflow-x: hidden;
+ }
+ 
+ .templates-grid {
+@@ -627,5 +673,9 @@ export default {
+ /* 每周挑战 */
+ .weekly-challenge {
+   margin: 0 32rpx 48rpx;
++  max-width: 100%;
++  min-width: 0;
++  box-sizing: border-box;
++  overflow-x: hidden;
+ }
+ </style>
+diff --git a/uniapp/pages/my-favorites/my-favorites.vue b/uniapp/pages/my-favorites/my-favorites.vue
+index ef4aa40..ed7fabc 100644
+--- a/uniapp/pages/my-favorites/my-favorites.vue
++++ b/uniapp/pages/my-favorites/my-favorites.vue
+@@ -167,6 +167,7 @@
+ <script>
+ import { collectionAPI } from "../../api/index.js";
+ import { useToast } from "../../composables/useToast.js";
++import { switchTabCompat } from "../../utils/customTabBar.js";
+ import { useDialog } from "../../composables/useDialog.js";
+ import statusBarMixin from "../../mixins/statusBar.js";
+ import Icon from "../../components/Icon.vue";
+@@ -269,7 +270,7 @@ export default {
+     },
+ 
+     goToExplore() {
+-      uni.switchTab({
++      switchTabCompat({
+         url: "/pages/community/community",
+       });
+     },
+diff --git a/uniapp/pages/overview/mixins/overviewActionMixin.js b/uniapp/pages/overview/mixins/overviewActionMixin.js
+index 93deba8..ebfe3fc 100644
+--- a/uniapp/pages/overview/mixins/overviewActionMixin.js
++++ b/uniapp/pages/overview/mixins/overviewActionMixin.js
+@@ -5,6 +5,7 @@ import {
+ } from "../../../utils/exportCanvas.js";
+ import { getCloudProjects, deleteCloudProject } from "../../../api/project.js";
+ import { PERLER_BOARD_SIZE } from "../../../constants/perler.js";
++import { switchTabCompat } from "../../../utils/customTabBar.js";
+ 
+ export default {
+   methods: {
+@@ -127,7 +128,7 @@ export default {
+     deleteProjectLocal() {
+       this.projectStore.deleteProject(this.project.id);
+       this.toast.showSuccess("本地画布已删除");
+-      uni.switchTab({
++      switchTabCompat({
+         url: "/pages/workspace/workspace",
+       });
+     },
+@@ -150,7 +151,7 @@ export default {
+ 
+         this.toast.hideLoading();
+         this.toast.showSuccess("本地和云端画布已删除");
+-        uni.switchTab({
++        switchTabCompat({
+           url: "/pages/workspace/workspace",
+         });
+       } catch (error) {
+@@ -160,7 +161,7 @@ export default {
+ 
+         this.projectStore.deleteProject(this.project.id);
+         setTimeout(() => {
+-          uni.switchTab({
++          switchTabCompat({
+             url: "/pages/workspace/workspace",
+           });
+         }, 1500);
+diff --git a/uniapp/pages/overview/overview.vue b/uniapp/pages/overview/overview.vue
+index 9e6e06f..9b5d881 100644
+--- a/uniapp/pages/overview/overview.vue
++++ b/uniapp/pages/overview/overview.vue
+@@ -352,6 +352,7 @@
+ import { useProjectStore } from "../../store/project.js";
+ import { useToast } from "../../composables/useToast.js";
+ import statusBarMixin from "../../mixins/statusBar.js";
++import { switchTabCompat } from "../../utils/customTabBar.js";
+ import Icon from "../../components/Icon.vue";
+ import LoadingOverlay from "../../components/LoadingOverlay.vue";
+ import Toast from "../../components/Toast.vue";
+@@ -462,7 +463,7 @@ export default {
+     if (!this.project) {
+       this.toast.showError("项目不存在");
+       setTimeout(() => {
+-        uni.switchTab({
++        switchTabCompat({
+           url: "/pages/workspace/workspace",
+         });
+       }, 1000);
+diff --git a/uniapp/pages/profile/profile.vue b/uniapp/pages/profile/profile.vue
+index 38e5028..06cfa6c 100644
+--- a/uniapp/pages/profile/profile.vue
++++ b/uniapp/pages/profile/profile.vue
+@@ -1,12 +1,12 @@
+ <template>
+-  <view class="profile-page glx-page-shell">
++  <view class="profile-page">
+     <!-- 状态栏占位 -->
+     <!-- #ifdef MP-WEIXIN -->
+     <view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
+     <!-- #endif -->
+     <scroll-view
+       scroll-y
+-      class="content glx-scroll-region glx-page-shell__content"
++      class="content"
+     >
+       <!-- 用户信息卡片 -->
+       <view class="user-card glx-panel-card">
+@@ -15,7 +15,7 @@
+             <Icon name="user" :size="80" />
+           </view>
+           <text class="prompt-text">登录后可同步数据到云端</text>
+-          <button class="login-btn glx-cta-button" @click="handleLogin">
++          <button class="login-btn glx-cta-button" hover-class="none" @click="handleLogin">
+             <Icon name="user" :size="28" />
+             <text>微信登录</text>
+           </button>
+@@ -34,21 +34,18 @@
+             </view>
+           </view>
+ 
+-          <view class="user-details">
+-            <view class="user-name-row">
+-              <text class="nickname">{{ userStore.nickname || "陈晓明" }}</text>
+-              <button
+-                class="edit-btn glx-cta-button"
+-                @click="handleEditProfile"
+-              >
+-                <text>编辑</text>
+-              </button>
+-            </view>
+-            <text class="user-id"
+-              >@{{
+-                userStore.openid ? userStore.openid.slice(0, 8) : "alexchen"
+-              }}</text
+-            >
++            <view class="user-details">
++              <view class="user-name-row">
++                <text class="nickname">{{ profileNickname }}</text>
++                <button
++                  class="edit-btn glx-cta-button"
++                  hover-class="none"
++                  @click="handleEditProfile"
++                >
++                  <text>编辑</text>
++                </button>
++              </view>
++              <text v-if="profileOpenId" class="user-id">@{{ profileOpenId }}</text>
+           </view>
+         </view>
+ 
+@@ -164,13 +161,12 @@
+ 
+       <!-- 退出登录 -->
+       <view v-if="userStore.hasLogin" class="logout-section">
+-        <button class="logout-btn" @click="handleLogout">
++        <button class="logout-btn" hover-class="none" @click="handleLogout">
+           <Icon name="sign-out" :size="32" />
+           <text>退出登录</text>
+         </button>
+       </view>
+     </scroll-view>
+-
+     <ConfirmDialogHost />
+     <LoadingOverlay />
+     <Toast ref="toastRef" />
+@@ -201,13 +197,9 @@ export default {
+   },
+ 
+   data() {
+-    // 直接初始化 store
+-    const userStore = useUserStore();
+-    const projectStore = useProjectStore();
+-
+     return {
+-      userStore,
+-      projectStore,
++      userStore: null,
++      projectStore: null,
+       toast: null,
+       dialog: null,
+     };
+@@ -219,12 +211,48 @@ export default {
+       return this.projectStore.projects.filter((p) => p.status === "published")
+         .length;
+     },
++    profileNickname() {
++      if (!this.userStore) {
++        return "";
++      }
++
++      if (typeof this.userStore.nickname === "string") {
++        return this.userStore.nickname;
++      }
++
++      return "";
++    },
++    profileOpenId() {
++      if (!this.userStore) {
++        return "";
++      }
++
++      if (typeof this.userStore.openid !== "string") {
++        return "";
++      }
++
++      return this.userStore.openid.slice(0, 8);
++    },
+   },
+ 
+-  onLoad() {
++  async onLoad() {
++    this.userStore = useUserStore();
++    this.projectStore = useProjectStore();
+     this.toast = useToast();
+     this.dialog = useDialog();
+ 
++    if (this.projectStore) {
++      await this.projectStore.loadProjects();
++    }
++
++    if (
++      this.userStore &&
++      this.userStore.hasLogin === true &&
++      this.userStore.currentUser == null
++    ) {
++      await this.userStore.loadCurrentUser();
++    }
++
+     // 注册 Toast
+     this.$nextTick(() => {
+       if (this.$refs.toastRef) {
+@@ -343,8 +371,12 @@ export default {
+ 
+ <style scoped>
+ .profile-page {
++  width: 100%;
++  max-width: 100%;
++  min-width: 0;
+   height: 100vh;
+   background-color: var(--nb-paper);
++  box-sizing: border-box;
+   overflow: hidden;
+ }
+ 
+@@ -363,7 +395,11 @@ export default {
+ 
+ .content {
+   flex: 1;
+-  overflow-y: auto;
++  width: 100%;
++  max-width: 100%;
++  min-width: 0;
++  box-sizing: border-box;
++  overflow-x: hidden;
+   padding-bottom: 80rpx;
+   height: 100%;
+ }
+@@ -374,7 +410,7 @@ export default {
+   border-radius: 0;
+   padding: 32rpx;
+   margin: 32rpx 20rpx;
+-  box-shadow: var(--nb-shadow-strong);
++  box-shadow: 0 4rpx 0 #000000;
+ }
+ 
+ .login-prompt {
+@@ -406,6 +442,7 @@ export default {
+   padding: 0 32rpx;
+   font-size: 28rpx;
+   font-weight: 900;
++  box-shadow: 0 2rpx 0 #000000;
+ }
+ 
+ .login-btn::after {
+@@ -449,6 +486,7 @@ export default {
+   font-weight: 900;
+   background-color: var(--nb-blue);
+   color: #ffffff;
++  box-shadow: 0 2rpx 0 #000000;
+ }
+ 
+ .edit-btn text,
+@@ -480,7 +518,7 @@ export default {
+   align-items: center;
+   gap: 8rpx;
+   cursor: pointer;
+-  transition: all 0.2s ease;
++  transition: none;
+ }
+ 
+ .stat-number {
+@@ -499,6 +537,10 @@ export default {
+   margin: 32rpx 20rpx;
+   padding: 0;
+   background-color: transparent;
++  max-width: 100%;
++  min-width: 0;
++  box-sizing: border-box;
++  overflow-x: hidden;
+ }
+ 
+ .menu-item {
+@@ -506,9 +548,9 @@ export default {
+   align-items: center;
+   justify-content: space-between;
+   padding: 32rpx;
+-  transition: all 0.2s ease;
++  transition: none;
+   min-height: 100rpx;
+-  box-shadow: var(--nb-shadow-strong);
++  box-shadow: 0 4rpx 0 #000000;
+ }
+ 
+ .menu-item:last-child {
+@@ -590,6 +632,10 @@ export default {
+ /* 退出登录 */
+ .logout-section {
+   margin: 32rpx 20rpx;
++  max-width: 100%;
++  min-width: 0;
++  box-sizing: border-box;
++  overflow-x: hidden;
+ }
+ 
+ .logout-btn {
+@@ -605,18 +651,14 @@ export default {
+   color: #ffffff;
+   font-size: 28rpx;
+   font-weight: 600;
+-  transition: background-color 0.2s ease;
+-  box-shadow: var(--nb-shadow-soft);
++  transition: none;
++  box-shadow: 0 2rpx 0 #000000;
+ }
+ 
+ .logout-btn::after {
+   border: none;
+ }
+ 
+-.logout-btn:active {
+-  background-color: #ef6258;
+-}
+-
+ .logout-btn text,
+ .logout-btn .iconfont {
+   color: inherit !important;
+diff --git a/uniapp/pages/publish-project/publish-project.vue b/uniapp/pages/publish-project/publish-project.vue
+index e2c02ec..8d5dd6a 100644
+--- a/uniapp/pages/publish-project/publish-project.vue
++++ b/uniapp/pages/publish-project/publish-project.vue
+@@ -198,7 +198,7 @@
+         @click="handlePublish"
+       >
+         <view v-if="isPublishing" class="loading-spinner">
+-          <Icon name="loading" :size="32" />
++          <GlxInlineLoader label="" :size="30" compact />
+         </view>
+         <Icon v-else name="upload" :size="32" />
+         <text class="publish-btn-text">{{
+diff --git a/uniapp/pages/user-detail/user-detail.vue b/uniapp/pages/user-detail/user-detail.vue
+index 5f3ba90..8742b14 100644
+--- a/uniapp/pages/user-detail/user-detail.vue
++++ b/uniapp/pages/user-detail/user-detail.vue
+@@ -125,8 +125,7 @@
+         
+         <!-- 加载更多 -->
+         <view v-if="isLoading" class="loading-more">
+-          <Icon name="loading" :size="48" color="currentColor" class="loading-icon" />
+-          <text class="loading-text">加载中...</text>
++          <GlxInlineLoader label="加载中..." :size="44" />
+         </view>
+         
+         <view v-if="hasMore && !isLoading && filteredWorks.length > 0" class="load-more-btn" @click="loadMore">
+diff --git a/uniapp/pages/user-list/user-list.vue b/uniapp/pages/user-list/user-list.vue
+index ee5cf04..b422aa9 100644
+--- a/uniapp/pages/user-list/user-list.vue
++++ b/uniapp/pages/user-list/user-list.vue
+@@ -80,8 +80,7 @@
+         
+         <!-- 加载更多 -->
+         <view v-if="isLoading" class="loading-more">
+-          <Icon name="loading" :size="48" color="currentColor" class="loading-icon" />
+-          <text class="loading-text">加载中...</text>
++          <GlxInlineLoader label="加载中..." :size="44" />
+         </view>
+         
+         <view v-if="hasMore && !isLoading && filteredUsers.length > 0" class="load-more-btn" @click="loadMore">
+diff --git a/uniapp/pages/workspace/workspace.vue b/uniapp/pages/workspace/workspace.vue
+index 6efab7f..8880976 100644
+--- a/uniapp/pages/workspace/workspace.vue
++++ b/uniapp/pages/workspace/workspace.vue
+@@ -1,21 +1,24 @@
+ <template>
+-  <view class="workspace-page glx-page-shell">
++  <view class="workspace-page">
+     <!-- 状态栏占位 -->
+     <!-- #ifdef MP-WEIXIN -->
+     <view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
+     <!-- #endif -->
+ 
+     <!-- 顶部栏 -->
+-    <view class="header glx-topbar glx-page-shell__fixed">
++    <view class="header">
+       <view class="header-content">
+         <view class="header-placeholder"></view>
+-        <text class="header-title glx-topbar__title">创作中心</text>
++        <text class="header-title">创作中心</text>
+         <view class="header-placeholder"></view>
+       </view>
+     </view>
+ 
+     <!-- 主要内容 -->
+-    <scroll-view scroll-y class="main-content glx-scroll-region glx-page-shell__content">
++    <scroll-view
++      scroll-y
++      class="main-content"
++    >
+       <!-- 快速开始 -->
+       <view class="quick-actions">
+         <view class="action-grid">
+@@ -64,7 +67,6 @@
+         </view>
+       </view>
+     </scroll-view>
+-
+     <!-- Toast -->
+     <Toast ref="toastRef" />
+   </view>
+@@ -100,9 +102,10 @@ export default {
+     },
+   },
+ 
+-  onLoad() {
++  async onLoad() {
+     this.projectStore = useProjectStore();
+     this.toast = useToast();
++    await this.projectStore.loadProjects();
+ 
+     // 注册自定义 Toast 实例
+     this.$nextTick(() => {
+@@ -137,10 +140,14 @@ export default {
+ 
+ <style scoped>
+ .workspace-page {
++  width: 100%;
++  max-width: 100%;
++  min-width: 0;
+   height: 100vh;
+   display: flex;
+   flex-direction: column;
+   background-color: var(--nb-paper);
++  box-sizing: border-box;
+   overflow: hidden;
+ }
+ 
+@@ -148,6 +155,11 @@ export default {
+   background-color: var(--nb-surface);
+   border-bottom: 2rpx solid var(--nb-ink);
+   padding: 0 32rpx;
++  width: 100%;
++  max-width: 100%;
++  min-width: 0;
++  box-sizing: border-box;
++  overflow-x: hidden;
+ }
+ 
+ .header-content {
+@@ -155,6 +167,10 @@ export default {
+   display: flex;
+   align-items: center;
+   justify-content: center;
++  width: 100%;
++  max-width: 100%;
++  min-width: 0;
++  box-sizing: border-box;
+ }
+ 
+ .header-title {
+@@ -170,7 +186,11 @@ export default {
+ 
+ .main-content {
+   flex: 1;
+-  overflow-y: auto;
++  width: 100%;
++  max-width: 100%;
++  min-width: 0;
++  box-sizing: border-box;
++  overflow-x: hidden;
+ }
+ 
+ .section-title {
+@@ -197,6 +217,10 @@ export default {
+ .quick-actions {
+   margin: 32rpx;
+   margin-bottom: 48rpx;
++  max-width: 100%;
++  min-width: 0;
++  box-sizing: border-box;
++  overflow-x: hidden;
+ }
+ 
+ .action-grid {
+@@ -212,12 +236,8 @@ export default {
+   padding: 32rpx 16rpx;
+   background-color: var(--nb-surface);
+   border-radius: 0;
+-  box-shadow: var(--nb-shadow-strong);
+-  transition: all 0.2s ease;
+-}
+-
+-.action-card:active {
+-  box-shadow: var(--nb-shadow-strong);
++  box-shadow: 0 4rpx 0 #000000;
++  transition: none;
+ }
+ 
+ .action-icon {
+@@ -255,6 +275,10 @@ export default {
+ /* 我的画布 */
+ .my-projects {
+   margin: 0 32rpx 48rpx;
++  max-width: 100%;
++  min-width: 0;
++  box-sizing: border-box;
++  overflow-x: hidden;
+ }
+ 
+ .projects-grid {
+@@ -297,7 +321,8 @@ export default {
+   background-color: var(--nb-yellow);
+   border-radius: 0;
+   border: 3rpx solid #000000;
+-  transition: all 0.2s ease;
++  box-shadow: 0 2rpx 0 #000000;
++  transition: none;
+ }
+ 
+ .empty-btn-text {
+diff --git a/uniapp/styles/glx-style-system.css b/uniapp/styles/glx-style-system.css
+index 003d66e..ba0f41a 100644
+--- a/uniapp/styles/glx-style-system.css
++++ b/uniapp/styles/glx-style-system.css
+@@ -106,6 +106,7 @@
+   border: var(--nb-border-width-control) solid var(--nb-ink);
+   box-shadow: var(--shadow-card);
+   border-radius: 0;
++  transition: none;
+ }
+ 
+ .glx-editor-card {
+@@ -135,6 +136,7 @@
+   box-shadow: var(--shadow-card);
+   border-radius: 0;
+   box-sizing: border-box;
++  transition: none;
+ }
+ 
+ .glx-tab-panel {
+@@ -230,6 +232,7 @@
+   border: 2rpx solid var(--nb-ink);
+   box-shadow: var(--nb-shadow-soft);
+   border-radius: 0;
++  transition: none;
+ }
+ 
+ .glx-inline-cta text,
+@@ -745,7 +748,7 @@
+   box-shadow: var(--nb-shadow-soft) !important;
+   border-radius: 0 !important;
+   background: var(--nb-surface) !important;
+-  transition: background-color 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease !important;
++  transition: none !important;
+ }
+ 
+ .action-btn-sm.primary,
+diff --git a/uniapp/styles/neubrutalism-global.css b/uniapp/styles/neubrutalism-global.css
+index 6e1393b..29d4dd8 100644
+--- a/uniapp/styles/neubrutalism-global.css
++++ b/uniapp/styles/neubrutalism-global.css
+@@ -4,15 +4,15 @@ page {
+   --nb-surface: #ffffff;
+   --nb-yellow: #ffcb45;
+   --nb-blue: #5ea8ff;
+-  --nb-green: #59d39e;
+-  --nb-coral: #ff8a78;
+-  --nb-orange: #ffb35c;
++  --nb-green: #67c23a;
++  --nb-coral: #f56c6c;
++  --nb-orange: #ffcb45;
+   --nb-lavender: #a88bff;
+-  --nb-border-width: 4rpx;
+-  --nb-border-width-panel: 4rpx;
+-  --nb-border-width-control: 3rpx;
+-  --nb-shadow-soft: 3rpx 3rpx 0 #000000;
+-  --nb-shadow-strong: 6rpx 6rpx 0 #000000;
++  --nb-border-width: 2rpx;
++  --nb-border-width-panel: 2rpx;
++  --nb-border-width-control: 2rpx;
++  --nb-shadow-soft: 0 2rpx 0 #000000;
++  --nb-shadow-strong: 0 4rpx 0 #000000;
+   --layout-bottom-offset: 32rpx;
+ }
+ 
+@@ -20,6 +20,10 @@ page,
+ body {
+   background: var(--nb-paper);
+   color: var(--nb-ink);
++  width: 100%;
++  max-width: 100%;
++  min-width: 0;
++  overflow-x: hidden;
+ }
+ 
+ .home-page,
+@@ -56,6 +60,11 @@ body {
+ .nb-page {
+   background: var(--nb-paper) !important;
+   color: var(--nb-ink) !important;
++  width: 100%;
++  max-width: 100%;
++  min-width: 0;
++  box-sizing: border-box;
++  overflow-x: hidden;
+ }
+ 
+ .content,
+@@ -63,6 +72,11 @@ body {
+ .content-area,
+ .content-wrapper {
+   background: transparent !important;
++  width: 100%;
++  max-width: 100%;
++  min-width: 0;
++  box-sizing: border-box;
++  overflow-x: hidden;
+ }
+ 
+ .header,
+@@ -70,6 +84,18 @@ body {
+   background: var(--nb-paper) !important;
+   border-bottom: var(--nb-border-width) solid var(--nb-ink) !important;
+   box-shadow: none !important;
++  width: 100%;
++  max-width: 100%;
++  min-width: 0;
++  box-sizing: border-box;
++  overflow-x: hidden;
++}
++
++.header-content {
++  width: 100%;
++  max-width: 100%;
++  min-width: 0;
++  box-sizing: border-box;
+ }
+ 
+ .header-title,
+@@ -98,29 +124,6 @@ body {
+   color: var(--text-secondary) !important;
+ }
+ 
+-.console-card,
+-.card,
+-.panel-card,
+-.settings-section,
+-.connect-entry-card,
+-.empty-state,
+-.preview-entry-card,
+-.preview-status-chip,
+-.preview-theme-chip,
+-.artwork-card,
+-.template-card,
+-.challenge-card,
+-.project-card,
+-.device-card,
+-.connect-modal,
+-.help-modal,
+-.json-import-modal {
+-  background: var(--nb-surface) !important;
+-  border: var(--nb-border-width-panel) solid var(--nb-ink) !important;
+-  border-radius: 0 !important;
+-  box-shadow: var(--shadow-card) !important;
+-}
+-
+ .preview-caption,
+ .preview-canvas-container,
+ .canvas-container,
+@@ -145,8 +148,7 @@ body {
+ .rarity-card,
+ .modal-meta-card,
+ .upload-placeholder,
+-.image-preview,
+-.banner-item {
++.image-preview {
+   border: var(--nb-border-width-panel) solid var(--nb-ink) !important;
+   box-shadow: var(--shadow-card) !important;
+ }
+@@ -154,16 +156,7 @@ body {
+ .nav-left,
+ .nav-right,
+ .back-btn,
+-.more-btn,
+-.menu-icon,
+-.setting-icon,
+-.action-icon,
+-.action-item,
+-.preview-entry-icon,
+-.panel-action-icon,
+-.mode-badge-icon-shell,
+-.mode-badge-icon-core,
+-.tool-btn {
++.more-btn {
+   border-radius: 0 !important;
+ }
+ 
+@@ -175,16 +168,6 @@ body {
+   background: var(--nb-surface) !important;
+ }
+ 
+-.menu-icon,
+-.setting-icon,
+-.action-icon,
+-.preview-entry-icon,
+-.panel-action-icon {
+-  border: var(--nb-border-width-control) solid var(--nb-ink) !important;
+-  box-shadow: var(--nb-shadow-soft) !important;
+-  background: var(--nb-surface) !important;
+-}
+-
+ .glx-topbar {
+   position: relative !important;
+   min-height: 96rpx !important;
+@@ -456,221 +439,3 @@ textarea {
+ [class*="-overlay"] {
+   backdrop-filter: none !important;
+ }
+-
+-.save-button,
+-.join-button,
+-.confirm-btn,
+-.modal-btn.primary,
+-.modal-btn.confirm,
+-.modal-action-button.primary,
+-.panel-action-icon.warm,
+-.panel-action-icon.blue,
+-.panel-action-icon.mint {
+-  box-shadow: var(--nb-shadow-soft) !important;
+-}
+-
+-/* 全项目样式收口：高频页面与编辑器家族共用骨架 */
+-.action-card,
+-.menu-item,
+-.setting-item,
+-.language-option,
+-.search-btn,
+-.clear-btn,
+-.banner-btn,
+-.empty-btn,
+-.logout-btn,
+-.follow-btn,
+-.message-btn,
+-.share-btn,
+-.load-more-btn,
+-.sort-option,
+-.menu-action,
+-.publish-btn,
+-.save-button,
+-.export-button,
+-.footer-mini-btn,
+-.modal-action-btn,
+-.modal-action-button,
+-.view-all-logs,
+-.user-item,
+-.favorite-item,
+-.device-item,
+-.board-card,
+-.index-item,
+-.action-btn,
+-.quick-size-btn,
+-.palette-toggle,
+-.upload-placeholder,
+-.image-action-btn,
+-.control-btn,
+-.option-btn,
+-.expression-item,
+-.picker-field,
+-.search-input-wrapper,
+-.size-input-shell,
+-.param-picker-value,
+-.value-box,
+-.readonly-value,
+-.number-input,
+-.text-input {
+-  border-radius: 0 !important;
+-}
+-
+-.action-card,
+-.menu-item,
+-.setting-item,
+-.language-option,
+-.search-btn,
+-.clear-btn,
+-.banner-btn,
+-.empty-btn,
+-.logout-btn,
+-.follow-btn,
+-.message-btn,
+-.share-btn,
+-.load-more-btn,
+-.sort-option,
+-.menu-action,
+-.publish-btn,
+-.save-button,
+-.export-button,
+-.footer-mini-btn,
+-.modal-action-btn,
+-.modal-action-button,
+-.view-all-logs,
+-.user-item,
+-.favorite-item,
+-.device-item,
+-.board-card,
+-.index-item,
+-.action-btn,
+-.quick-size-btn,
+-.palette-toggle,
+-.upload-placeholder,
+-.image-action-btn,
+-.control-btn,
+-.option-btn,
+-.expression-item {
+-  border: var(--nb-border-width-control) solid var(--nb-ink) !important;
+-  box-shadow: var(--nb-shadow-soft) !important;
+-  transition: background-color 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease !important;
+-}
+-
+-.action-card,
+-.menu-item,
+-.setting-item,
+-.language-option,
+-.empty-btn,
+-.load-more-btn,
+-.sort-option,
+-.menu-action,
+-.follow-btn,
+-.view-all-logs,
+-.user-item,
+-.favorite-item,
+-.device-item,
+-.board-card,
+-.index-item,
+-.quick-size-btn,
+-.palette-toggle,
+-.upload-placeholder,
+-.control-btn,
+-.option-btn,
+-.expression-item {
+-  background: var(--tone-paper-soft) !important;
+-}
+-
+-.picker-field,
+-.search-input-wrapper,
+-.size-input-shell,
+-.param-picker-value,
+-.value-box,
+-.readonly-value,
+-.number-input,
+-.text-input {
+-  background: var(--tone-paper-soft) !important;
+-  border: var(--nb-border-width-control) solid var(--nb-ink) !important;
+-  box-shadow: var(--nb-shadow-soft) !important;
+-  transition: border-color 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease !important;
+-}
+-
+-.search-btn,
+-.clear-btn {
+-  background: var(--tone-paper-soft) !important;
+-}
+-
+-.banner-btn {
+-  background: rgba(255, 255, 255, 0.2) !important;
+-}
+-
+-.publish-btn,
+-.save-button,
+-.next-btn,
+-.export-button,
+-.modal-action-btn.primary,
+-.modal-action-button.primary {
+-  background: var(--nb-yellow) !important;
+-  color: var(--nb-ink) !important;
+-}
+-
+-.logout-btn,
+-.image-action-btn.danger,
+-.modal-action-btn.tertiary {
+-  background: var(--nb-coral) !important;
+-  border-color: var(--nb-ink) !important;
+-  color: var(--nb-ink) !important;
+-}
+-
+-.image-action-btn {
+-  background: var(--nb-blue) !important;
+-  color: var(--nb-ink) !important;
+-}
+-
+-.follow-btn.following,
+-.join-button.button-joined {
+-  background: var(--nb-green) !important;
+-  color: var(--nb-ink) !important;
+-}
+-
+-.join-button.button-active,
+-.join-button.button-upcoming,
+-.join-button.button-ended {
+-  border: var(--nb-border-width-control) solid var(--nb-ink) !important;
+-  box-shadow: var(--nb-shadow-soft) !important;
+-}
+-
+-.menu-icon,
+-.setting-icon,
+-.empty-icon,
+-.challenge-icon {
+-  border: var(--nb-border-width-control) solid var(--nb-ink) !important;
+-  border-radius: 0 !important;
+-  box-shadow: var(--nb-shadow-soft) !important;
+-}
+-
+-.menu-icon,
+-.setting-icon {
+-  background: var(--nb-surface) !important;
+-}
+-
+-.action-icon,
+-.preview-entry-icon,
+-.panel-action-icon {
+-  background: var(--nb-surface) !important;
+-}
+-
+-.panel-action-icon.warm {
+-  background: var(--nb-yellow) !important;
+-}
+-
+-.panel-action-icon.blue {
+-  background: var(--nb-blue) !important;
+-}
+-
+-.panel-action-icon.mint {
+-  background: var(--nb-green) !important;
+-}
+-
+-.panel-action-icon.danger {
+-  background: var(--nb-coral) !important;
+-}
+diff --git a/uniapp/styles/theme.css b/uniapp/styles/theme.css
+index 6fc37fe..8279269 100644
+--- a/uniapp/styles/theme.css
++++ b/uniapp/styles/theme.css
+@@ -10,14 +10,14 @@
+ }
+ 
+ .card {
+-  transition: box-shadow 0.18s ease, background-color 0.18s ease;
++  transition: none;
+ }
+ 
+ .btn {
+   padding: 24rpx 48rpx;
+   border-radius: 0;
+   font-size: 28rpx;
+-  transition: background-color 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
++  transition: none;
+   font-weight: 900;
+   display: flex;
+   align-items: center;
+@@ -59,7 +59,7 @@ input, textarea {
+   background-color: transparent;
+   color: var(--color-text-primary);
+   caret-color: var(--color-brand-primary);
+-  transition: border-color 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
++  transition: none;
+ }
+ 
+ input::placeholder, textarea::placeholder {
+@@ -83,7 +83,7 @@ input:focus, textarea:focus {
+ 
+ ::-webkit-scrollbar-thumb {
+   background: var(--border-primary);
+-  border-radius: 3rpx;
++  border-radius: 0;
+ }
+ 
+ ::-webkit-scrollbar-thumb:hover {
+diff --git a/uniapp/styles/themes/light.css b/uniapp/styles/themes/light.css
+index cef2044..a11b57e 100644
+--- a/uniapp/styles/themes/light.css
++++ b/uniapp/styles/themes/light.css
+@@ -9,17 +9,17 @@ page {
+   --color-app-background: #FFFFFF;
+   --color-card-background: #FFFFFF;
+   --bg-primary: #FFFFFF;
+-  --bg-secondary: #FFF8EF;
++  --bg-secondary: #FFFFFF;
+   --bg-tertiary: #FFFFFF;
+   --bg-elevated: #FFFFFF;
+   
+   /* 文字色系 */
+   --color-text-primary: #000000;
+   --color-text-secondary: #374151;
+-  --color-text-disabled: #667085;
++  --color-text-disabled: #7A7A7A;
+   --text-primary: #000000;
+   --text-secondary: #374151;
+-  --text-tertiary: #667085;
++  --text-tertiary: #7A7A7A;
+   --text-inverse: #000000;
+   
+   /* 边框色系 */
+@@ -34,30 +34,30 @@ page {
+   --accent-color: #FFCB45;
+   
+   /* 状态色系 */
+-  --color-success: #59D39E;
+-  --color-warning: #FFB35C;
+-  --color-error: #FF8A78;
+-  --success-color: #59D39E;
+-  --error-color: #FF8A78;
+-  --warning-color: #FFB35C;
+-  --info-color: #5EA8FF;
++  --color-success: #67C23A;
++  --color-warning: #FFCB45;
++  --color-error: #F56C6C;
++  --success-color: #67C23A;
++  --error-color: #F56C6C;
++  --warning-color: #FFCB45;
++  --info-color: #909399;
+ 
+   /* 柔和彩色面 */
+-  --tone-yellow-soft: #FFF1B8;
++  --tone-yellow-soft: #FFF4C8;
+   --tone-blue-soft: #E3F0FF;
+-  --tone-green-soft: #E2F8EE;
+-  --tone-orange-soft: #FFE6CC;
+-  --tone-coral-soft: #FFE1DB;
++  --tone-green-soft: #EEF8E7;
++  --tone-orange-soft: #FFF4C8;
++  --tone-coral-soft: #FFE6E6;
+   --tone-lavender-soft: #EEE8FF;
+   --tone-paper-soft: #ffffff;
+   
+   /* 阴影系统 */
+-  --shadow-card: 5rpx 5rpx 0 #000000;
+-  --shadow-floating: 7rpx 7rpx 0 #000000;
+-  --shadow-modal: 9rpx 9rpx 0 #000000;
+-  --shadow-sm: 3rpx 3rpx 0 #000000;
+-  --shadow-md: 6rpx 6rpx 0 #000000;
+-  --shadow-lg: 8rpx 8rpx 0 #000000;
++  --shadow-card: 0 3rpx 0 #000000;
++  --shadow-floating: 0 4rpx 0 #000000;
++  --shadow-modal: 0 4rpx 0 #000000;
++  --shadow-sm: 0 2rpx 0 #000000;
++  --shadow-md: 0 3rpx 0 #000000;
++  --shadow-lg: 0 4rpx 0 #000000;
+   --shadow-glow: 0 0 0 transparent;
+   
+   /* 间距系统 (8px网格) */
+diff --git a/uniapp/uni.scss b/uniapp/uni.scss
+index 1a263e3..ed0e5ca 100644
+--- a/uniapp/uni.scss
++++ b/uniapp/uni.scss
+@@ -14,23 +14,23 @@
+ 
+ /* 新设计系统颜色变量 */
+ 
+-/* 主品牌色系 */
+-$color-brand-primary: #4F7FFF;
+-$color-brand-accent: #FF7A45;
+-
+-/* 背景色系 */
+-$color-app-background: #F5F6F8;
+-$color-card-background: #FFFFFF;
+-
+-/* 文字色系 */
+-$color-text-primary: #1F1F1F;
+-$color-text-secondary: #666666;
+-$color-text-disabled: #AAAAAA;
+-
+-/* 状态色系 */
+-$color-success: #2ECC71;
+-$color-warning: #F39C12;
+-$color-error: #E74C3C;
++/* 主品牌色系 */
++$color-brand-primary: #FFCB45;
++$color-brand-accent: #5EA8FF;
++
++/* 背景色系 */
++$color-app-background: #FFFFFF;
++$color-card-background: #FFFFFF;
++
++/* 文字色系 */
++$color-text-primary: #111111;
++$color-text-secondary: #4D4D4D;
++$color-text-disabled: #7A7A7A;
++
++/* 状态色系 */
++$color-success: #67C23A;
++$color-warning: #FFCB45;
++$color-error: #F56C6C;
+ 
+ /* 间距系统 (8px网格) */
+ $spacing-1: 4px;
+@@ -42,30 +42,30 @@ $spacing-8: 32px;
+ $spacing-10: 40px;
+ $spacing-12: 48px;
+ 
+-/* 圆角系统 */
+-$radius-small: 8px;
+-$radius-medium: 12px;
+-$radius-large: 16px;
++/* 圆角系统 */
++$radius-small: 0px;
++$radius-medium: 0px;
++$radius-large: 0px;
+ 
+ /* 原有uni-app变量（兼容性保留） */
+ 
+ /* 行为相关颜色 */
+-$uni-color-primary: #4F7FFF;
+-$uni-color-success: #2ECC71;
+-$uni-color-warning: #F39C12;
+-$uni-color-error: #E74C3C;
++$uni-color-primary: #FFCB45;
++$uni-color-success: #67C23A;
++$uni-color-warning: #FFCB45;
++$uni-color-error: #F56C6C;
+ 
+ /* 文字基本颜色 */
+-$uni-text-color: #1F1F1F;//基本色
+-$uni-text-color-inverse: #FFFFFF;//反色
+-$uni-text-color-grey: #666666;//辅助灰色，如加载更多的提示信息
+-$uni-text-color-placeholder: #AAAAAA;
+-$uni-text-color-disable: #AAAAAA;
++$uni-text-color: #111111;//基本色
++$uni-text-color-inverse: #FFFFFF;//反色
++$uni-text-color-grey: #4D4D4D;//辅助灰色，如加载更多的提示信息
++$uni-text-color-placeholder: #7A7A7A;
++$uni-text-color-disable: #7A7A7A;
+ 
+ /* 背景颜色 */
+ $uni-bg-color: #FFFFFF;
+-$uni-bg-color-grey: #F5F6F8;
+-$uni-bg-color-hover: #F0F0F0;//点击状态颜色
++$uni-bg-color-grey: #FFFFFF;
++$uni-bg-color-hover: #F5F5F5;//点击状态颜色
+ $uni-bg-color-mask: rgba(0, 0, 0, 0.4);//遮罩颜色
+ 
+ /* 边框颜色 */
+@@ -84,9 +84,9 @@ $uni-img-size-base: 26px;
+ $uni-img-size-lg: 40px;
+ 
+ /* Border Radius */
+-$uni-border-radius-sm: 8px;
+-$uni-border-radius-base: 12px;
+-$uni-border-radius-lg: 16px;
++$uni-border-radius-sm: 0px;
++$uni-border-radius-base: 0px;
++$uni-border-radius-lg: 0px;
+ $uni-border-radius-circle: 50%;
+ 
+ /* 水平间距 */

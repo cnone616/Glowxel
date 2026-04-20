@@ -65,20 +65,21 @@ async function handleLogin() {
 .login-card {
   width: 100%;
   max-width: 380px;
-  background: #fafafa;
-  border: 1px solid #f0f0f0;
-  border-radius: 16px;
+  background: var(--tone-paper-soft);
+  border: 3px solid var(--nb-ink);
+  border-radius: 0;
   padding: 40px 32px;
+  box-shadow: var(--nb-shadow-card);
 }
 .login-card h1 {
   font-size: 24px;
-  font-weight: 700;
-  color: #1a1a1a;
+  font-weight: 800;
+  color: var(--nb-ink);
   text-align: center;
 }
 .subtitle {
   text-align: center;
-  color: #999;
+  color: var(--text-secondary);
   font-size: 14px;
   margin: 8px 0 28px;
 }
@@ -89,23 +90,26 @@ form {
 }
 input {
   padding: 12px 14px;
-  border: 1px solid #e0e0e0;
-  border-radius: 8px;
+  border: 2px solid var(--nb-ink);
+  border-radius: 0;
   font-size: 14px;
   outline: none;
+  color: var(--nb-ink);
+  background: var(--tone-paper-soft);
 }
 input:focus {
-  border-color: var(--color-primary);
+  border-color: var(--nb-ink);
 }
 .login-btn {
   padding: 12px;
-  border: none;
-  border-radius: 8px;
-  background: var(--color-primary);
-  color: #fff;
+  border: 2px solid var(--nb-ink);
+  border-radius: 0;
+  background: var(--nb-yellow);
+  color: var(--nb-ink);
   font-size: 15px;
-  font-weight: 600;
+  font-weight: 800;
   cursor: pointer;
+  box-shadow: var(--nb-shadow-soft);
 }
 .login-btn:hover {
   background: var(--color-primary-hover);
@@ -116,7 +120,7 @@ input:focus {
 }
 .error {
   text-align: center;
-  color: #e53e3e;
+  color: var(--nb-coral);
   font-size: 13px;
   margin-top: 12px;
 }

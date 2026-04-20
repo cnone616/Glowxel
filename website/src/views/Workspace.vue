@@ -149,11 +149,10 @@ onMounted(async () => {
 
 .header {
   margin-bottom: 24px;
-  border: 1px solid rgba(36, 49, 66, 0.08);
-  border-radius: 30px;
+  border: 3px solid var(--nb-ink);
+  border-radius: 0;
   background:
-    radial-gradient(circle at top right, rgba(136, 161, 186, 0.16), transparent 30%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(251, 247, 241, 0.82));
+    linear-gradient(90deg, rgba(255, 243, 196, 0.64), rgba(255, 255, 255, 0.98) 54%, rgba(220, 235, 255, 0.7));
   box-shadow: var(--nb-shadow-strong);
 }
 
@@ -172,13 +171,15 @@ onMounted(async () => {
   align-items: center;
   min-height: 30px;
   padding: 0 12px;
-  border-radius: 999px;
-  background: rgba(136, 161, 186, 0.14);
+  border: 2px solid var(--nb-ink);
+  border-radius: 0;
+  background: var(--tone-paper-soft);
   color: var(--nb-ink);
   font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
+  font-weight: 800;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
+  box-shadow: var(--nb-shadow-soft);
 }
 
 .header-title {
@@ -210,9 +211,9 @@ onMounted(async () => {
 .quick-actions,
 .my-projects {
   padding: 24px;
-  border: 1px solid rgba(36, 49, 66, 0.08);
-  border-radius: 28px;
-  background: rgba(255, 255, 255, 0.8);
+  border: 3px solid var(--nb-ink);
+  border-radius: 0;
+  background: var(--tone-paper-soft);
   box-shadow: var(--nb-shadow-card);
 }
 
@@ -228,18 +229,16 @@ onMounted(async () => {
   align-items: flex-start;
   gap: 10px;
   padding: 28px 18px;
-  border: 1px solid rgba(36, 49, 66, 0.08);
-  border-radius: 24px;
-  background: rgba(255, 255, 255, 0.74);
+  border: 3px solid var(--nb-ink);
+  border-radius: 0;
+  background: var(--tone-paper-soft);
   text-decoration: none;
   box-shadow: var(--nb-shadow-soft);
-  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+  transition: background-color 0.18s ease;
 }
 
 .action-card:hover {
-  transform: translateY(-2px);
-  border-color: rgba(136, 161, 186, 0.18);
-  box-shadow: var(--nb-shadow-card);
+  background: #f8f8f8;
 }
 
 .action-icon {
@@ -248,7 +247,9 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 22px;
+  border: 2px solid var(--nb-ink);
+  border-radius: 0;
+  box-shadow: var(--nb-shadow-soft);
 }
 
 .action-icon.blue {
@@ -329,7 +330,8 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 22px;
+  border: 2px solid var(--nb-ink);
+  border-radius: 0;
   background: var(--tone-blue-soft);
   box-shadow: var(--nb-shadow-soft);
 }
@@ -351,8 +353,8 @@ onMounted(async () => {
   justify-content: center;
   min-height: 44px;
   padding: 10px 18px;
-  border: 1px solid rgba(215, 178, 109, 0.36);
-  border-radius: 999px;
+  border: 2px solid var(--nb-ink);
+  border-radius: 0;
   background: var(--nb-yellow);
   box-shadow: var(--nb-shadow-soft);
   color: var(--nb-ink);
@@ -369,20 +371,20 @@ onMounted(async () => {
 
 .project-card {
   overflow: hidden;
-  border: 1px solid rgba(36, 49, 66, 0.08);
-  border-radius: 24px;
-  background: rgba(255, 255, 255, 0.78);
-  box-shadow: var(--nb-shadow-soft);
+  border: 3px solid var(--nb-ink);
+  border-radius: 0;
+  background: var(--tone-paper-soft);
+  box-shadow: var(--nb-shadow-card);
 }
 
 .project-thumb {
   position: relative;
   aspect-ratio: 1;
-  background: rgba(255, 255, 255, 0.72);
+  background: #f5f5f5;
   background-size: cover;
   background-position: center;
   cursor: pointer;
-  border-bottom: 1px solid rgba(36, 49, 66, 0.08);
+  border-bottom: 3px solid var(--nb-ink);
 }
 
 .thumb-placeholder {
@@ -404,9 +406,9 @@ onMounted(async () => {
 .action-btn {
   height: 30px;
   padding: 0 12px;
-  border: 1px solid rgba(36, 49, 66, 0.08);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.84);
+  border: 2px solid var(--nb-ink);
+  border-radius: 0;
+  background: var(--tone-paper-soft);
   color: var(--nb-ink);
   font-size: 12px;
   font-weight: 700;
@@ -415,7 +417,7 @@ onMounted(async () => {
 }
 
 .action-btn.danger {
-  background: rgba(213, 155, 142, 0.22);
+  background: var(--tone-coral-soft);
   color: var(--nb-ink);
 }
 

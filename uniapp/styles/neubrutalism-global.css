@@ -56,6 +56,9 @@ body {
 .nb-page {
   background: var(--nb-paper) !important;
   color: var(--nb-ink) !important;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
 }
 
 .content,
@@ -606,7 +609,6 @@ textarea {
 .publish-btn,
 .save-button,
 .next-btn,
-.export-button,
 .modal-action-btn.primary,
 .modal-action-button.primary {
   background: var(--nb-yellow) !important;
@@ -615,7 +617,7 @@ textarea {
 
 .logout-btn,
 .image-action-btn.danger,
-.modal-action-btn.tertiary {
+.modal-action-btn.danger {
   background: var(--nb-coral) !important;
   border-color: var(--nb-ink) !important;
   color: var(--nb-ink) !important;

@@ -44,16 +44,15 @@ function handleLogout() {
 </script>
 
 <style scoped>
-.container { max-width: 600px; margin: 0 auto; padding: 0 20px; }
-.back-btn { background: none; border: none; font-size: 14px; color: #666; cursor: pointer; padding: 20px 0; display: block; }
-.back-btn:hover { color: #1a1a1a; }
-.page-title { font-size: 22px; font-weight: 700; color: #1a1a1a; margin-bottom: 24px; }
-.settings-card { background: #fafafa; border: 1px solid #f0f0f0; border-radius: 16px; padding: 24px; }
-.section-title { font-size: 11px; font-weight: 600; color: #999; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; }
-.setting-item { display: flex; justify-content: space-between; align-items: center; padding: 14px 0; border-bottom: 1px solid #f0f0f0; cursor: pointer; font-size: 14px; color: #1a1a1a; }
+.container { max-width: 600px; margin: 0 auto; padding: 24px 20px 56px; }
+.back-btn { min-height: 42px; padding: 0 16px; border: 2px solid var(--nb-ink); background: var(--tone-paper-soft); box-shadow: var(--nb-shadow-soft); font-size: 14px; font-weight: 800; color: var(--nb-ink); cursor: pointer; display: inline-flex; align-items: center; margin-bottom: 18px; }
+.back-btn:hover { background: #f6f6f6; }
+.page-title { font-size: 28px; font-weight: 800; color: var(--nb-ink); margin-bottom: 20px; }
+.settings-card { background: var(--tone-paper-soft); border: 3px solid var(--nb-ink); border-radius: 0; padding: 24px; box-shadow: var(--nb-shadow-card); }
+.section-title { font-size: 11px; font-weight: 800; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; }
+.setting-item { display: flex; justify-content: space-between; align-items: center; padding: 14px 0; border-bottom: 2px solid var(--nb-ink); cursor: pointer; font-size: 14px; color: var(--nb-ink); font-weight: 700; }
 .setting-item:last-child { border-bottom: none; }
-.setting-item:hover { color: #555; }
-.setting-item.danger { color: #e53e3e; }
-.value { font-size: 13px; color: #999; }
+.setting-item:hover { background: #fafafa; }
+.setting-item.danger { color: var(--nb-coral); }
+.value { font-size: 13px; color: var(--text-secondary); }
 </style>
-
