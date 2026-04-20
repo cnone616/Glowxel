@@ -232,7 +232,7 @@ watch(() => props.selectedColor, (newColor) => {
 .series-tab.active {
   background: linear-gradient(135deg, #ff6b6b 0%, #ffa500 100%);
   border-color: #ff6b6b;
-  color: #fff;
+  color: var(--nb-ink);
 }
 
 .series-count {
@@ -304,7 +304,7 @@ watch(() => props.selectedColor, (newColor) => {
   top: -6px;
   right: -6px;
   background: #10b981;
-  color: white;
+  color: var(--nb-ink);
   font-size: 10px;
   font-weight: 700;
   padding: 2px 6px;

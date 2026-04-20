@@ -474,7 +474,7 @@ onUnmounted(() => {
 
 .footer-btn.confirm {
   background: #4f7fff;
-  color: #ffffff;
+  color: var(--nb-ink);
   font-weight: 700;
 }
 </style>

@@ -215,7 +215,7 @@ input[type="range"]::-webkit-slider-thumb {
 
 .btn-accent {
   background: var(--nb-blue);
-  color: #ffffff;
+  color: var(--nb-ink);
 }
 
 .btn-accent:hover {
@@ -257,7 +257,7 @@ input[type="range"]::-webkit-slider-thumb {
 
 .glx-web-chip.is-active {
   background: var(--nb-blue);
-  color: #ffffff;
+  color: var(--nb-ink);
 }
 
 @media (max-width: 768px) {

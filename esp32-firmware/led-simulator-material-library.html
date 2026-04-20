@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LED 模拟器素材快选版</title>
+    <link rel="stylesheet" href="led-simulator-material-library.css" />
+  </head>
+  <body>
+    <h1>LED 模拟器 · 红白机标题素材快选</h1>
+
+    <div class="page">
+      <section class="card preview-panel">
+        <div class="canvas-wrap">
+          <canvas id="materialCanvas" width="640" height="640"></canvas>
+        </div>
+        <div class="preview-tip">预览区仅显示当前素材像素效果（64x64）。</div>
+      </section>
+
+      <section class="card library-panel">
+        <div class="section-title">素材库</div>
+        <div class="library-tabs">
+          <button
+            id="libraryTabBuiltIn"
+            class="small secondary library-tab-btn active"
+            onclick="switchLibraryTab('builtIn')"
+          >
+            内置素材
+          </button>
+          <button
+            id="libraryTabSaved"
+            class="small secondary library-tab-btn"
+            onclick="switchLibraryTab('saved')"
+          >
+            本地像素素材
+          </button>
+        </div>
+
+        <div id="libraryBuiltInContent" class="library-tab-content active">
+          <div class="control-group">
+            <input
+              type="text"
+              id="materialSearch"
+              placeholder="搜索游戏名（如：魂斗罗、马里奥）"
+              oninput="filterMaterialLibrary()"
+            />
+          </div>
+          <div id="materialLibraryGrid" class="material-grid"></div>
+
+          <div class="control-group">
+            <label>自定义上传</label>
+            <div
+              class="upload-area"
+              id="uploadArea"
+              onclick="document.getElementById('imageInput').click()"
+            >
+              <div id="uploadPlaceholder">
+                <div class="upload-icon">📁</div>
+                <div class="upload-text">点击上传图片素材</div>
+                <div class="upload-tip">上传后可继续裁剪、缩放并像素化</div>
+              </div>
+              <div id="imagePreviewContainer" style="display: none">
+                <img id="imagePreview" class="image-preview" alt="64x64 像素预览" />
+                <div class="upload-tip">此处仅显示 64x64 转换后的像素结果</div>
+                <div class="image-actions">
+                  <button
+                    class="secondary"
+                    onclick="event.stopPropagation(); document.getElementById('imageInput').click();"
+                  >
+                    更换
+                  </button>
+                  <button
+                    class="secondary"
+                    onclick="event.stopPropagation(); removeCurrentMaterial();"
+                  >
+                    清空
+                  </button>
+                </div>
+              </div>
+            </div>
+            <input
+              type="file"
+              id="imageInput"
+              accept="image/*"
+              style="display: none"
+              onchange="handleImageUpload(event)"
+            />
+          </div>
+
+          <div class="control-group">
+            <div class="upload-tip">提示：先选素材，再在右侧做参数调整与保存。</div>
+          </div>
+        </div>
+
+        <div id="librarySavedContent" class="library-tab-content">
+          <div class="saved-header">
+            <div class="section-title">本地像素素材（可回显）</div>
+            <div class="saved-actions">
+              <button class="small secondary" onclick="loadSavedPixelLibrary()">刷新</button>
+              <button class="small danger" onclick="clearAllSavedMaterials()">清空全部</button>
+            </div>
+          </div>
+          <div id="savedMaterialList" class="saved-list"></div>
+        </div>
+
+      </section>
+
+      <section class="card control-panel">
+        <div class="section-title">参数控制</div>
+
+        <div class="control-group">
+          <label>素材名称</label>
+          <input type="text" id="materialName" placeholder="用于保存和回显" />
+        </div>
+
+        <div class="control-group">
+          <label>尺寸与位置</label>
+          <div class="ratio-box">
+            <div>原图比例：<span id="sourceAspectRatioText">未加载</span></div>
+            <div>当前比例：<span id="currentAspectRatioText">--</span></div>
+            <label class="ratio-lock-label">
+              <input
+                type="checkbox"
+                id="lockAspectRatio"
+                checked
+                onchange="handleAspectLockChange()"
+              />
+              锁定比例
+            </label>
+          </div>
+        </div>
+
+        <div class="control-grid">
+          <div class="control-group wide-step-control">
+            <label>宽度</label>
+            <div class="number-input-group extended-stepper">
+              <button class="num-btn step-btn" onclick="adjustValue('imageWidth', -10)">-10</button>
+              <button class="num-btn step-btn" onclick="adjustValue('imageWidth', -5)">-5</button>
+              <button class="num-btn" onclick="adjustValue('imageWidth', -1)">-</button>
+              <input
+                type="number"
+                id="imageWidth"
+                min="1"
+                value="64"
+                oninput="handleSizeInput('width')"
+              />
+              <button class="num-btn" onclick="adjustValue('imageWidth', 1)">+</button>
+              <button class="num-btn step-btn" onclick="adjustValue('imageWidth', 5)">+5</button>
+              <button class="num-btn step-btn" onclick="adjustValue('imageWidth', 10)">+10</button>
+            </div>
+            <div id="widthWarning" class="warning-text" style="display: none">
+              宽度超过 64 可能显示不完整
+            </div>
+          </div>
+
+          <div class="control-group wide-step-control">
+            <label>高度</label>
+            <div class="number-input-group extended-stepper">
+              <button class="num-btn step-btn" onclick="adjustValue('imageHeight', -10)">-10</button>
+              <button class="num-btn step-btn" onclick="adjustValue('imageHeight', -5)">-5</button>
+              <button class="num-btn" onclick="adjustValue('imageHeight', -1)">-</button>
+              <input
+                type="number"
+                id="imageHeight"
+                min="1"
+                value="64"
+                oninput="handleSizeInput('height')"
+              />
+              <button class="num-btn" onclick="adjustValue('imageHeight', 1)">+</button>
+              <button class="num-btn step-btn" onclick="adjustValue('imageHeight', 5)">+5</button>
+              <button class="num-btn step-btn" onclick="adjustValue('imageHeight', 10)">+10</button>
+            </div>
+            <div id="heightWarning" class="warning-text" style="display: none">
+              高度超过 64 可能显示不完整
+            </div>
+          </div>
+
+          <div class="control-group wide-step-control">
+            <label>X 位置</label>
+            <div class="number-input-group extended-stepper">
+              <button class="num-btn step-btn" onclick="adjustValue('imageX', -10)">-10</button>
+              <button class="num-btn step-btn" onclick="adjustValue('imageX', -5)">-5</button>
+              <button class="num-btn" onclick="adjustValue('imageX', -1)">-</button>
+              <input
+                type="number"
+                id="imageX"
+                value="0"
+                oninput="updateDisplay()"
+              />
+              <button class="num-btn" onclick="adjustValue('imageX', 1)">+</button>
+              <button class="num-btn step-btn" onclick="adjustValue('imageX', 5)">+5</button>
+              <button class="num-btn step-btn" onclick="adjustValue('imageX', 10)">+10</button>
+            </div>
+          </div>
+
+          <div class="control-group wide-step-control">
+            <label>Y 位置</label>
+            <div class="number-input-group extended-stepper">
+              <button class="num-btn step-btn" onclick="adjustValue('imageY', -10)">-10</button>
+              <button class="num-btn step-btn" onclick="adjustValue('imageY', -5)">-5</button>
+              <button class="num-btn" onclick="adjustValue('imageY', -1)">-</button>
+              <input
+                type="number"
+                id="imageY"
+                value="0"
+                oninput="updateDisplay()"
+              />
+              <button class="num-btn" onclick="adjustValue('imageY', 1)">+</button>
+              <button class="num-btn step-btn" onclick="adjustValue('imageY', 5)">+5</button>
+              <button class="num-btn step-btn" onclick="adjustValue('imageY', 10)">+10</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="control-group">
+          <div class="control-header">
+            <label>橡皮擦（直接修改素材像素）</label>
+            <button id="eraseToggleBtn" class="small secondary" onclick="toggleEraseMode()">
+              开启擦除
+            </button>
+          </div>
+          <div class="number-input-group">
+            <label class="inline-label" for="eraseBrushSize">笔刷</label>
+            <button class="num-btn" onclick="adjustValue('eraseBrushSize', -1)">-</button>
+            <input
+              type="number"
+              id="eraseBrushSize"
+              min="1"
+              max="8"
+              value="1"
+              oninput="updateEraseBrushSize()"
+            />
+            <button class="num-btn" onclick="adjustValue('eraseBrushSize', 1)">+</button>
+            <button class="small secondary" onclick="clearEraseMask()">清空擦除</button>
+          </div>
+          <div class="erase-tip">开启后在左侧画布按住拖动即可擦除，擦除会直接写入素材像素数据。</div>
+        </div>
+
+        <div class="button-group">
+          <button onclick="fitToPanel()">按比例适配 64x64</button>
+          <button onclick="saveCurrentMaterial()">保存像素数据到本地</button>
+          <button class="secondary" onclick="copyCurrentPixels()">复制当前像素 JSON</button>
+          <button class="secondary" onclick="downloadCurrentPixels()">下载当前像素 JSON</button>
+        </div>
+
+        <div id="statusOutput" class="status-output">请选择内置素材或上传图片。</div>
+      </section>
+    </div>
+
+    <script src="led-simulator-material-library.js"></script>
+  </body>
+</html>

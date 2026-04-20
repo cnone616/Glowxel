@@ -142,15 +142,6 @@
       }
     },
     {
-      "path": "pages/pet-source-preview/pet-source-preview",
-      "style": {
-        "navigationStyle": "custom",
-        "navigationBarTextStyle": "white",
-        "backgroundColor": "#1a1a1a",
-        "enablePullDownRefresh": false
-      }
-    },
-    {
       "path": "pages/ambient-editor/ambient-editor",
       "style": {
         "navigationStyle": "custom",

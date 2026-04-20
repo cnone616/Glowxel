@@ -1,0 +1,96 @@
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - link "Theme Studio 素材驱动的像素时钟主题工作室" [ref=e5] [cursor=pointer]:
+      - /url: /
+      - generic [ref=e7]:
+        - strong [ref=e8]: Theme Studio
+        - generic [ref=e9]: 素材驱动的像素时钟主题工作室
+    - navigation [ref=e10]:
+      - link "项目库" [ref=e11] [cursor=pointer]:
+        - /url: /
+    - generic [ref=e12]:
+      - generic [ref=e13]: 0 个项目
+      - generic [ref=e14]: 0 条发布记录
+  - main [ref=e15]:
+    - generic [ref=e16]:
+      - generic [ref=e17]:
+        - generic [ref=e18]:
+          - paragraph [ref=e19]: Material Driven Studio
+          - heading "上传图片素材，布背景和路径，让动态时钟主题更贴近真实项目制作方式。" [level=1] [ref=e20]
+          - paragraph [ref=e21]: 这版工作室不要求你从零手动画每一帧，而是围绕素材上传、背景轮播、对象路径、闪烁规则、 时间组件和分钟 / 整点预演来搭建主题。
+          - generic [ref=e22]:
+            - button "从空白工作室开始" [ref=e23] [cursor=pointer]
+            - generic [ref=e24]: PNG / JPG / WebP / GIF
+            - generic [ref=e25]: 路径移动
+            - generic [ref=e26]: 背景轮播
+            - generic [ref=e27]: 多事件动作
+        - generic [ref=e29]:
+          - generic [ref=e30]: 08:45
+          - generic [ref=e31]: Scene Builder
+      - generic [ref=e32]:
+        - generic [ref=e33]:
+          - generic [ref=e35]:
+            - paragraph [ref=e36]: Projects
+            - heading "最近项目" [level=2] [ref=e37]
+          - generic [ref=e38]:
+            - strong [ref=e39]: 这里还没有项目
+            - paragraph [ref=e40]: 直接从空白工作室开始会更接近你真实做主题的方式。
+        - generic [ref=e41]:
+          - generic [ref=e43]:
+            - paragraph [ref=e44]: Templates
+            - heading "现有模板骨架" [level=2] [ref=e45]
+          - generic [ref=e46]:
+            - article [ref=e47]:
+              - generic [ref=e49]:
+                - paragraph [ref=e50]: 琥珀数字窗 + 跳动刻度
+                - heading "复古电子" [level=3] [ref=e51]
+                - paragraph [ref=e52]: 适合做老式桌面电子钟主题，时间层覆盖在温暖的数字舱上。
+                - generic [ref=e53]:
+                  - generic [ref=e54]: 8 张背景序列
+                  - generic [ref=e55]: 可继续加对象
+              - button "基于此模板创建" [ref=e56] [cursor=pointer]
+            - article [ref=e57]:
+              - generic [ref=e59]:
+                - paragraph [ref=e60]: 扫描线 + 雷达边框
+                - heading "霓虹 HUD" [level=3] [ref=e61]
+                - paragraph [ref=e62]: 未来感 HUD 风格，适合夜间桌面氛围。
+                - generic [ref=e63]:
+                  - generic [ref=e64]: 10 张背景序列
+                  - generic [ref=e65]: 可继续加对象
+              - button "基于此模板创建" [ref=e66] [cursor=pointer]
+            - article [ref=e67]:
+              - generic [ref=e69]:
+                - paragraph [ref=e70]: 眨眼伙伴 + 柔和舱室
+                - heading "像素宠物" [level=3] [ref=e71]
+                - paragraph [ref=e72]: 中央宠物会眨眼和抬爪，适合陪伴型主题。
+                - generic [ref=e73]:
+                  - generic [ref=e74]: 8 张背景序列
+                  - generic [ref=e75]: 可继续加对象
+              - button "基于此模板创建" [ref=e76] [cursor=pointer]
+            - article [ref=e77]:
+              - generic [ref=e79]:
+                - paragraph [ref=e80]: 云团呼吸 + 阳光光环
+                - heading "天气脉冲" [level=3] [ref=e81]
+                - paragraph [ref=e82]: 柔和天气动画，适合白天和工作台主题。
+                - generic [ref=e83]:
+                  - generic [ref=e84]: 9 张背景序列
+                  - generic [ref=e85]: 可继续加对象
+              - button "基于此模板创建" [ref=e86] [cursor=pointer]
+            - article [ref=e87]:
+              - generic [ref=e89]:
+                - paragraph [ref=e90]: 灯珠追光 + 节庆横幅
+                - heading "节日灯牌" [level=3] [ref=e91]
+                - paragraph [ref=e92]: 适合节日主题与活动感场景。
+                - generic [ref=e93]:
+                  - generic [ref=e94]: 10 张背景序列
+                  - generic [ref=e95]: 可继续加对象
+              - button "基于此模板创建" [ref=e96] [cursor=pointer]
+            - article [ref=e97]:
+              - generic [ref=e99]:
+                - paragraph [ref=e100]: 净面卡片 + 轻微翻页
+                - heading "极简日历" [level=3] [ref=e101]
+                - paragraph [ref=e102]: 安静、干净、偏信息设计的像素时钟主题。
+                - generic [ref=e103]:
+                  - generic [ref=e104]: 6 张背景序列
+                  - generic [ref=e105]: 可继续加对象
+              - button "基于此模板创建" [ref=e106] [cursor=pointer]

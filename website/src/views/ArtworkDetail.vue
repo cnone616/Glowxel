@@ -124,31 +124,33 @@ async function submitComment() {
 </script>
 
 <style scoped>
-.container { max-width: 1200px; margin: 0 auto; padding: 0 20px; }
-.back-btn { background: none; border: none; font-size: 14px; color: #666; cursor: pointer; padding: 20px 0; }
-.back-btn:hover { color: #1a1a1a; }
+.container { max-width: 1200px; margin: 0 auto; padding: 24px 20px 56px; }
+.back-btn { min-height: 42px; padding: 0 16px; border: 2px solid var(--nb-ink); background: var(--tone-paper-soft); box-shadow: var(--nb-shadow-soft); font-size: 14px; font-weight: 800; color: var(--nb-ink); cursor: pointer; display: inline-flex; align-items: center; margin-bottom: 20px; }
+.back-btn:hover { background: #f6f6f6; }
 
 .detail-layout { display: grid; grid-template-columns: 1fr 360px; gap: 32px; }
-.preview-img { width: 100%; aspect-ratio: 1; border-radius: 12px; }
+.preview-img { width: 100%; aspect-ratio: 1; border: 3px solid var(--nb-ink); border-radius: 0; box-shadow: var(--nb-shadow-card); }
 
-.artwork-sidebar h1 { font-size: 22px; font-weight: 700; color: #1a1a1a; }
+.artwork-sidebar { align-self: start; padding: 20px; border: 3px solid var(--nb-ink); background: var(--tone-paper-soft); box-shadow: var(--nb-shadow-card); }
+.artwork-sidebar h1 { font-size: 26px; font-weight: 800; color: var(--nb-ink); }
 .author-row { display: flex; justify-content: space-between; align-items: center; margin: 12px 0; }
-.author-name { font-size: 14px; color: #666; }
-.follow-btn { padding: 6px 16px; border-radius: 6px; border: 1px solid #e0e0e0; background: #fff; font-size: 13px; cursor: pointer; }
-.follow-btn:hover { border-color: #1a1a1a; }
-.desc { font-size: 14px; color: #888; line-height: 1.6; margin-bottom: 16px; }
+.author-name { font-size: 14px; color: var(--text-secondary); font-weight: 700; }
+.follow-btn { padding: 6px 16px; border-radius: 0; border: 2px solid var(--nb-ink); background: var(--tone-paper-soft); font-size: 13px; font-weight: 800; cursor: pointer; box-shadow: var(--nb-shadow-soft); }
+.follow-btn:hover { background: #f6f6f6; }
+.desc { font-size: 14px; color: var(--text-secondary); line-height: 1.6; margin-bottom: 16px; }
 
 .actions { display: flex; gap: 12px; margin-bottom: 24px; }
-.action-btn { padding: 8px 16px; border-radius: 8px; border: 1px solid #f0f0f0; background: #fafafa; font-size: 13px; cursor: pointer; }
-.action-btn:hover { border-color: #ddd; }
+.action-btn { padding: 8px 16px; border-radius: 0; border: 2px solid var(--nb-ink); background: var(--tone-paper-soft); font-size: 13px; font-weight: 800; cursor: pointer; box-shadow: var(--nb-shadow-soft); }
+.action-btn:hover { background: #f6f6f6; }
 
-.comments-section h3 { font-size: 16px; font-weight: 600; margin-bottom: 12px; }
+.comments-section { padding-top: 18px; border-top: 3px solid var(--nb-ink); }
+.comments-section h3 { font-size: 18px; font-weight: 800; margin-bottom: 12px; color: var(--nb-ink); }
 .comment-input { display: flex; gap: 8px; margin-bottom: 16px; }
-.comment-input input { flex: 1; padding: 8px 12px; border: 1px solid #e0e0e0; border-radius: 6px; font-size: 13px; }
-.comment-input button { padding: 8px 16px; border: none; background: var(--color-primary); color: #fff; border-radius: 6px; font-size: 13px; cursor: pointer; }
-.comment-item { padding: 8px 0; border-bottom: 1px solid #f5f5f5; }
-.comment-author { font-size: 13px; font-weight: 500; color: #1a1a1a; margin-right: 8px; }
-.comment-text { font-size: 13px; color: #666; }
+.comment-input input { flex: 1; padding: 8px 12px; border: 2px solid var(--nb-ink); border-radius: 0; font-size: 13px; }
+.comment-input button { padding: 8px 16px; border: 2px solid var(--nb-ink); background: var(--nb-yellow); color: var(--nb-ink); border-radius: 0; font-size: 13px; font-weight: 800; cursor: pointer; box-shadow: var(--nb-shadow-soft); }
+.comment-item { padding: 8px 0; border-bottom: 2px solid var(--nb-ink); }
+.comment-author { font-size: 13px; font-weight: 700; color: var(--nb-ink); margin-right: 8px; }
+.comment-text { font-size: 13px; color: var(--text-secondary); }
 
 @media (max-width: 768px) {
   .detail-layout { grid-template-columns: 1fr; }

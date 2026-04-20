@@ -1,0 +1,114 @@
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - link "Theme Studio 素材驱动的像素时钟主题工作室" [ref=e5] [cursor=pointer]:
+      - /url: /
+      - generic [ref=e7]:
+        - strong [ref=e8]: Theme Studio
+        - generic [ref=e9]: 素材驱动的像素时钟主题工作室
+    - navigation [ref=e10]:
+      - link "项目库" [ref=e11] [cursor=pointer]:
+        - /url: /
+      - link "工作室" [ref=e107] [cursor=pointer]:
+        - /url: /studio/4fe9aadf-b584-449f-80fa-ee857ca001bb
+      - link "验包" [ref=e108] [cursor=pointer]:
+        - /url: /validate/4fe9aadf-b584-449f-80fa-ee857ca001bb
+      - link "发布" [ref=e109] [cursor=pointer]:
+        - /url: /publish/4fe9aadf-b584-449f-80fa-ee857ca001bb
+    - generic [ref=e12]:
+      - generic [ref=e13]: 1 个项目
+      - generic [ref=e14]: 0 条发布记录
+  - main [ref=e15]:
+    - generic [ref=e110]:
+      - generic [ref=e111]:
+        - generic [ref=e112]:
+          - paragraph [ref=e113]: Theme Studio
+          - textbox [ref=e114]: 空白主题
+          - generic [ref=e115]:
+            - generic [ref=e116]: 0 素材
+            - generic [ref=e117]: 0 对象
+            - generic [ref=e118]: 0 背景
+            - generic [ref=e119]: 预估 5 帧
+            - generic [ref=e120]: 常规预览
+        - generic [ref=e121]:
+          - button "保存" [ref=e122] [cursor=pointer]
+          - button "验包" [ref=e123] [cursor=pointer]
+          - button "发布" [ref=e124] [cursor=pointer]
+      - generic [ref=e125]:
+        - complementary [ref=e126]:
+          - generic [ref=e127]:
+            - generic [ref=e128]:
+              - strong [ref=e129]: 素材上传
+              - generic [ref=e130]: PNG / JPG / WebP / GIF
+            - generic [ref=e131]:
+              - button "背景" [ref=e132] [cursor=pointer]
+              - button "对象" [ref=e133] [cursor=pointer]
+              - button "装饰" [ref=e134] [cursor=pointer]
+            - generic [ref=e135] [cursor=pointer]:
+              - strong [ref=e136]: 上传到当前分类
+              - generic [ref=e137]: 导入后可直接加入背景序列，或放进场景作为移动对象。
+          - generic [ref=e138]:
+            - generic [ref=e139]:
+              - strong [ref=e140]: 素材库
+              - generic [ref=e141]: 0 项
+            - paragraph [ref=e142]: 当前分类还没有素材。
+          - generic [ref=e143]:
+            - generic [ref=e144]:
+              - strong [ref=e145]: 场景对象
+              - generic [ref=e146]: 0 项
+            - paragraph [ref=e147]: 把对象素材加入场景后，这里会列出可编辑对象。
+        - generic [ref=e148]:
+          - generic [ref=e149]:
+            - generic [ref=e150]:
+              - generic [ref=e151]: 预览模式
+              - generic [ref=e152]:
+                - button "常规预览" [ref=e153] [cursor=pointer]
+                - button "分钟触发" [ref=e154] [cursor=pointer]
+                - button "整点触发" [ref=e155] [cursor=pointer]
+            - generic [ref=e156]:
+              - generic [ref=e157]: 场景点击
+              - generic [ref=e158]:
+                - button "摆放对象" [ref=e159] [cursor=pointer]
+                - button "录路径点" [ref=e160] [cursor=pointer]
+            - generic [ref=e161]:
+              - generic [ref=e162]: 预览时刻
+              - combobox "预览时刻" [ref=e163]:
+                - option "08:00"
+                - option "12:34" [selected]
+                - option "18:45"
+                - option "23:59"
+          - generic [ref=e165]:
+            - img [ref=e166]
+            - generic [ref=e167]: 12:34:00
+            - generic [ref=e168]: 01/01
+            - generic [ref=e169]: 周四
+          - generic [ref=e170]:
+            - generic [ref=e171]: 工作室已载入。先上传素材，再配置背景和对象动作。
+            - generic [ref=e172]:
+              - generic [ref=e173]: 循环 1s
+              - generic [ref=e174]: 采样 200ms
+              - generic [ref=e175]: 2026-01-01 12:34:00
+        - complementary [ref=e176]:
+          - generic [ref=e177]:
+            - button "背景" [ref=e178] [cursor=pointer]
+            - button "对象" [ref=e179] [cursor=pointer]
+            - button "时间" [ref=e180] [cursor=pointer]
+            - button "触发" [ref=e181] [cursor=pointer]
+          - generic [ref=e182]:
+            - generic [ref=e183]:
+              - strong [ref=e184]: 背景规则
+              - generic [ref=e185]: 0 张
+            - paragraph [ref=e186]: 从左侧把背景素材加入序列后，这里控制轮播和闪烁。
+            - generic [ref=e187]:
+              - generic [ref=e188]:
+                - generic [ref=e189]: 背景动作
+                - combobox "背景动作" [ref=e190]:
+                  - option "固定" [selected]
+                  - option "轮播"
+                  - option "闪烁"
+              - generic [ref=e191]:
+                - generic [ref=e192]: 节奏毫秒
+                - spinbutton "节奏毫秒" [ref=e193]: "5000"
+            - generic [ref=e194]:
+              - generic [ref=e195]: 背景描述
+              - textbox "背景描述" [ref=e196]: 背景静止显示
+            - button "根据描述套用规则" [ref=e197] [cursor=pointer]

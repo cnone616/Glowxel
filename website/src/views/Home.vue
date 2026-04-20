@@ -136,8 +136,8 @@ const features = [
   },
   {
     icon: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>`,
-    title: "模板与灵感",
-    desc: "浏览作品、模板和社区内容，快速开始创作",
+    title: "边框玩法",
+    desc: "浏览边框样式和社区作品，中间主体内容由你自己决定",
   },
 ];
 

@@ -205,7 +205,7 @@ bool sanitizeEyesConfig(EyesConfig& config) {
     changed = true;
   }
 
-  if (config.time.font > CLOCK_FONT_RETRO_5X7) {
+  if (config.time.font > CLOCK_FONT_PIXEL_RAIL_5X8) {
     config.time.font = defaults.time.font;
     changed = true;
   }

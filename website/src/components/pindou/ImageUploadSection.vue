@@ -136,7 +136,7 @@ function clearImage() {
   align-items: center;
   justify-content: center;
   font-size: 14px;
-  color: #fff;
+  color: var(--nb-ink);
   font-weight: 700;
   box-shadow: 0 6px 20px rgba(255, 107, 107, 0.3);
 }

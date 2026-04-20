@@ -110,6 +110,195 @@ function switchTab(tabName) {
   document.getElementById(tabName + 'Tab').classList.add('active');
 }
 
+function parseNumberInputValue(inputId) {
+  const input = document.getElementById(inputId);
+  const value = parseInt(input.value, 10);
+  if (Number.isNaN(value)) {
+    return 0;
+  }
+  return value;
+}
+
+function setInputValueIfPresent(inputId, value) {
+  if (value === undefined || value === null) {
+    return;
+  }
+  const input = document.getElementById(inputId);
+  if (input === null) {
+    return;
+  }
+  input.value = value;
+}
+
+function setCheckedIfPresent(inputId, checked) {
+  if (checked === undefined || checked === null) {
+    return;
+  }
+  const input = document.getElementById(inputId);
+  if (input === null) {
+    return;
+  }
+  input.checked = checked;
+}
+
+function parseTimeInputParts(timeValue) {
+  const parts = timeValue.split(':');
+  let hour = 0;
+  let minute = 0;
+  let second = 0;
+
+  if (parts.length >= 1) {
+    const parsedHour = parseInt(parts[0], 10);
+    if (!Number.isNaN(parsedHour)) {
+      hour = parsedHour;
+    }
+  }
+  if (parts.length >= 2) {
+    const parsedMinute = parseInt(parts[1], 10);
+    if (!Number.isNaN(parsedMinute)) {
+      minute = parsedMinute;
+    }
+  }
+  if (parts.length >= 3) {
+    const parsedSecond = parseInt(parts[2], 10);
+    if (!Number.isNaN(parsedSecond)) {
+      second = parsedSecond;
+    }
+  }
+
+  if (hour < 0) {
+    hour = 0;
+  } else if (hour > 23) {
+    hour = 23;
+  }
+
+  if (minute < 0) {
+    minute = 0;
+  } else if (minute > 59) {
+    minute = 59;
+  }
+
+  if (second < 0) {
+    second = 0;
+  } else if (second > 59) {
+    second = 59;
+  }
+
+  return {
+    hour: String(hour).padStart(2, '0'),
+    minute: String(minute).padStart(2, '0'),
+    second: String(second).padStart(2, '0')
+  };
+}
+
+function readSplitTimeLayout() {
+  return {
+    hour: {
+      show: document.getElementById('hourShow').checked,
+      x: parseNumberInputValue('hourX'),
+      y: parseNumberInputValue('hourY')
+    },
+    minute: {
+      show: document.getElementById('minuteShow').checked,
+      x: parseNumberInputValue('minuteX'),
+      y: parseNumberInputValue('minuteY')
+    },
+    second: {
+      show: document.getElementById('secondShow').checked,
+      x: parseNumberInputValue('secondX'),
+      y: parseNumberInputValue('secondY')
+    },
+    colon1: {
+      show: document.getElementById('colon1Show').checked,
+      x: parseNumberInputValue('colon1X'),
+      y: parseNumberInputValue('colon1Y')
+    },
+    colon2: {
+      show: document.getElementById('colon2Show').checked,
+      x: parseNumberInputValue('colon2X'),
+      y: parseNumberInputValue('colon2Y')
+    }
+  };
+}
+
+function buildTimeLayoutPayload() {
+  const layout = readSplitTimeLayout();
+  return {
+    hour: {
+      show: layout.hour.show,
+      x: layout.hour.x,
+      y: layout.hour.y
+    },
+    minute: {
+      show: layout.minute.show,
+      x: layout.minute.x,
+      y: layout.minute.y
+    },
+    second: {
+      show: layout.second.show,
+      x: layout.second.x,
+      y: layout.second.y
+    },
+    colon1: {
+      show: layout.colon1.show,
+      x: layout.colon1.x,
+      y: layout.colon1.y
+    },
+    colon2: {
+      show: layout.colon2.show,
+      x: layout.colon2.x,
+      y: layout.colon2.y
+    },
+    style: {
+      font: document.getElementById('timeFont').value,
+      fontSize: parseNumberInputValue('timeFontSize'),
+      color: selectedColors.time
+    }
+  };
+}
+
+function drawSplitTimeLayout(timeLayout, timeParts, color, fontSize) {
+  if (timeLayout.hour.show) {
+    drawText(timeParts.hour, timeLayout.hour.x, timeLayout.hour.y, ...color, fontSize);
+  }
+  if (timeLayout.minute.show) {
+    drawText(timeParts.minute, timeLayout.minute.x, timeLayout.minute.y, ...color, fontSize);
+  }
+  if (timeLayout.second.show) {
+    drawText(timeParts.second, timeLayout.second.x, timeLayout.second.y, ...color, fontSize);
+  }
+  if (timeLayout.colon1.show) {
+    drawText(':', timeLayout.colon1.x, timeLayout.colon1.y, ...color, fontSize);
+  }
+  if (timeLayout.colon2.show) {
+    drawText(':', timeLayout.colon2.x, timeLayout.colon2.y, ...color, fontSize);
+  }
+}
+
+function syncCurrentTimeInput(syncDateValue) {
+  const now = new Date();
+  const hours = String(now.getHours()).padStart(2, '0');
+  const minutes = String(now.getMinutes()).padStart(2, '0');
+  const seconds = String(now.getSeconds()).padStart(2, '0');
+  document.getElementById('timeInput').value = `${hours}:${minutes}:${seconds}`;
+  if (syncDateValue) {
+    document.getElementById('dateInput').valueAsDate = now;
+  }
+}
+
+function toggleSplitTimeMode() {
+  const splitEnabled = document.getElementById('timeSplitMode').checked;
+  document.getElementById('timeSplitPanel').style.display = splitEnabled ? 'block' : 'none';
+  document.getElementById('timeLegacyPanel').style.display = splitEnabled ? 'none' : 'block';
+}
+
+function handleRealtimeToggle() {
+  if (document.getElementById('timeRealtime').checked) {
+    syncCurrentTimeInput(false);
+    updateDisplay();
+  }
+}
+
 // 图片处理
 function handleImageUpload(event) {
   const file = event.target.files[0];
@@ -822,25 +1011,28 @@ function updateDisplay() {
   
   const config = {
     showImage: document.getElementById('showImage').checked,
-    imageWidth: parseInt(document.getElementById('imageWidth').value),
-    imageHeight: parseInt(document.getElementById('imageHeight').value),
-    imageX: parseInt(document.getElementById('imageX').value),
-    imageY: parseInt(document.getElementById('imageY').value),
+    imageWidth: parseNumberInputValue('imageWidth'),
+    imageHeight: parseNumberInputValue('imageHeight'),
+    imageX: parseNumberInputValue('imageX'),
+    imageY: parseNumberInputValue('imageY'),
     
-    timeFontSize: parseInt(document.getElementById('timeFontSize').value),
-    timeX: parseInt(document.getElementById('timeX').value),
-    timeY: parseInt(document.getElementById('timeY').value),
+    timeFont: document.getElementById('timeFont').value,
+    timeFontSize: parseNumberInputValue('timeFontSize'),
+    timeX: parseNumberInputValue('timeX'),
+    timeY: parseNumberInputValue('timeY'),
     timeColor: hexToRgb(selectedColors.time),
+    timeSplitMode: document.getElementById('timeSplitMode').checked,
+    timeLayout: readSplitTimeLayout(),
     
     showDate: document.getElementById('showDate').checked,
-    dateFontSize: parseInt(document.getElementById('dateFontSize').value),
-    dateX: parseInt(document.getElementById('dateX').value),
-    dateY: parseInt(document.getElementById('dateY').value),
+    dateFontSize: parseNumberInputValue('dateFontSize'),
+    dateX: parseNumberInputValue('dateX'),
+    dateY: parseNumberInputValue('dateY'),
     dateColor: hexToRgb(selectedColors.date),
     
     showWeek: document.getElementById('showWeek').checked,
-    weekX: parseInt(document.getElementById('weekX').value),
-    weekY: parseInt(document.getElementById('weekY').value),
+    weekX: parseNumberInputValue('weekX'),
+    weekY: parseNumberInputValue('weekY'),
     weekColor: hexToRgb(selectedColors.week)
   };
   
@@ -852,8 +1044,13 @@ function updateDisplay() {
   }
   
   const timeInput = document.getElementById('timeInput').value;
-  const timeOnly = timeInput.substring(0, 5);
-  drawText(timeOnly, config.timeX, config.timeY, ...config.timeColor, config.timeFontSize);
+  const timeParts = parseTimeInputParts(timeInput);
+  if (config.timeSplitMode) {
+    drawSplitTimeLayout(config.timeLayout, timeParts, config.timeColor, config.timeFontSize);
+  } else {
+    const timeOnly = `${timeParts.hour}:${timeParts.minute}`;
+    drawText(timeOnly, config.timeX, config.timeY, ...config.timeColor, config.timeFontSize);
+  }
   
   if (config.showDate) {
     const dateInput = document.getElementById('dateInput').value;
@@ -874,34 +1071,36 @@ function updateDisplay() {
 }
 
 function showCurrentTime() {
-  const now = new Date();
-  const hours = String(now.getHours()).padStart(2, '0');
-  const minutes = String(now.getMinutes()).padStart(2, '0');
-  document.getElementById('timeInput').value = `${hours}:${minutes}`;
-  document.getElementById('dateInput').valueAsDate = now;
+  syncCurrentTimeInput(true);
   updateDisplay();
 }
 
 function saveConfig() {
+  const timeLayout = buildTimeLayoutPayload();
   const config = {
-    timeFontSize: parseInt(document.getElementById('timeFontSize').value),
-    timeX: parseInt(document.getElementById('timeX').value),
-    timeY: parseInt(document.getElementById('timeY').value),
+    timeInput: document.getElementById('timeInput').value,
+    timeFont: document.getElementById('timeFont').value,
+    timeFontSize: parseNumberInputValue('timeFontSize'),
+    timeX: parseNumberInputValue('timeX'),
+    timeY: parseNumberInputValue('timeY'),
     timeColor: selectedColors.time,
+    timeSplitMode: document.getElementById('timeSplitMode').checked,
+    timeRealtime: document.getElementById('timeRealtime').checked,
+    timeLayout: timeLayout,
     showDate: document.getElementById('showDate').checked,
-    dateFontSize: parseInt(document.getElementById('dateFontSize').value),
-    dateX: parseInt(document.getElementById('dateX').value),
-    dateY: parseInt(document.getElementById('dateY').value),
+    dateFontSize: parseNumberInputValue('dateFontSize'),
+    dateX: parseNumberInputValue('dateX'),
+    dateY: parseNumberInputValue('dateY'),
     dateColor: selectedColors.date,
     showWeek: document.getElementById('showWeek').checked,
-    weekX: parseInt(document.getElementById('weekX').value),
-    weekY: parseInt(document.getElementById('weekY').value),
+    weekX: parseNumberInputValue('weekX'),
+    weekY: parseNumberInputValue('weekY'),
     weekColor: selectedColors.week,
     showImage: document.getElementById('showImage').checked,
-    imageWidth: parseInt(document.getElementById('imageWidth').value),
-    imageHeight: parseInt(document.getElementById('imageHeight').value),
-    imageX: parseInt(document.getElementById('imageX').value),
-    imageY: parseInt(document.getElementById('imageY').value),
+    imageWidth: parseNumberInputValue('imageWidth'),
+    imageHeight: parseNumberInputValue('imageHeight'),
+    imageX: parseNumberInputValue('imageX'),
+    imageY: parseNumberInputValue('imageY'),
     imageData: uploadedImage ? document.getElementById('imagePreview').src : null,
     imagePixels: currentImagePixels // 保存像素数据数组
   };
@@ -912,7 +1111,10 @@ function saveConfig() {
   
   const configText = `时钟配置参数：
 ━━━━━━━━━━━━━━━━━━━━
-时间: 字体${config.timeFontSize} X${config.timeX} Y${config.timeY} 颜色${config.timeColor}
+时间: 字体${config.timeFont} 大小${config.timeFontSize} 颜色${config.timeColor}
+时间布局模式: ${config.timeSplitMode ? '分离布局' : '整串布局'}
+时间布局字段 timeLayout:
+${JSON.stringify(config.timeLayout, null, 2)}
 日期: ${config.showDate?'显示':'隐藏'} 字体${config.dateFontSize} X${config.dateX} Y${config.dateY} 颜色${config.dateColor}
 星期: ${config.showWeek?'显示':'隐藏'} X${config.weekX} Y${config.weekY} 颜色${config.weekColor}
 图片: ${config.showImage?'显示':'隐藏'} 尺寸${config.imageWidth}x${config.imageHeight} 位置(${config.imageX},${config.imageY})
@@ -1087,39 +1289,78 @@ function loadSavedConfig() {
       const config = JSON.parse(saved);
       
       // 时间设置
-      if (config.timeFontSize) document.getElementById('timeFontSize').value = config.timeFontSize;
-      if (config.timeX !== undefined) document.getElementById('timeX').value = config.timeX;
-      if (config.timeY !== undefined) document.getElementById('timeY').value = config.timeY;
+      setInputValueIfPresent('timeInput', config.timeInput);
+      setInputValueIfPresent('timeFont', config.timeFont);
+      setInputValueIfPresent('timeFontSize', config.timeFontSize);
+      setInputValueIfPresent('timeX', config.timeX);
+      setInputValueIfPresent('timeY', config.timeY);
+      setCheckedIfPresent('timeSplitMode', config.timeSplitMode);
+      setCheckedIfPresent('timeRealtime', config.timeRealtime);
       if (config.timeColor) {
         selectedColors.time = config.timeColor;
         selectColor('time', config.timeColor);
       }
+      if (config.timeLayout) {
+        if (config.timeLayout.hour) {
+          setCheckedIfPresent('hourShow', config.timeLayout.hour.show);
+          setInputValueIfPresent('hourX', config.timeLayout.hour.x);
+          setInputValueIfPresent('hourY', config.timeLayout.hour.y);
+        }
+        if (config.timeLayout.minute) {
+          setCheckedIfPresent('minuteShow', config.timeLayout.minute.show);
+          setInputValueIfPresent('minuteX', config.timeLayout.minute.x);
+          setInputValueIfPresent('minuteY', config.timeLayout.minute.y);
+        }
+        if (config.timeLayout.second) {
+          setCheckedIfPresent('secondShow', config.timeLayout.second.show);
+          setInputValueIfPresent('secondX', config.timeLayout.second.x);
+          setInputValueIfPresent('secondY', config.timeLayout.second.y);
+        }
+        if (config.timeLayout.colon1) {
+          setCheckedIfPresent('colon1Show', config.timeLayout.colon1.show);
+          setInputValueIfPresent('colon1X', config.timeLayout.colon1.x);
+          setInputValueIfPresent('colon1Y', config.timeLayout.colon1.y);
+        }
+        if (config.timeLayout.colon2) {
+          setCheckedIfPresent('colon2Show', config.timeLayout.colon2.show);
+          setInputValueIfPresent('colon2X', config.timeLayout.colon2.x);
+          setInputValueIfPresent('colon2Y', config.timeLayout.colon2.y);
+        }
+        if (config.timeLayout.style) {
+          setInputValueIfPresent('timeFont', config.timeLayout.style.font);
+          setInputValueIfPresent('timeFontSize', config.timeLayout.style.fontSize);
+          if (config.timeLayout.style.color) {
+            selectedColors.time = config.timeLayout.style.color;
+            selectColor('time', config.timeLayout.style.color);
+          }
+        }
+      }
       
       // 日期设置
-      if (config.showDate !== undefined) document.getElementById('showDate').checked = config.showDate;
-      if (config.dateFontSize) document.getElementById('dateFontSize').value = config.dateFontSize;
-      if (config.dateX !== undefined) document.getElementById('dateX').value = config.dateX;
-      if (config.dateY !== undefined) document.getElementById('dateY').value = config.dateY;
+      setCheckedIfPresent('showDate', config.showDate);
+      setInputValueIfPresent('dateFontSize', config.dateFontSize);
+      setInputValueIfPresent('dateX', config.dateX);
+      setInputValueIfPresent('dateY', config.dateY);
       if (config.dateColor) {
         selectedColors.date = config.dateColor;
         selectColor('date', config.dateColor);
       }
       
       // 星期设置
-      if (config.showWeek !== undefined) document.getElementById('showWeek').checked = config.showWeek;
-      if (config.weekX !== undefined) document.getElementById('weekX').value = config.weekX;
-      if (config.weekY !== undefined) document.getElementById('weekY').value = config.weekY;
+      setCheckedIfPresent('showWeek', config.showWeek);
+      setInputValueIfPresent('weekX', config.weekX);
+      setInputValueIfPresent('weekY', config.weekY);
       if (config.weekColor) {
         selectedColors.week = config.weekColor;
         selectColor('week', config.weekColor);
       }
       
       // 图片设置
-      if (config.showImage !== undefined) document.getElementById('showImage').checked = config.showImage;
-      if (config.imageWidth) document.getElementById('imageWidth').value = config.imageWidth;
-      if (config.imageHeight) document.getElementById('imageHeight').value = config.imageHeight;
-      if (config.imageX !== undefined) document.getElementById('imageX').value = config.imageX;
-      if (config.imageY !== undefined) document.getElementById('imageY').value = config.imageY;
+      setCheckedIfPresent('showImage', config.showImage);
+      setInputValueIfPresent('imageWidth', config.imageWidth);
+      setInputValueIfPresent('imageHeight', config.imageHeight);
+      setInputValueIfPresent('imageX', config.imageX);
+      setInputValueIfPresent('imageY', config.imageY);
       
       // 恢复图片
       if (config.imageData) {
@@ -1142,8 +1383,21 @@ function loadSavedConfig() {
   }
 }
 
+toggleSplitTimeMode();
 loadSavedConfig();
+toggleSplitTimeMode();
+if (document.getElementById('timeRealtime').checked) {
+  syncCurrentTimeInput(false);
+}
 updateDisplay();
+
+setInterval(() => {
+  const realtimeInput = document.getElementById('timeRealtime');
+  if (realtimeInput && realtimeInput.checked) {
+    syncCurrentTimeInput(false);
+    updateDisplay();
+  }
+}, 1000);
 
 // 页面加载完成后的初始化
 document.addEventListener('DOMContentLoaded', function() {

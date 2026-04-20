@@ -133,14 +133,14 @@ defineEmits(['update:tool', 'update:gridVisible', 'undo', 'redo', 'fit', 'export
 .tool-btn.active {
   background: linear-gradient(135deg, #ff6b6b 0%, #ffa500 100%);
   border-color: #ff6b6b;
-  color: #fff;
+  color: var(--nb-ink);
   box-shadow: 0 4px 16px rgba(255, 107, 107, 0.3);
 }
 
 .tool-btn.primary {
   background: linear-gradient(135deg, #ff6b6b 0%, #ffa500 100%);
   border-color: #ff6b6b;
-  color: #fff;
+  color: var(--nb-ink);
   font-weight: 700;
   box-shadow: 0 4px 16px rgba(255, 107, 107, 0.3);
 }

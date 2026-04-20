@@ -51,7 +51,8 @@
             <input
               type="time"
               id="timeInput"
-              value="14:30"
+              step="1"
+              value="14:30:45"
               oninput="updateDisplay()"
             />
           </div>
@@ -76,49 +77,177 @@
             </div>
           </div>
 
-          <div class="control-group">
-            <label>X 位置</label>
-            <div class="number-input-group">
-              <button class="num-btn" onclick="adjustValue('timeX', -1)">
-                -
-              </button>
-              <input
-                type="number"
-                id="timeX"
-                min="0"
-                max="60"
-                value="17"
-                oninput="updateDisplay()"
-              />
-              <button class="num-btn" onclick="adjustValue('timeX', 1)">
-                +
-              </button>
+          <div id="timeLegacyPanel">
+            <div class="control-group">
+              <label>X 位置（整串时间）</label>
+              <div class="number-input-group">
+                <button class="num-btn" onclick="adjustValue('timeX', -1)">
+                  -
+                </button>
+                <input
+                  type="number"
+                  id="timeX"
+                  min="0"
+                  max="60"
+                  value="17"
+                  oninput="updateDisplay()"
+                />
+                <button class="num-btn" onclick="adjustValue('timeX', 1)">
+                  +
+                </button>
+              </div>
             </div>
-          </div>
 
-          <div class="control-group">
-            <label>Y 位置</label>
-            <div class="number-input-group">
-              <button class="num-btn" onclick="adjustValue('timeY', -1)">
-                -
-              </button>
-              <input
-                type="number"
-                id="timeY"
-                min="0"
-                max="60"
-                value="18"
-                oninput="updateDisplay()"
-              />
-              <button class="num-btn" onclick="adjustValue('timeY', 1)">
-                +
-              </button>
+            <div class="control-group">
+              <label>Y 位置（整串时间）</label>
+              <div class="number-input-group">
+                <button class="num-btn" onclick="adjustValue('timeY', -1)">
+                  -
+                </button>
+                <input
+                  type="number"
+                  id="timeY"
+                  min="0"
+                  max="60"
+                  value="18"
+                  oninput="updateDisplay()"
+                />
+                <button class="num-btn" onclick="adjustValue('timeY', 1)">
+                  +
+                </button>
+              </div>
             </div>
           </div>
 
           <div class="control-group">
             <label>颜色</label>
             <div class="color-picker" id="timeColorPicker"></div>
+          </div>
+
+          <div class="control-group">
+            <label>时间字体</label>
+            <select id="timeFont" onchange="updateDisplay()">
+              <option value="classic_5x7">classic_5x7</option>
+            </select>
+          </div>
+
+          <div class="control-group">
+            <label class="checkbox-label">
+              <input
+                type="checkbox"
+                id="timeSplitMode"
+                checked
+                onchange="
+                  toggleSplitTimeMode();
+                  updateDisplay();
+                "
+              />
+              分离布局模式（时/分/秒/冒号独立）
+            </label>
+          </div>
+
+          <div class="split-layout-panel" id="timeSplitPanel">
+            <div class="split-layout-item">
+              <label class="checkbox-label">
+                <input type="checkbox" id="hourShow" checked onchange="updateDisplay()" />
+                小时（HH）
+              </label>
+              <div class="split-layout-row">
+                <div class="number-input-group">
+                  <button class="num-btn" onclick="adjustValue('hourX', -1)">-</button>
+                  <input type="number" id="hourX" min="-16" max="63" value="4" oninput="updateDisplay()" />
+                  <button class="num-btn" onclick="adjustValue('hourX', 1)">+</button>
+                </div>
+                <div class="number-input-group">
+                  <button class="num-btn" onclick="adjustValue('hourY', -1)">-</button>
+                  <input type="number" id="hourY" min="-16" max="63" value="18" oninput="updateDisplay()" />
+                  <button class="num-btn" onclick="adjustValue('hourY', 1)">+</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="split-layout-item">
+              <label class="checkbox-label">
+                <input type="checkbox" id="minuteShow" checked onchange="updateDisplay()" />
+                分钟（MM）
+              </label>
+              <div class="split-layout-row">
+                <div class="number-input-group">
+                  <button class="num-btn" onclick="adjustValue('minuteX', -1)">-</button>
+                  <input type="number" id="minuteX" min="-16" max="63" value="22" oninput="updateDisplay()" />
+                  <button class="num-btn" onclick="adjustValue('minuteX', 1)">+</button>
+                </div>
+                <div class="number-input-group">
+                  <button class="num-btn" onclick="adjustValue('minuteY', -1)">-</button>
+                  <input type="number" id="minuteY" min="-16" max="63" value="18" oninput="updateDisplay()" />
+                  <button class="num-btn" onclick="adjustValue('minuteY', 1)">+</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="split-layout-item">
+              <label class="checkbox-label">
+                <input type="checkbox" id="secondShow" checked onchange="updateDisplay()" />
+                秒钟（SS）
+              </label>
+              <div class="split-layout-row">
+                <div class="number-input-group">
+                  <button class="num-btn" onclick="adjustValue('secondX', -1)">-</button>
+                  <input type="number" id="secondX" min="-16" max="63" value="40" oninput="updateDisplay()" />
+                  <button class="num-btn" onclick="adjustValue('secondX', 1)">+</button>
+                </div>
+                <div class="number-input-group">
+                  <button class="num-btn" onclick="adjustValue('secondY', -1)">-</button>
+                  <input type="number" id="secondY" min="-16" max="63" value="18" oninput="updateDisplay()" />
+                  <button class="num-btn" onclick="adjustValue('secondY', 1)">+</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="split-layout-item">
+              <label class="checkbox-label">
+                <input type="checkbox" id="colon1Show" checked onchange="updateDisplay()" />
+                冒号 1（H:M）
+              </label>
+              <div class="split-layout-row">
+                <div class="number-input-group">
+                  <button class="num-btn" onclick="adjustValue('colon1X', -1)">-</button>
+                  <input type="number" id="colon1X" min="-16" max="63" value="16" oninput="updateDisplay()" />
+                  <button class="num-btn" onclick="adjustValue('colon1X', 1)">+</button>
+                </div>
+                <div class="number-input-group">
+                  <button class="num-btn" onclick="adjustValue('colon1Y', -1)">-</button>
+                  <input type="number" id="colon1Y" min="-16" max="63" value="18" oninput="updateDisplay()" />
+                  <button class="num-btn" onclick="adjustValue('colon1Y', 1)">+</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="split-layout-item">
+              <label class="checkbox-label">
+                <input type="checkbox" id="colon2Show" checked onchange="updateDisplay()" />
+                冒号 2（M:S）
+              </label>
+              <div class="split-layout-row">
+                <div class="number-input-group">
+                  <button class="num-btn" onclick="adjustValue('colon2X', -1)">-</button>
+                  <input type="number" id="colon2X" min="-16" max="63" value="34" oninput="updateDisplay()" />
+                  <button class="num-btn" onclick="adjustValue('colon2X', 1)">+</button>
+                </div>
+                <div class="number-input-group">
+                  <button class="num-btn" onclick="adjustValue('colon2Y', -1)">-</button>
+                  <input type="number" id="colon2Y" min="-16" max="63" value="18" oninput="updateDisplay()" />
+                  <button class="num-btn" onclick="adjustValue('colon2Y', 1)">+</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="control-group">
+            <label class="checkbox-label">
+              <input type="checkbox" id="timeRealtime" checked onchange="handleRealtimeToggle()" />
+              实时时间（每秒自动刷新）
+            </label>
           </div>
 
           <button onclick="showCurrentTime()">显示当前时间</button>

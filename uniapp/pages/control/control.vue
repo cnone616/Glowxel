@@ -104,26 +104,6 @@
 
       <view class="section-block">
         <view class="section-header glx-section-head">
-          <text class="section-title glx-section-title">素材预览</text>
-        </view>
-        <view class="panel-card glx-panel-card">
-          <view class="panel-action" @click="openPetSourcePreview">
-            <view class="panel-action-icon mint">
-              <Icon name="browse" :size="32" color="var(--nb-ink)" />
-            </view>
-            <view class="panel-action-text">
-              <text class="panel-action-label">鸡狗素材预览</text>
-              <text class="panel-action-desc"
-                >独立展示 Husky / Chick，不覆盖原桌面宠物</text
-              >
-            </view>
-            <Icon name="direction-right" :size="28" color="var(--nb-ink)" />
-          </view>
-        </view>
-      </view>
-
-      <view class="section-block">
-        <view class="section-header glx-section-head">
           <text class="section-title glx-section-title">设备参数</text>
         </view>
         <view class="panel-card glx-panel-card">
@@ -474,12 +454,6 @@ export default {
     openSpiritScreen() {
       uni.navigateTo({
         url: "/pages/spirit-screen/spirit-screen",
-      });
-    },
-
-    openPetSourcePreview() {
-      uni.navigateTo({
-        url: "/pages/pet-source-preview/pet-source-preview",
       });
     },
 

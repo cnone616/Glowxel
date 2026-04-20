@@ -241,7 +241,7 @@ function selectDifficulty(difficulty) {
 .difficulty-btn.active {
   background: linear-gradient(135deg, #ff6b6b 0%, #ffa500 100%);
   border-color: #ff6b6b;
-  color: #fff;
+  color: var(--nb-ink);
   box-shadow: 0 2px 8px rgba(255, 107, 107, 0.3);
 }
 

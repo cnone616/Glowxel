@@ -55,35 +55,35 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.container { max-width: 1200px; margin: 0 auto; padding: 0 20px; }
-.page-title { font-size: 28px; font-weight: 700; color: #1a1a1a; text-align: center; padding-top: 40px; }
-.page-desc { text-align: center; color: #999; font-size: 14px; margin-top: 8px; }
+.container { max-width: 1200px; margin: 0 auto; padding: 32px 20px 56px; }
+.page-title { font-size: 34px; font-weight: 800; color: var(--nb-ink); text-align: center; }
+.page-desc { text-align: center; color: var(--text-secondary); font-size: 14px; margin-top: 8px; }
 
 .challenge-list { display: flex; flex-direction: column; gap: 16px; margin: 40px 0; max-width: 800px; margin-left: auto; margin-right: auto; }
 
 .challenge-card {
-  background: #fafafa; border: 1px solid #f0f0f0; border-radius: 12px;
-  padding: 24px; transition: border-color 0.2s; cursor: pointer;
+  background: var(--tone-paper-soft); border: 3px solid var(--nb-ink); border-radius: 0;
+  padding: 24px; transition: background-color 0.2s; cursor: pointer; box-shadow: var(--nb-shadow-soft);
 }
-.challenge-card:hover { border-color: #ddd; }
+.challenge-card:hover { background: #f8f8f8; }
 
 .challenge-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .challenge-tag {
-  font-size: 12px; padding: 3px 10px; border-radius: 12px; font-weight: 500;
+  font-size: 12px; padding: 3px 10px; border: 2px solid var(--nb-ink); border-radius: 0; font-weight: 700;
 }
-.challenge-tag.active { background: #e8f5e9; color: #2e7d32; }
-.challenge-tag.ended { background: #f5f5f5; color: #999; }
-.challenge-tag.upcoming { background: #fff3e0; color: #e65100; }
-.challenge-date { font-size: 12px; color: #999; }
+.challenge-tag.active { background: var(--tone-green-soft); color: var(--nb-ink); }
+.challenge-tag.ended { background: #f5f5f5; color: var(--text-secondary); }
+.challenge-tag.upcoming { background: var(--tone-yellow-soft); color: var(--nb-ink); }
+.challenge-date { font-size: 12px; color: var(--text-secondary); }
 
-.challenge-card h3 { font-size: 18px; font-weight: 600; color: #1a1a1a; margin-bottom: 8px; }
-.challenge-card p { font-size: 14px; color: #888; line-height: 1.6; margin-bottom: 16px; }
+.challenge-card h3 { font-size: 18px; font-weight: 700; color: var(--nb-ink); margin-bottom: 8px; }
+.challenge-card p { font-size: 14px; color: var(--text-secondary); line-height: 1.6; margin-bottom: 16px; }
 
 .challenge-footer { display: flex; justify-content: space-between; align-items: center; }
-.participants { font-size: 13px; color: #999; }
+.participants { font-size: 13px; color: var(--text-secondary); }
 .join-btn {
-  padding: 8px 20px; border-radius: 6px; border: none;
-  background: var(--color-primary); color: #fff; font-size: 13px; font-weight: 500; cursor: pointer;
+  padding: 8px 20px; border-radius: 0; border: 2px solid var(--nb-ink);
+  background: var(--nb-yellow); color: var(--nb-ink); font-size: 13px; font-weight: 800; cursor: pointer; box-shadow: var(--nb-shadow-soft);
 }
 .join-btn:hover { background: var(--color-primary-hover); }
 

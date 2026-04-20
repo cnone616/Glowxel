@@ -330,7 +330,7 @@ const actionStateText = computed(() => {
 
 .action-btn.primary {
   background: linear-gradient(135deg, #2f6dff, #55c4ff);
-  color: #fff;
+  color: var(--nb-ink);
   border-color: transparent;
 }
 

@@ -226,7 +226,7 @@ function handleExport(format) {
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  color: white;
+  color: var(--nb-ink);
   font-size: 12px;
   font-weight: bold;
 }
@@ -276,7 +276,7 @@ function handleExport(format) {
 .spacing-btn.active {
   background: linear-gradient(135deg, #ff6b6b 0%, #ffa500 100%);
   border-color: #ff6b6b;
-  color: #fff;
+  color: var(--nb-ink);
   box-shadow: 0 2px 8px rgba(255, 107, 107, 0.3);
 }
 
@@ -303,7 +303,7 @@ function handleExport(format) {
 
 .export-btn.primary {
   background: linear-gradient(135deg, #ff6b6b 0%, #ffa500 100%);
-  color: #fff;
+  color: var(--nb-ink);
   box-shadow: 0 4px 16px rgba(255, 107, 107, 0.3);
 }
 

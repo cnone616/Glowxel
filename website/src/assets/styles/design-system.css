@@ -466,17 +466,17 @@
 
 .ds-icon-shell--blue {
   background: var(--ds-blue);
-  color: #ffffff;
+  color: var(--ds-ink);
 }
 
 .ds-icon-shell--info {
   background: var(--ds-info);
-  color: #ffffff;
+  color: var(--ds-ink);
 }
 
 .ds-icon-shell--success {
   background: var(--ds-success);
-  color: #ffffff;
+  color: var(--ds-ink);
 }
 
 .ds-icon-shell--warning {
@@ -486,7 +486,7 @@
 
 .ds-icon-shell--danger {
   background: var(--ds-danger);
-  color: #ffffff;
+  color: var(--ds-ink);
 }
 
 .ds-showcase {
@@ -1396,17 +1396,17 @@
 
 .ds-btn--edit {
   background: var(--ds-blue);
-  color: #ffffff;
+  color: var(--ds-ink);
 }
 
 .ds-btn--info {
   background: var(--ds-info);
-  color: #ffffff;
+  color: var(--ds-ink);
 }
 
 .ds-btn--success {
   background: var(--ds-success);
-  color: #ffffff;
+  color: var(--ds-ink);
 }
 
 .ds-btn--warning {
@@ -1416,7 +1416,7 @@
 
 .ds-btn--danger {
   background: var(--ds-danger);
-  color: #ffffff;
+  color: var(--ds-ink);
 }
 
 .ds-btn:disabled {
@@ -2132,23 +2132,23 @@
 }
 
 .ds-status-pill--info {
-  background: #f3f3f3;
-  color: #4d4d4d;
+  background: #d9d9d9;
+  color: var(--ds-ink);
 }
 
 .ds-status-pill--success {
-  background: #eef8e7;
-  color: #365c1d;
+  background: var(--ds-success);
+  color: var(--ds-ink);
 }
 
 .ds-status-pill--warning {
-  background: #fff3c4;
+  background: var(--ds-warning);
   color: var(--ds-ink);
 }
 
 .ds-status-pill--danger {
-  background: #ffe6e6;
-  color: #8c2323;
+  background: var(--ds-danger);
+  color: var(--ds-ink);
 }
 
 .ds-pagination {
@@ -2584,12 +2584,12 @@
 
 .ds-loader-chip--success {
   background: #eef8e7;
-  color: #365c1d;
+  color: var(--ds-ink);
 }
 
 .ds-loader-chip--info {
   background: #f3f3f3;
-  color: #4d4d4d;
+  color: var(--ds-ink);
 }
 
 .ds-toast-stack {

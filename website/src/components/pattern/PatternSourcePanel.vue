@@ -135,7 +135,7 @@ const captureReviewName = computed(() => {
 .chip.action.primary {
   background: linear-gradient(135deg, #2f6dff, #58c0ff);
   border-color: transparent;
-  color: #ffffff;
+  color: var(--nb-ink);
 }
 
 .chip:disabled {
