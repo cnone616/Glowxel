@@ -1,18 +1,19 @@
 #include "websocket_effect_command_dispatch.h"
-#include "websocket_effect_common.h"
-#include "animation_manager.h"
-#include "board_native_effect.h"
+
 #include "config_manager.h"
 #include "display_manager.h"
 #include "game_screensaver_effect.h"
 #include "mode_tags.h"
-#include "tetris_effect.h"
+#include "runtime_command_bus.h"
+#include "runtime_mode_coordinator.h"
+#include "websocket_effect_common.h"
 
 namespace WebSocketEffectCommandDispatch {
 bool handleGameEffectCommand(
   AsyncWebSocketClient* client,
   JsonDocument& doc,
-  StaticJsonDocument<768>& response
+  StaticJsonDocument<768>& response,
+  bool& responseSent
 ) {
   String cmd = doc["cmd"].as<String>();
 
@@ -78,56 +79,27 @@ bool handleGameEffectCommand(
     }
     config.speed = (uint8_t)speed;
 
-    const DeviceMode previousMode = DisplayManager::currentMode;
-    const String previousBusinessModeTag = DisplayManager::currentBusinessModeTag;
-    const bool previousGameScreensaverActive = GameScreensaverEffect::isActive();
-    const GameScreensaverConfig previousGameScreensaverConfig =
-      GameScreensaverEffect::getConfig();
-
-    GameScreensaverEffect::applyConfig(config);
-    if (!GameScreensaverEffect::isActive()) {
-      if (previousMode == MODE_ANIMATION &&
-          previousBusinessModeTag == ModeTags::GAME_SCREENSAVER &&
-          previousGameScreensaverActive) {
-        GameScreensaverEffect::applyConfig(previousGameScreensaverConfig);
-      }
-      wsSetErrorResponse(response, "game screensaver activation failed");
+    RuntimeCommandBus::RuntimeCommand* command =
+      RuntimeCommandBus::createCommand(
+        RuntimeCommandBus::RuntimeCommandSource::WEBSOCKET,
+        client != nullptr ? client->id() : 0
+      );
+    if (command == nullptr) {
+      wsSetErrorResponse(response, "out of memory");
       return true;
     }
-
-    ConfigManager::gameScreensaverConfig = config;
-    ConfigManager::saveGameScreensaverConfig();
-    DisplayManager::currentMode = MODE_ANIMATION;
-    DisplayManager::lastBusinessMode = MODE_ANIMATION;
-    DisplayManager::currentBusinessModeTag = ModeTags::GAME_SCREENSAVER;
-    DisplayManager::lastBusinessModeTag = ModeTags::GAME_SCREENSAVER;
-    ConfigManager::saveClockConfig();
-    TetrisEffect::isActive = false;
-    BoardNativeEffect::deactivate();
-    if (AnimationManager::currentGIF != nullptr) {
-      AnimationManager::currentGIF->isPlaying = false;
+    command->type = RuntimeCommandBus::RuntimeCommandType::GAME_SCREENSAVER;
+    command->gameScreensaverConfig = config;
+    command->stringValue1 = game;
+    if (!RuntimeCommandBus::enqueue(command)) {
+      RuntimeCommandBus::destroyCommand(command);
+      wsSetErrorResponse(response, "device busy");
+      return true;
     }
-    DisplayManager::setNativeEffectNone();
-    GameScreensaverEffect::render();
-
-    response["message"] = "game screensaver applied";
-    response["speed"] = config.speed;
-    response["game"] = game;
-    if (config.game == GAME_SCREENSAVER_SNAKE) {
-      response["snakeWidth"] = config.snakeWidth;
-    }
-    if (config.game == GAME_SCREENSAVER_MAZE) {
-      response["mazeSizeMode"] =
-        config.mazeSizeMode == GAME_SCREENSAVER_MAZE_DENSE ? "dense" : "wide";
-    }
-    if (config.game == GAME_SCREENSAVER_TETRIS_GAME) {
-      response["cellSize"] = config.cellSize;
-      response["showClock"] = config.showClock;
-    }
+    responseSent = true;
     return true;
   }
 
-  (void)client;
   return false;
 }
 }

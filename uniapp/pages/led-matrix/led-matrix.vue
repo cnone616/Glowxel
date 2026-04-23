@@ -15,7 +15,7 @@
     <view class="canvas-section">
       <view class="preview-canvas-container" :style="previewCanvasBoxStyle">
         <PixelCanvas
-          v-if="previewCanvasReady && previewCanvasVisible"
+          v-if="previewCanvasReady && !shouldHidePreview"
           :width="64"
           :height="64"
           :pixels="currentPreviewPixels"
@@ -41,7 +41,7 @@
             @click="saveAndApply"
           >
             <Icon name="link" :size="36" color="var(--nb-ink)" />
-            <text>{{ isSending ? "发送中" : "发送" }}</text>
+            <text>发送</text>
           </view>
         </view>
       </view>
@@ -125,11 +125,15 @@
       </view>
     </scroll-view>
 
-    <view v-if="isSending" class="glx-sending-overlay" @touchmove.stop.prevent>
-      <view class="glx-sending-modal">
-        <view class="glx-sending-spinner"></view>
-        <text class="glx-sending-title">正在传输数据...</text>
-        <text class="glx-sending-tip">请勿切换网络或关闭程序</text>
+    <view
+      v-if="isSending"
+      class="glx-device-sending-overlay"
+      @touchmove.stop.prevent
+    >
+      <view class="glx-device-sending-card">
+        <view class="glx-device-sending-spinner"></view>
+        <text class="glx-device-sending-title">{{ sendOverlayTitle }}</text>
+        <text class="glx-device-sending-tip">{{ sendOverlayTip }}</text>
       </view>
     </view>
 
@@ -143,6 +147,7 @@
 
 <script>
 import statusBarMixin from "../../mixins/statusBar.js";
+import deviceSendUxMixin from "../../mixins/deviceSendUxMixin.js";
 import Icon from "../../components/Icon.vue";
 import Toast from "../../components/Toast.vue";
 import PixelCanvas from "../../components/PixelCanvas.vue";
@@ -161,7 +166,7 @@ import githubSceneManifest from "../../utils/githubSceneFinalistsManifest.js";
 const LED_MATRIX_CONFIG_KEY = "led_matrix_showcase_config";
 
 export default {
-  mixins: [statusBarMixin],
+  mixins: [statusBarMixin, deviceSendUxMixin],
   components: {
     Icon,
     Toast,
@@ -174,11 +179,9 @@ export default {
     return {
       deviceStore: null,
       toast: null,
-      isSending: false,
-      isToastVisible: false,
+      sendPreviewKind: "native",
       contentHeight: "calc(100vh - 88rpx - 520rpx)",
       previewCanvasReady: false,
-      previewCanvasVisible: true,
       previewZoom: 4,
       previewOffset: { x: 0, y: 0 },
       previewContainerSize: { width: 320, height: 320 },
@@ -321,25 +324,8 @@ export default {
         url: "/pages/github-scene-preview/index",
       });
     },
-    syncPreviewCanvasVisibility() {
-      const nextVisible = !this.isSending && !this.isToastVisible;
-      if (this.previewCanvasVisible === nextVisible) {
-        return;
-      }
-      this.previewCanvasVisible = nextVisible;
-      if (nextVisible) {
-        this.$nextTick(() => {
-          this.schedulePreviewRefresh();
-        });
-      }
-    },
-    handleToastShow() {
-      this.isToastVisible = true;
-      this.syncPreviewCanvasVisibility();
-    },
-    handleToastHide() {
-      this.isToastVisible = false;
-      this.syncPreviewCanvasVisibility();
+    handleDeviceSendPreviewRestored() {
+      this.schedulePreviewRefresh();
     },
     initPreviewCanvas() {
       const systemInfo = uni.getSystemInfoSync();
@@ -510,17 +496,11 @@ export default {
       });
     },
     async saveAndApply() {
-      if (this.isSending) {
-        this.toast.showInfo("正在传输中，请等待完成");
-        return;
-      }
-      if (!this.deviceStore.connected) {
-        this.toast.showError("设备未连接");
+      if (!this.guardBeforeSend(this.deviceStore.connected)) {
         return;
       }
 
-      this.isSending = true;
-      this.syncPreviewCanvasVisibility();
+      this.beginSendUi();
       try {
         const ws = this.deviceStore.getWebSocket();
         const sendPlan = buildLedMatrixSendPlan({
@@ -533,26 +513,36 @@ export default {
         if (sendPlan.type !== "command") {
           throw new Error("LED 演示集仅支持板载原生命令");
         }
-        await ws.waitForCommand(sendPlan.command, "ambient effect applied", 5000);
-        await ws.setMode(sendPlan.deviceMode);
-        const status = await ws.getStatus();
-        if (
-          status.businessMode !== sendPlan.deviceMode ||
-          status.effectMode !== "ambient_effect" ||
-          status.effectPreset !== sendPlan.command.preset
+
+        if (sendPlan.command.cmd === "set_ambient_effect") {
+          await ws.setAmbientEffect(sendPlan.command);
+        } else if (
+          sendPlan.command.cmd === "set_mode" &&
+          sendPlan.command.mode === "tetris"
         ) {
-          throw new Error("设备未进入对应像素场景");
+          await ws.startTetris({
+            clearMode: sendPlan.command.clearMode,
+            cellSize: sendPlan.command.cellSize,
+            speed: sendPlan.command.speed,
+            showClock: sendPlan.command.showClock,
+            pieces: sendPlan.command.pieces,
+          });
+        } else {
+          throw new Error("未支持的像素场景发送命令");
         }
 
+        await this.deviceStore.syncAndRequireBusinessMode(
+          sendPlan.deviceMode,
+          "设备未进入对应像素场景",
+        );
+
         this.saveConfig();
-        this.deviceStore.setDeviceMode(sendPlan.deviceMode, { businessMode: true });
-        this.toast.showSuccess("演示已发送到设备");
+        this.showSendSuccess();
       } catch (error) {
         console.error("发送 LED Matrix 演示失败:", error);
-        this.toast.showError("发送失败：" + error.message);
+        this.showSendFailure(error);
       } finally {
-        this.isSending = false;
-        this.syncPreviewCanvasVisibility();
+        this.endSendUi();
       }
     },
   },

@@ -55,6 +55,11 @@ void TetrisEffect::init(bool clearMode, int cellSz, int speed, bool clock, uint8
   isActive = true;
 }
 
+void TetrisEffect::deactivate() {
+  isActive = false;
+  needsRender = false;
+}
+
 void TetrisEffect::resetBoard() {
   memset(board, 0, sizeof(board));
 }

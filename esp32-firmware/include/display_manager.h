@@ -150,6 +150,8 @@ public:
   static void applyDeviceParams(bool showBootLogo = false);
   static bool rebuildMatrix(bool doubleBuffered, bool showBootLogo);
   static bool enableDoubleBuffer();
+  static bool disableDoubleBuffer();
+  static bool syncBufferStrategyForCurrentMode();
   static void drawBackground();       // 独立：清屏+画像素背景或Logo
   static void displayClock(bool force = false);
   static void displayTheme(bool force = false);
@@ -177,6 +179,8 @@ public:
   static void clearScreen();
   static void setBrightness(int brightness);
   static void refreshScheduledBrightness();
+  static void lockRuntimeAccess();
+  static void unlockRuntimeAccess();
 
   // 3x5 微型字体渲染
   static void drawTinyText(const char* text, int x, int y, uint16_t color, int size = 1);

@@ -1,7 +1,9 @@
 #include "config_manager.h"
+#include "animation_manager.h"
 #include "display_manager.h"
 #include "device_mode_tag_codec.h"
 #include "mode_tags.h"
+#include "runtime_mode_coordinator.h"
 
 // 静态成员初始化
 Preferences ConfigManager::preferences;
@@ -225,6 +227,65 @@ bool sanitizeEyesConfig(EyesConfig& config) {
 
   return changed;
 }
+
+bool isStaticallyRecoverableBusinessModeTag(const String& businessModeTag) {
+  return businessModeTag == ModeTags::CLOCK ||
+         businessModeTag == ModeTags::THEME ||
+         businessModeTag == ModeTags::CANVAS ||
+         businessModeTag == ModeTags::ANIMATION ||
+         businessModeTag == ModeTags::TETRIS ||
+         businessModeTag == ModeTags::TETRIS_CLOCK ||
+         businessModeTag == ModeTags::GIF_PLAYER ||
+         businessModeTag == ModeTags::EYES ||
+         businessModeTag == ModeTags::AMBIENT_EFFECT ||
+         businessModeTag == ModeTags::LED_MATRIX_SHOWCASE ||
+         businessModeTag == ModeTags::GAME_SCREENSAVER;
+}
+
+bool canPersistCurrentBusinessModeTag(const String& businessModeTag) {
+  if (businessModeTag == ModeTags::GIF_PLAYER) {
+    return AnimationManager::currentGIF != nullptr &&
+           AnimationManager::currentGIF->frameCount > 0;
+  }
+
+  return isStaticallyRecoverableBusinessModeTag(businessModeTag);
+}
+
+bool isReturnTargetBusinessModeTag(const String& businessModeTag) {
+  return RuntimeModeCoordinator::isReturnTargetBusinessModeTag(businessModeTag);
+}
+
+DeviceMode resolveTopLevelModeFromBusinessModeTag(const String& businessModeTag) {
+  return RuntimeModeCoordinator::resolveTopLevelMode(businessModeTag);
+}
+
+String resolveBusinessModeTagFromMode(DeviceMode mode) {
+  const char* restoredModeTag = DeviceModeTagCodec::toTagOrEmpty(mode);
+  if (restoredModeTag[0] == '\0') {
+    return ModeTags::CLOCK;
+  }
+  return String(restoredModeTag);
+}
+
+String sanitizeRecoverableBusinessModeTag(const String& primary, const String& fallback) {
+  if (isStaticallyRecoverableBusinessModeTag(primary)) {
+    return primary;
+  }
+  if (isStaticallyRecoverableBusinessModeTag(fallback)) {
+    return fallback;
+  }
+  return ModeTags::CLOCK;
+}
+
+String sanitizeLastBusinessTargetTag(const String& primary, const String& fallback) {
+  if (isReturnTargetBusinessModeTag(primary)) {
+    return primary;
+  }
+  if (isReturnTargetBusinessModeTag(fallback)) {
+    return fallback;
+  }
+  return ModeTags::CLOCK;
+}
 }
 
 ClockConfig ConfigManager::clockConfig = {
@@ -311,7 +372,7 @@ void ConfigManager::preloadDeviceParamsConfig() {
 void ConfigManager::loadDeviceParamsConfig() {
   readDeviceParamsConfigFromPreferences(deviceParamsConfig);
   DisplayManager::currentBrightness = deviceParamsConfig.displayBright;
-  DisplayManager::applyDeviceParams(false);
+  Serial.println("device params config loaded for runtime state");
 }
 
 void ConfigManager::saveDeviceParamsConfig() {
@@ -341,56 +402,30 @@ void ConfigManager::loadClockConfig() {
   }
 
   // 恢复上次的显示模式
-  int savedMode = preferences.getInt("dispMode", (int)MODE_CLOCK);
+  DeviceMode savedMode = static_cast<DeviceMode>(preferences.getInt("dispMode", (int)MODE_CLOCK));
   String savedBusinessMode = preferences.getString("bizMode", "");
   if (savedBusinessMode.length() == 0) {
-    const char* restoredModeTag =
-      DeviceModeTagCodec::toTagOrEmpty(static_cast<DeviceMode>(savedMode));
-    if (restoredModeTag[0] != '\0') {
-      savedBusinessMode = restoredModeTag;
-    } else {
-      savedBusinessMode = ModeTags::CLOCK;
-    }
+    savedBusinessMode = resolveBusinessModeTagFromMode(savedMode);
   }
+
   String savedLastBusinessMode = preferences.getString("lastBizMode", "");
-  if (savedLastBusinessMode.length() == 0) {
-    if (savedBusinessMode == ModeTags::CLOCK) {
-      savedLastBusinessMode = ModeTags::CLOCK;
-    } else if (savedBusinessMode == ModeTags::CANVAS) {
-      savedLastBusinessMode = ModeTags::CLOCK;
-    } else {
-      savedLastBusinessMode = savedBusinessMode;
-    }
+  savedLastBusinessMode = sanitizeLastBusinessTargetTag(savedLastBusinessMode, savedBusinessMode);
+
+  if (savedMode == MODE_TRANSFERRING || savedBusinessMode == ModeTags::TRANSFERRING) {
+    savedBusinessMode = sanitizeRecoverableBusinessModeTag(savedLastBusinessMode, "");
+    Serial.println("检测到传输临时模式，已恢复到最近可恢复业务模式");
+  } else {
+    savedBusinessMode = sanitizeRecoverableBusinessModeTag(savedBusinessMode, savedLastBusinessMode);
   }
 
-  // 传输模式是临时态，重启后不应停留在该模式
-  if (savedMode == MODE_TRANSFERRING) {
-    if (savedLastBusinessMode == ModeTags::CLOCK) {
-      savedMode = MODE_CLOCK;
-      savedBusinessMode = ModeTags::CLOCK;
-    } else if (savedLastBusinessMode == ModeTags::THEME) {
-      savedMode = MODE_THEME;
-      savedBusinessMode = ModeTags::THEME;
-    } else if (savedLastBusinessMode == ModeTags::CANVAS) {
-      savedMode = MODE_CANVAS;
-      savedBusinessMode = ModeTags::CANVAS;
-    } else {
-      savedMode = MODE_ANIMATION;
-      savedBusinessMode = savedLastBusinessMode;
-    }
-    Serial.println("检测到传输临时模式，已恢复到上次业务模式");
-  }
+  savedMode = resolveTopLevelModeFromBusinessModeTag(savedBusinessMode);
 
-  DisplayManager::currentMode = (DeviceMode)savedMode;
+  DisplayManager::currentMode = savedMode;
   DisplayManager::currentBusinessModeTag = savedBusinessMode;
   DisplayManager::lastBusinessModeTag = savedLastBusinessMode;
-  if (savedLastBusinessMode == ModeTags::CLOCK) {
-    DisplayManager::lastBusinessMode = MODE_CLOCK;
-  } else if (savedLastBusinessMode == ModeTags::THEME) {
-    DisplayManager::lastBusinessMode = MODE_THEME;
-  } else {
-    DisplayManager::lastBusinessMode = MODE_ANIMATION;
-  }
+  DisplayManager::lastBusinessMode =
+    resolveTopLevelModeFromBusinessModeTag(savedLastBusinessMode);
+
   const char* modeStr =
     savedMode == MODE_ANIMATION
       ? "ANIMATION"
@@ -406,15 +441,27 @@ void ConfigManager::loadClockConfig() {
 void ConfigManager::saveClockConfig() {
   preferences.begin("clock", false);
   preferences.putBytes("config", &clockConfig, sizeof(ClockConfig));
-  DeviceMode modeToSave = DisplayManager::currentMode;
-  String bizModeToSave = DisplayManager::currentBusinessModeTag;
-  if (modeToSave == MODE_TRANSFERRING) {
-    modeToSave = DisplayManager::lastBusinessMode;
-    bizModeToSave = DisplayManager::lastBusinessModeTag;
+
+  DeviceMode storedMode = static_cast<DeviceMode>(preferences.getInt("dispMode", (int)MODE_CLOCK));
+  String storedBusinessMode = preferences.getString("bizMode", "");
+  if (storedBusinessMode.length() == 0) {
+    storedBusinessMode = resolveBusinessModeTagFromMode(storedMode);
   }
+  storedBusinessMode = sanitizeRecoverableBusinessModeTag(storedBusinessMode, "");
+
+  String bizModeToSave = storedBusinessMode;
+  if (DisplayManager::currentMode != MODE_TRANSFERRING &&
+      canPersistCurrentBusinessModeTag(DisplayManager::currentBusinessModeTag)) {
+    bizModeToSave = DisplayManager::currentBusinessModeTag;
+  }
+
+  DeviceMode modeToSave = resolveTopLevelModeFromBusinessModeTag(bizModeToSave);
+  String lastBusinessModeToSave =
+    sanitizeLastBusinessTargetTag(DisplayManager::lastBusinessModeTag, bizModeToSave);
+
   preferences.putInt("dispMode", (int)modeToSave);
   preferences.putString("bizMode", bizModeToSave);
-  preferences.putString("lastBizMode", DisplayManager::lastBusinessModeTag);
+  preferences.putString("lastBizMode", lastBusinessModeToSave);
   preferences.end();
   Serial.println("static clock config saved");
 }

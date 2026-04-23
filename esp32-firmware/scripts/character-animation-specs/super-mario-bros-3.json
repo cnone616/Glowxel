@@ -1,0 +1,892 @@
+{
+  "gameId": "super-mario-bros-3",
+  "label": "Super Mario Bros. 3",
+  "roles": [
+    {
+      "id": "mario",
+      "label": "Mario",
+      "forms": [
+        {
+          "id": "small",
+          "label": "Small Mario",
+          "actions": [
+            {
+              "id": "idle",
+              "label": "待机",
+              "loop": true,
+              "frames": [
+                {
+                  "frameId": "mario-small-idle-01",
+                  "sourceAsset": "character_01__mario_and_luigi_super_mario_bros_3.png",
+                  "sourceBox": { "x": 1, "y": 16, "width": 16, "height": 16 },
+                  "origin": { "x": 8, "y": 15 },
+                  "durationMs": 180
+                }
+              ]
+            },
+            {
+              "id": "walk",
+              "label": "行走",
+              "loop": true,
+              "frames": [
+                {
+                  "frameId": "mario-small-walk-01",
+                  "sourceAsset": "character_01__mario_and_luigi_super_mario_bros_3.png",
+                  "sourceBox": { "x": 19, "y": 16, "width": 16, "height": 16 },
+                  "origin": { "x": 8, "y": 15 },
+                  "durationMs": 120
+                },
+                {
+                  "frameId": "mario-small-walk-02",
+                  "sourceAsset": "character_01__mario_and_luigi_super_mario_bros_3.png",
+                  "sourceBox": { "x": 37, "y": 16, "width": 16, "height": 16 },
+                  "origin": { "x": 8, "y": 15 },
+                  "durationMs": 120
+                },
+                {
+                  "frameId": "mario-small-walk-03",
+                  "sourceAsset": "character_01__mario_and_luigi_super_mario_bros_3.png",
+                  "sourceBox": { "x": 55, "y": 16, "width": 16, "height": 16 },
+                  "origin": { "x": 8, "y": 15 },
+                  "durationMs": 120
+                }
+              ]
+            },
+            {
+              "id": "run",
+              "label": "奔跑",
+              "loop": true,
+              "frames": [
+                {
+                  "frameId": "mario-small-run-01",
+                  "sourceAsset": "character_01__mario_and_luigi_super_mario_bros_3.png",
+                  "sourceBox": { "x": 73, "y": 16, "width": 16, "height": 16 },
+                  "origin": { "x": 8, "y": 15 },
+                  "durationMs": 100
+                },
+                {
+                  "frameId": "mario-small-run-02",
+                  "sourceAsset": "character_01__mario_and_luigi_super_mario_bros_3.png",
+                  "sourceBox": { "x": 91, "y": 16, "width": 16, "height": 16 },
+                  "origin": { "x": 8, "y": 15 },
+                  "durationMs": 100
+                },
+                {
+                  "frameId": "mario-small-run-03",
+                  "sourceAsset": "character_01__mario_and_luigi_super_mario_bros_3.png",
+                  "sourceBox": { "x": 109, "y": 16, "width": 16, "height": 16 },
+                  "origin": { "x": 8, "y": 15 },
+                  "durationMs": 100
+                }
+              ]
+            },
+            {
+              "id": "jump",
+              "label": "跳跃",
+              "loop": false,
+              "frames": [
+                {
+                  "frameId": "mario-small-jump-01",
+                  "sourceAsset": "character_01__mario_and_luigi_super_mario_bros_3.png",
+                  "sourceBox": { "x": 127, "y": 16, "width": 16, "height": 16 },
+                  "origin": { "x": 8, "y": 15 },
+                  "durationMs": 140
+                },
+                {
+                  "frameId": "mario-small-jump-02",
+                  "sourceAsset": "character_01__mario_and_luigi_super_mario_bros_3.png",
+                  "sourceBox": { "x": 145, "y": 16, "width": 16, "height": 16 },
+                  "origin": { "x": 8, "y": 15 },
+                  "durationMs": 160
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "super",
+          "label": "Super Mario",
+          "actions": [
+            {
+              "id": "idle",
+              "label": "待机",
+              "loop": true,
+              "frames": [
+                {
+                  "frameId": "mario-super-idle-01",
+                  "sourceAsset": "character_01__mario_and_luigi_super_mario_bros_3.png",
+                  "sourceBox": { "x": 1, "y": 88, "width": 16, "height": 32 },
+                  "origin": { "x": 8, "y": 31 },
+                  "durationMs": 180
+                }
+              ]
+            },
+            {
+              "id": "walk",
+              "label": "行走",
+              "loop": true,
+              "frames": [
+                {
+                  "frameId": "mario-super-walk-01",
+                  "sourceAsset": "character_01__mario_and_luigi_super_mario_bros_3.png",
+                  "sourceBox": { "x": 19, "y": 88, "width": 16, "height": 32 },
+                  "origin": { "x": 8, "y": 31 },
+                  "durationMs": 120
+                },
+                {
+                  "frameId": "mario-super-walk-02",
+                  "sourceAsset": "character_01__mario_and_luigi_super_mario_bros_3.png",
+                  "sourceBox": { "x": 37, "y": 88, "width": 16, "height": 32 },
+                  "origin": { "x": 8, "y": 31 },
+                  "durationMs": 120
+                },
+                {
+                  "frameId": "mario-super-walk-03",
+                  "sourceAsset": "character_01__mario_and_luigi_super_mario_bros_3.png",
+                  "sourceBox": { "x": 55, "y": 88, "width": 16, "height": 32 },
+                  "origin": { "x": 8, "y": 31 },
+                  "durationMs": 120
+                },
+                {
+                  "frameId": "mario-super-walk-04",
+                  "sourceAsset": "character_01__mario_and_luigi_super_mario_bros_3.png",
+                  "sourceBox": { "x": 73, "y": 88, "width": 16, "height": 32 },
+                  "origin": { "x": 8, "y": 31 },
+                  "durationMs": 120
+                }
+              ]
+            },
+            {
+              "id": "run",
+              "label": "奔跑",
+              "loop": true,
+              "frames": [
+                {
+                  "frameId": "mario-super-run-01",
+                  "sourceAsset": "character_01__mario_and_luigi_super_mario_bros_3.png",
+                  "sourceBox": { "x": 91, "y": 88, "width": 24, "height": 32 },
+                  "origin": { "x": 12, "y": 31 },
+                  "durationMs": 100
+                },
+                {
+                  "frameId": "mario-super-run-02",
+                  "sourceAsset": "character_01__mario_and_luigi_super_mario_bros_3.png",
+                  "sourceBox": { "x": 117, "y": 88, "width": 24, "height": 32 },
+                  "origin": { "x": 12, "y": 31 },
+                  "durationMs": 100
+                },
+                {
+                  "frameId": "mario-super-run-03",
+                  "sourceAsset": "character_01__mario_and_luigi_super_mario_bros_3.png",
+                  "sourceBox": { "x": 143, "y": 88, "width": 24, "height": 32 },
+                  "origin": { "x": 12, "y": 31 },
+                  "durationMs": 100
+                },
+                {
+                  "frameId": "mario-super-run-04",
+                  "sourceAsset": "character_01__mario_and_luigi_super_mario_bros_3.png",
+                  "sourceBox": { "x": 169, "y": 88, "width": 24, "height": 32 },
+                  "origin": { "x": 12, "y": 31 },
+                  "durationMs": 100
+                }
+              ]
+            },
+            {
+              "id": "jump",
+              "label": "跳跃",
+              "loop": false,
+              "frames": [
+                {
+                  "frameId": "mario-super-jump-01",
+                  "sourceAsset": "character_01__mario_and_luigi_super_mario_bros_3.png",
+                  "sourceBox": { "x": 249, "y": 88, "width": 16, "height": 32 },
+                  "origin": { "x": 8, "y": 31 },
+                  "durationMs": 120
+                },
+                {
+                  "frameId": "mario-super-jump-02",
+                  "sourceAsset": "character_01__mario_and_luigi_super_mario_bros_3.png",
+                  "sourceBox": { "x": 267, "y": 88, "width": 16, "height": 32 },
+                  "origin": { "x": 8, "y": 31 },
+                  "durationMs": 140
+                },
+                {
+                  "frameId": "mario-super-jump-03",
+                  "sourceAsset": "character_01__mario_and_luigi_super_mario_bros_3.png",
+                  "sourceBox": { "x": 303, "y": 88, "width": 24, "height": 32 },
+                  "origin": { "x": 12, "y": 31 },
+                  "durationMs": 160
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "fire",
+          "label": "Fire Mario",
+          "actions": [
+            {
+              "id": "idle",
+              "label": "待机",
+              "loop": true,
+              "frames": [
+                {
+                  "frameId": "mario-fire-idle-01",
+                  "sourceAsset": "character_01__mario_and_luigi_super_mario_bros_3.png",
+                  "sourceBox": { "x": 1, "y": 294, "width": 24, "height": 32 },
+                  "origin": { "x": 12, "y": 31 },
+                  "durationMs": 180
+                }
+              ]
+            },
+            {
+              "id": "walk",
+              "label": "行走",
+              "loop": true,
+              "frames": [
+                {
+                  "frameId": "mario-fire-walk-01",
+                  "sourceAsset": "character_01__mario_and_luigi_super_mario_bros_3.png",
+                  "sourceBox": { "x": 27, "y": 294, "width": 24, "height": 32 },
+                  "origin": { "x": 12, "y": 31 },
+                  "durationMs": 120
+                },
+                {
+                  "frameId": "mario-fire-walk-02",
+                  "sourceAsset": "character_01__mario_and_luigi_super_mario_bros_3.png",
+                  "sourceBox": { "x": 53, "y": 294, "width": 24, "height": 32 },
+                  "origin": { "x": 12, "y": 31 },
+                  "durationMs": 120
+                },
+                {
+                  "frameId": "mario-fire-walk-03",
+                  "sourceAsset": "character_01__mario_and_luigi_super_mario_bros_3.png",
+                  "sourceBox": { "x": 79, "y": 294, "width": 24, "height": 32 },
+                  "origin": { "x": 12, "y": 31 },
+                  "durationMs": 120
+                }
+              ]
+            },
+            {
+              "id": "jump",
+              "label": "跳跃",
+              "loop": false,
+              "frames": [
+                {
+                  "frameId": "mario-fire-jump-01",
+                  "sourceAsset": "character_01__mario_and_luigi_super_mario_bros_3.png",
+                  "sourceBox": { "x": 105, "y": 294, "width": 24, "height": 32 },
+                  "origin": { "x": 12, "y": 31 },
+                  "durationMs": 120
+                },
+                {
+                  "frameId": "mario-fire-jump-02",
+                  "sourceAsset": "character_01__mario_and_luigi_super_mario_bros_3.png",
+                  "sourceBox": { "x": 131, "y": 294, "width": 24, "height": 32 },
+                  "origin": { "x": 12, "y": 31 },
+                  "durationMs": 160
+                }
+              ]
+            },
+            {
+              "id": "attack",
+              "label": "火球",
+              "loop": false,
+              "frames": [
+                {
+                  "frameId": "mario-fire-attack-01",
+                  "sourceAsset": "character_01__mario_and_luigi_super_mario_bros_3.png",
+                  "sourceBox": { "x": 157, "y": 294, "width": 24, "height": 32 },
+                  "origin": { "x": 12, "y": 31 },
+                  "durationMs": 100
+                },
+                {
+                  "frameId": "mario-fire-attack-02",
+                  "sourceAsset": "character_01__mario_and_luigi_super_mario_bros_3.png",
+                  "sourceBox": { "x": 183, "y": 294, "width": 24, "height": 32 },
+                  "origin": { "x": 12, "y": 31 },
+                  "durationMs": 100
+                },
+                {
+                  "frameId": "mario-fire-attack-03",
+                  "sourceAsset": "character_01__mario_and_luigi_super_mario_bros_3.png",
+                  "sourceBox": { "x": 209, "y": 294, "width": 16, "height": 32 },
+                  "origin": { "x": 8, "y": 31 },
+                  "durationMs": 120
+                },
+                {
+                  "frameId": "mario-fire-attack-04",
+                  "sourceAsset": "character_01__mario_and_luigi_super_mario_bros_3.png",
+                  "sourceBox": { "x": 227, "y": 294, "width": 16, "height": 32 },
+                  "origin": { "x": 8, "y": 31 },
+                  "durationMs": 120
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "raccoon",
+          "label": "Raccoon Mario",
+          "actions": [
+            {
+              "id": "idle",
+              "label": "待机",
+              "loop": true,
+              "frames": [
+                {
+                  "frameId": "mario-raccoon-idle-01",
+                  "sourceAsset": "character_01__mario_and_luigi_super_mario_bros_3.png",
+                  "sourceBox": { "x": 1, "y": 380, "width": 24, "height": 32 },
+                  "origin": { "x": 12, "y": 31 },
+                  "durationMs": 180
+                }
+              ]
+            },
+            {
+              "id": "walk",
+              "label": "行走",
+              "loop": true,
+              "frames": [
+                {
+                  "frameId": "mario-raccoon-walk-01",
+                  "sourceAsset": "character_01__mario_and_luigi_super_mario_bros_3.png",
+                  "sourceBox": { "x": 27, "y": 380, "width": 24, "height": 32 },
+                  "origin": { "x": 12, "y": 31 },
+                  "durationMs": 120
+                },
+                {
+                  "frameId": "mario-raccoon-walk-02",
+                  "sourceAsset": "character_01__mario_and_luigi_super_mario_bros_3.png",
+                  "sourceBox": { "x": 53, "y": 380, "width": 24, "height": 32 },
+                  "origin": { "x": 12, "y": 31 },
+                  "durationMs": 120
+                },
+                {
+                  "frameId": "mario-raccoon-walk-03",
+                  "sourceAsset": "character_01__mario_and_luigi_super_mario_bros_3.png",
+                  "sourceBox": { "x": 79, "y": 380, "width": 24, "height": 32 },
+                  "origin": { "x": 12, "y": 31 },
+                  "durationMs": 120
+                }
+              ]
+            },
+            {
+              "id": "run",
+              "label": "奔跑",
+              "loop": true,
+              "frames": [
+                {
+                  "frameId": "mario-raccoon-run-01",
+                  "sourceAsset": "character_01__mario_and_luigi_super_mario_bros_3.png",
+                  "sourceBox": { "x": 123, "y": 380, "width": 24, "height": 32 },
+                  "origin": { "x": 12, "y": 31 },
+                  "durationMs": 100
+                },
+                {
+                  "frameId": "mario-raccoon-run-02",
+                  "sourceAsset": "character_01__mario_and_luigi_super_mario_bros_3.png",
+                  "sourceBox": { "x": 149, "y": 380, "width": 24, "height": 32 },
+                  "origin": { "x": 12, "y": 31 },
+                  "durationMs": 100
+                },
+                {
+                  "frameId": "mario-raccoon-run-03",
+                  "sourceAsset": "character_01__mario_and_luigi_super_mario_bros_3.png",
+                  "sourceBox": { "x": 175, "y": 380, "width": 24, "height": 32 },
+                  "origin": { "x": 12, "y": 31 },
+                  "durationMs": 100
+                },
+                {
+                  "frameId": "mario-raccoon-run-04",
+                  "sourceAsset": "character_01__mario_and_luigi_super_mario_bros_3.png",
+                  "sourceBox": { "x": 201, "y": 380, "width": 24, "height": 32 },
+                  "origin": { "x": 12, "y": 31 },
+                  "durationMs": 100
+                }
+              ]
+            },
+            {
+              "id": "jump",
+              "label": "跳跃",
+              "loop": false,
+              "frames": [
+                {
+                  "frameId": "mario-raccoon-jump-01",
+                  "sourceAsset": "character_01__mario_and_luigi_super_mario_bros_3.png",
+                  "sourceBox": { "x": 245, "y": 380, "width": 24, "height": 32 },
+                  "origin": { "x": 12, "y": 31 },
+                  "durationMs": 120
+                },
+                {
+                  "frameId": "mario-raccoon-jump-02",
+                  "sourceAsset": "character_01__mario_and_luigi_super_mario_bros_3.png",
+                  "sourceBox": { "x": 271, "y": 380, "width": 24, "height": 32 },
+                  "origin": { "x": 12, "y": 31 },
+                  "durationMs": 120
+                },
+                {
+                  "frameId": "mario-raccoon-jump-03",
+                  "sourceAsset": "character_01__mario_and_luigi_super_mario_bros_3.png",
+                  "sourceBox": { "x": 297, "y": 380, "width": 24, "height": 32 },
+                  "origin": { "x": 12, "y": 31 },
+                  "durationMs": 140
+                },
+                {
+                  "frameId": "mario-raccoon-jump-04",
+                  "sourceAsset": "character_01__mario_and_luigi_super_mario_bros_3.png",
+                  "sourceBox": { "x": 323, "y": 380, "width": 24, "height": 32 },
+                  "origin": { "x": 12, "y": 31 },
+                  "durationMs": 160
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "luigi-super-mario-bros-3",
+      "label": "Luigi",
+      "forms": [
+        {
+          "id": "small",
+          "label": "Small Luigi",
+          "actions": [
+            {
+              "id": "idle",
+              "label": "待机",
+              "loop": true,
+              "frames": [
+                {
+                  "frameId": "luigi-small-idle-01",
+                  "sourceAsset": "character_01__mario_and_luigi_super_mario_bros_3.png",
+                  "sourceBox": { "x": 1, "y": 52, "width": 16, "height": 16 },
+                  "origin": { "x": 8, "y": 15 },
+                  "durationMs": 180
+                }
+              ]
+            },
+            {
+              "id": "walk",
+              "label": "行走",
+              "loop": true,
+              "frames": [
+                {
+                  "frameId": "luigi-small-walk-01",
+                  "sourceAsset": "character_01__mario_and_luigi_super_mario_bros_3.png",
+                  "sourceBox": { "x": 19, "y": 52, "width": 16, "height": 16 },
+                  "origin": { "x": 8, "y": 15 },
+                  "durationMs": 120
+                },
+                {
+                  "frameId": "luigi-small-walk-02",
+                  "sourceAsset": "character_01__mario_and_luigi_super_mario_bros_3.png",
+                  "sourceBox": { "x": 37, "y": 52, "width": 16, "height": 16 },
+                  "origin": { "x": 8, "y": 15 },
+                  "durationMs": 120
+                },
+                {
+                  "frameId": "luigi-small-walk-03",
+                  "sourceAsset": "character_01__mario_and_luigi_super_mario_bros_3.png",
+                  "sourceBox": { "x": 55, "y": 52, "width": 16, "height": 16 },
+                  "origin": { "x": 8, "y": 15 },
+                  "durationMs": 120
+                }
+              ]
+            },
+            {
+              "id": "run",
+              "label": "奔跑",
+              "loop": true,
+              "frames": [
+                {
+                  "frameId": "luigi-small-run-01",
+                  "sourceAsset": "character_01__mario_and_luigi_super_mario_bros_3.png",
+                  "sourceBox": { "x": 73, "y": 52, "width": 16, "height": 16 },
+                  "origin": { "x": 8, "y": 15 },
+                  "durationMs": 100
+                },
+                {
+                  "frameId": "luigi-small-run-02",
+                  "sourceAsset": "character_01__mario_and_luigi_super_mario_bros_3.png",
+                  "sourceBox": { "x": 91, "y": 52, "width": 16, "height": 16 },
+                  "origin": { "x": 8, "y": 15 },
+                  "durationMs": 100
+                },
+                {
+                  "frameId": "luigi-small-run-03",
+                  "sourceAsset": "character_01__mario_and_luigi_super_mario_bros_3.png",
+                  "sourceBox": { "x": 109, "y": 52, "width": 16, "height": 16 },
+                  "origin": { "x": 8, "y": 15 },
+                  "durationMs": 100
+                }
+              ]
+            },
+            {
+              "id": "jump",
+              "label": "跳跃",
+              "loop": false,
+              "frames": [
+                {
+                  "frameId": "luigi-small-jump-01",
+                  "sourceAsset": "character_01__mario_and_luigi_super_mario_bros_3.png",
+                  "sourceBox": { "x": 127, "y": 52, "width": 16, "height": 16 },
+                  "origin": { "x": 8, "y": 15 },
+                  "durationMs": 140
+                },
+                {
+                  "frameId": "luigi-small-jump-02",
+                  "sourceAsset": "character_01__mario_and_luigi_super_mario_bros_3.png",
+                  "sourceBox": { "x": 145, "y": 52, "width": 16, "height": 16 },
+                  "origin": { "x": 8, "y": 15 },
+                  "durationMs": 160
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "super",
+          "label": "Super Luigi",
+          "actions": [
+            {
+              "id": "idle",
+              "label": "待机",
+              "loop": true,
+              "frames": [
+                {
+                  "frameId": "luigi-super-idle-01",
+                  "sourceAsset": "character_01__mario_and_luigi_super_mario_bros_3.png",
+                  "sourceBox": { "x": 1, "y": 174, "width": 16, "height": 32 },
+                  "origin": { "x": 8, "y": 31 },
+                  "durationMs": 180
+                }
+              ]
+            },
+            {
+              "id": "walk",
+              "label": "行走",
+              "loop": true,
+              "frames": [
+                {
+                  "frameId": "luigi-super-walk-01",
+                  "sourceAsset": "character_01__mario_and_luigi_super_mario_bros_3.png",
+                  "sourceBox": { "x": 19, "y": 174, "width": 16, "height": 32 },
+                  "origin": { "x": 8, "y": 31 },
+                  "durationMs": 120
+                },
+                {
+                  "frameId": "luigi-super-walk-02",
+                  "sourceAsset": "character_01__mario_and_luigi_super_mario_bros_3.png",
+                  "sourceBox": { "x": 37, "y": 174, "width": 16, "height": 32 },
+                  "origin": { "x": 8, "y": 31 },
+                  "durationMs": 120
+                },
+                {
+                  "frameId": "luigi-super-walk-03",
+                  "sourceAsset": "character_01__mario_and_luigi_super_mario_bros_3.png",
+                  "sourceBox": { "x": 55, "y": 174, "width": 16, "height": 32 },
+                  "origin": { "x": 8, "y": 31 },
+                  "durationMs": 120
+                },
+                {
+                  "frameId": "luigi-super-walk-04",
+                  "sourceAsset": "character_01__mario_and_luigi_super_mario_bros_3.png",
+                  "sourceBox": { "x": 73, "y": 174, "width": 16, "height": 32 },
+                  "origin": { "x": 8, "y": 31 },
+                  "durationMs": 120
+                }
+              ]
+            },
+            {
+              "id": "run",
+              "label": "奔跑",
+              "loop": true,
+              "frames": [
+                {
+                  "frameId": "luigi-super-run-01",
+                  "sourceAsset": "character_01__mario_and_luigi_super_mario_bros_3.png",
+                  "sourceBox": { "x": 91, "y": 174, "width": 24, "height": 32 },
+                  "origin": { "x": 12, "y": 31 },
+                  "durationMs": 100
+                },
+                {
+                  "frameId": "luigi-super-run-02",
+                  "sourceAsset": "character_01__mario_and_luigi_super_mario_bros_3.png",
+                  "sourceBox": { "x": 117, "y": 174, "width": 24, "height": 32 },
+                  "origin": { "x": 12, "y": 31 },
+                  "durationMs": 100
+                },
+                {
+                  "frameId": "luigi-super-run-03",
+                  "sourceAsset": "character_01__mario_and_luigi_super_mario_bros_3.png",
+                  "sourceBox": { "x": 143, "y": 174, "width": 24, "height": 32 },
+                  "origin": { "x": 12, "y": 31 },
+                  "durationMs": 100
+                },
+                {
+                  "frameId": "luigi-super-run-04",
+                  "sourceAsset": "character_01__mario_and_luigi_super_mario_bros_3.png",
+                  "sourceBox": { "x": 169, "y": 174, "width": 24, "height": 32 },
+                  "origin": { "x": 12, "y": 31 },
+                  "durationMs": 100
+                }
+              ]
+            },
+            {
+              "id": "jump",
+              "label": "跳跃",
+              "loop": false,
+              "frames": [
+                {
+                  "frameId": "luigi-super-jump-01",
+                  "sourceAsset": "character_01__mario_and_luigi_super_mario_bros_3.png",
+                  "sourceBox": { "x": 249, "y": 174, "width": 16, "height": 32 },
+                  "origin": { "x": 8, "y": 31 },
+                  "durationMs": 120
+                },
+                {
+                  "frameId": "luigi-super-jump-02",
+                  "sourceAsset": "character_01__mario_and_luigi_super_mario_bros_3.png",
+                  "sourceBox": { "x": 267, "y": 174, "width": 16, "height": 32 },
+                  "origin": { "x": 8, "y": 31 },
+                  "durationMs": 140
+                },
+                {
+                  "frameId": "luigi-super-jump-03",
+                  "sourceAsset": "character_01__mario_and_luigi_super_mario_bros_3.png",
+                  "sourceBox": { "x": 303, "y": 174, "width": 24, "height": 32 },
+                  "origin": { "x": 12, "y": 31 },
+                  "durationMs": 160
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "fire",
+          "label": "Fire Luigi",
+          "actions": [
+            {
+              "id": "idle",
+              "label": "待机",
+              "loop": true,
+              "frames": [
+                {
+                  "frameId": "luigi-fire-idle-01",
+                  "sourceAsset": "character_01__mario_and_luigi_super_mario_bros_3.png",
+                  "sourceBox": { "x": 1, "y": 346, "width": 24, "height": 32 },
+                  "origin": { "x": 12, "y": 31 },
+                  "durationMs": 180
+                }
+              ]
+            },
+            {
+              "id": "walk",
+              "label": "行走",
+              "loop": true,
+              "frames": [
+                {
+                  "frameId": "luigi-fire-walk-01",
+                  "sourceAsset": "character_01__mario_and_luigi_super_mario_bros_3.png",
+                  "sourceBox": { "x": 27, "y": 346, "width": 24, "height": 32 },
+                  "origin": { "x": 12, "y": 31 },
+                  "durationMs": 120
+                },
+                {
+                  "frameId": "luigi-fire-walk-02",
+                  "sourceAsset": "character_01__mario_and_luigi_super_mario_bros_3.png",
+                  "sourceBox": { "x": 53, "y": 346, "width": 24, "height": 32 },
+                  "origin": { "x": 12, "y": 31 },
+                  "durationMs": 120
+                },
+                {
+                  "frameId": "luigi-fire-walk-03",
+                  "sourceAsset": "character_01__mario_and_luigi_super_mario_bros_3.png",
+                  "sourceBox": { "x": 79, "y": 346, "width": 24, "height": 32 },
+                  "origin": { "x": 12, "y": 31 },
+                  "durationMs": 120
+                }
+              ]
+            },
+            {
+              "id": "jump",
+              "label": "跳跃",
+              "loop": false,
+              "frames": [
+                {
+                  "frameId": "luigi-fire-jump-01",
+                  "sourceAsset": "character_01__mario_and_luigi_super_mario_bros_3.png",
+                  "sourceBox": { "x": 105, "y": 346, "width": 24, "height": 32 },
+                  "origin": { "x": 12, "y": 31 },
+                  "durationMs": 120
+                },
+                {
+                  "frameId": "luigi-fire-jump-02",
+                  "sourceAsset": "character_01__mario_and_luigi_super_mario_bros_3.png",
+                  "sourceBox": { "x": 131, "y": 346, "width": 24, "height": 32 },
+                  "origin": { "x": 12, "y": 31 },
+                  "durationMs": 160
+                }
+              ]
+            },
+            {
+              "id": "attack",
+              "label": "火球",
+              "loop": false,
+              "frames": [
+                {
+                  "frameId": "luigi-fire-attack-01",
+                  "sourceAsset": "character_01__mario_and_luigi_super_mario_bros_3.png",
+                  "sourceBox": { "x": 157, "y": 346, "width": 24, "height": 32 },
+                  "origin": { "x": 12, "y": 31 },
+                  "durationMs": 100
+                },
+                {
+                  "frameId": "luigi-fire-attack-02",
+                  "sourceAsset": "character_01__mario_and_luigi_super_mario_bros_3.png",
+                  "sourceBox": { "x": 183, "y": 346, "width": 24, "height": 32 },
+                  "origin": { "x": 12, "y": 31 },
+                  "durationMs": 100
+                },
+                {
+                  "frameId": "luigi-fire-attack-03",
+                  "sourceAsset": "character_01__mario_and_luigi_super_mario_bros_3.png",
+                  "sourceBox": { "x": 209, "y": 346, "width": 24, "height": 32 },
+                  "origin": { "x": 12, "y": 31 },
+                  "durationMs": 120
+                },
+                {
+                  "frameId": "luigi-fire-attack-04",
+                  "sourceAsset": "character_01__mario_and_luigi_super_mario_bros_3.png",
+                  "sourceBox": { "x": 235, "y": 346, "width": 24, "height": 32 },
+                  "origin": { "x": 12, "y": 31 },
+                  "durationMs": 120
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "raccoon",
+          "label": "Raccoon Luigi",
+          "actions": [
+            {
+              "id": "idle",
+              "label": "待机",
+              "loop": true,
+              "frames": [
+                {
+                  "frameId": "luigi-raccoon-idle-01",
+                  "sourceAsset": "character_01__mario_and_luigi_super_mario_bros_3.png",
+                  "sourceBox": { "x": 1, "y": 432, "width": 24, "height": 32 },
+                  "origin": { "x": 12, "y": 31 },
+                  "durationMs": 180
+                }
+              ]
+            },
+            {
+              "id": "walk",
+              "label": "行走",
+              "loop": true,
+              "frames": [
+                {
+                  "frameId": "luigi-raccoon-walk-01",
+                  "sourceAsset": "character_01__mario_and_luigi_super_mario_bros_3.png",
+                  "sourceBox": { "x": 27, "y": 432, "width": 24, "height": 32 },
+                  "origin": { "x": 12, "y": 31 },
+                  "durationMs": 120
+                },
+                {
+                  "frameId": "luigi-raccoon-walk-02",
+                  "sourceAsset": "character_01__mario_and_luigi_super_mario_bros_3.png",
+                  "sourceBox": { "x": 53, "y": 432, "width": 24, "height": 32 },
+                  "origin": { "x": 12, "y": 31 },
+                  "durationMs": 120
+                },
+                {
+                  "frameId": "luigi-raccoon-walk-03",
+                  "sourceAsset": "character_01__mario_and_luigi_super_mario_bros_3.png",
+                  "sourceBox": { "x": 79, "y": 432, "width": 24, "height": 32 },
+                  "origin": { "x": 12, "y": 31 },
+                  "durationMs": 120
+                }
+              ]
+            },
+            {
+              "id": "run",
+              "label": "奔跑",
+              "loop": true,
+              "frames": [
+                {
+                  "frameId": "luigi-raccoon-run-01",
+                  "sourceAsset": "character_01__mario_and_luigi_super_mario_bros_3.png",
+                  "sourceBox": { "x": 123, "y": 432, "width": 24, "height": 32 },
+                  "origin": { "x": 12, "y": 31 },
+                  "durationMs": 100
+                },
+                {
+                  "frameId": "luigi-raccoon-run-02",
+                  "sourceAsset": "character_01__mario_and_luigi_super_mario_bros_3.png",
+                  "sourceBox": { "x": 149, "y": 432, "width": 24, "height": 32 },
+                  "origin": { "x": 12, "y": 31 },
+                  "durationMs": 100
+                },
+                {
+                  "frameId": "luigi-raccoon-run-03",
+                  "sourceAsset": "character_01__mario_and_luigi_super_mario_bros_3.png",
+                  "sourceBox": { "x": 175, "y": 432, "width": 24, "height": 32 },
+                  "origin": { "x": 12, "y": 31 },
+                  "durationMs": 100
+                },
+                {
+                  "frameId": "luigi-raccoon-run-04",
+                  "sourceAsset": "character_01__mario_and_luigi_super_mario_bros_3.png",
+                  "sourceBox": { "x": 201, "y": 432, "width": 24, "height": 32 },
+                  "origin": { "x": 12, "y": 31 },
+                  "durationMs": 100
+                }
+              ]
+            },
+            {
+              "id": "jump",
+              "label": "跳跃",
+              "loop": false,
+              "frames": [
+                {
+                  "frameId": "luigi-raccoon-jump-01",
+                  "sourceAsset": "character_01__mario_and_luigi_super_mario_bros_3.png",
+                  "sourceBox": { "x": 261, "y": 432, "width": 24, "height": 32 },
+                  "origin": { "x": 12, "y": 31 },
+                  "durationMs": 120
+                },
+                {
+                  "frameId": "luigi-raccoon-jump-02",
+                  "sourceAsset": "character_01__mario_and_luigi_super_mario_bros_3.png",
+                  "sourceBox": { "x": 287, "y": 432, "width": 24, "height": 32 },
+                  "origin": { "x": 12, "y": 31 },
+                  "durationMs": 120
+                },
+                {
+                  "frameId": "luigi-raccoon-jump-03",
+                  "sourceAsset": "character_01__mario_and_luigi_super_mario_bros_3.png",
+                  "sourceBox": { "x": 313, "y": 432, "width": 24, "height": 32 },
+                  "origin": { "x": 12, "y": 31 },
+                  "durationMs": 140
+                },
+                {
+                  "frameId": "luigi-raccoon-jump-04",
+                  "sourceAsset": "character_01__mario_and_luigi_super_mario_bros_3.png",
+                  "sourceBox": { "x": 339, "y": 432, "width": 16, "height": 32 },
+                  "origin": { "x": 8, "y": 31 },
+                  "durationMs": 160
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

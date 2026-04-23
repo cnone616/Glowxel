@@ -15,7 +15,7 @@
     <view class="canvas-section">
       <view class="preview-canvas-container" :style="previewCanvasBoxStyle">
         <PixelCanvas
-          v-if="previewCanvasReady && previewCanvasVisible"
+          v-if="previewCanvasReady && !shouldHidePreview"
           :width="64"
           :height="64"
           :pixels="currentPreviewPixels"
@@ -41,7 +41,7 @@
             @click="saveAndApply"
           >
             <Icon name="link" :size="36" color="var(--nb-ink)" />
-            <text>{{ isSending ? "发送中" : "发送" }}</text>
+            <text>发送</text>
           </view>
         </view>
       </view>
@@ -98,11 +98,15 @@
       </view>
     </scroll-view>
 
-    <view v-if="isSending" class="glx-sending-overlay" @touchmove.stop.prevent>
-      <view class="glx-sending-modal">
-        <view class="glx-sending-spinner"></view>
-        <text class="glx-sending-title">正在传输数据...</text>
-        <text class="glx-sending-tip">请勿切换网络或关闭程序</text>
+    <view
+      v-if="isSending"
+      class="glx-device-sending-overlay"
+      @touchmove.stop.prevent
+    >
+      <view class="glx-device-sending-card">
+        <view class="glx-device-sending-spinner"></view>
+        <text class="glx-device-sending-title">{{ sendOverlayTitle }}</text>
+        <text class="glx-device-sending-tip">{{ sendOverlayTip }}</text>
       </view>
     </view>
 
@@ -116,6 +120,7 @@
 
 <script>
 import statusBarMixin from "../../mixins/statusBar.js";
+import deviceSendUxMixin from "../../mixins/deviceSendUxMixin.js";
 import Icon from "../../components/Icon.vue";
 import Toast from "../../components/Toast.vue";
 import PixelCanvas from "../../components/PixelCanvas.vue";
@@ -132,7 +137,7 @@ import {
 const GIF_PLAYER_CONFIG_KEY = "gif_player_config";
 
 export default {
-  mixins: [statusBarMixin],
+  mixins: [statusBarMixin, deviceSendUxMixin],
   components: {
     Icon,
     Toast,
@@ -143,11 +148,9 @@ export default {
     return {
       deviceStore: null,
       toast: null,
-      isSending: false,
-      isToastVisible: false,
+      sendPreviewKind: "native",
       contentHeight: "calc(100vh - 88rpx - 520rpx)",
       previewCanvasReady: false,
-      previewCanvasVisible: true,
       previewZoom: 4,
       previewOffset: { x: 0, y: 0 },
       previewContainerSize: { width: 320, height: 320 },
@@ -216,25 +219,8 @@ export default {
     handleBack() {
       uni.navigateBack();
     },
-    syncPreviewCanvasVisibility() {
-      const nextVisible = !this.isSending && !this.isToastVisible;
-      if (this.previewCanvasVisible === nextVisible) {
-        return;
-      }
-      this.previewCanvasVisible = nextVisible;
-      if (nextVisible) {
-        this.$nextTick(() => {
-          this.schedulePreviewRefresh();
-        });
-      }
-    },
-    handleToastShow() {
-      this.isToastVisible = true;
-      this.syncPreviewCanvasVisibility();
-    },
-    handleToastHide() {
-      this.isToastVisible = false;
-      this.syncPreviewCanvasVisibility();
+    handleDeviceSendPreviewRestored() {
+      this.schedulePreviewRefresh();
     },
     initPreviewCanvas() {
       const systemInfo = uni.getSystemInfoSync();
@@ -378,17 +364,11 @@ export default {
       });
     },
     async saveAndApply() {
-      if (this.isSending) {
-        this.toast.showInfo("正在传输中，请等待完成");
-        return;
-      }
-      if (!this.deviceStore.connected) {
-        this.toast.showError("设备未连接");
+      if (!this.guardBeforeSend(this.deviceStore.connected)) {
         return;
       }
 
-      this.isSending = true;
-      this.syncPreviewCanvasVisibility();
+      this.beginSendUi();
       try {
         const ws = this.deviceStore.getWebSocket();
         const payload = buildGifPlayerAnimationPayload({
@@ -398,24 +378,17 @@ export default {
         });
         await ws.setGifAnimation(payload.animationData);
         await ws.setMode("gif_player");
-        const status = await ws.getStatus();
-        if (
-          status.businessMode !== "gif_player" ||
-          status.mode !== "animation" ||
-          !Number.isFinite(Number(status.animationFrames)) ||
-          Number(status.animationFrames) <= 0
-        ) {
-          throw new Error("设备未成功加载 GIF 动画");
-        }
-        this.deviceStore.setDeviceMode("gif_player", { businessMode: true });
+        await this.deviceStore.syncAndRequireBusinessMode(
+          "gif_player",
+          "设备未成功加载 GIF 动画",
+        );
         this.saveConfig();
-        this.toast.showSuccess("离线素材已发送到设备");
+        this.showSendSuccess();
       } catch (error) {
         console.error("发送 GIF 素材失败:", error);
-        this.toast.showError("发送失败：" + error.message);
+        this.showSendFailure(error);
       } finally {
-        this.isSending = false;
-        this.syncPreviewCanvasVisibility();
+        this.endSendUi();
       }
     },
   },

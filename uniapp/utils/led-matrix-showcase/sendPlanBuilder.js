@@ -40,7 +40,6 @@ function buildLedMatrixSendPlan(options) {
   const speed = normalizeSpeed(safeOptions.speed);
   const intensity = normalizeIntensity(safeOptions.intensity);
   const density = normalizeDensity(safeOptions.density);
-  const color = hexToRgb(safeOptions.color);
 
   if (
     demo.id === "maze" ||
@@ -78,7 +77,7 @@ function buildLedMatrixSendPlan(options) {
           preset: demo.ambientPreset,
           speed,
           density,
-          color,
+          color: hexToRgb(safeOptions.color),
           loop: true,
         },
       };

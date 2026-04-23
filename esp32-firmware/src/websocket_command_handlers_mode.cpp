@@ -4,13 +4,14 @@
 bool WebSocketCommandHandlers::handleModeCommand(
   AsyncWebSocketClient* client,
   JsonDocument& doc,
-  StaticJsonDocument<768>& response
+  StaticJsonDocument<768>& response,
+  bool& responseSent
 ) {
-  if (WebSocketModeCommandDispatch::handleModeSwitchCommand(client, doc, response)) {
+  if (WebSocketModeCommandDispatch::handleModeSwitchCommand(client, doc, response, responseSent)) {
     return true;
   }
 
-  if (WebSocketModeCommandDispatch::handleModeUtilityCommand(client, doc, response)) {
+  if (WebSocketModeCommandDispatch::handleModeUtilityCommand(client, doc, response, responseSent)) {
     return true;
   }
 

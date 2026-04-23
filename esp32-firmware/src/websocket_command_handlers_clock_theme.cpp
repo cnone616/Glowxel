@@ -3,6 +3,8 @@
 #include "config_manager.h"
 #include "display_manager.h"
 #include "mode_tags.h"
+#include "runtime_command_bus.h"
+#include "runtime_mode_coordinator.h"
 
 namespace {
 void setErrorResponse(StaticJsonDocument<768>& response, const char* message) {
@@ -153,10 +155,9 @@ bool WebSocketCommandHandlers::handleClockCommand(
 bool WebSocketCommandHandlers::handleThemeCommand(
   AsyncWebSocketClient* client,
   JsonDocument& doc,
-  StaticJsonDocument<768>& response
+  StaticJsonDocument<768>& response,
+  bool& responseSent
 ) {
-  (void)client;
-
   String cmd = doc["cmd"].as<String>();
   if (cmd != "set_theme_config") {
     return false;
@@ -173,21 +174,27 @@ bool WebSocketCommandHandlers::handleThemeCommand(
     return true;
   }
 
+  RuntimeCommandBus::RuntimeCommand* command =
+    RuntimeCommandBus::createCommand(
+      RuntimeCommandBus::RuntimeCommandSource::WEBSOCKET,
+      client != nullptr ? client->id() : 0
+    );
+  if (command == nullptr) {
+    setErrorResponse(response, "out of memory");
+    return true;
+  }
   snprintf(
-    ConfigManager::themeConfig.themeId,
-    sizeof(ConfigManager::themeConfig.themeId),
+    command->themeConfig.themeId,
+    sizeof(command->themeConfig.themeId),
     "%s",
     themeId
   );
-  ConfigManager::saveThemeConfig();
-  DisplayManager::currentMode = MODE_THEME;
-  DisplayManager::lastBusinessMode = MODE_THEME;
-  DisplayManager::currentBusinessModeTag = ModeTags::THEME;
-  DisplayManager::lastBusinessModeTag = ModeTags::THEME;
-  ConfigManager::saveClockConfig();
-  DisplayManager::displayTheme(true);
-
-  response["message"] = "theme config updated";
+  command->type = RuntimeCommandBus::RuntimeCommandType::THEME_CONFIG;
+  if (!RuntimeCommandBus::enqueue(command)) {
+    RuntimeCommandBus::destroyCommand(command);
+    setErrorResponse(response, "device busy");
+    return true;
+  }
+  responseSent = true;
   return true;
 }
-

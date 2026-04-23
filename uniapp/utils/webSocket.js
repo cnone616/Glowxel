@@ -23,6 +23,29 @@ function hexToRgb(value) {
   };
 }
 
+function normalizeRgbColor(value) {
+  if (!value || typeof value !== "object") {
+    throw new Error("颜色值无效");
+  }
+
+  const { r, g, b } = value;
+  if (
+    !Number.isInteger(r) ||
+    !Number.isInteger(g) ||
+    !Number.isInteger(b) ||
+    r < 0 ||
+    r > 255 ||
+    g < 0 ||
+    g > 255 ||
+    b < 0 ||
+    b > 255
+  ) {
+    throw new Error("颜色值无效");
+  }
+
+  return { r, g, b };
+}
+
 function isErrorResponse(message) {
   return !!(message && (message.error || message.status === "error"));
 }
@@ -83,6 +106,9 @@ function getSetModeSuccessMessage(mode) {
   if (mode === "tetris") {
     return "tetris started";
   }
+  if (mode === "tetris_clock") {
+    return "tetris clock started";
+  }
   if (mode === "weather") {
     return "switched to weather mode";
   }
@@ -117,19 +143,13 @@ class WebSocket {
     this.onDisconnectCallback = null;
     this.onErrorCallback = null;
 
-    this._reconnectAttempts = 0;
-    this._reconnectTimer = null;
-    this._manualDisconnect = false;
-    this._maxReconnectAttempts = 10;
-    this._heartbeatTimer = null;
-
     this._socketIdSeed = 0;
     this._currentSocketId = 0;
     this._connectPromise = null;
     this._connectKey = "";
     this._closeMetaBySocketId = new Map();
     this._messageWaiters = new Set();
-    this._hasReceivedMessage = false;
+    this._jsonCommandQueue = Promise.resolve();
   }
 
   normalizeHostInput(host) {
@@ -148,13 +168,6 @@ class WebSocket {
     }
 
     return normalized;
-  }
-
-  _clearReconnectTimer() {
-    if (this._reconnectTimer) {
-      clearTimeout(this._reconnectTimer);
-      this._reconnectTimer = null;
-    }
   }
 
   _emitError(err) {
@@ -193,8 +206,6 @@ class WebSocket {
   _setDisconnectedState(nextState = "idle") {
     this.connected = false;
     this.connectionState = nextState;
-    this._stopHeartbeat();
-    this._hasReceivedMessage = false;
   }
 
   _addMessageWaiter(waiter) {
@@ -215,13 +226,102 @@ class WebSocket {
     });
   }
 
+  _enqueueJsonCommand(task) {
+    const queuedTask = this._jsonCommandQueue
+      .catch(() => {})
+      .then(() => {
+        if (!this.connected || !this.socket) {
+          throw new Error("未连接到设备");
+        }
+        return task();
+      });
+
+    this._jsonCommandQueue = queuedTask.catch(() => {});
+    return queuedTask;
+  }
+
+  _createMessageWaiter(matcher, timeout) {
+    if (!this.connected || !this.socket) {
+      return {
+        promise: Promise.reject(new Error("未连接到设备")),
+        reject: () => {},
+      };
+    }
+
+    let finishReject = null;
+    const promise = new Promise((resolve, reject) => {
+      let done = false;
+      let timer = null;
+
+      const finishResolve = (message) => {
+        if (done) {
+          return;
+        }
+        done = true;
+        if (timer) {
+          clearTimeout(timer);
+          timer = null;
+        }
+        this.offMessage(handler);
+        this._removeMessageWaiter(waiter);
+        resolve(message);
+      };
+
+      finishReject = (err) => {
+        if (done) {
+          return;
+        }
+        done = true;
+        if (timer) {
+          clearTimeout(timer);
+          timer = null;
+        }
+        this.offMessage(handler);
+        this._removeMessageWaiter(waiter);
+        reject(err);
+      };
+
+      const handler = (message) => {
+        if (!matcher(message)) {
+          return;
+        }
+        if (message && (message.error || message.status === "error")) {
+          finishReject(
+            new Error(message.error || message.message || "设备返回错误"),
+          );
+          return;
+        }
+        finishResolve(message);
+      };
+
+      this.onMessage(handler);
+      const waiter = {
+        socketId: this._currentSocketId,
+        reject: (err) => finishReject(err),
+      };
+      this._addMessageWaiter(waiter);
+
+      timer = setTimeout(() => {
+        finishReject(new Error("等待回复超时"));
+      }, timeout);
+    });
+
+    return {
+      promise,
+      reject: (err) => {
+        if (finishReject) {
+          finishReject(err);
+        }
+      },
+    };
+  }
+
   /**
    * 连接到 ESP32
    * @param {string} host - IP 地址
    * @param {number} port - 端口号，默认 80
-   * @param {object} options - 内部连接选项
    */
-  connect(host, port = 80, options = {}) {
+  connect(host, port = 80) {
     const normalizedHost = this.normalizeHostInput(host);
     if (!normalizedHost) {
       const err = new Error("设备 IP 地址无效");
@@ -230,8 +330,6 @@ class WebSocket {
     }
 
     const connectKey = `${normalizedHost}:${port}`;
-    const isReconnect = options.isReconnect === true;
-
     if (
       this.connected &&
       this.connectionState === "open" &&
@@ -248,9 +346,6 @@ class WebSocket {
     ) {
       return this._connectPromise;
     }
-
-    this._clearReconnectTimer();
-    this._manualDisconnect = false;
 
     const previousSocket = this.socket;
     const previousSocketId = this._currentSocketId;
@@ -273,7 +368,6 @@ class WebSocket {
     this._connectPromise = new Promise((resolve, reject) => {
       let settled = false;
       let connectTimeoutTimer = null;
-      let opened = false;
 
       const finishResolve = () => {
         if (settled) {
@@ -314,9 +408,6 @@ class WebSocket {
           console.error("WebSocket 创建失败:", err);
           this._setDisconnectedState("idle");
           this._emitError(err);
-          if (isReconnect && !this._manualDisconnect) {
-            this._scheduleReconnect();
-          }
           finishReject(err);
         },
       });
@@ -334,9 +425,6 @@ class WebSocket {
         this._closeSocketTask(socketTask, socketId, {
           suppressReconnect: true,
         });
-        if (isReconnect && !this._manualDisconnect) {
-          this._scheduleReconnect();
-        }
         finishReject(err);
       }, 12000);
 
@@ -345,10 +433,8 @@ class WebSocket {
           return;
         }
         console.log("WebSocket 连接成功");
-        opened = true;
         this.connected = true;
         this.connectionState = "open";
-        this._reconnectAttempts = 0;
         if (this.onConnectCallback) {
           this.onConnectCallback();
         }
@@ -360,10 +446,6 @@ class WebSocket {
           return;
         }
         console.log("收到消息:", res.data);
-        if (!this._hasReceivedMessage) {
-          this._hasReceivedMessage = true;
-          this._startHeartbeat();
-        }
         try {
           const data = JSON.parse(res.data);
           this.onMessageCallbacks.forEach((callback) => {
@@ -377,7 +459,7 @@ class WebSocket {
       });
 
       socketTask.onClose((event) => {
-        const closeMeta = this._consumeCloseMeta(socketId);
+        this._consumeCloseMeta(socketId);
         if (socketId !== this._currentSocketId) {
           return;
         }
@@ -400,16 +482,6 @@ class WebSocket {
 
         if (this.onDisconnectCallback) {
           this.onDisconnectCallback();
-        }
-
-        const shouldReconnect =
-          !this._manualDisconnect &&
-          this.host &&
-          (!closeMeta || closeMeta.suppressReconnect !== true) &&
-          (opened || isReconnect);
-
-        if (shouldReconnect) {
-          this._scheduleReconnect();
         }
 
         if (!settled) {
@@ -462,11 +534,6 @@ class WebSocket {
    * 断开连接
    */
   disconnect() {
-    this._manualDisconnect = true;
-    this._clearReconnectTimer();
-    this._reconnectAttempts = 0;
-    this._stopHeartbeat();
-
     if (!this.socket) {
       this._setDisconnectedState("idle");
       return;
@@ -479,74 +546,6 @@ class WebSocket {
       suppressReconnect: true,
       logClose: "WebSocket 已关闭",
     });
-  }
-
-  _startHeartbeat() {
-    this._stopHeartbeat();
-    this._heartbeatTimer = setInterval(() => {
-      if (!this.connected || !this.socket) {
-        return;
-      }
-      this.send({ cmd: "ping" }).catch(() => {});
-    }, 5000);
-  }
-
-  _stopHeartbeat() {
-    if (this._heartbeatTimer) {
-      clearInterval(this._heartbeatTimer);
-      this._heartbeatTimer = null;
-    }
-  }
-
-  pauseHeartbeat() {
-    this._stopHeartbeat();
-  }
-
-  resumeHeartbeat() {
-    if (this.connected && this.connectionState === "open") {
-      this._startHeartbeat();
-    }
-  }
-
-  /**
-   * 指数退避重连（意外断线时自动调用）
-   */
-  _scheduleReconnect() {
-    if (!this.host) {
-      return;
-    }
-    if (this._manualDisconnect) {
-      return;
-    }
-    if (this.connected || this.connectionState === "connecting") {
-      return;
-    }
-    if (this._reconnectTimer) {
-      return;
-    }
-    if (this._reconnectAttempts >= this._maxReconnectAttempts) {
-      console.log(`已达最大重连次数 ${this._maxReconnectAttempts}，停止重连`);
-      return;
-    }
-
-    const delay = Math.min(1000 * Math.pow(2, this._reconnectAttempts), 30000);
-    this._reconnectAttempts += 1;
-    this.connectionState = "reconnect_wait";
-    console.log(`将在 ${delay}ms 后第 ${this._reconnectAttempts} 次重连...`);
-
-    this._reconnectTimer = setTimeout(() => {
-      this._reconnectTimer = null;
-      if (this._manualDisconnect) {
-        return;
-      }
-      if (this.connected || this.connectionState === "connecting") {
-        return;
-      }
-      console.log("正在重连...");
-      this.connect(this.host, this.port, { isReconnect: true }).catch((err) => {
-        console.error("重连失败:", err);
-      });
-    }, delay);
   }
 
   onMessage(callback) {
@@ -578,70 +577,11 @@ class WebSocket {
     return this.send({ cmd: "ping" });
   }
 
-  waitForMessage(matcher, timeout = 3000) {
-    if (!this.connected || !this.socket) {
-      return Promise.reject(new Error("未连接到设备"));
-    }
-
-    return new Promise((resolve, reject) => {
-      let done = false;
-      let timer = null;
-
-      const finishResolve = (message) => {
-        if (done) {
-          return;
-        }
-        done = true;
-        if (timer) {
-          clearTimeout(timer);
-          timer = null;
-        }
-        this.offMessage(handler);
-        this._removeMessageWaiter(waiter);
-        resolve(message);
-      };
-
-      const finishReject = (err) => {
-        if (done) {
-          return;
-        }
-        done = true;
-        if (timer) {
-          clearTimeout(timer);
-          timer = null;
-        }
-        this.offMessage(handler);
-        this._removeMessageWaiter(waiter);
-        reject(err);
-      };
-
-      const handler = (message) => {
-        if (!matcher(message)) {
-          return;
-        }
-        if (message && (message.error || message.status === "error")) {
-          finishReject(
-            new Error(message.error || message.message || "设备返回错误"),
-          );
-          return;
-        }
-        finishResolve(message);
-      };
-
-      this.onMessage(handler);
-      const waiter = {
-        socketId: this._currentSocketId,
-        reject: finishReject,
-      };
-      this._addMessageWaiter(waiter);
-
-      timer = setTimeout(() => {
-        finishReject(new Error("等待回复超时"));
-      }, timeout);
-    });
+  waitForMessage(matcher, timeout = 8000) {
+    return this._createMessageWaiter(matcher, timeout).promise;
   }
 
-  sendAndWait(data, timeout = 3000, matcher = null) {
+  sendAndWait(data, timeout = 8000, matcher = null) {
     const finalMatcher =
       typeof matcher === "function"
         ? matcher
@@ -656,19 +596,22 @@ class WebSocket {
             );
           };
 
-    return new Promise((resolve, reject) => {
-      this.waitForMessage(finalMatcher, timeout)
-        .then(resolve)
-        .catch(reject);
-
-      this.send(data).catch(reject);
+    return this._enqueueJsonCommand(async () => {
+      const waiter = this._createMessageWaiter(finalMatcher, timeout);
+      try {
+        await this.send(data);
+        return await waiter.promise;
+      } catch (err) {
+        waiter.reject(err);
+        throw err;
+      }
     });
   }
 
   async getStatus() {
     return this.sendAndWait(
       { cmd: "status" },
-      3000,
+      5000,
       (response) => {
         if (!response || typeof response !== "object") {
           return false;
@@ -682,7 +625,9 @@ class WebSocket {
           typeof response.width === "number" &&
           typeof response.height === "number" &&
           typeof response.brightness === "number" &&
-          typeof response.mode === "string"
+          typeof response.mode === "string" &&
+          typeof response.businessMode === "string" &&
+          typeof response.effectMode === "string"
         );
       },
     );
@@ -691,7 +636,7 @@ class WebSocket {
   async getInfo() {
     return this.sendAndWait(
       { cmd: "get_info" },
-      3000,
+      8000,
       (response) => {
         if (!response || typeof response !== "object") {
           return false;
@@ -708,7 +653,7 @@ class WebSocket {
     );
   }
 
-  waitForCommand(data, expectedMessages, timeout = 5000) {
+  waitForCommand(data, expectedMessages, timeout = 8000) {
     return this.sendAndWait(
       data,
       timeout,
@@ -721,18 +666,22 @@ class WebSocket {
     if (!expectedMessage) {
       throw new Error(`未支持的模式切换确认：${mode}`);
     }
-    return this.waitForCommand({ cmd: "set_mode", mode }, expectedMessage, 5000);
+    return this.waitForCommand({ cmd: "set_mode", mode }, expectedMessage, 8000);
   }
 
-  async setClockConfig(config) {
-    return this.send({ cmd: "set_clock_config", config });
+  async setClockConfig(clockMode, config) {
+    return this.waitForCommand(
+      { cmd: "set_clock_config", clockMode, config },
+      "clock config updated",
+      8000,
+    );
   }
 
   async setThemeConfig(themeId) {
     return this.waitForCommand(
       { cmd: "set_theme_config", themeId },
       "theme config updated",
-      5000,
+      8000,
     );
   }
 
@@ -740,7 +689,7 @@ class WebSocket {
     return this.waitForCommand(
       { cmd: "set_eyes_config", config },
       "eyes config updated",
-      5000,
+      8000,
     );
   }
 
@@ -756,7 +705,7 @@ class WebSocket {
           loop: config.loop,
         },
         "ambient effect applied",
-        5000,
+        8000,
       );
     }
 
@@ -769,8 +718,64 @@ class WebSocket {
         loop: config.loop,
       },
       "ambient effect applied",
-      5000,
+      8000,
     );
+  }
+
+  async setGameScreensaver(config) {
+    if (config.game === "maze") {
+      return this.waitForCommand(
+        {
+          cmd: "set_game_screensaver",
+          game: config.game,
+          speed: config.speed,
+          mazeSizeMode: config.mazeSizeMode,
+        },
+        "game screensaver applied",
+        8000,
+      );
+    }
+
+    if (config.game === "snake") {
+      return this.waitForCommand(
+        {
+          cmd: "set_game_screensaver",
+          game: config.game,
+          speed: config.speed,
+          snakeWidth: config.snakeWidth,
+        },
+        "game screensaver applied",
+        8000,
+      );
+    }
+
+    if (config.game === "ping_pong") {
+      return this.waitForCommand(
+        {
+          cmd: "set_game_screensaver",
+          game: config.game,
+          speed: config.speed,
+        },
+        "game screensaver applied",
+        8000,
+      );
+    }
+
+    if (config.game === "tetris_game") {
+      return this.waitForCommand(
+        {
+          cmd: "set_game_screensaver",
+          game: config.game,
+          speed: config.speed,
+          cellSize: config.cellSize,
+          showClock: config.showClock,
+        },
+        "game screensaver applied",
+        8000,
+      );
+    }
+
+    throw new Error(`未支持的游戏屏保：${config.game}`);
   }
 
   async setCountdownBoard(config) {
@@ -783,7 +788,39 @@ class WebSocket {
         progress: config.progress,
       },
       "countdown board applied",
-      5000,
+      8000,
+    );
+  }
+
+  async startTetris(config) {
+    return this.waitForCommand(
+      {
+        cmd: "set_mode",
+        mode: "tetris",
+        clearMode: config.clearMode,
+        cellSize: config.cellSize,
+        speed: config.speed,
+        showClock: false,
+        pieces: config.pieces,
+      },
+      "tetris started",
+      8000,
+    );
+  }
+
+  async startTetrisClock(config) {
+    return this.waitForCommand(
+      {
+        cmd: "set_mode",
+        mode: "tetris_clock",
+        clearMode: config.clearMode,
+        cellSize: config.cellSize,
+        speed: config.speed,
+        showClock: true,
+        pieces: config.pieces,
+      },
+      "tetris clock started",
+      8000,
     );
   }
 
@@ -799,7 +836,7 @@ class WebSocket {
         colorSeed: config.colorSeed,
       },
       "planet screensaver applied",
-      5000,
+      8000,
     );
   }
 
@@ -815,7 +852,83 @@ class WebSocket {
   }
 
   async eyesInteract(action) {
-    return this.send({ cmd: "eyes_interact", action });
+    return this.waitForCommand(
+      { cmd: "eyes_interact", action },
+      "eyes action applied",
+      8000,
+    );
+  }
+
+  async startLoading() {
+    return this.waitForCommand(
+      { cmd: "start_loading" },
+      "loading started",
+      8000,
+    );
+  }
+
+  async stopLoading() {
+    return this.waitForCommand(
+      { cmd: "stop_loading" },
+      "loading stopped",
+      8000,
+    );
+  }
+
+  async highlightRow(row) {
+    const expectedMessage = row >= 0 ? "row highlighted" : "highlight cleared";
+    return this.waitForCommand(
+      { cmd: "highlight_row", row },
+      expectedMessage,
+      8000,
+    );
+  }
+
+  async highlightColor(color) {
+    if (color === null) {
+      return this.waitForCommand(
+        { cmd: "highlight_color", color: null },
+        "highlight cleared",
+        8000,
+      );
+    }
+
+    return this.waitForCommand(
+      {
+        cmd: "highlight_color",
+        color: normalizeRgbColor(color),
+      },
+      "color highlighted",
+      8000,
+    );
+  }
+
+  async otaCheck() {
+    return this.sendAndWait(
+      { cmd: "ota_check" },
+      8000,
+      (response) => {
+        if (!response || typeof response !== "object") {
+          return false;
+        }
+        if (isErrorResponse(response)) {
+          return true;
+        }
+        return (
+          response.status === "ok" &&
+          typeof response.firmware_version === "string" &&
+          typeof response.has_update === "boolean"
+        );
+      },
+    );
+  }
+
+  async otaUpdate() {
+    return this.waitForCommand(
+      { cmd: "ota_update" },
+      "starting update",
+      8000,
+    );
   }
 
   async clear() {
@@ -823,11 +936,11 @@ class WebSocket {
   }
 
   async saveCanvas() {
-    return this.waitForCommand({ cmd: "save_canvas" }, "canvas saved", 5000);
+    return this.waitForCommand({ cmd: "save_canvas" }, "canvas saved", 8000);
   }
 
   async clearCanvas() {
-    return this.waitForCommand({ cmd: "clear_canvas" }, "canvas cleared", 5000);
+    return this.waitForCommand({ cmd: "clear_canvas" }, "canvas cleared", 8000);
   }
 
   async setBrightness(value) {

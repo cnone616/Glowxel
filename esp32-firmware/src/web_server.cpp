@@ -8,6 +8,9 @@
 #include "device_mode_tag_codec.h"
 #include "ambient_preset_codec.h"
 #include "mode_tags.h"
+#include "runtime_command_bus.h"
+#include "runtime_mode_coordinator.h"
+#include "runtime_status_builder.h"
 
 namespace {
 struct ThemePageItem {
@@ -84,6 +87,30 @@ bool parseBooleanSwitch(const String& text, bool& outValue) {
   return false;
 }
 
+int gUploadResponseStatusCode = 200;
+String gUploadResponseBody = "{\"status\":\"ok\"}";
+bool gIgnoreCurrentUpload = false;
+
+void resetUploadResponseState() {
+  gUploadResponseStatusCode = 200;
+  gUploadResponseBody = "{\"status\":\"ok\"}";
+  gIgnoreCurrentUpload = false;
+}
+
+void setUploadErrorResponse(int statusCode, const char* message) {
+  gUploadResponseStatusCode = statusCode;
+  gUploadResponseBody = "{\"error\":\"" + String(message) + "\"}";
+  gIgnoreCurrentUpload = true;
+}
+
+void releaseUploadBuffer() {
+  if (WebServer::imageBuffer != nullptr) {
+    free(WebServer::imageBuffer);
+    WebServer::imageBuffer = nullptr;
+  }
+  WebServer::imageSize = 0;
+}
+
 bool isValidHourMinuteText(const String& text) {
   if (text.length() != 5 || text[2] != ':') {
     return false;
@@ -138,7 +165,7 @@ void sendDeviceParamsResponse(AsyncWebServerRequest* request) {
 }
 
 bool applyDeviceParamValue(const String& key, const String& value, String& errorMessage) {
-  bool requiresDisplayRebuild = false;
+  bool requiresRuntimeApply = false;
   uint32_t parsedNumber = 0;
   bool parsedBool = false;
 
@@ -147,54 +174,57 @@ bool applyDeviceParamValue(const String& key, const String& value, String& error
       errorMessage = "displayBright must be 0-255";
       return false;
     }
-    DisplayManager::setBrightness(static_cast<int>(parsedNumber));
+    ConfigManager::deviceParamsConfig.displayBright = static_cast<uint8_t>(parsedNumber);
+    requiresRuntimeApply = true;
   } else if (key == "brightnessDay") {
     if (!parseUnsignedValue(value, 0, 255, parsedNumber)) {
       errorMessage = "brightnessDay must be 0-255";
       return false;
     }
     ConfigManager::deviceParamsConfig.brightnessDay = static_cast<uint8_t>(parsedNumber);
+    requiresRuntimeApply = true;
   } else if (key == "brightnessNight") {
     if (!parseUnsignedValue(value, 0, 255, parsedNumber)) {
       errorMessage = "brightnessNight must be 0-255";
       return false;
     }
     ConfigManager::deviceParamsConfig.brightnessNight = static_cast<uint8_t>(parsedNumber);
+    requiresRuntimeApply = true;
   } else if (key == "displayRotation") {
     if (!parseUnsignedValue(value, 0, 3, parsedNumber)) {
       errorMessage = "displayRotation must be 0-3";
       return false;
     }
     ConfigManager::deviceParamsConfig.displayRotation = static_cast<uint8_t>(parsedNumber);
-    requiresDisplayRebuild = true;
+    requiresRuntimeApply = true;
   } else if (key == "swapBlueGreen") {
     if (!parseBooleanSwitch(value, parsedBool)) {
       errorMessage = "swapBlueGreen must be 0 or 1";
       return false;
     }
     ConfigManager::deviceParamsConfig.swapBlueGreen = parsedBool;
-    requiresDisplayRebuild = true;
+    requiresRuntimeApply = true;
   } else if (key == "swapBlueRed") {
     if (!parseBooleanSwitch(value, parsedBool)) {
       errorMessage = "swapBlueRed must be 0 or 1";
       return false;
     }
     ConfigManager::deviceParamsConfig.swapBlueRed = parsedBool;
-    requiresDisplayRebuild = true;
+    requiresRuntimeApply = true;
   } else if (key == "clkphase") {
     if (!parseBooleanSwitch(value, parsedBool)) {
       errorMessage = "clkphase must be 0 or 1";
       return false;
     }
     ConfigManager::deviceParamsConfig.clkphase = parsedBool;
-    requiresDisplayRebuild = true;
+    requiresRuntimeApply = true;
   } else if (key == "driver") {
     if (!parseUnsignedValue(value, 0, 5, parsedNumber)) {
       errorMessage = "driver must be 0-5";
       return false;
     }
     ConfigManager::deviceParamsConfig.driver = static_cast<uint8_t>(parsedNumber);
-    requiresDisplayRebuild = true;
+    requiresRuntimeApply = true;
   } else if (key == "i2cSpeed") {
     if (!parseUnsignedValue(value, 8000000, 20000000, parsedNumber) ||
         (parsedNumber != 8000000 && parsedNumber != 16000000 && parsedNumber != 20000000)) {
@@ -202,14 +232,14 @@ bool applyDeviceParamValue(const String& key, const String& value, String& error
       return false;
     }
     ConfigManager::deviceParamsConfig.i2cSpeed = parsedNumber;
-    requiresDisplayRebuild = true;
+    requiresRuntimeApply = true;
   } else if (key == "E_pin") {
     if (!parseUnsignedValue(value, 0, 32, parsedNumber)) {
       errorMessage = "E_pin must be 0-32";
       return false;
     }
     ConfigManager::deviceParamsConfig.E_pin = static_cast<uint8_t>(parsedNumber);
-    requiresDisplayRebuild = true;
+    requiresRuntimeApply = true;
   } else if (key == "nightStart") {
     if (!isValidHourMinuteText(value)) {
       errorMessage = "nightStart must be HH:MM";
@@ -217,6 +247,7 @@ bool applyDeviceParamValue(const String& key, const String& value, String& error
     }
     memset(ConfigManager::deviceParamsConfig.nightStart, 0, sizeof(ConfigManager::deviceParamsConfig.nightStart));
     value.toCharArray(ConfigManager::deviceParamsConfig.nightStart, sizeof(ConfigManager::deviceParamsConfig.nightStart));
+    requiresRuntimeApply = true;
   } else if (key == "nightEnd") {
     if (!isValidHourMinuteText(value)) {
       errorMessage = "nightEnd must be HH:MM";
@@ -224,6 +255,7 @@ bool applyDeviceParamValue(const String& key, const String& value, String& error
     }
     memset(ConfigManager::deviceParamsConfig.nightEnd, 0, sizeof(ConfigManager::deviceParamsConfig.nightEnd));
     value.toCharArray(ConfigManager::deviceParamsConfig.nightEnd, sizeof(ConfigManager::deviceParamsConfig.nightEnd));
+    requiresRuntimeApply = true;
   } else if (key == "ntpServer") {
     if (value.length() == 0 || value.length() >= (int)sizeof(ConfigManager::deviceParamsConfig.ntpServer)) {
       errorMessage = "ntpServer length is invalid";
@@ -238,15 +270,24 @@ bool applyDeviceParamValue(const String& key, const String& value, String& error
 
   ConfigManager::saveDeviceParamsConfig();
 
-  if (requiresDisplayRebuild) {
-    DisplayManager::applyDeviceParams(false);
-    WebSocketHandler::restoreDisplayForCurrentMode();
+  if (requiresRuntimeApply) {
+    RuntimeCommandBus::RuntimeCommand* command =
+      RuntimeCommandBus::createCommand(RuntimeCommandBus::RuntimeCommandSource::HTTP, 0);
+    if (command == nullptr) {
+      errorMessage = "out of memory";
+      return false;
+    }
+    command->type = RuntimeCommandBus::RuntimeCommandType::APPLY_DEVICE_PARAMS;
+    if (!RuntimeCommandBus::enqueue(command)) {
+      RuntimeCommandBus::destroyCommand(command);
+      errorMessage = "device busy";
+      return false;
+    }
   }
 
   if (key == "ntpServer") {
     WiFiManager::refreshTimeSync();
   }
-  DisplayManager::refreshScheduledBrightness();
 
   return true;
 }
@@ -285,29 +326,31 @@ int wifiSignalPercentFromRssi(int32_t rssi) {
   return (rssi + 100) * 2;
 }
 
-String buildWifiNetworkListHtml() {
-  String listHtml;
+const char* wifiScanPhaseApiValue(WifiScanPhase phase) {
+  switch (phase) {
+    case WifiScanPhase::IDLE:
+      return "idle";
+    case WifiScanPhase::REQUESTED:
+      return "requested";
+    case WifiScanPhase::RUNNING:
+      return "running";
+    default:
+      return "idle";
+  }
+}
+
+void addConfigPortalNoCacheHeaders(AsyncWebServerResponse* response);
+
+String buildWifiScanSelectOptionsHtml() {
+  String optionsHtml;
   size_t count = WiFiManager::getScannedNetworkCount();
 
   if (count == 0) {
-    if (WiFiManager::isNetworkScanRunning()) {
-      listHtml += R"HTML(
-        <div class="empty-state">
-          <strong>正在扫描附近 WiFi</strong>
-          <span>设备正在后台扫描热点，页面会自动刷新。请稍候 1-3 秒。</span>
-        </div>
-      )HTML";
-      return listHtml;
-    }
-
-    listHtml += R"HTML(
-      <div class="empty-state">
-        <strong>页面已经打开成功</strong>
-        <span>为避免热点门户卡死，设备不会在热点刚启动时立刻扫描。请点一次“开始扫描 WiFi”，也可以直接手动输入 SSID。</span>
-      </div>
-    )HTML";
-    return listHtml;
+    optionsHtml += R"HTML(<option value="">请先点击扫描 WiFi</option>)HTML";
+    return optionsHtml;
   }
+
+  optionsHtml += R"HTML(<option value="">请选择扫描到的 WiFi</option>)HTML";
 
   for (size_t i = 0; i < count; i++) {
     WiFiScanResultItem item = WiFiManager::getScannedNetwork(i);
@@ -316,37 +359,95 @@ String buildWifiNetworkListHtml() {
       continue;
     }
 
-    listHtml += "<button type=\"button\" class=\"wifi-item\" data-ssid=\"";
-    listHtml += escapeHtml(ssid);
-    listHtml += "\">";
-    listHtml += "<span class=\"wifi-name\">";
-    listHtml += escapeHtml(ssid);
-    listHtml += "</span>";
-    listHtml += "<span class=\"wifi-meta\">";
-    listHtml += item.secure ? "加密网络" : "开放网络";
-    listHtml += " · ";
-    listHtml += String(wifiSignalPercentFromRssi(item.rssi));
-    listHtml += "%";
-    listHtml += "</span>";
-    listHtml += "</button>";
+    optionsHtml += "<option value=\"";
+    optionsHtml += escapeHtml(ssid);
+    optionsHtml += "\">";
+    optionsHtml += escapeHtml(ssid);
+    optionsHtml += " · ";
+    optionsHtml += item.secure ? "加密网络" : "开放网络";
+    optionsHtml += " · ";
+    optionsHtml += String(wifiSignalPercentFromRssi(item.rssi));
+    optionsHtml += "%</option>";
   }
 
-  return listHtml;
+  return optionsHtml;
+}
+
+String buildWifiScanStatusText() {
+  WifiScanPhase phase = WiFiManager::getScanPhase();
+  size_t count = WiFiManager::getScannedNetworkCount();
+
+  if (phase == WifiScanPhase::REQUESTED || phase == WifiScanPhase::RUNNING) {
+    return "正在扫描附近 WiFi，请稍候 3-6 秒。";
+  }
+
+  if (count == 0) {
+    return "尚未扫描到 WiFi。请点击“扫描 WiFi”，也可以直接手动输入 SSID。";
+  }
+
+  return "已扫描到 " + String(count) + " 个 WiFi，请从下拉框选择，也可以直接手动输入。";
+}
+
+const char* buildWifiScanStatusClassName() {
+  WifiScanPhase phase = WiFiManager::getScanPhase();
+  if (phase == WifiScanPhase::REQUESTED || phase == WifiScanPhase::RUNNING) {
+    return "scan-status status-busy";
+  }
+  if (WiFiManager::getScannedNetworkCount() > 0) {
+    return "scan-status status-ready";
+  }
+  return "scan-status status-empty";
+}
+
+void sendWifiScanSnapshotResponse(AsyncWebServerRequest* request) {
+  size_t count = WiFiManager::getScannedNetworkCount();
+  size_t jsonCapacity = JSON_OBJECT_SIZE(2) + JSON_ARRAY_SIZE(count) + 24;
+
+  for (size_t i = 0; i < count; i++) {
+    WiFiScanResultItem item = WiFiManager::getScannedNetwork(i);
+    jsonCapacity += JSON_OBJECT_SIZE(3);
+    jsonCapacity += strlen(item.ssid) + 1;
+  }
+
+  DynamicJsonDocument doc(jsonCapacity);
+  doc["scanPhase"] = wifiScanPhaseApiValue(WiFiManager::getScanPhase());
+  JsonArray networks = doc.createNestedArray("networks");
+
+  for (size_t i = 0; i < count; i++) {
+    WiFiScanResultItem item = WiFiManager::getScannedNetwork(i);
+    JsonObject network = networks.createNestedObject();
+    network["ssid"] = item.ssid;
+    network["rssi"] = item.rssi;
+    network["secure"] = item.secure;
+  }
+
+  String responseBody;
+  serializeJson(doc, responseBody);
+
+  AsyncWebServerResponse* response = request->beginResponse(
+    200,
+    "application/json; charset=utf-8",
+    responseBody
+  );
+  addConfigPortalNoCacheHeaders(response);
+  request->send(response);
 }
 
 String buildWifiConfigPortalPage() {
   String portalSsid = WiFiManager::getConfigPortalSSID();
   String portalIp = WiFiManager::getConfigPortalIP();
-  String networkListHtml = buildWifiNetworkListHtml();
+  String networkOptionsHtml = buildWifiScanSelectOptionsHtml();
+  String scanStatusText = buildWifiScanStatusText();
+  const char* scanStatusClassName = buildWifiScanStatusClassName();
   bool scanRunning = WiFiManager::isNetworkScanRunning();
   String scanButtonText = scanRunning
     ? "正在扫描..."
     : (WiFiManager::getScannedNetworkCount() > 0
     ? "重新扫描 WiFi"
-    : "开始扫描 WiFi");
+    : "扫描 WiFi");
 
   String html;
-  html.reserve(9000);
+  html.reserve(15000);
   html += R"HTML(<!doctype html>
 <html lang="zh-CN">
 <head>
@@ -354,9 +455,6 @@ String buildWifiConfigPortalPage() {
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Glowxel WiFi 配网</title>
 )HTML";
-  if (scanRunning) {
-    html += R"HTML(<meta http-equiv="refresh" content="2">)HTML";
-  }
   html += R"HTML(
   <style>
     body { margin: 0; padding: 18px; background: #f4f7fb; color: #142033; font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif; }
@@ -368,17 +466,17 @@ String buildWifiConfigPortalPage() {
     .meta strong { color: #142033; word-break: break-all; }
     .notice { margin-bottom: 16px; padding: 12px 14px; border-radius: 12px; background: #fff7e8; border: 1px solid #ffd89a; color: #7d5412; font-size: 13px; line-height: 1.6; }
     .section-title { margin: 18px 0 10px; font-size: 15px; font-weight: 700; }
-    .wifi-list { display: block; margin-bottom: 14px; }
-    .wifi-item { width: 100%; display: block; margin-bottom: 10px; padding: 12px 14px; text-align: left; border: 1px solid #dce7f5; border-radius: 12px; background: #f7fafe; color: #142033; }
-    .wifi-name { display: block; font-size: 14px; font-weight: 700; margin-bottom: 4px; word-break: break-all; }
-    .wifi-meta { display: block; font-size: 12px; color: #5c6c84; }
-    .empty-state { padding: 14px; border-radius: 12px; border: 1px dashed #c6d6ea; background: #f8fbff; color: #5c6c84; font-size: 13px; line-height: 1.6; }
-    .empty-state strong { display: block; color: #142033; margin-bottom: 6px; }
+    .scan-box { margin-bottom: 14px; }
+    .scan-status { margin: 10px 0 0; padding: 12px 14px; border-radius: 12px; font-size: 13px; line-height: 1.6; border: 1px solid #dce7f5; background: #f8fbff; color: #50627d; }
+    .status-busy { border-color: #bfd5ff; background: #eef4ff; color: #184fb6; }
+    .status-ready { border-color: #cde9d2; background: #f3fcf5; color: #1e6b3a; }
+    .status-empty { border-color: #dce7f5; background: #f8fbff; color: #50627d; }
     label { display: block; margin: 12px 0 8px; color: #50627d; font-size: 13px; font-weight: 600; }
-    input { width: 100%; box-sizing: border-box; padding: 13px 14px; border: 1px solid #cfdced; border-radius: 12px; background: #fff; color: #142033; font-size: 14px; }
+    input, select { width: 100%; box-sizing: border-box; padding: 13px 14px; border: 1px solid #cfdced; border-radius: 12px; background: #fff; color: #142033; font-size: 14px; }
     .actions { margin-top: 14px; }
     .btn { width: 100%; box-sizing: border-box; display: block; padding: 13px 16px; border-radius: 12px; border: 1px solid #1e5eff; background: #1e5eff; color: #fff; text-align: center; text-decoration: none; font-size: 14px; font-weight: 700; }
     .btn-secondary { margin-bottom: 10px; background: #eef4ff; color: #1e5eff; }
+    .btn-disabled { border-color: #d8e1ef; background: #f3f6fb; color: #7e8ea5; pointer-events: none; }
     .hint { margin-top: 14px; color: #5c6c84; font-size: 12px; line-height: 1.6; }
   </style>
 </head>
@@ -394,10 +492,16 @@ String buildWifiConfigPortalPage() {
   html += R"HTML(</strong></div>
       <div class="notice">仅支持 2.4GHz WiFi。为保证系统登录页稳定打开，设备不会在热点刚启动时立刻扫描，请手动点一次扫描。</div>
       <div class="section-title">附近 WiFi</div>
-      <div class="wifi-list">
-)HTML";
-  html += networkListHtml;
-  html += R"HTML(
+      <div class="scan-box">
+        <label for="ssid-select">扫描结果</label>
+        <select id="ssid-select">)HTML";
+  html += networkOptionsHtml;
+  html += R"HTML(</select>
+        <p class=")HTML";
+  html += scanStatusClassName;
+  html += R"HTML(" id="scan-status">)HTML";
+  html += escapeHtml(scanStatusText);
+  html += R"HTML(</p>
       </div>
       <form method="post" action="/configure-wifi">
         <label for="ssid-input">WiFi 名称 (SSID)</label>
@@ -405,7 +509,15 @@ String buildWifiConfigPortalPage() {
         <label for="password-input">WiFi 密码</label>
         <input id="password-input" name="password" maxlength="64" type="password" autocomplete="off" placeholder="输入 WiFi 密码，开放网络可留空">
         <div class="actions">
-          <button class="btn btn-secondary" type="button" id="scan-btn">)HTML";
+          <button class="btn btn-secondary )HTML";
+  if (scanRunning) {
+    html += R"HTML(btn-disabled)HTML";
+  }
+  html += R"HTML(" id="scan-btn" type="button")HTML";
+  if (scanRunning) {
+    html += R"HTML( disabled)HTML";
+  }
+  html += R"HTML(>)HTML";
   html += scanButtonText;
   html += R"HTML(</button>
           <button class="btn" type="submit">保存并连接</button>
@@ -418,32 +530,171 @@ String buildWifiConfigPortalPage() {
   </div>
   <script>
     (function () {
-      var items = document.querySelectorAll(".wifi-item[data-ssid]");
-      for (var i = 0; i < items.length; i++) {
-        items[i].addEventListener("click", function () {
-          var ssid = this.getAttribute("data-ssid") || "";
-          var ssidInput = document.getElementById("ssid-input");
-          if (ssidInput) {
-            ssidInput.value = ssid;
-            ssidInput.focus();
-          }
-        });
+      var scanBtn = document.getElementById("scan-btn");
+      var scanStatus = document.getElementById("scan-status");
+      var ssidSelect = document.getElementById("ssid-select");
+      var ssidInput = document.getElementById("ssid-input");
+      var scanPollTimer = 0;
+
+      if (scanBtn == null || scanStatus == null || ssidSelect == null || ssidInput == null) {
+        return;
       }
 
-      var scanBtn = document.getElementById("scan-btn");
-      if (scanBtn) {
-        scanBtn.addEventListener("click", function () {
-          if (scanBtn.disabled) {
-            return;
-          }
-          scanBtn.disabled = true;
+      function clearScanPollTimer() {
+        if (scanPollTimer !== 0) {
+          window.clearTimeout(scanPollTimer);
+          scanPollTimer = 0;
+        }
+      }
+
+      function setScanButtonState(scanPhase, networkCount) {
+        var busy = scanPhase === "requested" || scanPhase === "running";
+        scanBtn.disabled = busy;
+        if (busy) {
+          scanBtn.classList.add("btn-disabled");
           scanBtn.textContent = "正在扫描...";
-          fetch("/scan-wifi", { cache: "no-store" })
-            .catch(function () {})
-            .finally(function () {
-              window.location.href = "/";
-            });
-        });
+          return;
+        }
+
+        scanBtn.classList.remove("btn-disabled");
+        if (networkCount > 0) {
+          scanBtn.textContent = "重新扫描 WiFi";
+          return;
+        }
+
+        scanBtn.textContent = "扫描 WiFi";
+      }
+
+      function setScanStatus(scanPhase, networkCount) {
+        scanStatus.className = "scan-status";
+
+        if (scanPhase === "requested" || scanPhase === "running") {
+          scanStatus.classList.add("status-busy");
+          scanStatus.textContent = "正在扫描附近 WiFi，请稍候 3-6 秒。";
+          return;
+        }
+
+        if (networkCount > 0) {
+          scanStatus.classList.add("status-ready");
+          scanStatus.textContent = "已扫描到 " + networkCount + " 个 WiFi，请从下拉框选择，也可以直接手动输入。";
+          return;
+        }
+
+        scanStatus.classList.add("status-empty");
+        scanStatus.textContent = "尚未扫描到 WiFi。请点击“扫描 WiFi”，也可以直接手动输入 SSID。";
+      }
+
+      function renderNetworkOptions(networks) {
+        var currentInputValue = ssidInput.value;
+        var placeholderText = "请先点击扫描 WiFi";
+
+        if (networks.length > 0) {
+          placeholderText = "请选择扫描到的 WiFi";
+        }
+
+        while (ssidSelect.options.length > 0) {
+          ssidSelect.remove(0);
+        }
+
+        var placeholderOption = document.createElement("option");
+        placeholderOption.value = "";
+        placeholderOption.textContent = placeholderText;
+        ssidSelect.appendChild(placeholderOption);
+
+        for (var i = 0; i < networks.length; i++) {
+          var network = networks[i];
+          var option = document.createElement("option");
+          option.value = network.ssid;
+          option.textContent = network.ssid + " · " + (network.secure ? "加密网络" : "开放网络") + " · " + network.rssi + " dBm";
+          if (currentInputValue === network.ssid) {
+            option.selected = true;
+          }
+          ssidSelect.appendChild(option);
+        }
+      }
+
+      function scheduleScanPoll() {
+        clearScanPollTimer();
+        scanPollTimer = window.setTimeout(function () {
+          fetchScanSnapshot("GET");
+        }, 1000);
+      }
+
+      function applyScanSnapshot(snapshot) {
+        if (snapshot == null || typeof snapshot !== "object") {
+          return;
+        }
+        if (snapshot.scanPhase !== "idle" &&
+            snapshot.scanPhase !== "requested" &&
+            snapshot.scanPhase !== "running") {
+          return;
+        }
+        if (!Array.isArray(snapshot.networks)) {
+          return;
+        }
+
+        renderNetworkOptions(snapshot.networks);
+        setScanStatus(snapshot.scanPhase, snapshot.networks.length);
+        setScanButtonState(snapshot.scanPhase, snapshot.networks.length);
+
+        if (snapshot.scanPhase === "requested" || snapshot.scanPhase === "running") {
+          scheduleScanPoll();
+          return;
+        }
+
+        clearScanPollTimer();
+      }
+
+      function fetchScanSnapshot(method) {
+        fetch("/scan-wifi", {
+          method: method,
+          cache: "no-store"
+        })
+          .then(function (response) {
+            if (!response.ok) {
+              throw new Error("scan request failed");
+            }
+            return response.json();
+          })
+          .then(function (snapshot) {
+            applyScanSnapshot(snapshot);
+          })
+          .catch(function () {
+            clearScanPollTimer();
+            scanStatus.className = "scan-status status-empty";
+            scanStatus.textContent = "扫描状态获取失败，请重试。";
+            setScanButtonState("idle", ssidSelect.options.length > 1 ? ssidSelect.options.length - 1 : 0);
+          });
+      }
+
+      ssidSelect.addEventListener("change", function () {
+        if (ssidSelect.value.length > 0) {
+          ssidInput.value = ssidSelect.value;
+          ssidInput.focus();
+        }
+      });
+
+      ssidInput.addEventListener("input", function () {
+        var matchedIndex = 0;
+        for (var i = 1; i < ssidSelect.options.length; i++) {
+          if (ssidSelect.options[i].value === ssidInput.value) {
+            matchedIndex = i;
+            break;
+          }
+        }
+        ssidSelect.selectedIndex = matchedIndex;
+      });
+
+      scanBtn.addEventListener("click", function () {
+        if (scanBtn.disabled) {
+          return;
+        }
+        fetchScanSnapshot("POST");
+      });
+
+      fetchScanSnapshot("GET");
+      if (scanBtn.disabled) {
+        scheduleScanPoll();
       }
     })();
   </script>
@@ -538,18 +789,15 @@ String buildWifiConfigSuccessPage(const String& ssid) {
   return html;
 }
 
-String buildConfigPortalRootUrl() {
-  return "http://" + WiFiManager::getConfigPortalIP() + "/";
-}
-
 void addConfigPortalNoCacheHeaders(AsyncWebServerResponse* response) {
   response->addHeader("Cache-Control", "no-cache, no-store, must-revalidate");
   response->addHeader("Pragma", "no-cache");
   response->addHeader("Expires", "-1");
+  response->addHeader("Connection", "close");
 }
 
 void redirectToConfigPortalRoot(AsyncWebServerRequest* request) {
-  String location = buildConfigPortalRootUrl();
+  String location = "http://" + WiFiManager::getConfigPortalIP() + "/";
   Serial.printf("[WiFi Portal] 重定向到根页: %s %s host=%s -> %s\n",
                 request->methodToString(),
                 request->url().c_str(),
@@ -2020,29 +2268,38 @@ AsyncWebServer WebServer::server(80);
 uint8_t* WebServer::imageBuffer = nullptr;
 size_t WebServer::imageSize = 0;
 
-void WebServer::init() {
-  Serial.println("4. 启动HTTP和WebSocket服务器...");
-  setupServer();
-}
+void WebServer::initConfigPortal() {
+  Serial.println("4. 启动热点配网HTTP服务器...");
 
-void WebServer::setupServer() {
-  // 设置 WebSocket
-  server.addHandler(&WebSocketHandler::ws);
-  
   DefaultHeaders::Instance().addHeader("Access-Control-Allow-Origin", "*");
   DefaultHeaders::Instance().addHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
   DefaultHeaders::Instance().addHeader("Access-Control-Allow-Headers", "Content-Type");
   DefaultHeaders::Instance().addHeader("Access-Control-Allow-Private-Network", "true");
-  
-  setupRoutes();
-  setupAPIRoutes();
-  
+
+  setupPortalRoutes();
   server.begin();
-  Serial.println("HTTP服务器已启动在端口80");
+  Serial.println("配网HTTP服务器已启动在端口80");
+}
+
+void WebServer::initRuntime() {
+  Serial.println("4. 启动运行态HTTP和WebSocket服务器...");
+
+  server.addHandler(&WebSocketHandler::ws);
+
+  DefaultHeaders::Instance().addHeader("Access-Control-Allow-Origin", "*");
+  DefaultHeaders::Instance().addHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+  DefaultHeaders::Instance().addHeader("Access-Control-Allow-Headers", "Content-Type");
+  DefaultHeaders::Instance().addHeader("Access-Control-Allow-Private-Network", "true");
+
+  setupRuntimeRoutes();
+  setupAPIRoutes();
+
+  server.begin();
+  Serial.println("运行态HTTP服务器已启动在端口80");
   Serial.println("等待客户端连接...");
 }
 
-void WebServer::setupRoutes() {
+void WebServer::setupPortalRoutes() {
   server.on("/test", HTTP_GET, [](AsyncWebServerRequest *request){
     Serial.println("收到测试请求");
     request->send(200, "text/plain", "ESP32 is working!");
@@ -2062,8 +2319,17 @@ void WebServer::setupRoutes() {
       return;
     }
 
+    sendWifiScanSnapshotResponse(request);
+  });
+
+  server.on("/scan-wifi", HTTP_POST, [](AsyncWebServerRequest *request){
+    if (!WiFiManager::isConfigMode()) {
+      request->send(409, "text/plain; charset=utf-8", "device is not in config portal mode");
+      return;
+    }
+
     WiFiManager::scanNearbyNetworks();
-    sendConfigPortalPage(request);
+    sendWifiScanSnapshotResponse(request);
   });
 
   server.on("/configure-wifi", HTTP_POST, [](AsyncWebServerRequest *request){
@@ -2111,28 +2377,8 @@ void WebServer::setupRoutes() {
     ESP.restart();
   });
 
-  server.on("/themes", HTTP_GET, [](AsyncWebServerRequest *request){
-    if (WiFiManager::isConfigMode()) {
-      sendConfigPortalPage(request);
-      return;
-    }
-    request->send(200, "text/html; charset=utf-8", buildThemeBrowserPage());
-  });
-
-  server.on("/effects", HTTP_GET, [](AsyncWebServerRequest *request){
-    if (WiFiManager::isConfigMode()) {
-      sendConfigPortalPage(request);
-      return;
-    }
-    request->send(200, "text/html; charset=utf-8", buildAmbientEffectsPage());
-  });
-
   auto captiveProbeHandler = [](AsyncWebServerRequest *request) {
-    if (WiFiManager::isConfigMode()) {
-      redirectToConfigPortalRoot(request);
-      return;
-    }
-    request->send(204);
+    redirectToConfigPortalRoot(request);
   };
 
   server.on("/generate_204", HTTP_ANY, captiveProbeHandler);
@@ -2146,6 +2392,47 @@ void WebServer::setupRoutes() {
   server.on("/connectivity-check.html", HTTP_ANY, captiveProbeHandler);
   server.on("/redirect", HTTP_ANY, captiveProbeHandler);
   server.on("/fwlink", HTTP_ANY, captiveProbeHandler);
+  server.on("/favicon.ico", HTTP_ANY, [](AsyncWebServerRequest *request){
+    request->send(204);
+  });
+
+  server.onNotFound([](AsyncWebServerRequest *request){
+    if (request->method() == HTTP_OPTIONS) {
+      request->send(204);
+      return;
+    }
+    redirectToConfigPortalRoot(request);
+  });
+}
+
+void WebServer::setupRuntimeRoutes() {
+  server.on("/test", HTTP_GET, [](AsyncWebServerRequest *request){
+    Serial.println("收到测试请求");
+    request->send(200, "text/plain", "ESP32 is working!");
+  });
+
+  server.on("/", HTTP_ANY, [](AsyncWebServerRequest *request){
+    request->send(200, "text/html; charset=utf-8", buildControlHubPage());
+  });
+
+  server.on("/clear-wifi", HTTP_GET, [](AsyncWebServerRequest *request){
+    Serial.println("清除WiFi配置");
+    ConfigManager::preferences.begin("wifi", false);
+    ConfigManager::preferences.clear();
+    ConfigManager::preferences.end();
+    request->send(200, "application/json", "{\"status\":\"ok\",\"message\":\"WiFi配置已清除，3秒后重启\"}");
+    Serial.println("3秒后重启...");
+    delay(3000);
+    ESP.restart();
+  });
+
+  server.on("/themes", HTTP_GET, [](AsyncWebServerRequest *request){
+    request->send(200, "text/html; charset=utf-8", buildThemeBrowserPage());
+  });
+
+  server.on("/effects", HTTP_GET, [](AsyncWebServerRequest *request){
+    request->send(200, "text/html; charset=utf-8", buildAmbientEffectsPage());
+  });
 
   auto sendLiveFrameBinary = [](AsyncWebServerRequest *request) {
     const uint8_t* frameData =
@@ -2203,10 +2490,6 @@ void WebServer::setupRoutes() {
   server.onNotFound([](AsyncWebServerRequest *request){
     if (request->method() == HTTP_OPTIONS) {
       request->send(204);
-      return;
-    }
-    if (WiFiManager::isConfigMode()) {
-      redirectToConfigPortalRoot(request);
       return;
     }
     Serial.printf("404: %s %s\n", request->methodToString(), request->url().c_str());
@@ -2275,55 +2558,15 @@ void WebServer::setupAPIRoutes() {
 
   server.on("/status", HTTP_GET, [](AsyncWebServerRequest *request){
     Serial.println("收到状态查询请求");
-    StaticJsonDocument<640> doc;
-    const char* mode = DeviceModeTagCodec::toTagOrUnknown(DisplayManager::currentMode);
+    StaticJsonDocument<RuntimeStatusBuilder::kStatusJsonCapacity> doc;
+    RuntimeStatusBuilder::fillStatus(doc, true, true);
 
-    doc["status"] = "ok";
-    doc["ip"] = WiFiManager::getDeviceIP();
-    doc["firmware_version"] = FIRMWARE_VERSION;
-    doc["device_type"] = DEVICE_TYPE;
-    doc["width"] = DisplayManager::PANEL_RES_X;
-    doc["height"] = DisplayManager::PANEL_RES_Y;
-    doc["brightness"] = DisplayManager::currentBrightness;
-    doc["displayBright"] = ConfigManager::deviceParamsConfig.displayBright;
-    doc["brightnessDay"] = ConfigManager::deviceParamsConfig.brightnessDay;
-    doc["brightnessNight"] = ConfigManager::deviceParamsConfig.brightnessNight;
-    doc["displayRotation"] = ConfigManager::deviceParamsConfig.displayRotation;
-    doc["swapBlueGreen"] = ConfigManager::deviceParamsConfig.swapBlueGreen;
-    doc["swapBlueRed"] = ConfigManager::deviceParamsConfig.swapBlueRed;
-    doc["clkphase"] = ConfigManager::deviceParamsConfig.clkphase;
-    doc["driver"] = ConfigManager::deviceParamsConfig.driver;
-    doc["i2cSpeed"] = ConfigManager::deviceParamsConfig.i2cSpeed;
-    doc["E_pin"] = ConfigManager::deviceParamsConfig.E_pin;
-    doc["nightStart"] = ConfigManager::deviceParamsConfig.nightStart;
-    doc["nightEnd"] = ConfigManager::deviceParamsConfig.nightEnd;
-    doc["ntpServer"] = ConfigManager::deviceParamsConfig.ntpServer;
-    doc["wifiSsid"] = WiFiManager::getConnectedSSID();
-    doc["freeHeap"] = ESP.getFreeHeap();
-    doc["uptime"] = millis() / 1000;
-    doc["mode"] = mode;
-    doc["businessMode"] = DisplayManager::currentBusinessModeTag;
-    if (DisplayManager::nativeEffectType == NATIVE_EFFECT_BREATH) {
-      doc["effectMode"] = ModeTags::BREATH_EFFECT;
-    } else if (DisplayManager::nativeEffectType == NATIVE_EFFECT_RHYTHM) {
-      doc["effectMode"] = ModeTags::RHYTHM_EFFECT;
-    } else if (DisplayManager::nativeEffectType == NATIVE_EFFECT_EYES) {
-      doc["effectMode"] = ModeTags::EYES;
-    } else if (DisplayManager::nativeEffectType == NATIVE_EFFECT_AMBIENT) {
-      doc["effectMode"] = ModeTags::AMBIENT_EFFECT;
-    } else {
-      doc["effectMode"] = "none";
+    if (doc.overflowed()) {
+      Serial.printf(
+        "/status 响应 JSON 溢出: capacity=%u\n",
+        RuntimeStatusBuilder::kStatusJsonCapacity
+      );
     }
-    doc["effectPreset"] = AmbientPresetCodec::toString(DisplayManager::ambientEffectConfig.preset);
-    doc["effectSpeed"] = DisplayManager::ambientEffectConfig.speed;
-    doc["effectIntensity"] = DisplayManager::ambientEffectConfig.intensity;
-    doc["effectDensity"] = DisplayManager::ambientEffectConfig.density;
-    JsonObject effectColor = doc.createNestedObject("effectColor");
-    effectColor["r"] = DisplayManager::ambientEffectConfig.colorR;
-    effectColor["g"] = DisplayManager::ambientEffectConfig.colorG;
-    effectColor["b"] = DisplayManager::ambientEffectConfig.colorB;
-    doc["effectLoop"] = DisplayManager::ambientEffectConfig.loop;
-    doc["themeId"] = ConfigManager::themeConfig.themeId;
     
     String response;
     serializeJson(doc, response);
@@ -2332,14 +2575,23 @@ void WebServer::setupAPIRoutes() {
 
   server.on("/upload", HTTP_POST, 
     [](AsyncWebServerRequest *request){
-      request->send(200, "application/json", "{\"status\":\"ok\"}");
+      request->send(gUploadResponseStatusCode, "application/json", gUploadResponseBody);
+      resetUploadResponseState();
     },
     [](AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final){
       if (index == 0) {
+        resetUploadResponseState();
+        if (imageBuffer != nullptr || imageSize != 0) {
+          Serial.println("图片上传被拒绝：上一张图片仍在主循环等待显示");
+          setUploadErrorResponse(503, "device busy");
+          return;
+        }
         Serial.println("开始接收图片...");
-        if (imageBuffer) free(imageBuffer);
-        imageBuffer = nullptr;
-        imageSize = 0;
+        releaseUploadBuffer();
+      }
+
+      if (gIgnoreCurrentUpload) {
+        return;
       }
       
       uint8_t* newBuffer = (uint8_t*)realloc(imageBuffer, imageSize + len);
@@ -2347,6 +2599,11 @@ void WebServer::setupAPIRoutes() {
         imageBuffer = newBuffer;
         memcpy(imageBuffer + imageSize, data, len);
         imageSize += len;
+      } else {
+        Serial.println("图片上传缓冲区扩容失败");
+        releaseUploadBuffer();
+        setUploadErrorResponse(500, "upload buffer alloc failed");
+        return;
       }
       
       if (final) {
@@ -2354,16 +2611,27 @@ void WebServer::setupAPIRoutes() {
         if (imageBuffer != nullptr && imageSize > 0) {
           int width = request->hasParam("width") ? request->getParam("width")->value().toInt() : DisplayManager::PANEL_RES_X;
           int height = request->hasParam("height") ? request->getParam("height")->value().toInt() : DisplayManager::PANEL_RES_Y;
-          DisplayManager::displayImage(imageBuffer, imageSize, width, height);
+          RuntimeCommandBus::RuntimeCommand* command =
+            RuntimeCommandBus::createCommand(RuntimeCommandBus::RuntimeCommandSource::HTTP, 0);
+          if (command == nullptr) {
+            Serial.println("图片上传入队失败：命令对象分配失败");
+            releaseUploadBuffer();
+            setUploadErrorResponse(500, "out of memory");
+            return;
+          }
+          command->type = RuntimeCommandBus::RuntimeCommandType::HTTP_UPLOAD_IMAGE;
+          command->intValue1 = width;
+          command->intValue2 = height;
+          if (!RuntimeCommandBus::enqueue(command)) {
+            Serial.println("图片上传入队失败：设备忙");
+            RuntimeCommandBus::destroyCommand(command);
+            releaseUploadBuffer();
+            setUploadErrorResponse(503, "device busy");
+          }
         } else {
           Serial.println("✗ 图片缓冲区为空，无法显示");
+          setUploadErrorResponse(400, "empty image buffer");
         }
-        
-        if (imageBuffer) {
-          free(imageBuffer);
-          imageBuffer = nullptr;
-        }
-        imageSize = 0;
       }
     }
   );
@@ -2372,8 +2640,19 @@ void WebServer::setupAPIRoutes() {
     if (request->hasParam("value", true)) {
       int brightness = request->getParam("value", true)->value().toInt();
       if (brightness >= 0 && brightness <= 255) {
-        DisplayManager::setBrightness(brightness);
-        ConfigManager::saveDeviceParamsConfig();
+        RuntimeCommandBus::RuntimeCommand* command =
+          RuntimeCommandBus::createCommand(RuntimeCommandBus::RuntimeCommandSource::HTTP, 0);
+        if (command == nullptr) {
+          request->send(500, "application/json", "{\"error\":\"out of memory\"}");
+          return;
+        }
+        command->type = RuntimeCommandBus::RuntimeCommandType::BRIGHTNESS;
+        command->intValue1 = brightness;
+        if (!RuntimeCommandBus::enqueue(command)) {
+          RuntimeCommandBus::destroyCommand(command);
+          request->send(503, "application/json", "{\"error\":\"device busy\"}");
+          return;
+        }
         request->send(200, "application/json", "{\"status\":\"ok\",\"brightness\":" + String(brightness) + "}");
       } else {
         request->send(400, "application/json", "{\"error\":\"brightness must be 0-255\"}");
@@ -2388,12 +2667,23 @@ void WebServer::setupAPIRoutes() {
       String text = request->getParam("content", true)->value();
       int x = request->hasParam("x", true) ? request->getParam("x", true)->value().toInt() : 0;
       int y = request->hasParam("y", true) ? request->getParam("y", true)->value().toInt() : 0;
-      
-      DisplayManager::dma_display->clearScreen();
-      DisplayManager::dma_display->setCursor(x, y);
-      DisplayManager::dma_display->setTextColor(DisplayManager::dma_display->color565(255, 255, 255));
-      DisplayManager::dma_display->print(text);
-      
+
+      RuntimeCommandBus::RuntimeCommand* command =
+        RuntimeCommandBus::createCommand(RuntimeCommandBus::RuntimeCommandSource::HTTP, 0);
+      if (command == nullptr) {
+        request->send(500, "application/json", "{\"error\":\"out of memory\"}");
+        return;
+      }
+      command->type = RuntimeCommandBus::RuntimeCommandType::TEXT;
+      command->stringValue1 = text;
+      command->intValue1 = x;
+      command->intValue2 = y;
+      if (!RuntimeCommandBus::enqueue(command)) {
+        RuntimeCommandBus::destroyCommand(command);
+        request->send(503, "application/json", "{\"error\":\"device busy\"}");
+        return;
+      }
+
       request->send(200, "application/json", "{\"status\":\"ok\"}");
     } else {
       request->send(400, "application/json", "{\"error\":\"missing content parameter\"}");

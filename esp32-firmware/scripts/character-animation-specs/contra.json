@@ -1,0 +1,615 @@
+{
+  "gameId": "contra",
+  "label": "魂斗罗 Contra",
+  "roles": [
+    {
+      "id": "bill",
+      "label": "Bill",
+      "forms": [
+        {
+          "id": "normal",
+          "label": "常态",
+          "actions": [
+            {
+              "id": "idle",
+              "label": "待机",
+              "loop": true,
+              "frames": [
+                {
+                  "frameId": "bill-normal-idle-01",
+                  "sourceAsset": "character_01__bill_and_lance.png",
+                  "sourceBox": {
+                    "x": 1,
+                    "y": 9,
+                    "width": 64,
+                    "height": 64
+                  },
+                  "origin": {
+                    "x": 33,
+                    "y": 62
+                  },
+                  "durationMs": 160
+                }
+              ]
+            },
+            {
+              "id": "run",
+              "label": "奔跑",
+              "loop": true,
+              "frames": [
+                {
+                  "frameId": "bill-normal-run-01",
+                  "sourceAsset": "character_01__bill_and_lance.png",
+                  "sourceBox": {
+                    "x": 1,
+                    "y": 9,
+                    "width": 64,
+                    "height": 64
+                  },
+                  "origin": {
+                    "x": 33,
+                    "y": 62
+                  },
+                  "durationMs": 100
+                },
+                {
+                  "frameId": "bill-normal-run-02",
+                  "sourceAsset": "character_01__bill_and_lance.png",
+                  "sourceBox": {
+                    "x": 66,
+                    "y": 9,
+                    "width": 64,
+                    "height": 64
+                  },
+                  "origin": {
+                    "x": 34,
+                    "y": 61
+                  },
+                  "durationMs": 100
+                },
+                {
+                  "frameId": "bill-normal-run-03",
+                  "sourceAsset": "character_01__bill_and_lance.png",
+                  "sourceBox": {
+                    "x": 131,
+                    "y": 9,
+                    "width": 64,
+                    "height": 64
+                  },
+                  "origin": {
+                    "x": 32,
+                    "y": 62
+                  },
+                  "durationMs": 100
+                },
+                {
+                  "frameId": "bill-normal-run-04",
+                  "sourceAsset": "character_01__bill_and_lance.png",
+                  "sourceBox": {
+                    "x": 196,
+                    "y": 9,
+                    "width": 64,
+                    "height": 64
+                  },
+                  "origin": {
+                    "x": 33,
+                    "y": 62
+                  },
+                  "durationMs": 100
+                }
+              ]
+            },
+            {
+              "id": "shoot",
+              "label": "射击",
+              "loop": false,
+              "frames": [
+                {
+                  "frameId": "bill-normal-shoot-01",
+                  "sourceAsset": "character_01__bill_and_lance.png",
+                  "sourceBox": {
+                    "x": 391,
+                    "y": 9,
+                    "width": 64,
+                    "height": 64
+                  },
+                  "origin": {
+                    "x": 36,
+                    "y": 62
+                  },
+                  "durationMs": 110
+                },
+                {
+                  "frameId": "bill-normal-shoot-02",
+                  "sourceAsset": "character_01__bill_and_lance.png",
+                  "sourceBox": {
+                    "x": 456,
+                    "y": 9,
+                    "width": 64,
+                    "height": 64
+                  },
+                  "origin": {
+                    "x": 36,
+                    "y": 61
+                  },
+                  "durationMs": 110
+                },
+                {
+                  "frameId": "bill-normal-shoot-03",
+                  "sourceAsset": "character_01__bill_and_lance.png",
+                  "sourceBox": {
+                    "x": 521,
+                    "y": 9,
+                    "width": 64,
+                    "height": 64
+                  },
+                  "origin": {
+                    "x": 36,
+                    "y": 62
+                  },
+                  "durationMs": 110
+                },
+                {
+                  "frameId": "bill-normal-shoot-04",
+                  "sourceAsset": "character_01__bill_and_lance.png",
+                  "sourceBox": {
+                    "x": 586,
+                    "y": 9,
+                    "width": 64,
+                    "height": 64
+                  },
+                  "origin": {
+                    "x": 36,
+                    "y": 62
+                  },
+                  "durationMs": 110
+                }
+              ]
+            },
+            {
+              "id": "jump",
+              "label": "跳跃",
+              "loop": false,
+              "frames": [
+                {
+                  "frameId": "bill-normal-jump-01",
+                  "sourceAsset": "character_01__bill_and_lance.png",
+                  "sourceBox": {
+                    "x": 1,
+                    "y": 139,
+                    "width": 64,
+                    "height": 129
+                  },
+                  "origin": {
+                    "x": 33,
+                    "y": 111
+                  },
+                  "durationMs": 120
+                },
+                {
+                  "frameId": "bill-normal-jump-02",
+                  "sourceAsset": "character_01__bill_and_lance.png",
+                  "sourceBox": {
+                    "x": 391,
+                    "y": 139,
+                    "width": 64,
+                    "height": 129
+                  },
+                  "origin": {
+                    "x": 32,
+                    "y": 127
+                  },
+                  "durationMs": 160
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "force-field",
+          "label": "力场",
+          "actions": [
+            {
+              "id": "idle",
+              "label": "待机",
+              "loop": true,
+              "frames": [
+                {
+                  "frameId": "bill-force-field-idle-01",
+                  "sourceAsset": "character_01__bill_and_lance.png",
+                  "sourceBox": {
+                    "x": 1,
+                    "y": 545,
+                    "width": 64,
+                    "height": 64
+                  },
+                  "origin": {
+                    "x": 33,
+                    "y": 62
+                  },
+                  "durationMs": 160
+                }
+              ]
+            },
+            {
+              "id": "run",
+              "label": "奔跑",
+              "loop": true,
+              "frames": [
+                {
+                  "frameId": "bill-force-field-run-01",
+                  "sourceAsset": "character_01__bill_and_lance.png",
+                  "sourceBox": {
+                    "x": 1,
+                    "y": 545,
+                    "width": 64,
+                    "height": 64
+                  },
+                  "origin": {
+                    "x": 33,
+                    "y": 62
+                  },
+                  "durationMs": 100
+                },
+                {
+                  "frameId": "bill-force-field-run-02",
+                  "sourceAsset": "character_01__bill_and_lance.png",
+                  "sourceBox": {
+                    "x": 66,
+                    "y": 545,
+                    "width": 64,
+                    "height": 64
+                  },
+                  "origin": {
+                    "x": 34,
+                    "y": 61
+                  },
+                  "durationMs": 100
+                },
+                {
+                  "frameId": "bill-force-field-run-03",
+                  "sourceAsset": "character_01__bill_and_lance.png",
+                  "sourceBox": {
+                    "x": 131,
+                    "y": 545,
+                    "width": 64,
+                    "height": 64
+                  },
+                  "origin": {
+                    "x": 32,
+                    "y": 62
+                  },
+                  "durationMs": 100
+                },
+                {
+                  "frameId": "bill-force-field-run-04",
+                  "sourceAsset": "character_01__bill_and_lance.png",
+                  "sourceBox": {
+                    "x": 196,
+                    "y": 545,
+                    "width": 64,
+                    "height": 64
+                  },
+                  "origin": {
+                    "x": 33,
+                    "y": 62
+                  },
+                  "durationMs": 100
+                }
+              ]
+            },
+            {
+              "id": "shoot",
+              "label": "射击",
+              "loop": false,
+              "frames": [
+                {
+                  "frameId": "bill-force-field-shoot-01",
+                  "sourceAsset": "character_01__bill_and_lance.png",
+                  "sourceBox": {
+                    "x": 391,
+                    "y": 545,
+                    "width": 64,
+                    "height": 64
+                  },
+                  "origin": {
+                    "x": 36,
+                    "y": 62
+                  },
+                  "durationMs": 110
+                },
+                {
+                  "frameId": "bill-force-field-shoot-02",
+                  "sourceAsset": "character_01__bill_and_lance.png",
+                  "sourceBox": {
+                    "x": 456,
+                    "y": 545,
+                    "width": 64,
+                    "height": 64
+                  },
+                  "origin": {
+                    "x": 36,
+                    "y": 61
+                  },
+                  "durationMs": 110
+                },
+                {
+                  "frameId": "bill-force-field-shoot-03",
+                  "sourceAsset": "character_01__bill_and_lance.png",
+                  "sourceBox": {
+                    "x": 521,
+                    "y": 545,
+                    "width": 64,
+                    "height": 64
+                  },
+                  "origin": {
+                    "x": 36,
+                    "y": 62
+                  },
+                  "durationMs": 110
+                },
+                {
+                  "frameId": "bill-force-field-shoot-04",
+                  "sourceAsset": "character_01__bill_and_lance.png",
+                  "sourceBox": {
+                    "x": 586,
+                    "y": 545,
+                    "width": 64,
+                    "height": 64
+                  },
+                  "origin": {
+                    "x": 36,
+                    "y": 62
+                  },
+                  "durationMs": 110
+                }
+              ]
+            },
+            {
+              "id": "jump",
+              "label": "跳跃",
+              "loop": false,
+              "frames": [
+                {
+                  "frameId": "bill-force-field-jump-01",
+                  "sourceAsset": "character_01__bill_and_lance.png",
+                  "sourceBox": {
+                    "x": 1,
+                    "y": 675,
+                    "width": 64,
+                    "height": 129
+                  },
+                  "origin": {
+                    "x": 33,
+                    "y": 111
+                  },
+                  "durationMs": 120
+                },
+                {
+                  "frameId": "bill-force-field-jump-02",
+                  "sourceAsset": "character_01__bill_and_lance.png",
+                  "sourceBox": {
+                    "x": 391,
+                    "y": 675,
+                    "width": 64,
+                    "height": 129
+                  },
+                  "origin": {
+                    "x": 32,
+                    "y": 127
+                  },
+                  "durationMs": 160
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "lance",
+      "label": "Lance",
+      "forms": [
+        {
+          "id": "normal",
+          "label": "常态",
+          "actions": [
+            {
+              "id": "idle",
+              "label": "待机",
+              "loop": true,
+              "frames": [
+                {
+                  "frameId": "lance-normal-idle-01",
+                  "sourceAsset": "character_01__bill_and_lance.png",
+                  "sourceBox": {
+                    "x": 1,
+                    "y": 277,
+                    "width": 64,
+                    "height": 64
+                  },
+                  "origin": {
+                    "x": 33,
+                    "y": 62
+                  },
+                  "durationMs": 160
+                }
+              ]
+            },
+            {
+              "id": "run",
+              "label": "奔跑",
+              "loop": true,
+              "frames": [
+                {
+                  "frameId": "lance-normal-run-01",
+                  "sourceAsset": "character_01__bill_and_lance.png",
+                  "sourceBox": {
+                    "x": 1,
+                    "y": 277,
+                    "width": 64,
+                    "height": 64
+                  },
+                  "origin": {
+                    "x": 33,
+                    "y": 62
+                  },
+                  "durationMs": 100
+                },
+                {
+                  "frameId": "lance-normal-run-02",
+                  "sourceAsset": "character_01__bill_and_lance.png",
+                  "sourceBox": {
+                    "x": 66,
+                    "y": 277,
+                    "width": 64,
+                    "height": 64
+                  },
+                  "origin": {
+                    "x": 34,
+                    "y": 61
+                  },
+                  "durationMs": 100
+                },
+                {
+                  "frameId": "lance-normal-run-03",
+                  "sourceAsset": "character_01__bill_and_lance.png",
+                  "sourceBox": {
+                    "x": 131,
+                    "y": 277,
+                    "width": 64,
+                    "height": 64
+                  },
+                  "origin": {
+                    "x": 32,
+                    "y": 62
+                  },
+                  "durationMs": 100
+                },
+                {
+                  "frameId": "lance-normal-run-04",
+                  "sourceAsset": "character_01__bill_and_lance.png",
+                  "sourceBox": {
+                    "x": 196,
+                    "y": 277,
+                    "width": 64,
+                    "height": 64
+                  },
+                  "origin": {
+                    "x": 33,
+                    "y": 62
+                  },
+                  "durationMs": 100
+                }
+              ]
+            },
+            {
+              "id": "shoot",
+              "label": "射击",
+              "loop": false,
+              "frames": [
+                {
+                  "frameId": "lance-normal-shoot-01",
+                  "sourceAsset": "character_01__bill_and_lance.png",
+                  "sourceBox": {
+                    "x": 391,
+                    "y": 277,
+                    "width": 64,
+                    "height": 64
+                  },
+                  "origin": {
+                    "x": 36,
+                    "y": 62
+                  },
+                  "durationMs": 110
+                },
+                {
+                  "frameId": "lance-normal-shoot-02",
+                  "sourceAsset": "character_01__bill_and_lance.png",
+                  "sourceBox": {
+                    "x": 456,
+                    "y": 277,
+                    "width": 64,
+                    "height": 64
+                  },
+                  "origin": {
+                    "x": 36,
+                    "y": 61
+                  },
+                  "durationMs": 110
+                },
+                {
+                  "frameId": "lance-normal-shoot-03",
+                  "sourceAsset": "character_01__bill_and_lance.png",
+                  "sourceBox": {
+                    "x": 521,
+                    "y": 277,
+                    "width": 64,
+                    "height": 64
+                  },
+                  "origin": {
+                    "x": 36,
+                    "y": 62
+                  },
+                  "durationMs": 110
+                },
+                {
+                  "frameId": "lance-normal-shoot-04",
+                  "sourceAsset": "character_01__bill_and_lance.png",
+                  "sourceBox": {
+                    "x": 586,
+                    "y": 277,
+                    "width": 64,
+                    "height": 64
+                  },
+                  "origin": {
+                    "x": 36,
+                    "y": 62
+                  },
+                  "durationMs": 110
+                }
+              ]
+            },
+            {
+              "id": "jump",
+              "label": "跳跃",
+              "loop": false,
+              "frames": [
+                {
+                  "frameId": "lance-normal-jump-01",
+                  "sourceAsset": "character_01__bill_and_lance.png",
+                  "sourceBox": {
+                    "x": 1,
+                    "y": 407,
+                    "width": 64,
+                    "height": 129
+                  },
+                  "origin": {
+                    "x": 33,
+                    "y": 111
+                  },
+                  "durationMs": 120
+                },
+                {
+                  "frameId": "lance-normal-jump-02",
+                  "sourceAsset": "character_01__bill_and_lance.png",
+                  "sourceBox": {
+                    "x": 391,
+                    "y": 407,
+                    "width": 64,
+                    "height": 129
+                  },
+                  "origin": {
+                    "x": 32,
+                    "y": 127
+                  },
+                  "durationMs": 160
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

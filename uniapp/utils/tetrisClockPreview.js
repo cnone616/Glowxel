@@ -95,6 +95,9 @@ const ORIGINAL_PREVIEW_SCALE = 2;
 const ORIGINAL_PREVIEW_OFFSET_X = 0;
 const ORIGINAL_PREVIEW_OFFSET_Y = 12;
 const ORIGINAL_FALL_START_Y = -5;
+const ORIGINAL_COLON_X = 15;
+const ORIGINAL_COLON_VERTICAL_GAP_RATIO = 0.2;
+
 function buildOriginalColonFalls(digits) {
   const topDigit = Number(digits[1]);
   const bottomDigit = Number(digits[2]);
@@ -106,10 +109,11 @@ function buildOriginalColonFalls(digits) {
     ORIGINAL_TETRIS_COLOR_SEQUENCE[
       (bottomDigit + 5) % ORIGINAL_TETRIS_COLOR_SEQUENCE.length
     ];
+  const colonLayout = getOriginalColonLayout(digits);
 
   return [
-    { block: 0, color: bottomColor, x: 15, y: 12, rot: 0 },
-    { block: 0, color: topColor, x: 15, y: 8, rot: 0 },
+    { block: 0, color: bottomColor, x: ORIGINAL_COLON_X, y: colonLayout.bottomY, rot: 0 },
+    { block: 0, color: topColor, x: ORIGINAL_COLON_X, y: colonLayout.topY, rot: 0 },
   ];
 }
 
@@ -238,6 +242,77 @@ const ORIGINAL_DIGIT_FALLS = {
     { block: 6, color: "myMAGENTA", x: 2, y: 8, rot: 2 },
   ],
 };
+
+function getOriginalPlacedBlockBounds(blockType, xPos, yPos, rotation) {
+  const cells = getOriginalShapeCells(blockType, rotation);
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minY = Infinity;
+  let maxY = -Infinity;
+
+  for (let index = 0; index < cells.length; index += 1) {
+    const x = xPos + cells[index][0];
+    const y = yPos + cells[index][1];
+    minX = Math.min(minX, x);
+    maxX = Math.max(maxX, x);
+    minY = Math.min(minY, y);
+    maxY = Math.max(maxY, y);
+  }
+
+  return { minX, maxX, minY, maxY };
+}
+
+function getOriginalDigitGroupBounds(digits) {
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minY = Infinity;
+  let maxY = -Infinity;
+
+  for (let index = 0; index < 4; index += 1) {
+    const digit = Number(digits[index]);
+    const instructions = ORIGINAL_DIGIT_FALLS[digit];
+    const xShift = ORIGINAL_DIGIT_X_SHIFTS[index];
+
+    for (let itemIndex = 0; itemIndex < instructions.length; itemIndex += 1) {
+      const item = instructions[itemIndex];
+      const bounds = getOriginalPlacedBlockBounds(
+        item.block,
+        item.x + xShift,
+        item.y - 1,
+        item.rot,
+      );
+      minX = Math.min(minX, bounds.minX);
+      maxX = Math.max(maxX, bounds.maxX);
+      minY = Math.min(minY, bounds.minY);
+      maxY = Math.max(maxY, bounds.maxY);
+    }
+  }
+
+  return { minX, maxX, minY, maxY };
+}
+
+function getOriginalColonLayout(digits) {
+  const digitBounds = getOriginalDigitGroupBounds(digits);
+  const colonBounds = getOriginalPlacedBlockBounds(0, 0, 0, 0);
+  const digitHeight = digitBounds.maxY - digitBounds.minY + 1;
+  const colonBlockHeight = colonBounds.maxY - colonBounds.minY + 1;
+  const maxGap = Math.max(0, digitHeight - colonBlockHeight * 2);
+  // Use the actual settled digit bounds so the colon stays vertically centered with the time group.
+  const colonGap = clamp(
+    Math.round(digitHeight * ORIGINAL_COLON_VERTICAL_GAP_RATIO),
+    0,
+    maxGap,
+  );
+  const colonGroupHeight = colonBlockHeight * 2 + colonGap;
+  const topPadding = Math.max(0, Math.floor((digitHeight - colonGroupHeight) / 2));
+  const topRow = digitBounds.minY + topPadding;
+  const bottomTopRow = topRow + colonBlockHeight + colonGap;
+
+  return {
+    topY: topRow - colonBounds.minY + 1,
+    bottomY: bottomTopRow - colonBounds.minY + 1,
+  };
+}
 
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));

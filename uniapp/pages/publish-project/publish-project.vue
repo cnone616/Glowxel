@@ -994,18 +994,23 @@ export default {
 }
 
 .add-tag-btn {
-  padding: 12rpx;
+  min-height: 80rpx;
+  padding: 14rpx 18rpx;
   margin-right: 12rpx;
   background-color: var(--nb-yellow);
   border-radius: 0;
-  border: 2rpx solid #000000;
-  color: #000000;
-  transition: all 0.2s ease;
+  border: 2rpx solid var(--nb-ink);
+  color: var(--nb-ink);
+  box-shadow: var(--nb-shadow-soft);
+  transition: opacity 0.2s ease;
 }
 
 .add-tag-btn.disabled {
-  background-color: #777777;
-  opacity: 0.5;
+  background-color: #e6e6e6;
+  border-color: #6b6b6b;
+  color: #6b6b6b;
+  box-shadow: none;
+  opacity: 1;
 }
 
 .tags-hint {
@@ -1068,13 +1073,14 @@ export default {
   justify-content: center;
   gap: 12rpx;
   width: 100%;
-  padding: 32rpx;
+  min-height: 96rpx;
+  padding: 18rpx 24rpx;
   background: var(--nb-yellow);
   border-radius: 0;
-  border: 3rpx solid #000000;
-  box-shadow: 2rpx 2rpx 0 #000000;
-  transition: all 0.3s ease;
-  color: #000000;
+  border: 2rpx solid var(--nb-ink);
+  box-shadow: var(--nb-shadow-soft);
+  transition: opacity 0.2s ease;
+  color: var(--nb-ink);
 }
 
 .publish-btn:active {
@@ -1082,9 +1088,11 @@ export default {
 }
 
 .publish-btn.disabled {
-  background: #777777;
+  background: #e6e6e6;
+  border-color: #6b6b6b;
+  color: #6b6b6b;
   box-shadow: none;
-  opacity: 0.6;
+  opacity: 1;
 }
 
 .loading-spinner {
@@ -1101,8 +1109,8 @@ export default {
 }
 
 .publish-btn-text {
-  font-size: 32rpx;
-  font-weight: 600;
+  font-size: 28rpx;
+  font-weight: 800;
   color: inherit;
 }
 </style>

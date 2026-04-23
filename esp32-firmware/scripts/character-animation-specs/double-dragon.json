@@ -1,0 +1,428 @@
+{
+  "gameId": "double-dragon",
+  "label": "双截龙",
+  "roles": [
+    {
+      "id": "billy-lee",
+      "label": "Billy Lee",
+      "forms": [
+        {
+          "id": "mode-b",
+          "label": "Mode B",
+          "actions": [
+            {
+              "id": "idle",
+              "label": "待机",
+              "loop": true,
+              "frames": [
+                {
+                  "frameId": "billy-mode-b-idle-01",
+                  "sourceAsset": "character_03__billy_and_jimmy.png",
+                  "sourceBox": {
+                    "x": 16,
+                    "y": 32,
+                    "width": 23,
+                    "height": 48
+                  },
+                  "origin": {
+                    "x": 11,
+                    "y": 47
+                  },
+                  "durationMs": 180
+                }
+              ]
+            },
+            {
+              "id": "walk",
+              "label": "行走",
+              "loop": true,
+              "frames": [
+                {
+                  "frameId": "billy-mode-b-walk-01",
+                  "sourceAsset": "character_03__billy_and_jimmy.png",
+                  "sourceBox": {
+                    "x": 16,
+                    "y": 32,
+                    "width": 23,
+                    "height": 48
+                  },
+                  "origin": {
+                    "x": 11,
+                    "y": 47
+                  },
+                  "durationMs": 140
+                },
+                {
+                  "frameId": "billy-mode-b-walk-02",
+                  "sourceAsset": "character_03__billy_and_jimmy.png",
+                  "sourceBox": {
+                    "x": 64,
+                    "y": 32,
+                    "width": 24,
+                    "height": 48
+                  },
+                  "origin": {
+                    "x": 12,
+                    "y": 47
+                  },
+                  "durationMs": 140
+                },
+                {
+                  "frameId": "billy-mode-b-walk-03",
+                  "sourceAsset": "character_03__billy_and_jimmy.png",
+                  "sourceBox": {
+                    "x": 112,
+                    "y": 32,
+                    "width": 23,
+                    "height": 48
+                  },
+                  "origin": {
+                    "x": 11,
+                    "y": 47
+                  },
+                  "durationMs": 140
+                }
+              ]
+            },
+            {
+              "id": "run",
+              "label": "奔跑",
+              "loop": true,
+              "frames": [
+                {
+                  "frameId": "billy-mode-b-run-01",
+                  "sourceAsset": "character_03__billy_and_jimmy.png",
+                  "sourceBox": {
+                    "x": 64,
+                    "y": 96,
+                    "width": 22,
+                    "height": 48
+                  },
+                  "origin": {
+                    "x": 11,
+                    "y": 47
+                  },
+                  "durationMs": 100
+                },
+                {
+                  "frameId": "billy-mode-b-run-02",
+                  "sourceAsset": "character_03__billy_and_jimmy.png",
+                  "sourceBox": {
+                    "x": 96,
+                    "y": 96,
+                    "width": 37,
+                    "height": 48
+                  },
+                  "origin": {
+                    "x": 18,
+                    "y": 47
+                  },
+                  "durationMs": 100
+                }
+              ]
+            },
+            {
+              "id": "punch",
+              "label": "直拳",
+              "loop": false,
+              "frames": [
+                {
+                  "frameId": "billy-mode-b-punch-01",
+                  "sourceAsset": "character_03__billy_and_jimmy.png",
+                  "sourceBox": {
+                    "x": 160,
+                    "y": 32,
+                    "width": 40,
+                    "height": 48
+                  },
+                  "origin": {
+                    "x": 20,
+                    "y": 47
+                  },
+                  "durationMs": 120
+                }
+              ]
+            },
+            {
+              "id": "kick",
+              "label": "高踢",
+              "loop": false,
+              "frames": [
+                {
+                  "frameId": "billy-mode-b-kick-01",
+                  "sourceAsset": "character_03__billy_and_jimmy.png",
+                  "sourceBox": {
+                    "x": 392,
+                    "y": 32,
+                    "width": 32,
+                    "height": 40
+                  },
+                  "origin": {
+                    "x": 16,
+                    "y": 39
+                  },
+                  "durationMs": 140
+                }
+              ]
+            },
+            {
+              "id": "jump-knee",
+              "label": "跳膝",
+              "loop": false,
+              "frames": [
+                {
+                  "frameId": "billy-mode-b-jump-knee-01",
+                  "sourceAsset": "character_03__billy_and_jimmy.png",
+                  "sourceBox": {
+                    "x": 512,
+                    "y": 40,
+                    "width": 38,
+                    "height": 40
+                  },
+                  "origin": {
+                    "x": 19,
+                    "y": 39
+                  },
+                  "durationMs": 160
+                }
+              ]
+            },
+            {
+              "id": "knockdown",
+              "label": "倒地",
+              "loop": false,
+              "frames": [
+                {
+                  "frameId": "billy-mode-b-knockdown-01",
+                  "sourceAsset": "character_03__billy_and_jimmy.png",
+                  "sourceBox": {
+                    "x": 336,
+                    "y": 104,
+                    "width": 40,
+                    "height": 36
+                  },
+                  "origin": {
+                    "x": 20,
+                    "y": 35
+                  },
+                  "durationMs": 180
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "jimmy-lee",
+      "label": "Jimmy Lee",
+      "forms": [
+        {
+          "id": "mode-b",
+          "label": "Mode B",
+          "actions": [
+            {
+              "id": "idle",
+              "label": "待机",
+              "loop": true,
+              "frames": [
+                {
+                  "frameId": "jimmy-mode-b-idle-01",
+                  "sourceAsset": "character_03__billy_and_jimmy.png",
+                  "sourceBox": {
+                    "x": 16,
+                    "y": 176,
+                    "width": 23,
+                    "height": 48
+                  },
+                  "origin": {
+                    "x": 11,
+                    "y": 47
+                  },
+                  "durationMs": 180
+                }
+              ]
+            },
+            {
+              "id": "walk",
+              "label": "行走",
+              "loop": true,
+              "frames": [
+                {
+                  "frameId": "jimmy-mode-b-walk-01",
+                  "sourceAsset": "character_03__billy_and_jimmy.png",
+                  "sourceBox": {
+                    "x": 16,
+                    "y": 176,
+                    "width": 23,
+                    "height": 48
+                  },
+                  "origin": {
+                    "x": 11,
+                    "y": 47
+                  },
+                  "durationMs": 140
+                },
+                {
+                  "frameId": "jimmy-mode-b-walk-02",
+                  "sourceAsset": "character_03__billy_and_jimmy.png",
+                  "sourceBox": {
+                    "x": 64,
+                    "y": 176,
+                    "width": 24,
+                    "height": 48
+                  },
+                  "origin": {
+                    "x": 12,
+                    "y": 47
+                  },
+                  "durationMs": 140
+                },
+                {
+                  "frameId": "jimmy-mode-b-walk-03",
+                  "sourceAsset": "character_03__billy_and_jimmy.png",
+                  "sourceBox": {
+                    "x": 112,
+                    "y": 176,
+                    "width": 23,
+                    "height": 48
+                  },
+                  "origin": {
+                    "x": 11,
+                    "y": 47
+                  },
+                  "durationMs": 140
+                }
+              ]
+            },
+            {
+              "id": "run",
+              "label": "奔跑",
+              "loop": true,
+              "frames": [
+                {
+                  "frameId": "jimmy-mode-b-run-01",
+                  "sourceAsset": "character_03__billy_and_jimmy.png",
+                  "sourceBox": {
+                    "x": 64,
+                    "y": 240,
+                    "width": 22,
+                    "height": 48
+                  },
+                  "origin": {
+                    "x": 11,
+                    "y": 47
+                  },
+                  "durationMs": 100
+                },
+                {
+                  "frameId": "jimmy-mode-b-run-02",
+                  "sourceAsset": "character_03__billy_and_jimmy.png",
+                  "sourceBox": {
+                    "x": 96,
+                    "y": 240,
+                    "width": 37,
+                    "height": 48
+                  },
+                  "origin": {
+                    "x": 18,
+                    "y": 47
+                  },
+                  "durationMs": 100
+                }
+              ]
+            },
+            {
+              "id": "punch",
+              "label": "直拳",
+              "loop": false,
+              "frames": [
+                {
+                  "frameId": "jimmy-mode-b-punch-01",
+                  "sourceAsset": "character_03__billy_and_jimmy.png",
+                  "sourceBox": {
+                    "x": 160,
+                    "y": 176,
+                    "width": 40,
+                    "height": 48
+                  },
+                  "origin": {
+                    "x": 20,
+                    "y": 47
+                  },
+                  "durationMs": 120
+                }
+              ]
+            },
+            {
+              "id": "kick",
+              "label": "高踢",
+              "loop": false,
+              "frames": [
+                {
+                  "frameId": "jimmy-mode-b-kick-01",
+                  "sourceAsset": "character_03__billy_and_jimmy.png",
+                  "sourceBox": {
+                    "x": 392,
+                    "y": 176,
+                    "width": 32,
+                    "height": 40
+                  },
+                  "origin": {
+                    "x": 16,
+                    "y": 39
+                  },
+                  "durationMs": 140
+                }
+              ]
+            },
+            {
+              "id": "jump-knee",
+              "label": "跳膝",
+              "loop": false,
+              "frames": [
+                {
+                  "frameId": "jimmy-mode-b-jump-knee-01",
+                  "sourceAsset": "character_03__billy_and_jimmy.png",
+                  "sourceBox": {
+                    "x": 512,
+                    "y": 184,
+                    "width": 38,
+                    "height": 40
+                  },
+                  "origin": {
+                    "x": 19,
+                    "y": 39
+                  },
+                  "durationMs": 160
+                }
+              ]
+            },
+            {
+              "id": "knockdown",
+              "label": "倒地",
+              "loop": false,
+              "frames": [
+                {
+                  "frameId": "jimmy-mode-b-knockdown-01",
+                  "sourceAsset": "character_03__billy_and_jimmy.png",
+                  "sourceBox": {
+                    "x": 336,
+                    "y": 248,
+                    "width": 40,
+                    "height": 36
+                  },
+                  "origin": {
+                    "x": 20,
+                    "y": 35
+                  },
+                  "durationMs": 180
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

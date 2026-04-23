@@ -17,7 +17,7 @@
     </view>
 
     <view class="canvas-section">
-      <view v-if="!previewHidden" class="preview-canvas-container">
+      <view v-if="!shouldHidePreview" class="preview-canvas-container">
         <PixelCanvas
           v-if="previewCanvasReady"
           :width="64"
@@ -49,7 +49,7 @@
             @click="saveAndApply"
           >
             <Icon name="link" :size="36" color="var(--nb-ink)" />
-            <text>{{ isSending ? "发送中" : "发送" }}</text>
+            <text>发送</text>
           </view>
         </view>
       </view>
@@ -216,7 +216,23 @@
       </view>
     </view>
 
-    <Toast ref="toastRef" @show="previewHidden = true" @hide="onToastHide" />
+    <view
+      v-if="isSending"
+      class="glx-device-sending-overlay"
+      @touchmove.stop.prevent
+    >
+      <view class="glx-device-sending-card">
+        <view class="glx-device-sending-spinner"></view>
+        <text class="glx-device-sending-title">{{ sendOverlayTitle }}</text>
+        <text class="glx-device-sending-tip">{{ sendOverlayTip }}</text>
+      </view>
+    </view>
+
+    <Toast
+      ref="toastRef"
+      @show="handleToastShow"
+      @hide="handleToastHide"
+    />
   </view>
 </template>
 
@@ -224,6 +240,7 @@
 import { useDeviceStore } from "../../store/device.js";
 import { useToast } from "../../composables/useToast.js";
 import statusBarMixin from "../../mixins/statusBar.js";
+import deviceSendUxMixin from "../../mixins/deviceSendUxMixin.js";
 import Icon from "../../components/Icon.vue";
 import Toast from "../../components/Toast.vue";
 import PixelCanvas from "../../components/PixelCanvas.vue";
@@ -735,7 +752,7 @@ function pointInQuarterEllipse(px, py, cx, cy, rx, ry, leftSide, topSide) {
 }
 
 export default {
-  mixins: [statusBarMixin],
+  mixins: [statusBarMixin, deviceSendUxMixin],
   components: {
     Icon,
     Toast,
@@ -749,10 +766,9 @@ export default {
     return {
       deviceStore: null,
       toast: null,
-      isSending: false,
+      sendPreviewKind: "native",
       contentHeight: "calc(100vh - 88rpx - 520rpx - 112rpx)",
       previewCanvasReady: false,
-      previewHidden: false,
       previewZoom: 4,
       previewOffset: { x: 16, y: 16 },
       previewContainerSize: { width: 320, height: 320 },
@@ -888,11 +904,6 @@ export default {
     handleBack() {
       uni.navigateBack();
     },
-    onToastHide() {
-      if (!this.isSending) {
-        this.previewHidden = false;
-      }
-    },
 
     initPreviewCanvas() {
       const systemInfo = uni.getSystemInfoSync();
@@ -1005,32 +1016,31 @@ export default {
     },
 
     async saveAndApply() {
-      if (this.isSending) {
-        return;
-      }
-      if (!this.deviceStore.connected) {
-        this.toast.showError("设备未连接");
+      if (!this.guardBeforeSend(this.deviceStore.connected)) {
         return;
       }
 
-      this.isSending = true;
+      this.beginSendUi();
       try {
         this.normalizeTimeLayout();
         const ws = this.deviceStore.getWebSocket();
         await ws.setMode("eyes");
+        await this.deviceStore.syncAndRequireBusinessMode(
+          "eyes",
+          "设备未进入桌面宠物模式",
+        );
         await ws.setEyesConfig(this.buildEyesConfigPayload());
         if (!this.eyesConfig.behavior.autoSwitch) {
           await ws.eyesInteract(`set_expression:${this.selectedEyesExpression}`);
         }
         this.saveEyesConfig();
         this.saveSelectedExpression();
-        this.deviceStore.setDeviceMode("eyes", { businessMode: true });
-        this.toast.showSuccess("桌面宠物已发送到设备");
+        this.showSendSuccess();
       } catch (error) {
         console.error("发送桌面宠物失败:", error);
-        this.toast.showError("发送失败：" + error.message);
+        this.showSendFailure(error);
       } finally {
-        this.isSending = false;
+        this.endSendUi();
       }
     },
 

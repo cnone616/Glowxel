@@ -1,0 +1,10 @@
+{
+  "version": "AssetCatalogManifestV1",
+  "collections": [
+    {
+      "id": "adventure-island",
+      "label": "Adventure Island",
+      "manifestPath": "/pixel-catalog/adventure-island/processed/manifest.json"
+    }
+  ]
+}

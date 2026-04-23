@@ -10,19 +10,57 @@ const VALID_BUSINESS_MODES = [
   'theme',
   'canvas',
   'gif_player',
-  'text_display',
-  'breath_effect',
-  'rhythm_effect',
-  'ambient_effect',
   'led_matrix_showcase',
   'game_screensaver',
   'tetris',
+  'tetris_clock',
   'planet_screensaver',
   'eyes'
 ]
 
 function isPersistedBusinessMode(mode) {
   return typeof mode === 'string' && VALID_BUSINESS_MODES.includes(mode)
+}
+
+function resolveTopLevelModeFromBusinessMode(mode) {
+  if (mode === 'clock') {
+    return 'clock'
+  }
+
+  if (mode === 'theme') {
+    return 'theme'
+  }
+
+  if (mode === 'canvas') {
+    return 'canvas'
+  }
+
+  if (
+    mode === 'animation' ||
+    mode === 'gif_player' ||
+    mode === 'led_matrix_showcase' ||
+    mode === 'game_screensaver' ||
+    mode === 'tetris' ||
+    mode === 'tetris_clock' ||
+    mode === 'planet_screensaver' ||
+    mode === 'eyes' ||
+    mode === 'text_display' ||
+    mode === 'weather' ||
+    mode === 'countdown' ||
+    mode === 'stopwatch' ||
+    mode === 'notification' ||
+    mode === 'breath_effect' ||
+    mode === 'rhythm_effect' ||
+    mode === 'ambient_effect'
+  ) {
+    return 'animation'
+  }
+
+  if (mode === 'transferring') {
+    return 'transferring'
+  }
+
+  return null
 }
 
 export const useDeviceStore = defineStore('device', {
@@ -56,40 +94,92 @@ export const useDeviceStore = defineStore('device', {
         typeof data.width === 'number' &&
         typeof data.height === 'number' &&
         typeof data.brightness === 'number' &&
-        typeof data.mode === 'string'
+        typeof data.mode === 'string' &&
+        typeof data.businessMode === 'string' &&
+        typeof data.effectMode === 'string'
       )
     },
 
     async syncDeviceStatus() {
       if (!this.webSocket || !this.connected || this.statusSyncInFlight) {
-        return
+        return null
       }
 
       this.statusSyncInFlight = true
       try {
         const status = await this.webSocket.getStatus()
         if (!this.connected) {
-          return
+          return null
         }
         if (!this.isDeviceStatusPayload(status)) {
-          return
+          return null
         }
 
-        this.deviceInfo = status
-        const resolvedMode = this.resolveDeviceModeFromStatus(status)
-        if (resolvedMode) {
-          this.deviceMode = resolvedMode
-          uni.setStorageSync(DEVICE_MODE_KEY, resolvedMode)
-          if (resolvedMode !== 'canvas') {
-            this.lastBusinessMode = resolvedMode
-            uni.setStorageSync(DEVICE_LAST_BUSINESS_MODE_KEY, resolvedMode)
-          }
-        }
+        this.applyDeviceStatus(status)
+        return status
       } catch (err) {
         console.error('同步设备状态失败:', err)
+        return null
       } finally {
         this.statusSyncInFlight = false
       }
+    },
+
+    matchesModeExpectation(status, expectation = {}) {
+      if (!this.isDeviceStatusPayload(status)) {
+        return false
+      }
+
+      if (
+        typeof expectation.businessMode === 'string' &&
+        status.businessMode !== expectation.businessMode
+      ) {
+        return false
+      }
+
+      if (typeof expectation.mode === 'string' && status.mode !== expectation.mode) {
+        return false
+      }
+
+      return true
+    },
+
+    async syncAndRequireMode(expectation, errorMessage = '设备模式确认失败') {
+      const status = await this.syncDeviceStatus()
+      if (!status || !this.matchesModeExpectation(status, expectation)) {
+        throw new Error(errorMessage)
+      }
+      return status
+    },
+
+    buildModeExpectation(expectation = {}, options = {}) {
+      const normalizedExpectation = { ...expectation }
+
+      if (
+        options.requireTopLevelMode === true &&
+        typeof normalizedExpectation.businessMode === 'string'
+      ) {
+        const expectedTopLevelMode = resolveTopLevelModeFromBusinessMode(
+          normalizedExpectation.businessMode
+        )
+        if (!expectedTopLevelMode) {
+          throw new Error(`未支持的业务模式校验: ${normalizedExpectation.businessMode}`)
+        }
+        normalizedExpectation.mode = expectedTopLevelMode
+      }
+
+      return normalizedExpectation
+    },
+
+    async syncAndRequireBusinessMode(
+      businessMode,
+      errorMessage = '设备模式确认失败',
+      options = {}
+    ) {
+      return this.syncAndRequireMode(
+        this.buildModeExpectation({ businessMode }, options),
+        errorMessage
+      )
     },
 
     resolveDeviceModeFromStatus(data) {
@@ -105,6 +195,35 @@ export const useDeviceStore = defineStore('device', {
       }
 
       return null
+    },
+
+    applyResolvedBusinessMode(mode) {
+      if (!isPersistedBusinessMode(mode)) {
+        return false
+      }
+
+      this.deviceMode = mode
+      uni.setStorageSync(DEVICE_MODE_KEY, mode)
+
+      if (mode !== 'canvas') {
+        this.lastBusinessMode = mode
+        uni.setStorageSync(DEVICE_LAST_BUSINESS_MODE_KEY, mode)
+      }
+
+      return true
+    },
+
+    applyDeviceStatus(status) {
+      if (!this.isDeviceStatusPayload(status)) {
+        return false
+      }
+
+      this.deviceInfo = status
+      const resolvedMode = this.resolveDeviceModeFromStatus(status)
+      if (resolvedMode) {
+        this.applyResolvedBusinessMode(resolvedMode)
+      }
+      return true
     },
 
     // 初始化
@@ -154,34 +273,23 @@ export const useDeviceStore = defineStore('device', {
         if (data.status === 'connected') {
           const resolvedMode = this.resolveDeviceModeFromStatus(data)
           if (resolvedMode) {
-            this.deviceMode = resolvedMode
-            uni.setStorageSync(DEVICE_MODE_KEY, resolvedMode)
-            if (resolvedMode !== 'canvas') {
-              this.lastBusinessMode = resolvedMode
-              uni.setStorageSync(DEVICE_LAST_BUSINESS_MODE_KEY, resolvedMode)
-            }
+            this.applyResolvedBusinessMode(resolvedMode)
           }
-          this.syncDeviceStatus()
           return
         }
 
         if (this.isDeviceStatusPayload(data)) {
-          this.deviceInfo = data
-        }
-
-        const resolvedMode = this.resolveDeviceModeFromStatus(data)
-        if (resolvedMode) {
-          this.deviceMode = resolvedMode
-          uni.setStorageSync(DEVICE_MODE_KEY, resolvedMode)
-          if (resolvedMode !== 'canvas') {
-            this.lastBusinessMode = resolvedMode
-            uni.setStorageSync(DEVICE_LAST_BUSINESS_MODE_KEY, resolvedMode)
-          }
+          this.applyDeviceStatus(data)
         }
       })
     },
 
     setDeviceMode(mode, options = {}) {
+      const source = options.source || 'local'
+      if (this.connected && source !== 'device') {
+        return
+      }
+
       const persist = options.persist !== false
       const businessMode = options.businessMode !== false
 

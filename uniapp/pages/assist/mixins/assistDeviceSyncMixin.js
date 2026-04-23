@@ -1,8 +1,13 @@
 import { ARTKAL_COLORS_FULL } from "../../../data/artkal-colors-full.js";
 
-const DEVICE_MODE_KEY = "device_mode";
-const DEVICE_LAST_BUSINESS_MODE_KEY = "device_last_business_mode";
-const PREVIOUS_MODE_BEFORE_CANVAS_KEY = "previous_mode_before_canvas";
+const TETRIS_MODE_PAYLOAD = Object.freeze({
+  clearMode: true,
+  cellSize: 2,
+  speed: 150,
+  showClock: false,
+  pieces: [0, 1, 2, 3, 4, 5, 6],
+});
+
 const TETRIS_CLOCK_MODE_PAYLOAD = Object.freeze({
   clearMode: true,
   cellSize: 2,
@@ -25,17 +30,7 @@ function hexToRgb(hex) {
 export default {
   methods: {
     getBusinessModeForCanvasRestore() {
-      const previousBusinessMode = uni.getStorageSync(DEVICE_LAST_BUSINESS_MODE_KEY);
-      if (previousBusinessMode) {
-        return previousBusinessMode;
-      }
-
-      const currentMode = uni.getStorageSync(DEVICE_MODE_KEY);
-      if (currentMode && currentMode !== "canvas") {
-        return currentMode;
-      }
-
-      return "clock";
+      return this.deviceStore.lastBusinessMode;
     },
 
     toggleDeviceSync() {
@@ -54,16 +49,14 @@ export default {
           return;
         }
 
-        const storedRestoreMode = uni.getStorageSync(
-          PREVIOUS_MODE_BEFORE_CANVAS_KEY,
+        await ws.setMode("canvas");
+        await this.deviceStore.syncAndRequireBusinessMode(
+          "canvas",
+          "设备未进入画板模式",
+          {
+            requireTopLevelMode: true,
+          },
         );
-        if (!storedRestoreMode) {
-          const restoreMode = this.getBusinessModeForCanvasRestore();
-          uni.setStorageSync(PREVIOUS_MODE_BEFORE_CANVAS_KEY, restoreMode);
-        }
-
-        await ws.send({ cmd: "set_mode", mode: "canvas" });
-        this.deviceStore.setDeviceMode("canvas", { businessMode: false });
         await new Promise((resolve) => setTimeout(resolve, 200));
         await this.syncToDevice();
       } catch (err) {
@@ -101,15 +94,7 @@ export default {
       }
       this._modeRestoredOnExit = true;
 
-      let restoreMode = uni.getStorageSync(PREVIOUS_MODE_BEFORE_CANVAS_KEY);
-      if (!restoreMode) {
-        restoreMode = this.getBusinessModeForCanvasRestore();
-      }
-
-      uni.removeStorageSync(PREVIOUS_MODE_BEFORE_CANVAS_KEY);
-      this.deviceStore.setDeviceMode(restoreMode, {
-        businessMode: restoreMode !== "canvas",
-      });
+      const restoreMode = this.getBusinessModeForCanvasRestore();
 
       if (!this.deviceConnected) {
         return;
@@ -122,19 +107,43 @@ export default {
         }
 
         if (restoreMode === "tetris") {
-          await ws.send({
-            cmd: "set_mode",
-            mode: "tetris",
+          await ws.startTetris({
+            clearMode: TETRIS_MODE_PAYLOAD.clearMode,
+            cellSize: TETRIS_MODE_PAYLOAD.cellSize,
+            speed: TETRIS_MODE_PAYLOAD.speed,
+            showClock: TETRIS_MODE_PAYLOAD.showClock,
+            pieces: TETRIS_MODE_PAYLOAD.pieces.slice(),
+          });
+          await this.deviceStore.syncAndRequireBusinessMode(
+            "tetris",
+            "设备未恢复到俄罗斯方块模式",
+          );
+          return;
+        }
+
+        if (restoreMode === "tetris_clock") {
+          await ws.startTetrisClock({
             clearMode: TETRIS_CLOCK_MODE_PAYLOAD.clearMode,
             cellSize: TETRIS_CLOCK_MODE_PAYLOAD.cellSize,
             speed: TETRIS_CLOCK_MODE_PAYLOAD.speed,
             showClock: TETRIS_CLOCK_MODE_PAYLOAD.showClock,
             pieces: TETRIS_CLOCK_MODE_PAYLOAD.pieces.slice(),
           });
+          await this.deviceStore.syncAndRequireBusinessMode(
+            "tetris_clock",
+            "设备未恢复到俄罗斯方块时钟模式",
+          );
           return;
         }
 
-        await ws.send({ cmd: "set_mode", mode: restoreMode });
+        await ws.setMode(restoreMode);
+        await this.deviceStore.syncAndRequireBusinessMode(
+          restoreMode,
+          "设备未恢复到上次模式",
+          {
+            requireTopLevelMode: true,
+          },
+        );
       } catch (err) {
         console.error("退出拼豆恢复模式失败:", err);
         this.toast.showError("恢复上次模式失败");
@@ -219,10 +228,7 @@ export default {
         }
 
         console.log("发送高亮行命令:", this.currentRow);
-        await ws.send({
-          cmd: "highlight_row",
-          row: this.currentRow,
-        });
+        await ws.highlightRow(this.currentRow);
 
         this.lastSyncedRow = this.currentRow;
       } catch (err) {
@@ -258,17 +264,11 @@ export default {
           if (colorObj) {
             const rgb = hexToRgb(colorObj.hex);
             console.log("发送高亮颜色命令:", colorObj.code, rgb);
-            await ws.send({
-              cmd: "highlight_color",
-              color: rgb,
-            });
+            await ws.highlightColor(rgb);
           }
         } else {
           console.log("发送取消高亮命令");
-          await ws.send({
-            cmd: "highlight_color",
-            color: null,
-          });
+          await ws.highlightColor(null);
         }
       } catch (err) {
         console.error("更新高亮亮度失败:", err);

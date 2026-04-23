@@ -4,6 +4,7 @@
 #include "display_manager.h"
 #include "eyes_effect.h"
 #include "mode_tags.h"
+#include "runtime_command_bus.h"
 #include <string.h>
 
 namespace {
@@ -71,7 +72,8 @@ bool ensureEyesStyleObject(JsonObject style) {
 bool WebSocketCommandHandlers::handleEyesCommand(
   AsyncWebSocketClient* client,
   JsonDocument& doc,
-  StaticJsonDocument<768>& response
+  StaticJsonDocument<768>& response,
+  bool& responseSent
 ) {
   String cmd = doc["cmd"].as<String>();
 
@@ -150,14 +152,23 @@ bool WebSocketCommandHandlers::handleEyesCommand(
     memcpy(nextConfig.style.eyeColor, eyeColor, sizeof(nextConfig.style.eyeColor));
     memcpy(nextConfig.style.timeColor, timeColor, sizeof(nextConfig.style.timeColor));
 
-    ConfigManager::eyesConfig = nextConfig;
-    ConfigManager::saveEyesConfig();
-
-    if (DisplayManager::currentBusinessModeTag == ModeTags::EYES) {
-      DisplayManager::activateEyesEffect(ConfigManager::eyesConfig);
+    RuntimeCommandBus::RuntimeCommand* command =
+      RuntimeCommandBus::createCommand(
+        RuntimeCommandBus::RuntimeCommandSource::WEBSOCKET,
+        client != nullptr ? client->id() : 0
+      );
+    if (command == nullptr) {
+      setErrorResponse(response, "out of memory");
+      return true;
     }
-
-    response["message"] = "eyes config updated";
+    command->type = RuntimeCommandBus::RuntimeCommandType::EYES_CONFIG;
+    command->eyesConfig = nextConfig;
+    if (!RuntimeCommandBus::enqueue(command)) {
+      RuntimeCommandBus::destroyCommand(command);
+      setErrorResponse(response, "device busy");
+      return true;
+    }
+    responseSent = true;
     return true;
   }
 
@@ -167,21 +178,30 @@ bool WebSocketCommandHandlers::handleEyesCommand(
       return true;
     }
 
-    if (DisplayManager::currentBusinessModeTag != ModeTags::EYES) {
-      setErrorResponse(response, "eyes mode required");
-      return true;
-    }
-
     const char* action = doc["action"];
-    if (!EyesEffect::triggerAction(action)) {
+    if (action == nullptr || action[0] == '\0') {
       setErrorResponse(response, "invalid eyes action");
       return true;
     }
-
-    response["message"] = "eyes action applied";
+    RuntimeCommandBus::RuntimeCommand* command =
+      RuntimeCommandBus::createCommand(
+        RuntimeCommandBus::RuntimeCommandSource::WEBSOCKET,
+        client != nullptr ? client->id() : 0
+      );
+    if (command == nullptr) {
+      setErrorResponse(response, "out of memory");
+      return true;
+    }
+    command->type = RuntimeCommandBus::RuntimeCommandType::EYES_ACTION;
+    command->stringValue1 = action;
+    if (!RuntimeCommandBus::enqueue(command)) {
+      RuntimeCommandBus::destroyCommand(command);
+      setErrorResponse(response, "device busy");
+      return true;
+    }
+    responseSent = true;
     return true;
   }
 
-  (void)client;
   return false;
 }

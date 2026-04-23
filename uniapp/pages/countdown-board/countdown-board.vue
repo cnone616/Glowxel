@@ -338,18 +338,14 @@ export default {
         this.config.progress = 100;
         const ws = this.deviceStore.getWebSocket();
         await ws.setCountdownBoard(this.config);
-        const status = await ws.getStatus();
-        if (
-          status.effectMode !== "countdown" ||
-          status.hours !== this.config.hours ||
-          status.minutes !== this.config.minutes ||
-          status.seconds !== this.config.seconds ||
-          status.progress !== this.config.progress
-        ) {
-          throw new Error("设备未进入倒计时模式");
-        }
+        await this.deviceStore.syncAndRequireMode(
+          {
+            businessMode: "countdown",
+            mode: "animation",
+          },
+          "设备未进入倒计时模式",
+        );
         uni.setStorageSync(COUNTDOWN_CONFIG_KEY, this.config);
-        this.deviceStore.setDeviceMode("countdown", { businessMode: true });
         this.toast.showSuccess("已保存并应用");
       } catch (error) {
         console.error("应用沙漏倒计时失败:", error);

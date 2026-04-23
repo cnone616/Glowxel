@@ -17,7 +17,7 @@
     </view>
 
     <view class="canvas-section">
-      <view v-if="!canvasHidden" class="canvas-container">
+      <view v-if="!shouldHidePreview" class="canvas-container">
         <PixelCanvas
           v-if="canvasReady"
           :width="64"
@@ -50,7 +50,7 @@
             @click="publishCanvas"
           >
             <Icon name="link" :size="36" color="var(--nb-ink)" />
-            <text>{{ isSending ? "发送中" : "发送" }}</text>
+            <text>发送</text>
           </view>
         </view>
       </view>
@@ -157,20 +157,29 @@
       </view>
     </scroll-view>
 
-    <view v-if="isSending" class="sending-overlay" @touchmove.stop.prevent>
-      <view class="sending-modal">
-        <view class="sending-spinner"></view>
-        <text class="sending-title">正在发送画板...</text>
-        <text class="sending-tip">请保持连接稳定，完成后会自动恢复预览</text>
+    <view
+      v-if="isSending"
+      class="glx-device-sending-overlay"
+      @touchmove.stop.prevent
+    >
+      <view class="glx-device-sending-card">
+        <view class="glx-device-sending-spinner"></view>
+        <text class="glx-device-sending-title">{{ sendOverlayTitle }}</text>
+        <text class="glx-device-sending-tip">{{ sendOverlayTip }}</text>
       </view>
     </view>
 
-    <Toast ref="toastRef" @show="canvasHidden = true" @hide="onToastHide" />
+    <Toast
+      ref="toastRef"
+      @show="handleToastShow"
+      @hide="handleToastHide"
+    />
   </view>
 </template>
 
 <script>
 import statusBarMixin from "../../mixins/statusBar.js";
+import deviceSendUxMixin from "../../mixins/deviceSendUxMixin.js";
 import Icon from "../../components/Icon.vue";
 import Toast from "../../components/Toast.vue";
 import PixelCanvas from "../../components/PixelCanvas.vue";
@@ -181,14 +190,19 @@ import { useToast } from "../../composables/useToast.js";
 const CANVAS_PIXELS_KEY = "canvas_mode_pixels";
 
 export default {
-  mixins: [statusBarMixin],
-  components: { Icon, Toast, PixelCanvas, ColorPanelPicker },
+  mixins: [statusBarMixin, deviceSendUxMixin],
+  components: {
+    Icon,
+    Toast,
+    PixelCanvas,
+    ColorPanelPicker,
+  },
   data() {
     return {
       deviceStore: null,
       toast: null,
       contentHeight: "calc(100vh - 88rpx - 520rpx)",
-      isSending: false,
+      sendPreviewKind: "native",
       livePreviewEnabled: true,
       deviceCanvasModeReady: false,
       syncQueue: [],
@@ -201,7 +215,6 @@ export default {
       pan: { x: 0, y: 0 },
       containerSize: { width: 320, height: 320 },
       canvasReady: false,
-      canvasHidden: false,
       pixels: new Map(),
       history: [],
       historyIndex: -1,
@@ -221,11 +234,6 @@ export default {
     }
     this.initCanvas();
   },
-  onShow() {
-    if (!this.isSending) {
-      this.canvasHidden = false;
-    }
-  },
   methods: {
     setTool(newTool) {
       if (this.currentTool !== newTool) {
@@ -236,11 +244,6 @@ export default {
     handleBack() {
       this.cleanupCanvasSync();
       uni.navigateBack();
-    },
-    onToastHide() {
-      if (!this.isSending) {
-        this.canvasHidden = false;
-      }
     },
 
     initCanvas() {
@@ -433,14 +436,15 @@ export default {
     },
 
     async publishCanvas() {
-      if (this.isSending) {
-        return;
-      }
-
       this.persistPixels();
 
-      if (!this.deviceStore.connected) {
-        this.toast.showInfo("已保存到本地，请先连接设备");
+      if (
+        !this.guardBeforeSend(
+          this.deviceStore.connected,
+          "已保存到本地，请先连接设备",
+          "info",
+        )
+      ) {
         return;
       }
 
@@ -454,19 +458,21 @@ export default {
         return;
       }
 
-      this.isSending = true;
+      this.beginSendUi();
       try {
         await this.ensureDeviceCanvasMode();
         const ws = this.deviceStore.getWebSocket();
 
         if (this.pixels.size === 0) {
           await ws.clearCanvas();
-          const status = await ws.getStatus();
-          if (status.mode !== "canvas") {
-            throw new Error("设备未保持在画板模式");
-          }
-          this.deviceStore.setDeviceMode("canvas", { businessMode: false });
-          this.toast.showSuccess("已清空并发布到设备");
+          await this.deviceStore.syncAndRequireBusinessMode(
+            "canvas",
+            "设备未保持在画板模式",
+            {
+              requireTopLevelMode: true,
+            },
+          );
+          this.showSendSuccess();
           return;
         }
 
@@ -479,17 +485,19 @@ export default {
 
         await this.deviceStore.sendSparseImage(sparsePixels, 64, 64);
         await ws.saveCanvas();
-        const status = await ws.getStatus();
-        if (status.mode !== "canvas") {
-          throw new Error("设备未保持在画板模式");
-        }
-        this.deviceStore.setDeviceMode("canvas", { businessMode: false });
-        this.toast.showSuccess("已发布到设备");
+        await this.deviceStore.syncAndRequireBusinessMode(
+          "canvas",
+          "设备未保持在画板模式",
+          {
+            requireTopLevelMode: true,
+          },
+        );
+        this.showSendSuccess();
       } catch (err) {
         console.error("画板发送失败:", err);
-        this.toast.showError("发送失败：" + err.message);
+        this.showSendFailure(err);
       } finally {
-        this.isSending = false;
+        this.endSendUi();
       }
     },
 
@@ -622,7 +630,13 @@ export default {
 
       const ws = this.deviceStore.getWebSocket();
       await ws.setMode("canvas");
-      this.deviceStore.setDeviceMode("canvas", { businessMode: false });
+      await this.deviceStore.syncAndRequireBusinessMode(
+        "canvas",
+        "设备未进入画板模式",
+        {
+          requireTopLevelMode: true,
+        },
+      );
       this.deviceCanvasModeReady = true;
     },
 

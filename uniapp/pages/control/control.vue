@@ -154,6 +154,7 @@
 <script>
 import { useDeviceStore } from "../../store/device.js";
 import { useToast } from "../../composables/useToast.js";
+import { uploadAnimationFrames } from "../../utils/animationUploader.js";
 import statusBarMixin from "../../mixins/statusBar.js";
 import Icon from "../../components/Icon.vue";
 import Toast from "../../components/Toast.vue";
@@ -175,9 +176,6 @@ export default {
 
       deviceIp: "",
 
-      // 设备模式
-      deviceMode: "clock", // clock, animation, canvas
-
       // 连接弹窗
       showConnectModal: false,
 
@@ -187,7 +185,7 @@ export default {
     };
   },
 
-  onLoad(options) {
+  onLoad() {
     this.deviceStore = useDeviceStore();
     this.toast = useToast();
     this.deviceStore.init();
@@ -196,23 +194,6 @@ export default {
     const savedIp = uni.getStorageSync("device_ip");
     if (savedIp) {
       this.deviceIp = savedIp;
-    }
-
-    // 从缓存读取设备模式
-    const savedMode = uni.getStorageSync("device_mode");
-    if (savedMode) {
-      this.deviceMode = savedMode;
-      this.deviceStore.setDeviceMode(savedMode, {
-        businessMode: false,
-      });
-    }
-
-    // 从 URL 参数读取模式（优先级更高）
-    if (options && options.mode) {
-      this.deviceMode = options.mode;
-      this.deviceStore.setDeviceMode(options.mode, {
-        businessMode: false,
-      });
     }
   },
 
@@ -224,19 +205,17 @@ export default {
 
   async onShow() {
     this.deviceIp = this.deviceStore?.deviceIp || this.deviceIp;
-    this.deviceMode = this.deviceStore?.deviceMode || this.deviceMode;
-    const status = this.deviceStore?.deviceInfo;
-    if (status && typeof status.mode === "string") {
-      this.deviceMode =
-        this.deviceStore.resolveDeviceModeFromStatus(status) ||
-        this.deviceStore.deviceMode ||
-        this.deviceMode;
+    if (this.deviceStore?.connected) {
+      await this.deviceStore.syncDeviceStatus();
     }
   },
 
   computed: {
     isDeviceConnected() {
       return this.deviceStore?.connected || false;
+    },
+    activeDeviceMode() {
+      return this.deviceStore?.deviceMode || "clock";
     },
     modeCatalog() {
       return [
@@ -289,17 +268,17 @@ export default {
           bucket: "secondary",
         },
         {
-          key: "game_screensaver",
-          name: "游戏屏保",
-          icon: "pad",
-          variant: "indigo",
+          key: "tetris_clock",
+          name: "俄罗斯方块时钟",
+          icon: "modular",
+          variant: "gold",
           type: "mode",
           bucket: "secondary",
         },
         {
-          key: "led_matrix_showcase",
-          name: "像素场景集",
-          icon: "layers",
+          key: "game_screensaver",
+          name: "游戏屏保",
+          icon: "pad",
           variant: "indigo",
           type: "mode",
           bucket: "secondary",
@@ -312,20 +291,12 @@ export default {
           type: "mode",
           bucket: "secondary",
         },
-        {
-          key: "gif_player",
-          name: "GIF播放器",
-          icon: "film",
-          variant: "teal",
-          type: "mode",
-          bucket: "migration",
-        },
       ];
     },
   },
   methods: {
     isModeActive(entry) {
-      return this.deviceMode === entry.key;
+      return this.activeDeviceMode === entry.key;
     },
 
     handleModeSelect(entry) {
@@ -387,11 +358,6 @@ export default {
         return;
       }
 
-      this.deviceMode = mode;
-      this.deviceStore.setDeviceMode(mode, {
-        businessMode: false,
-      });
-
       if (mode === "eyes") {
         this.openSpiritScreen();
       } else if (mode === "clock" || mode === "animation" || mode === "theme") {
@@ -400,6 +366,8 @@ export default {
         this.openLedMatrixShowcase();
       } else if (mode === "tetris") {
         this.openTetrisSettings();
+      } else if (mode === "tetris_clock") {
+        this.openTetrisClockSettings();
       } else if (mode === "game_screensaver") {
         this.openGameScreensaver();
       } else if (mode === "gif_player") {
@@ -424,6 +392,12 @@ export default {
     openTetrisSettings() {
       uni.navigateTo({
         url: "/pages/tetris-settings/tetris-settings",
+      });
+    },
+
+    openTetrisClockSettings() {
+      uni.navigateTo({
+        url: "/pages/tetris-clock-settings/tetris-clock-settings",
       });
     },
 
@@ -513,69 +487,29 @@ export default {
           try {
             const frameCount = jsonData.f;
             const frames = jsonData.d;
-
-            // 1. 发送 animation_begin
-            await ws.send({ cmd: "animation_begin", frameCount: frameCount });
-            console.log(`动画初始化完成，准备发送 ${frameCount} 帧`);
-
-            // 2. 逐帧发送（大帧自动拆分 chunk）
-            const CHUNK_SIZE = 500; // 每个 chunk 最多 500 像素
-            for (let i = 0; i < frames.length && i < frameCount; i++) {
-              const frame = frames[i]; // [type, delay, count, pixels]
-              const type = frame[0];
-              const delay = frame[1];
-              const pixels = frame[3];
-              const totalPixels = pixels.length;
-
-              if (totalPixels <= CHUNK_SIZE) {
-                // 小帧直接发送
-                await ws.send({
-                  cmd: "animation_frame",
-                  index: i,
-                  frame: frame,
-                });
-                console.log(
-                  `帧 ${i + 1}/${frameCount} 直接发送 (${totalPixels} 像素)`,
-                );
-              } else {
-                // 大帧拆分发送
-                await ws.send({
-                  cmd: "frame_begin",
-                  index: i,
-                  type,
-                  delay,
-                  totalPixels,
-                });
-                console.log(
-                  `帧 ${i + 1}/${frameCount} 开始分片 (${totalPixels} 像素)`,
-                );
-
-                for (
-                  let offset = 0;
-                  offset < totalPixels;
-                  offset += CHUNK_SIZE
-                ) {
-                  const chunk = pixels.slice(offset, offset + CHUNK_SIZE);
-                  await ws.send({
-                    cmd: "frame_chunk",
-                    index: i,
-                    pixels: chunk,
-                  });
-                  console.log(
-                    `  chunk ${Math.floor(offset / CHUNK_SIZE) + 1}: ${chunk.length} 像素`,
-                  );
-                  await new Promise((resolve) => setTimeout(resolve, 50));
+            const uploadFrames = frames
+              .slice(0, frameCount)
+              .map((frame, index) => {
+                if (!Array.isArray(frame) || frame.length < 4) {
+                  throw new Error(`第 ${index + 1} 帧数据格式错误`);
                 }
-              }
 
-              // 每帧间隔 100ms，让 ESP32 处理
-              if (i < frameCount - 1) {
-                await new Promise((resolve) => setTimeout(resolve, 100));
-              }
-            }
+                return {
+                  type: frame[0],
+                  delay: frame[1],
+                  totalPixels: frame[2],
+                  pixels:
+                    frame[3] instanceof Uint8Array
+                      ? frame[3]
+                      : new Uint8Array(frame[3]),
+                };
+              });
 
-            // 3. 发送 animation_end
-            await ws.send({ cmd: "animation_end" });
+            await uploadAnimationFrames(ws, uploadFrames, "animation");
+            await this.deviceStore.syncAndRequireBusinessMode(
+              "animation",
+              "设备未进入动画模式",
+            );
 
             this.toast.showSuccess(`动画已发送！${frameCount} 帧`);
           } catch (err) {
@@ -602,47 +536,92 @@ export default {
 
         // 直接发送到设备
         try {
-          // 转换配置格式
+          if (jsonData.clockMode !== "clock" || !jsonData.config) {
+            throw new Error("请导入静态时钟页面导出的配置文件");
+          }
+
           const configData = {
+            font: jsonData.config.font,
+            showSeconds: jsonData.config.showSeconds,
+            hourFormat: jsonData.config.hourFormat,
             time: {
-              fontSize: jsonData.timeFontSize || 1,
-              x: jsonData.timeX || 17,
-              y: jsonData.timeY || 5,
-              color: this.hexToRgb(jsonData.timeColor || "#64c8ff"),
+              show: jsonData.config.time.show,
+              fontSize: jsonData.config.time.fontSize,
+              x: jsonData.config.time.x,
+              y: jsonData.config.time.y,
+              color: this.hexToRgb(jsonData.config.time.color),
             },
             date: {
-              show: jsonData.showDate !== false,
-              fontSize: jsonData.dateFontSize || 1,
-              x: jsonData.dateX || 3,
-              y: jsonData.dateY || 30,
-              color: this.hexToRgb(jsonData.dateColor || "#787878"),
+              show: jsonData.config.date.show,
+              fontSize: jsonData.config.date.fontSize,
+              x: jsonData.config.date.x,
+              y: jsonData.config.date.y,
+              color: this.hexToRgb(jsonData.config.date.color),
             },
             week: {
-              show: jsonData.showWeek !== false,
-              x: jsonData.weekX || 23,
-              y: jsonData.weekY || 44,
-              color: this.hexToRgb(jsonData.weekColor || "#646464"),
+              show: jsonData.config.week.show,
+              x: jsonData.config.week.x,
+              y: jsonData.config.week.y,
+              color: this.hexToRgb(jsonData.config.week.color),
             },
             image: {
-              show: jsonData.showImage || false,
-              x: jsonData.imageX || 0,
-              y: jsonData.imageY || 0,
-              width: jsonData.imageWidth || 64,
-              height: jsonData.imageHeight || 64,
+              show: jsonData.config.image.show,
+              x: jsonData.config.image.x,
+              y: jsonData.config.image.y,
+              width: jsonData.config.image.width,
+              height: jsonData.config.image.height,
             },
           };
+          const imagePixels = Array.isArray(jsonData.imagePixels)
+            ? jsonData.imagePixels.map((entry, index) => {
+                if (
+                  !Array.isArray(entry) ||
+                  entry.length !== 2 ||
+                  typeof entry[0] !== "string" ||
+                  typeof entry[1] !== "string"
+                ) {
+                  throw new Error(
+                    `第 ${index + 1} 个图片像素格式无效`,
+                  );
+                }
+                const [xText, yText] = entry[0].split(",");
+                const x = Number(xText);
+                const y = Number(yText);
+                if (!Number.isInteger(x) || !Number.isInteger(y)) {
+                  throw new Error(
+                    `第 ${index + 1} 个图片像素坐标无效`,
+                  );
+                }
+                const rgb = this.hexToRgb(entry[1]);
+                return {
+                  x,
+                  y,
+                  r: rgb.r,
+                  g: rgb.g,
+                  b: rgb.b,
+                };
+              })
+            : [];
 
           // 闹钟背景图必须用闹钟模式接收，先切换模式
           await ws.setMode("clock");
 
           // 发送配置
-          await ws.send({ cmd: "set_clock_config", config: configData });
+          await ws.setClockConfig("clock", configData);
 
           // 如果有像素数据，使用二进制方式发送（闹钟背景图）
-          if (jsonData.imagePixels && jsonData.imagePixels.length > 0) {
-            await this.sendImagePixelsBinary(jsonData.imagePixels);
+          if (imagePixels.length > 0) {
+            await this.sendImagePixelsBinary(imagePixels);
+          }
+
+          await this.deviceStore.syncAndRequireBusinessMode(
+            "clock",
+            "设备未进入静态时钟模式",
+          );
+
+          if (imagePixels.length > 0) {
             this.toast.showSuccess(
-              `配置已发送！包含 ${jsonData.imagePixels.length} 个像素点`,
+              `配置已发送！包含 ${imagePixels.length} 个像素点`,
             );
           } else {
             this.toast.showSuccess("配置已发送到设备！");
@@ -970,17 +949,17 @@ export default {
 .connect-entry-grid {
   display: flex;
   flex-direction: column;
-  gap: 16rpx;
+  gap: 20rpx;
 }
 
 .connect-entry-card {
   border-radius: 0;
   background: var(--nb-surface);
   box-shadow: var(--nb-shadow-soft);
-  padding: 20rpx;
+  padding: 16rpx 18rpx;
   display: flex;
   align-items: center;
-  gap: 16rpx;
+  gap: 20rpx;
 }
 
 .connect-entry-icon,
@@ -1061,19 +1040,19 @@ export default {
 .mode-badge-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12rpx;
+  gap: 18rpx;
 }
 
 .mode-badge {
   border-radius: 0;
-  padding: 16rpx 8rpx 14rpx;
+  padding: 12rpx 6rpx 10rpx;
   border: 2rpx solid var(--nb-ink);
   background: var(--nb-surface);
   box-shadow: var(--nb-shadow-soft);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 10rpx;
+  gap: 12rpx;
 }
 
 .mode-badge-icon-shell {
@@ -1123,7 +1102,7 @@ export default {
 }
 
 .mode-badge.pink {
-  background: #fff1f6;
+  background: var(--nb-surface);
 }
 
 .mode-badge.pink .mode-badge-icon-core {
@@ -1131,7 +1110,7 @@ export default {
 }
 
 .mode-badge.cyan {
-  background: #ecfbfd;
+  background: var(--nb-surface);
 }
 
 .mode-badge.cyan .mode-badge-icon-core {
@@ -1139,7 +1118,7 @@ export default {
 }
 
 .mode-badge.teal {
-  background: #e9faf6;
+  background: var(--nb-surface);
 }
 
 .mode-badge.teal .mode-badge-icon-core {
@@ -1147,7 +1126,7 @@ export default {
 }
 
 .mode-badge.purple {
-  background: #f1ecff;
+  background: var(--nb-surface);
 }
 
 .mode-badge.purple .mode-badge-icon-core {
@@ -1163,7 +1142,7 @@ export default {
 }
 
 .mode-badge.indigo {
-  background: #eef0ff;
+  background: var(--nb-surface);
 }
 
 .mode-badge.indigo .mode-badge-icon-core {
@@ -1203,7 +1182,7 @@ export default {
 }
 
 .mode-badge.mint {
-  background: #e8faf2;
+  background: var(--nb-surface);
 }
 
 .mode-badge.mint .mode-badge-icon-core {
@@ -1211,7 +1190,7 @@ export default {
 }
 
 .mode-badge.azure {
-  background: #e8f2ff;
+  background: var(--nb-surface);
 }
 
 .mode-badge.azure .mode-badge-icon-core {

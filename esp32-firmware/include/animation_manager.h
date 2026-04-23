@@ -38,9 +38,14 @@ public:
   static bool beginFrame(int index, int type, int delay, int totalPixels);
   static bool addFrameChunk(int index, JsonArray pixels);
   static bool addFrameChunkBinary(int index, uint8_t *data, int pixelCount);
+  static bool frameStatus(int index, int& outCount);
   static bool endAnimation();
   static bool saveAnimation();   // 保存动画到 LittleFS
   static bool loadAnimation();   // 从 LittleFS 加载动画
+  static bool hasPendingUploadReady();
+  static bool isUploadSessionActive();
+  static bool finalizeUploadSession();
+  static void abortUploadSession();
 
   static GIFAnimation* currentGIF;
   static int receivingFrameIndex;  // 当前正在接收的帧索引，-1 表示未在接收

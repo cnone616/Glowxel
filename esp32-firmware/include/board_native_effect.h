@@ -66,9 +66,9 @@ struct NotificationBoardNativeConfig {
 };
 
 struct PlanetScreensaverNativeConfig {
-  String preset;
-  String size;
-  String direction;
+  char preset[20];
+  char size[12];
+  char direction[12];
   uint8_t speed;
   uint32_t seed;
   uint32_t colorSeed;

@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LED 角色动作编排页</title>
+    <link rel="stylesheet" href="led-simulator-theme-composer.css" />
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="topbar">
+        <div class="title-block">
+          <div class="eyebrow">Character Motion State Composer</div>
+          <h1>LED 模拟器 · 角色动作编排页</h1>
+          <p>三列预览、语义动作状态机和帧序列同步工作，用 64x64 视窗直接验证基础态、攻击、跳跃和变身切换。</p>
+        </div>
+
+        <div class="status-block">
+          <div class="status-pill" id="pageStatus" data-state="loading">正在加载游戏目录…</div>
+          <div class="status-copy" id="selectionSummary">等待人物动作数据</div>
+        </div>
+      </header>
+
+      <main class="workspace">
+        <section class="panel preview-panel">
+          <div class="panel-head">
+            <div>
+              <div class="panel-kicker">Preview</div>
+              <h2 id="panelTitle">角色帧动画预览</h2>
+            </div>
+            <div class="panel-meta" id="frameMeta">尚未载入动作</div>
+          </div>
+
+          <div class="stage-shell" id="stageShell">
+            <canvas id="themeCanvas" width="640" height="640"></canvas>
+
+            <div class="stage-overlay">
+              <div class="overlay-chip" id="currentGameLabel">等待游戏</div>
+              <div class="overlay-chip accent" id="currentRoleLabel">等待角色</div>
+            </div>
+          </div>
+
+          <div class="mini-stat-grid">
+            <div class="mini-stat">
+              <span>当前动作</span>
+              <strong id="activeActionLabel">-</strong>
+            </div>
+            <div class="mini-stat">
+              <span>基础态</span>
+              <strong id="baseActionLabel">-</strong>
+            </div>
+            <div class="mini-stat">
+              <span>播放模式</span>
+              <strong id="playbackModeLabel">-</strong>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel control-panel">
+          <div class="panel-head">
+            <div>
+              <div class="panel-kicker">Control</div>
+              <h2>语义动作控制</h2>
+            </div>
+            <div class="panel-meta" id="libraryMeta">游戏 → 角色 → 形态</div>
+          </div>
+
+          <div class="select-grid">
+            <label class="control-group">
+              <span>游戏</span>
+              <select id="gameSelect"></select>
+            </label>
+
+            <label class="control-group">
+              <span>角色</span>
+              <select id="roleSelect"></select>
+            </label>
+
+            <label class="control-group">
+              <span>形态</span>
+              <select id="formSelect"></select>
+            </label>
+          </div>
+
+          <div class="notice" id="emptyState" data-state="info">等待载入数据…</div>
+
+          <div class="control-dock">
+            <div class="transport">
+              <div class="transport-row">
+                <button type="button" class="secondary" id="previewPrevBtn">上一帧</button>
+                <button type="button" id="previewPlayBtn">播放</button>
+                <button type="button" class="secondary" id="previewNextBtn">下一帧</button>
+              </div>
+
+              <div class="range-wrap">
+                <input type="range" id="previewFrameRange" min="0" max="0" step="1" value="0" />
+                <div class="range-label" id="previewFrameLabel">等待动作帧</div>
+              </div>
+            </div>
+
+            <div class="key-help">
+              <span><code>1</code> 主基础态</span>
+              <span><code>2</code> 移动态</span>
+              <span><code>3</code> 跳跃</span>
+              <span><code>4</code> 攻击</span>
+              <span><code>Q / E</code> 切形态</span>
+              <span><code>← / →</code> 切帧</span>
+              <span><code>Space</code> 播放 / 暂停</span>
+            </div>
+          </div>
+
+          <section class="semantic-block">
+            <div class="semantic-head">
+              <h3>基础态</h3>
+              <p>切换并记录当前基础动作</p>
+            </div>
+            <div class="button-grid" id="baseActionButtons"></div>
+          </section>
+
+          <section class="semantic-block">
+            <div class="semantic-head">
+              <h3>跳跃</h3>
+              <p>按当前基础态触发跳跃相关动作</p>
+            </div>
+            <div class="button-grid" id="jumpActionButtons"></div>
+          </section>
+
+          <section class="semantic-block">
+            <div class="semantic-head">
+              <h3>攻击</h3>
+              <p>优先命中当前基础态的精确组合动作</p>
+            </div>
+            <div class="button-grid" id="attackActionButtons"></div>
+          </section>
+
+          <section class="semantic-block">
+            <div class="semantic-head">
+              <h3>变身</h3>
+              <p>切 form 后自动落到新 form 默认基础态</p>
+            </div>
+            <div class="button-grid" id="formActionButtons"></div>
+          </section>
+
+          <section class="semantic-block">
+            <div class="semantic-head">
+              <h3>特殊</h3>
+              <p>播放不属于基础态 / 跳跃 / 攻击的动作</p>
+            </div>
+            <div class="button-grid" id="specialActionButtons"></div>
+          </section>
+        </section>
+
+        <aside class="panel insight-panel">
+          <div class="panel-head">
+            <div>
+              <div class="panel-kicker">Insight</div>
+              <h2>动作关系与帧信息</h2>
+            </div>
+            <div class="panel-meta" id="resolutionMeta">尚未建立动作关系</div>
+          </div>
+
+          <div class="summary-list">
+            <div class="summary-item">
+              <span>默认基础态</span>
+              <strong id="defaultBaseActionValue">-</strong>
+            </div>
+            <div class="summary-item">
+              <span>当前基础态</span>
+              <strong id="currentBaseActionValue">-</strong>
+            </div>
+            <div class="summary-item">
+              <span>当前播放动作</span>
+              <strong id="currentResolvedActionValue">-</strong>
+            </div>
+            <div class="summary-item">
+              <span>最近触发</span>
+              <strong id="lastTriggerValue">-</strong>
+            </div>
+            <div class="summary-item">
+              <span>命中策略</span>
+              <strong id="resolutionPolicyValue">-</strong>
+            </div>
+            <div class="summary-item">
+              <span>回落目标</span>
+              <strong id="returnTargetValue">-</strong>
+            </div>
+          </div>
+
+          <div class="detail-grid">
+            <div class="detail-item">
+              <span>动作循环</span>
+              <strong id="actionLoopValue">-</strong>
+            </div>
+            <div class="detail-item">
+              <span>动作帧数</span>
+              <strong id="actionFrameCountValue">-</strong>
+            </div>
+            <div class="detail-item">
+              <span>当前帧 Ref</span>
+              <strong id="frameRefValue">-</strong>
+            </div>
+            <div class="detail-item">
+              <span>渲染模式</span>
+              <strong id="frameRenderTypeValue">-</strong>
+            </div>
+            <div class="detail-item">
+              <span>帧时长</span>
+              <strong id="frameDurationValue">-</strong>
+            </div>
+            <div class="detail-item">
+              <span>当前源图</span>
+              <strong id="sourceAssetValue">-</strong>
+            </div>
+            <div class="detail-item">
+              <span>Source Box</span>
+              <strong id="sourceBoxValue">-</strong>
+            </div>
+            <div class="detail-item">
+              <span>Trim Box</span>
+              <strong id="trimBoxValue">-</strong>
+            </div>
+            <div class="detail-item">
+              <span>尺寸</span>
+              <strong id="frameSizeValue">-</strong>
+            </div>
+            <div class="detail-item">
+              <span>Origin</span>
+              <strong id="originValue">-</strong>
+            </div>
+            <div class="detail-item">
+              <span>像素数</span>
+              <strong id="pixelCountValue">-</strong>
+            </div>
+            <div class="detail-item">
+              <span>64x64 裁切</span>
+              <strong id="clipCountValue">-</strong>
+            </div>
+          </div>
+
+          <div class="strip-head">
+            <h3>帧序列条</h3>
+            <div class="panel-meta" id="sequenceMeta">等待动作帧</div>
+          </div>
+          <div class="frame-strip" id="frameStrip"></div>
+        </aside>
+      </main>
+    </div>
+
+    <script src="led-simulator-theme-composer.js"></script>
+  </body>
+</html>

@@ -16,7 +16,8 @@ namespace WebSocketCommandHandlers {
   bool handleModeCommand(
     AsyncWebSocketClient* client,
     JsonDocument& doc,
-    StaticJsonDocument<768>& response
+    StaticJsonDocument<768>& response,
+    bool& responseSent
   );
 
   bool handleClockCommand(
@@ -28,7 +29,8 @@ namespace WebSocketCommandHandlers {
   bool handleThemeCommand(
     AsyncWebSocketClient* client,
     JsonDocument& doc,
-    StaticJsonDocument<768>& response
+    StaticJsonDocument<768>& response,
+    bool& responseSent
   );
 
   bool handleAnimationCommand(
@@ -41,19 +43,22 @@ namespace WebSocketCommandHandlers {
   bool handleCanvasCommand(
     AsyncWebSocketClient* client,
     JsonDocument& doc,
-    StaticJsonDocument<768>& response
+    StaticJsonDocument<768>& response,
+    bool& responseSent
   );
 
   bool handleEffectCommand(
     AsyncWebSocketClient* client,
     JsonDocument& doc,
-    StaticJsonDocument<768>& response
+    StaticJsonDocument<768>& response,
+    bool& responseSent
   );
 
   bool handleEyesCommand(
     AsyncWebSocketClient* client,
     JsonDocument& doc,
-    StaticJsonDocument<768>& response
+    StaticJsonDocument<768>& response,
+    bool& responseSent
   );
 
   bool handleOtaCommand(

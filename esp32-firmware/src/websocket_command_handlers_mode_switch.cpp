@@ -1,17 +1,82 @@
 #include "websocket_mode_command_dispatch.h"
-#include "animation_manager.h"
-#include "board_native_effect.h"
-#include "config_manager.h"
-#include "device_mode_tag_codec.h"
-#include "display_manager.h"
-#include "game_screensaver_effect.h"
+
 #include "mode_tags.h"
-#include "tetris_effect.h"
+#include "runtime_command_bus.h"
 
 namespace {
 void setErrorResponse(StaticJsonDocument<768>& response, const char* message) {
   response["status"] = "error";
   response["message"] = message;
+}
+
+bool hasRequiredTetrisFields(JsonDocument& doc) {
+  return doc.containsKey("clearMode") &&
+         doc.containsKey("cellSize") &&
+         doc.containsKey("speed") &&
+         doc.containsKey("showClock") &&
+         doc.containsKey("pieces");
+}
+
+bool parseTetrisPiecesMask(JsonDocument& doc, uint8_t& piecesMask) {
+  JsonArray pieces = doc["pieces"].as<JsonArray>();
+  if (pieces.isNull()) {
+    return false;
+  }
+
+  uint8_t mask = 0;
+  for (JsonVariant item : pieces) {
+    if (!item.is<int>()) {
+      return false;
+    }
+    int index = item.as<int>();
+    if (index < 0 || index >= 7) {
+      return false;
+    }
+    mask |= static_cast<uint8_t>(1U << index);
+  }
+
+  if (mask == 0) {
+    return false;
+  }
+
+  piecesMask = mask;
+  return true;
+}
+
+bool fillTetrisModeCommand(
+  RuntimeCommandBus::RuntimeCommand* command,
+  JsonDocument& doc,
+  const char* businessModeTag,
+  bool expectedShowClock,
+  const char* successMessage
+) {
+  if (!hasRequiredTetrisFields(doc)) {
+    return false;
+  }
+
+  if (!doc["showClock"].is<bool>()) {
+    return false;
+  }
+
+  const bool showClock = doc["showClock"].as<bool>();
+  if (showClock != expectedShowClock) {
+    return false;
+  }
+
+  uint8_t piecesMask = 0;
+  if (!parseTetrisPiecesMask(doc, piecesMask)) {
+    return false;
+  }
+
+  command->targetMode = MODE_ANIMATION;
+  command->businessModeTag = businessModeTag;
+  command->successMessage = successMessage;
+  command->flag1 = doc["clearMode"].as<bool>();
+  command->flag2 = expectedShowClock;
+  command->intValue1 = doc["cellSize"].as<int>();
+  command->intValue2 = doc["speed"].as<int>();
+  command->byteValue1 = piecesMask;
+  return true;
 }
 }
 
@@ -19,257 +84,137 @@ namespace WebSocketModeCommandDispatch {
 bool handleModeSwitchCommand(
   AsyncWebSocketClient* client,
   JsonDocument& doc,
-  StaticJsonDocument<768>& response
+  StaticJsonDocument<768>& response,
+  bool& responseSent
 ) {
-  auto modeToString = [](DeviceMode mode) {
-    return DeviceModeTagCodec::toTagOrUnknown(mode);
-  };
-
   String cmd = doc["cmd"].as<String>();
   if (cmd != "set_mode") {
     return false;
   }
 
   String mode = doc["mode"].as<String>();
-  DeviceMode fromMode = DisplayManager::currentMode;
-  auto playLoadedAnimation = []() {
-    if (AnimationManager::currentGIF != nullptr) {
-      AnimationManager::currentGIF->isPlaying = true;
-      AnimationManager::currentGIF->currentFrame = 0;
-      AnimationManager::currentGIF->lastFrameTime = millis();
-      AnimationManager::renderGIFFrame(0);
-      return true;
-    }
-    return false;
-  };
-  auto setAnimationBusinessMode = [&](const String& modeTag, const char* message, bool fallbackToClock) {
-    DisplayManager::currentMode = MODE_ANIMATION;
-    DisplayManager::lastBusinessMode = MODE_ANIMATION;
-    DisplayManager::currentBusinessModeTag = modeTag;
-    DisplayManager::lastBusinessModeTag = modeTag;
-    ConfigManager::saveClockConfig();
-
-    bool boardMode = modeTag == ModeTags::TEXT_DISPLAY ||
-                     modeTag == ModeTags::WEATHER ||
-                     modeTag == ModeTags::COUNTDOWN ||
-                     modeTag == ModeTags::STOPWATCH ||
-                     modeTag == ModeTags::NOTIFICATION ||
-                     modeTag == ModeTags::PLANET_SCREENSAVER;
-    if (boardMode && BoardNativeEffect::isActive()) {
-      BoardNativeEffect::render();
-    } else if (!playLoadedAnimation()) {
-      if (fallbackToClock) {
-        DisplayManager::displayClock(true);
-      } else {
-        DisplayManager::dma_display->clearScreen();
-      }
-    }
-
-    Serial.printf("模式切换: %s -> %s\n", modeToString(fromMode), modeTag.c_str());
-    response["message"] = message;
+  RuntimeCommandBus::RuntimeCommand* command =
+    RuntimeCommandBus::createCommand(
+      RuntimeCommandBus::RuntimeCommandSource::WEBSOCKET,
+      client != nullptr ? client->id() : 0
+    );
+  if (command == nullptr) {
+    setErrorResponse(response, "out of memory");
     return true;
-  };
-
-  bool keepBoardState = mode == ModeTags::TEXT_DISPLAY ||
-                        mode == ModeTags::WEATHER ||
-                        mode == ModeTags::COUNTDOWN ||
-                        mode == ModeTags::STOPWATCH ||
-                        mode == ModeTags::NOTIFICATION ||
-                        mode == ModeTags::PLANET_SCREENSAVER;
-
-  TetrisEffect::isActive = false;
-  GameScreensaverEffect::init();
-  if (!keepBoardState) {
-    BoardNativeEffect::deactivate();
   }
-  DisplayManager::setNativeEffectNone();
-  if (AnimationManager::currentGIF != nullptr) {
-    AnimationManager::currentGIF->isPlaying = false;
-  }
-  DisplayManager::receivingPixels = false;
-  DisplayManager::dma_display->clearScreen();
+  command->type = RuntimeCommandBus::RuntimeCommandType::MODE_SWITCH;
+  command->flag1 = true;
+  command->flag2 = true;
 
   if (mode == ModeTags::CLOCK) {
-    DisplayManager::currentMode = MODE_CLOCK;
-    DisplayManager::lastBusinessMode = MODE_CLOCK;
-    DisplayManager::currentBusinessModeTag = ModeTags::CLOCK;
-    DisplayManager::lastBusinessModeTag = ModeTags::CLOCK;
-    ConfigManager::saveClockConfig();
-    DisplayManager::displayClock(true);
-    Serial.printf("模式切换: %s -> clock\n", modeToString(fromMode));
-    response["message"] = "switched to static clock mode";
+    command->targetMode = MODE_CLOCK;
+    command->businessModeTag = ModeTags::CLOCK;
+    command->successMessage = "switched to static clock mode";
+  } else if (mode == ModeTags::CANVAS) {
+    command->targetMode = MODE_CANVAS;
+    command->businessModeTag = ModeTags::CANVAS;
+    command->flag1 = false;
+    command->successMessage = "switched to canvas mode";
+  } else if (mode == ModeTags::ANIMATION) {
+    command->targetMode = MODE_ANIMATION;
+    command->businessModeTag = ModeTags::ANIMATION;
+    command->successMessage = "switched to animation mode";
+  } else if (mode == ModeTags::GIF_PLAYER) {
+    command->targetMode = MODE_ANIMATION;
+    command->businessModeTag = ModeTags::GIF_PLAYER;
+    command->successMessage = "switched to gif player mode";
+  } else if (mode == ModeTags::THEME) {
+    command->targetMode = MODE_THEME;
+    command->businessModeTag = ModeTags::THEME;
+    command->successMessage = "switched to theme mode";
+  } else if (mode == ModeTags::TEXT_DISPLAY) {
+    command->targetMode = MODE_ANIMATION;
+    command->businessModeTag = ModeTags::TEXT_DISPLAY;
+    command->successMessage = "switched to text display mode";
+  } else if (mode == ModeTags::BREATH_EFFECT) {
+    command->targetMode = MODE_ANIMATION;
+    command->businessModeTag = ModeTags::BREATH_EFFECT;
+    command->successMessage = "switched to breath effect mode";
+  } else if (mode == ModeTags::RHYTHM_EFFECT) {
+    command->targetMode = MODE_ANIMATION;
+    command->businessModeTag = ModeTags::RHYTHM_EFFECT;
+    command->successMessage = "switched to rhythm effect mode";
+  } else if (mode == ModeTags::AMBIENT_EFFECT) {
+    command->targetMode = MODE_ANIMATION;
+    command->businessModeTag = ModeTags::AMBIENT_EFFECT;
+    command->successMessage = "switched to ambient effect mode";
+  } else if (mode == ModeTags::LED_MATRIX_SHOWCASE) {
+    command->targetMode = MODE_ANIMATION;
+    command->businessModeTag = ModeTags::LED_MATRIX_SHOWCASE;
+    command->successMessage = "switched to led matrix showcase mode";
+  } else if (mode == ModeTags::TRANSFERRING) {
+    command->targetMode = MODE_TRANSFERRING;
+    command->businessModeTag = ModeTags::TRANSFERRING;
+    command->flag1 = false;
+    command->flag2 = false;
+    command->successMessage = "entered transferring mode";
+  } else if (mode == ModeTags::TETRIS) {
+    if (!fillTetrisModeCommand(
+          command,
+          doc,
+          ModeTags::TETRIS,
+          false,
+          "tetris started")) {
+      RuntimeCommandBus::destroyCommand(command);
+      setErrorResponse(response, "invalid tetris mode fields");
+      return true;
+    }
+  } else if (mode == ModeTags::TETRIS_CLOCK) {
+    if (!fillTetrisModeCommand(
+          command,
+          doc,
+          ModeTags::TETRIS_CLOCK,
+          true,
+          "tetris clock started")) {
+      RuntimeCommandBus::destroyCommand(command);
+      setErrorResponse(response, "invalid tetris clock mode fields");
+      return true;
+    }
+  } else if (mode == ModeTags::WEATHER) {
+    command->targetMode = MODE_ANIMATION;
+    command->businessModeTag = ModeTags::WEATHER;
+    command->successMessage = "switched to weather mode";
+  } else if (mode == ModeTags::COUNTDOWN) {
+    command->targetMode = MODE_ANIMATION;
+    command->businessModeTag = ModeTags::COUNTDOWN;
+    command->successMessage = "switched to countdown mode";
+  } else if (mode == ModeTags::STOPWATCH) {
+    command->targetMode = MODE_ANIMATION;
+    command->businessModeTag = ModeTags::STOPWATCH;
+    command->successMessage = "switched to stopwatch mode";
+  } else if (mode == ModeTags::NOTIFICATION) {
+    command->targetMode = MODE_ANIMATION;
+    command->businessModeTag = ModeTags::NOTIFICATION;
+    command->successMessage = "switched to notification mode";
+  } else if (mode == ModeTags::PLANET_SCREENSAVER) {
+    command->targetMode = MODE_ANIMATION;
+    command->businessModeTag = ModeTags::PLANET_SCREENSAVER;
+    command->successMessage = "switched to planet screensaver mode";
+  } else if (mode == ModeTags::EYES) {
+    command->targetMode = MODE_ANIMATION;
+    command->businessModeTag = ModeTags::EYES;
+    command->successMessage = "switched to eyes mode";
+  } else {
+    RuntimeCommandBus::destroyCommand(command);
+    setErrorResponse(response, "invalid mode");
     return true;
   }
 
-  if (mode == ModeTags::CANVAS) {
-    DisplayManager::currentMode = MODE_CANVAS;
-    DisplayManager::currentBusinessModeTag = ModeTags::CANVAS;
-    ConfigManager::saveClockConfig();
-    DisplayManager::renderCanvas();
-    Serial.printf("模式切换: %s -> canvas\n", modeToString(fromMode));
-    response["message"] = "switched to canvas mode";
-    return true;
-  }
-
-  if (mode == ModeTags::ANIMATION) {
-    return setAnimationBusinessMode(ModeTags::ANIMATION, "switched to animation mode", true);
-  }
-
-  if (mode == ModeTags::GIF_PLAYER) {
-    return setAnimationBusinessMode(ModeTags::GIF_PLAYER, "switched to gif player mode", true);
-  }
-
-  if (mode == ModeTags::THEME) {
-    DisplayManager::currentMode = MODE_THEME;
-    DisplayManager::lastBusinessMode = MODE_THEME;
-    DisplayManager::currentBusinessModeTag = ModeTags::THEME;
-    DisplayManager::lastBusinessModeTag = ModeTags::THEME;
-    ConfigManager::saveClockConfig();
-    DisplayManager::displayTheme(true);
-    Serial.printf("模式切换: %s -> theme\n", modeToString(fromMode));
-    response["message"] = "switched to theme mode";
-    return true;
-  }
-
-  if (mode == ModeTags::TEXT_DISPLAY) {
-    return setAnimationBusinessMode(ModeTags::TEXT_DISPLAY, "switched to text display mode", true);
-  }
-
-  if (mode == ModeTags::BREATH_EFFECT) {
-    DisplayManager::currentMode = MODE_ANIMATION;
-    DisplayManager::lastBusinessMode = MODE_ANIMATION;
-    DisplayManager::currentBusinessModeTag = ModeTags::BREATH_EFFECT;
-    DisplayManager::lastBusinessModeTag = ModeTags::BREATH_EFFECT;
-    ConfigManager::saveClockConfig();
-    DisplayManager::activateBreathEffect(DisplayManager::breathEffectConfig);
-
-    Serial.printf("模式切换: %s -> breath_effect\n", modeToString(fromMode));
-    response["message"] = "switched to breath effect mode";
-    return true;
-  }
-
-  if (mode == ModeTags::RHYTHM_EFFECT) {
-    DisplayManager::currentMode = MODE_ANIMATION;
-    DisplayManager::lastBusinessMode = MODE_ANIMATION;
-    DisplayManager::currentBusinessModeTag = ModeTags::RHYTHM_EFFECT;
-    DisplayManager::lastBusinessModeTag = ModeTags::RHYTHM_EFFECT;
-    ConfigManager::saveClockConfig();
-    DisplayManager::activateRhythmEffect(DisplayManager::rhythmEffectConfig);
-
-    Serial.printf("模式切换: %s -> rhythm_effect\n", modeToString(fromMode));
-    response["message"] = "switched to rhythm effect mode";
-    return true;
-  }
-
-  if (mode == ModeTags::AMBIENT_EFFECT) {
-    DisplayManager::currentMode = MODE_ANIMATION;
-    DisplayManager::lastBusinessMode = MODE_ANIMATION;
-    DisplayManager::currentBusinessModeTag = ModeTags::AMBIENT_EFFECT;
-    DisplayManager::lastBusinessModeTag = ModeTags::AMBIENT_EFFECT;
-    ConfigManager::saveClockConfig();
-    DisplayManager::activateAmbientEffect(DisplayManager::ambientEffectConfig);
-
-    Serial.printf("模式切换: %s -> ambient_effect\n", modeToString(fromMode));
-    response["message"] = "switched to ambient effect mode";
-    return true;
-  }
-
-  if (mode == ModeTags::LED_MATRIX_SHOWCASE) {
-    DisplayManager::currentMode = MODE_ANIMATION;
-    DisplayManager::lastBusinessMode = MODE_ANIMATION;
-    DisplayManager::currentBusinessModeTag = ModeTags::LED_MATRIX_SHOWCASE;
-    DisplayManager::lastBusinessModeTag = ModeTags::LED_MATRIX_SHOWCASE;
-    ConfigManager::saveClockConfig();
-    DisplayManager::activateAmbientEffect(DisplayManager::ambientEffectConfig);
-
-    Serial.printf("模式切换: %s -> led_matrix_showcase\n", modeToString(fromMode));
-    response["message"] = "switched to led matrix showcase mode";
+  if (!RuntimeCommandBus::enqueue(command)) {
+    RuntimeCommandBus::destroyCommand(command);
+    setErrorResponse(response, "device busy");
     return true;
   }
 
   if (mode == ModeTags::TRANSFERRING) {
-    DisplayManager::currentMode = MODE_TRANSFERRING;
-    DisplayManager::currentBusinessModeTag = ModeTags::TRANSFERRING;
-    DisplayManager::dma_display->clearScreen();
-    Serial.printf("模式切换: %s -> transferring\n", modeToString(fromMode));
     Serial.println("进入传输模式，准备接收动画数据");
-    response["message"] = "entered transferring mode";
-    return true;
   }
-
-  if (mode == ModeTags::TETRIS) {
-    if (!doc.containsKey("clearMode") ||
-        !doc.containsKey("cellSize") ||
-        !doc.containsKey("speed") ||
-        !doc.containsKey("showClock")) {
-      setErrorResponse(response, "missing tetris mode fields");
-      return true;
-    }
-
-    bool clearMode = doc["clearMode"].as<bool>();
-    int cellSz = doc["cellSize"].as<int>();
-    int speed = doc["speed"].as<int>();
-    bool clock = doc["showClock"].as<bool>();
-    uint8_t mask = 0x7F;
-
-    if (doc.containsKey("pieces")) {
-      mask = 0;
-      JsonArray arr = doc["pieces"].as<JsonArray>();
-      for (JsonVariant v : arr) {
-        int idx = v.as<int>();
-        if (idx >= 0 && idx < 7) {
-          mask |= (1 << idx);
-        }
-      }
-      if (mask == 0) {
-        mask = 0x7F;
-      }
-    }
-
-    DisplayManager::currentMode = MODE_ANIMATION;
-    DisplayManager::lastBusinessMode = MODE_ANIMATION;
-    DisplayManager::currentBusinessModeTag = ModeTags::TETRIS;
-    DisplayManager::lastBusinessModeTag = ModeTags::TETRIS;
-    TetrisEffect::init(clearMode, cellSz, speed, clock, mask);
-    Serial.printf("模式切换: %s -> tetris\n", modeToString(fromMode));
-    response["message"] = "tetris started";
-    return true;
-  }
-
-  if (mode == ModeTags::WEATHER) {
-    return setAnimationBusinessMode(ModeTags::WEATHER, "switched to weather mode", false);
-  }
-
-  if (mode == ModeTags::COUNTDOWN) {
-    return setAnimationBusinessMode(ModeTags::COUNTDOWN, "switched to countdown mode", false);
-  }
-
-  if (mode == ModeTags::STOPWATCH) {
-    return setAnimationBusinessMode(ModeTags::STOPWATCH, "switched to stopwatch mode", false);
-  }
-
-  if (mode == ModeTags::NOTIFICATION) {
-    return setAnimationBusinessMode(ModeTags::NOTIFICATION, "switched to notification mode", false);
-  }
-
-  if (mode == ModeTags::PLANET_SCREENSAVER) {
-    return setAnimationBusinessMode(ModeTags::PLANET_SCREENSAVER, "switched to planet screensaver mode", false);
-  }
-
-  if (mode == ModeTags::EYES) {
-    DisplayManager::currentMode = MODE_ANIMATION;
-    DisplayManager::lastBusinessMode = MODE_ANIMATION;
-    DisplayManager::currentBusinessModeTag = ModeTags::EYES;
-    DisplayManager::lastBusinessModeTag = ModeTags::EYES;
-    ConfigManager::saveClockConfig();
-    DisplayManager::activateEyesEffect(ConfigManager::eyesConfig);
-
-    Serial.printf("模式切换: %s -> eyes\n", modeToString(fromMode));
-    response["message"] = "switched to eyes mode";
-    return true;
-  }
-
-  setErrorResponse(response, "invalid mode");
+  responseSent = true;
   return true;
 }
 }
