@@ -389,12 +389,15 @@ export default {
       try {
         const ws = this.deviceStore.getWebSocket();
         await ws.setAmbientEffect(this.config);
+        await this.deviceStore.syncAndRequireBusinessMode(
+          "led_matrix_showcase",
+          "设备未进入像素场景模式",
+        );
         uni.setStorageSync(AMBIENT_CONFIG_KEY, this.config);
-        this.deviceStore.setDeviceMode("ambient_effect", { businessMode: true });
         this.toast.showSuccess("已保存并应用");
       } catch (error) {
         console.error("应用场景失败:", error);
-        this.toast.showError("发送失败");
+        this.toast.showError("发送失败：" + error.message);
       } finally {
         this.isSending = false;
       }

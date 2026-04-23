@@ -202,14 +202,14 @@ export default {
 .action-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 24rpx;
+  gap: 32rpx;
 }
 
 .action-card {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 32rpx 16rpx;
+  padding: 24rpx 14rpx;
   background-color: var(--nb-surface);
   border-radius: 0;
   box-shadow: var(--nb-shadow-strong);
@@ -230,7 +230,7 @@ export default {
   border: 2rpx solid var(--nb-ink);
   box-shadow: var(--nb-shadow-soft);
   border-radius: 0;
-  margin-bottom: 16rpx;
+  margin-bottom: 12rpx;
 }
 
 .action-card:nth-child(2) .action-icon {

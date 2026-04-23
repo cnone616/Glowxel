@@ -375,7 +375,7 @@ export default {
       const ws = deviceStore.getWebSocket();
 
       // 发送检查更新命令
-      ws.send({ cmd: "ota_check" })
+      ws.otaCheck()
         .then((res) => {
           this.toast.hideLoading();
           this.firmwareVersion = res.firmware_version || "";
@@ -421,7 +421,7 @@ export default {
       this.toast.showLoading("正在更新固件...");
       const ws = deviceStore.getWebSocket();
 
-      ws.send({ cmd: "ota_update" })
+      ws.otaUpdate()
         .then(() => {
           // 设备会重启，连接会断开
           setTimeout(() => {

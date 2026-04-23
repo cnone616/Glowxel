@@ -1318,7 +1318,7 @@ export default {
 
 .confirm-icon--danger {
   background: var(--nb-coral);
-  color: #ffffff;
+  color: var(--nb-ink);
 }
 
 .confirm-icon--primary {
@@ -1401,7 +1401,7 @@ export default {
 }
 
 .confirm-btn.danger .confirm-btn-text {
-  color: #ffffff;
+  color: var(--nb-ink);
 }
 
 .thumbnail-placeholder {

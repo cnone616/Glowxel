@@ -17,6 +17,7 @@ static constexpr const char* AMBIENT_EFFECT = "ambient_effect";
 static constexpr const char* LED_MATRIX_SHOWCASE = "led_matrix_showcase";
 
 static constexpr const char* TETRIS = "tetris";
+static constexpr const char* TETRIS_CLOCK = "tetris_clock";
 static constexpr const char* EYES = "eyes";
 static constexpr const char* GAME_SCREENSAVER = "game_screensaver";
 static constexpr const char* GIF_PLAYER = "gif_player";

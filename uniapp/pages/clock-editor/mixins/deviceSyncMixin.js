@@ -19,7 +19,7 @@ export default {
       this.stopLoading();
       this.loadingActive = true;
       const ws = this.deviceStore.getWebSocket();
-      ws.send({ cmd: "start_loading" }).catch(() => {});
+      ws.startLoading().catch(() => {});
     },
 
     stopLoading() {
@@ -33,7 +33,7 @@ export default {
 
       this.loadingActive = false;
       const ws = this.deviceStore.getWebSocket();
-      ws.send({ cmd: "stop_loading" }).catch(() => {});
+      ws.stopLoading().catch(() => {});
       if (this.loadingTimer) {
         clearInterval(this.loadingTimer);
         this.loadingTimer = null;
@@ -198,51 +198,37 @@ export default {
     },
 
     async sendToDevice() {
-      if (!this.deviceStore.connected) {
-        this.toast.showError("设备未连接");
-        return;
-      }
-      if (this.isSending) {
-        this.toast.showInfo("正在传输中，请等待完成");
+      if (!this.guardBeforeSend(this.deviceStore.connected)) {
         return;
       }
 
-      this.isSending = true;
-      this.canvasHidden = true;
+      this.beginSendUi();
       const ws = this.deviceStore.getWebSocket();
       try {
-        const sendCommand = async (data, delayMs = 120) => {
-          await ws.send(data);
-          if (delayMs > 0) {
-            await new Promise((resolve) => setTimeout(resolve, delayMs));
-          }
-        };
-
         const timeText = this.getTimeText();
         const dateText = this.getDateText();
         const weekText = this.getWeekText();
-        ws.pauseHeartbeat();
 
         if (this.clockMode === "theme") {
           if (!this.lastAppliedClockThemeId) {
             throw new Error("请先选择主题");
           }
 
-          await sendCommand({ cmd: "set_mode", mode: "theme" });
-          await sendCommand({
-            cmd: "set_theme_config",
-            themeId: this.lastAppliedClockThemeId,
-          });
-          this.toast.showSuccess("主题已发送到设备并保存");
+          await ws.setThemeConfig(this.lastAppliedClockThemeId);
+          await ws.setMode("theme");
+          await this.deviceStore.syncAndRequireBusinessMode(
+            "theme",
+            "设备未进入主题模式",
+          );
 
-          this.deviceStore.setDeviceMode("theme", { businessMode: true });
           this.deviceThemeId = this.lastAppliedClockThemeId;
           uni.setStorageSync(CLOCK_DEVICE_THEME_ID_KEY, this.deviceThemeId);
           this.saveConfig();
+          this.showSendSuccess();
           return;
         }
 
-        await sendCommand({ cmd: "set_mode", mode: this.clockMode });
+        await ws.setMode(this.clockMode);
         console.log("模式切换成功");
 
         const timeAlign = this.config.time.align || "left";
@@ -283,40 +269,36 @@ export default {
           weekX = weekX - getClockTextWidth(weekText, this.config.font, 1);
         }
 
-        await sendCommand({
-          cmd: "set_clock_config",
-          clockMode: this.clockMode,
-          config: {
-            font: this.config.font,
-            showSeconds: this.config.showSeconds,
-            hourFormat: this.config.hourFormat,
-            time: {
-              show: this.config.time.show,
-              fontSize: this.config.time.fontSize,
-              x: timeX,
-              y: this.config.time.y,
-              color: this.hexToRgb(this.config.time.color),
-            },
-            date: {
-              show: this.config.date.show,
-              fontSize: this.config.date.fontSize,
-              x: dateX,
-              y: this.config.date.y,
-              color: this.hexToRgb(this.config.date.color),
-            },
-            week: {
-              show: this.config.week.show,
-              x: weekX,
-              y: this.config.week.y,
-              color: this.hexToRgb(this.config.week.color),
-            },
-            image: {
-              show: this.config.image.show,
-              x: this.config.image.x,
-              y: this.config.image.y,
-              width: this.config.image.width,
-              height: this.config.image.height,
-            },
+        await ws.setClockConfig(this.clockMode, {
+          font: this.config.font,
+          showSeconds: this.config.showSeconds,
+          hourFormat: this.config.hourFormat,
+          time: {
+            show: this.config.time.show,
+            fontSize: this.config.time.fontSize,
+            x: timeX,
+            y: this.config.time.y,
+            color: this.hexToRgb(this.config.time.color),
+          },
+          date: {
+            show: this.config.date.show,
+            fontSize: this.config.date.fontSize,
+            x: dateX,
+            y: this.config.date.y,
+            color: this.hexToRgb(this.config.date.color),
+          },
+          week: {
+            show: this.config.week.show,
+            x: weekX,
+            y: this.config.week.y,
+            color: this.hexToRgb(this.config.week.color),
+          },
+          image: {
+            show: this.config.image.show,
+            x: this.config.image.x,
+            y: this.config.image.y,
+            width: this.config.image.width,
+            height: this.config.image.height,
           },
         });
 
@@ -342,8 +324,7 @@ export default {
           }
           console.log(`发送 GIF 动画: ${this.gifAnimationData.frameCount} 帧`);
 
-          this.startLoading();
-          const { frameCount, frames } = this.gifAnimationData;
+          const { frames } = this.gifAnimationData;
           const uploadFrames = frames.map((frame, index) => {
             if (!Array.isArray(frame) || frame.length < 4) {
               throw new Error(`第 ${index + 1} 帧数据格式错误`);
@@ -361,8 +342,6 @@ export default {
           });
 
           await uploadAnimationFrames(ws, uploadFrames, this.clockMode);
-          this.stopLoading();
-          this.toast.showSuccess(`GIF 动画已发送！${frameCount} 帧`);
         } else {
           const allPixels = this.buildImageLayerPixels();
 
@@ -377,24 +356,21 @@ export default {
             });
 
             await this.sendImagePixelsBinary(pixelArray);
-            this.toast.showSuccess(
-              `已发送到设备并保存！包含 ${pixelArray.length} 个像素点`,
-            );
-          } else {
-            this.toast.showSuccess("已发送到设备并保存");
           }
         }
 
-        this.deviceStore.setDeviceMode(this.clockMode, { businessMode: true });
+        await this.deviceStore.syncAndRequireBusinessMode(
+          this.clockMode,
+          "设备模式确认失败",
+        );
         this.saveConfig();
+        this.showSendSuccess();
       } catch (err) {
         console.error("发送失败:", err);
-        this.toast.showError("发送失败: " + err.message);
+        this.showSendFailure(err);
       } finally {
         this.stopLoading();
-        ws.resumeHeartbeat();
-        this.isSending = false;
-        this.canvasHidden = false;
+        this.endSendUi();
       }
     },
 

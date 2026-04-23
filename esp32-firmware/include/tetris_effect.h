@@ -9,6 +9,7 @@
 class TetrisEffect {
 public:
   static void init(bool clearMode = true, int cellSize = 2, int speed = 150, bool showClock = true, uint8_t piecesMask = 0x7F);
+  static void deactivate();
   static void update();
   static void render(MatrixPanel_I2S_DMA* display);
   static bool isActive;

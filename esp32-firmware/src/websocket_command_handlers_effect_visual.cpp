@@ -1,19 +1,19 @@
 #include "websocket_effect_command_dispatch.h"
-#include "websocket_effect_common.h"
-#include "animation_manager.h"
-#include "board_native_effect.h"
+
+#include "ambient_preset_codec.h"
 #include "config_manager.h"
 #include "display_manager.h"
-#include "game_screensaver_effect.h"
 #include "mode_tags.h"
-#include "tetris_effect.h"
-#include "ambient_preset_codec.h"
+#include "runtime_command_bus.h"
+#include "runtime_mode_coordinator.h"
+#include "websocket_effect_common.h"
 
 namespace WebSocketEffectCommandDispatch {
 bool handleVisualEffectCommand(
   AsyncWebSocketClient* client,
   JsonDocument& doc,
-  StaticJsonDocument<768>& response
+  StaticJsonDocument<768>& response,
+  bool& responseSent
 ) {
   String cmd = doc["cmd"].as<String>();
 
@@ -39,6 +39,7 @@ bool handleVisualEffectCommand(
     BreathEffectConfig config;
     config.speed = doc["speed"].as<uint8_t>();
     config.loop = doc["loop"].as<bool>();
+
     String motion = doc["motion"].as<String>();
     if (motion == "clockwise") {
       config.motion = BREATH_MOTION_CLOCKWISE;
@@ -80,19 +81,23 @@ bool handleVisualEffectCommand(
     config.colorBG = colorB["g"].as<uint8_t>();
     config.colorBB = colorB["b"].as<uint8_t>();
 
-    DisplayManager::currentMode = MODE_ANIMATION;
-    DisplayManager::lastBusinessMode = MODE_ANIMATION;
-    DisplayManager::currentBusinessModeTag = ModeTags::BREATH_EFFECT;
-    DisplayManager::lastBusinessModeTag = ModeTags::BREATH_EFFECT;
-    TetrisEffect::isActive = false;
-    BoardNativeEffect::deactivate();
-    GameScreensaverEffect::init();
-    if (AnimationManager::currentGIF != nullptr) {
-      AnimationManager::currentGIF->isPlaying = false;
+    RuntimeCommandBus::RuntimeCommand* command =
+      RuntimeCommandBus::createCommand(
+        RuntimeCommandBus::RuntimeCommandSource::WEBSOCKET,
+        client != nullptr ? client->id() : 0
+      );
+    if (command == nullptr) {
+      wsSetErrorResponse(response, "out of memory");
+      return true;
     }
-    DisplayManager::activateBreathEffect(config);
-
-    response["message"] = "breath effect applied";
+    command->type = RuntimeCommandBus::RuntimeCommandType::BREATH_EFFECT;
+    command->breathEffectConfig = config;
+    if (!RuntimeCommandBus::enqueue(command)) {
+      RuntimeCommandBus::destroyCommand(command);
+      wsSetErrorResponse(response, "device busy");
+      return true;
+    }
+    responseSent = true;
     return true;
   }
 
@@ -155,19 +160,23 @@ bool handleVisualEffectCommand(
     config.colorBG = colorB["g"].as<uint8_t>();
     config.colorBB = colorB["b"].as<uint8_t>();
 
-    DisplayManager::currentMode = MODE_ANIMATION;
-    DisplayManager::lastBusinessMode = MODE_ANIMATION;
-    DisplayManager::currentBusinessModeTag = ModeTags::RHYTHM_EFFECT;
-    DisplayManager::lastBusinessModeTag = ModeTags::RHYTHM_EFFECT;
-    TetrisEffect::isActive = false;
-    BoardNativeEffect::deactivate();
-    GameScreensaverEffect::init();
-    if (AnimationManager::currentGIF != nullptr) {
-      AnimationManager::currentGIF->isPlaying = false;
+    RuntimeCommandBus::RuntimeCommand* command =
+      RuntimeCommandBus::createCommand(
+        RuntimeCommandBus::RuntimeCommandSource::WEBSOCKET,
+        client != nullptr ? client->id() : 0
+      );
+    if (command == nullptr) {
+      wsSetErrorResponse(response, "out of memory");
+      return true;
     }
-    DisplayManager::activateRhythmEffect(config);
-
-    response["message"] = "rhythm effect applied";
+    command->type = RuntimeCommandBus::RuntimeCommandType::RHYTHM_EFFECT;
+    command->rhythmEffectConfig = config;
+    if (!RuntimeCommandBus::enqueue(command)) {
+      RuntimeCommandBus::destroyCommand(command);
+      wsSetErrorResponse(response, "device busy");
+      return true;
+    }
+    responseSent = true;
     return true;
   }
 
@@ -190,8 +199,12 @@ bool handleVisualEffectCommand(
     config.preset = preset;
     config.speed = doc["speed"].as<uint8_t>();
     config.loop = doc["loop"].as<bool>();
-    if (config.speed < 1) config.speed = 1;
-    if (config.speed > 10) config.speed = 10;
+    if (config.speed < 1) {
+      config.speed = 1;
+    }
+    if (config.speed > 10) {
+      config.speed = 10;
+    }
 
     if (config.preset == AMBIENT_PRESET_SUNSET_BLUSH) {
       if (!doc.containsKey("density") || !doc.containsKey("color")) {
@@ -205,8 +218,12 @@ bool handleVisualEffectCommand(
       }
       config.intensity = DisplayManager::ambientEffectConfig.intensity;
       config.density = doc["density"].as<uint8_t>();
-      if (config.density < 10) config.density = 10;
-      if (config.density > 100) config.density = 100;
+      if (config.density < 10) {
+        config.density = 10;
+      }
+      if (config.density > 100) {
+        config.density = 100;
+      }
       config.colorR = color["r"].as<uint8_t>();
       config.colorG = color["g"].as<uint8_t>();
       config.colorB = color["b"].as<uint8_t>();
@@ -216,35 +233,39 @@ bool handleVisualEffectCommand(
         return true;
       }
       config.intensity = doc["intensity"].as<uint8_t>();
-      if (config.intensity < 10) config.intensity = 10;
-      if (config.intensity > 100) config.intensity = 100;
+      if (config.intensity < 10) {
+        config.intensity = 10;
+      }
+      if (config.intensity > 100) {
+        config.intensity = 100;
+      }
       config.density = DisplayManager::ambientEffectConfig.density;
       config.colorR = DisplayManager::ambientEffectConfig.colorR;
       config.colorG = DisplayManager::ambientEffectConfig.colorG;
       config.colorB = DisplayManager::ambientEffectConfig.colorB;
     }
 
-    DisplayManager::ambientEffectConfig = config;
-    ConfigManager::saveAmbientEffectConfig();
-    DisplayManager::currentMode = MODE_ANIMATION;
-    DisplayManager::lastBusinessMode = MODE_ANIMATION;
-    DisplayManager::currentBusinessModeTag = ModeTags::AMBIENT_EFFECT;
-    DisplayManager::lastBusinessModeTag = ModeTags::AMBIENT_EFFECT;
-    ConfigManager::saveClockConfig();
-    TetrisEffect::isActive = false;
-    BoardNativeEffect::deactivate();
-    GameScreensaverEffect::init();
-    if (AnimationManager::currentGIF != nullptr) {
-      AnimationManager::currentGIF->isPlaying = false;
+    RuntimeCommandBus::RuntimeCommand* command =
+      RuntimeCommandBus::createCommand(
+        RuntimeCommandBus::RuntimeCommandSource::WEBSOCKET,
+        client != nullptr ? client->id() : 0
+      );
+    if (command == nullptr) {
+      wsSetErrorResponse(response, "out of memory");
+      return true;
     }
-    DisplayManager::activateAmbientEffect(config);
-
-    response["message"] = "ambient effect applied";
-    response["preset"] = AmbientPresetCodec::toString(config.preset);
+    command->type = RuntimeCommandBus::RuntimeCommandType::AMBIENT_EFFECT;
+    command->ambientEffectConfig = config;
+    command->stringValue1 = AmbientPresetCodec::toString(config.preset);
+    if (!RuntimeCommandBus::enqueue(command)) {
+      RuntimeCommandBus::destroyCommand(command);
+      wsSetErrorResponse(response, "device busy");
+      return true;
+    }
+    responseSent = true;
     return true;
   }
 
-  (void)client;
   return false;
 }
 }

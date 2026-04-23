@@ -15,7 +15,7 @@
     <view class="canvas-section">
       <view class="preview-canvas-container" :style="previewCanvasBoxStyle">
         <PixelCanvas
-          v-if="previewCanvasReady"
+          v-if="previewCanvasReady && !shouldHidePreview"
           :width="64"
           :height="64"
           :pixels="currentPreviewPixels"
@@ -41,7 +41,7 @@
             @click="handleSend"
           >
             <Icon name="link" :size="36" color="var(--nb-ink)" />
-            <text>{{ isSending ? "发送中" : "发送" }}</text>
+            <text>发送</text>
           </view>
         </view>
       </view>
@@ -142,18 +142,33 @@
       </view>
     </scroll-view>
 
-    <Toast ref="toastRef" />
-    <LoadingOverlay />
+    <view
+      v-if="isSending"
+      class="glx-device-sending-overlay"
+      @touchmove.stop.prevent
+    >
+      <view class="glx-device-sending-card">
+        <view class="glx-device-sending-spinner"></view>
+        <text class="glx-device-sending-title">{{ sendOverlayTitle }}</text>
+        <text class="glx-device-sending-tip">{{ sendOverlayTip }}</text>
+      </view>
+    </view>
+
+    <Toast
+      ref="toastRef"
+      @show="handleToastShow"
+      @hide="handleToastHide"
+    />
   </view>
 </template>
 
 <script>
 import statusBarMixin from "../../mixins/statusBar.js";
+import deviceSendUxMixin from "../../mixins/deviceSendUxMixin.js";
 import Icon from "../../components/Icon.vue";
 import Toast from "../../components/Toast.vue";
 import PixelCanvas from "../../components/PixelCanvas.vue";
 import GlxStepper from "../../components/GlxStepper.vue";
-import LoadingOverlay from "../../components/LoadingOverlay.vue";
 import { useDeviceStore } from "../../store/device.js";
 import { useToast } from "../../composables/useToast.js";
 import {
@@ -171,20 +186,19 @@ import {
 } from "../../utils/planetScreensaverPreview.js";
 
 export default {
-  mixins: [statusBarMixin],
+  mixins: [statusBarMixin, deviceSendUxMixin],
   components: {
     Icon,
     Toast,
     PixelCanvas,
     GlxStepper,
-    LoadingOverlay,
   },
   data() {
     const config = createDefaultPlanetPreviewConfig();
     return {
       deviceStore: null,
       toast: null,
-      isSending: false,
+      sendPreviewKind: "native",
       PLANET_PREVIEW_MIN_SPEED,
       PLANET_PREVIEW_MAX_SPEED,
       contentHeight: "calc(100vh - 88rpx - 520rpx)",
@@ -252,42 +266,24 @@ export default {
       uni.navigateBack();
     },
     async handleSend() {
-      if (this.isSending) {
-        this.toast.showInfo("正在传输中，请等待完成");
-        return;
-      }
-      if (!this.isDeviceConnected) {
-        this.toast.showError("设备未连接");
+      if (!this.guardBeforeSend(this.isDeviceConnected)) {
         return;
       }
 
-      this.isSending = true;
-      this.toast.showLoading("发送中...");
+      this.beginSendUi();
       try {
         const ws = this.deviceStore.getWebSocket();
         await ws.setPlanetScreensaver(this.config);
-        const status = await ws.getStatus();
-        if (
-          status.effectMode !== "planet_screensaver" ||
-          status.preset !== this.config.preset ||
-          status.size !== this.config.size ||
-          status.direction !== this.config.direction ||
-          status.speed !== this.config.speed ||
-          status.seed !== this.config.seed ||
-          status.colorSeed !== this.config.colorSeed
-        ) {
-          throw new Error("设备未进入星球屏保模式");
-        }
-        this.deviceStore.setDeviceMode("planet_screensaver", {
-          businessMode: true,
-        });
-        this.toast.showSuccess("星球屏保已发送到设备");
+        await this.deviceStore.syncAndRequireBusinessMode(
+          "planet_screensaver",
+          "设备未进入星球屏保模式",
+        );
+        this.showSendSuccess();
       } catch (error) {
         console.error("发送星球屏保失败:", error);
-        this.toast.showError("发送失败：" + error.message);
+        this.showSendFailure(error);
       } finally {
-        this.toast.hideLoading();
-        this.isSending = false;
+        this.endSendUi();
       }
     },
     initPreviewCanvas() {

@@ -1,0 +1,446 @@
+{
+  "gameId": "adventure-island",
+  "label": "冒险岛",
+  "roles": [
+    {
+      "id": "master-higgins",
+      "label": "Master Higgins",
+      "forms": [
+        {
+          "id": "on-foot",
+          "label": "徒步",
+          "actions": [
+            {
+              "id": "idle",
+              "label": "待机",
+              "loop": true,
+              "frames": [
+                {
+                  "frameId": "master-higgins-on-foot-idle-01",
+                  "sourceAsset": "character_01__master_higgins.png",
+                  "sourceBox": {
+                    "x": 1,
+                    "y": 1,
+                    "width": 16,
+                    "height": 32
+                  },
+                  "origin": {
+                    "x": 8,
+                    "y": 31
+                  },
+                  "durationMs": 180
+                }
+              ]
+            },
+            {
+              "id": "run",
+              "label": "奔跑",
+              "loop": true,
+              "frames": [
+                {
+                  "frameId": "master-higgins-on-foot-run-01",
+                  "sourceAsset": "character_01__master_higgins.png",
+                  "sourceBox": {
+                    "x": 1,
+                    "y": 1,
+                    "width": 16,
+                    "height": 32
+                  },
+                  "origin": {
+                    "x": 8,
+                    "y": 31
+                  },
+                  "durationMs": 120
+                },
+                {
+                  "frameId": "master-higgins-on-foot-run-02",
+                  "sourceAsset": "character_01__master_higgins.png",
+                  "sourceBox": {
+                    "x": 18,
+                    "y": 1,
+                    "width": 16,
+                    "height": 32
+                  },
+                  "origin": {
+                    "x": 8,
+                    "y": 31
+                  },
+                  "durationMs": 120
+                },
+                {
+                  "frameId": "master-higgins-on-foot-run-03",
+                  "sourceAsset": "character_01__master_higgins.png",
+                  "sourceBox": {
+                    "x": 37,
+                    "y": 1,
+                    "width": 16,
+                    "height": 32
+                  },
+                  "origin": {
+                    "x": 8,
+                    "y": 31
+                  },
+                  "durationMs": 120
+                },
+                {
+                  "frameId": "master-higgins-on-foot-run-04",
+                  "sourceAsset": "character_01__master_higgins.png",
+                  "sourceBox": {
+                    "x": 54,
+                    "y": 1,
+                    "width": 24,
+                    "height": 32
+                  },
+                  "origin": {
+                    "x": 10,
+                    "y": 29
+                  },
+                  "durationMs": 120
+                }
+              ]
+            },
+            {
+              "id": "duck",
+              "label": "下蹲",
+              "loop": true,
+              "frames": [
+                {
+                  "frameId": "master-higgins-on-foot-duck-01",
+                  "sourceAsset": "character_01__master_higgins.png",
+                  "sourceBox": {
+                    "x": 177,
+                    "y": 9,
+                    "width": 32,
+                    "height": 24
+                  },
+                  "origin": {
+                    "x": 16,
+                    "y": 23
+                  },
+                  "durationMs": 180
+                },
+                {
+                  "frameId": "master-higgins-on-foot-duck-02",
+                  "sourceAsset": "character_01__master_higgins.png",
+                  "sourceBox": {
+                    "x": 210,
+                    "y": 9,
+                    "width": 32,
+                    "height": 24
+                  },
+                  "origin": {
+                    "x": 16,
+                    "y": 23
+                  },
+                  "durationMs": 180
+                }
+              ]
+            },
+            {
+              "id": "jump",
+              "label": "徒步跳跃",
+              "loop": false,
+              "frames": [
+                {
+                  "frameId": "master-higgins-on-foot-jump-01",
+                  "sourceAsset": "character_01__master_higgins.png",
+                  "sourceBox": {
+                    "x": 79,
+                    "y": 1,
+                    "width": 16,
+                    "height": 32
+                  },
+                  "origin": {
+                    "x": 8,
+                    "y": 31
+                  },
+                  "durationMs": 120
+                },
+                {
+                  "frameId": "master-higgins-on-foot-jump-02",
+                  "sourceAsset": "character_01__master_higgins.png",
+                  "sourceBox": {
+                    "x": 96,
+                    "y": 1,
+                    "width": 24,
+                    "height": 32
+                  },
+                  "origin": {
+                    "x": 12,
+                    "y": 31
+                  },
+                  "durationMs": 120
+                },
+                {
+                  "frameId": "master-higgins-on-foot-jump-03",
+                  "sourceAsset": "character_01__master_higgins.png",
+                  "sourceBox": {
+                    "x": 123,
+                    "y": 1,
+                    "width": 24,
+                    "height": 32
+                  },
+                  "origin": {
+                    "x": 12,
+                    "y": 31
+                  },
+                  "durationMs": 130
+                },
+                {
+                  "frameId": "master-higgins-on-foot-jump-04",
+                  "sourceAsset": "character_01__master_higgins.png",
+                  "sourceBox": {
+                    "x": 150,
+                    "y": 1,
+                    "width": 24,
+                    "height": 32
+                  },
+                  "origin": {
+                    "x": 12,
+                    "y": 31
+                  },
+                  "durationMs": 150
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "skateboard",
+          "label": "滑板",
+          "actions": [
+            {
+              "id": "ride",
+              "label": "滑板前进",
+              "loop": true,
+              "frames": [
+                {
+                  "frameId": "master-higgins-skateboard-ride-01",
+                  "sourceAsset": "character_01__master_higgins.png",
+                  "sourceBox": {
+                    "x": 1,
+                    "y": 34,
+                    "width": 24,
+                    "height": 32
+                  },
+                  "origin": {
+                    "x": 11,
+                    "y": 29
+                  },
+                  "durationMs": 100
+                },
+                {
+                  "frameId": "master-higgins-skateboard-ride-02",
+                  "sourceAsset": "character_01__master_higgins.png",
+                  "sourceBox": {
+                    "x": 28,
+                    "y": 34,
+                    "width": 24,
+                    "height": 32
+                  },
+                  "origin": {
+                    "x": 12,
+                    "y": 31
+                  },
+                  "durationMs": 100
+                },
+                {
+                  "frameId": "master-higgins-skateboard-ride-03",
+                  "sourceAsset": "character_01__master_higgins.png",
+                  "sourceBox": {
+                    "x": 53,
+                    "y": 34,
+                    "width": 24,
+                    "height": 32
+                  },
+                  "origin": {
+                    "x": 12,
+                    "y": 31
+                  },
+                  "durationMs": 100
+                },
+                {
+                  "frameId": "master-higgins-skateboard-ride-04",
+                  "sourceAsset": "character_01__master_higgins.png",
+                  "sourceBox": {
+                    "x": 80,
+                    "y": 34,
+                    "width": 24,
+                    "height": 32
+                  },
+                  "origin": {
+                    "x": 11,
+                    "y": 31
+                  },
+                  "durationMs": 100
+                },
+                {
+                  "frameId": "master-higgins-skateboard-ride-05",
+                  "sourceAsset": "character_01__master_higgins.png",
+                  "sourceBox": {
+                    "x": 105,
+                    "y": 34,
+                    "width": 24,
+                    "height": 32
+                  },
+                  "origin": {
+                    "x": 11,
+                    "y": 31
+                  },
+                  "durationMs": 100
+                },
+                {
+                  "frameId": "master-higgins-skateboard-ride-06",
+                  "sourceAsset": "character_01__master_higgins.png",
+                  "sourceBox": {
+                    "x": 132,
+                    "y": 34,
+                    "width": 24,
+                    "height": 32
+                  },
+                  "origin": {
+                    "x": 12,
+                    "y": 31
+                  },
+                  "durationMs": 100
+                }
+              ]
+            },
+            {
+              "id": "jump",
+              "label": "滑板跳跃",
+              "loop": false,
+              "frames": [
+                {
+                  "frameId": "master-higgins-skateboard-jump-01",
+                  "sourceAsset": "character_01__master_higgins.png",
+                  "sourceBox": {
+                    "x": 96,
+                    "y": 1,
+                    "width": 24,
+                    "height": 32
+                  },
+                  "origin": {
+                    "x": 9,
+                    "y": 31
+                  },
+                  "durationMs": 140
+                },
+                {
+                  "frameId": "master-higgins-skateboard-jump-02",
+                  "sourceAsset": "character_01__master_higgins.png",
+                  "sourceBox": {
+                    "x": 123,
+                    "y": 1,
+                    "width": 24,
+                    "height": 32
+                  },
+                  "origin": {
+                    "x": 10,
+                    "y": 29
+                  },
+                  "durationMs": 140
+                },
+                {
+                  "frameId": "master-higgins-skateboard-jump-03",
+                  "sourceAsset": "character_01__master_higgins.png",
+                  "sourceBox": {
+                    "x": 150,
+                    "y": 1,
+                    "width": 24,
+                    "height": 32
+                  },
+                  "origin": {
+                    "x": 13,
+                    "y": 29
+                  },
+                  "durationMs": 160
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "damaged",
+          "label": "受伤",
+          "actions": [
+            {
+              "id": "idle",
+              "label": "待机",
+              "loop": true,
+              "frames": [
+                {
+                  "frameId": "master-higgins-damaged-idle-01",
+                  "sourceAsset": "character_01__master_higgins.png",
+                  "sourceBox": {
+                    "x": 229,
+                    "y": 34,
+                    "width": 16,
+                    "height": 32
+                  },
+                  "origin": {
+                    "x": 8,
+                    "y": 31
+                  },
+                  "durationMs": 200
+                }
+              ]
+            },
+            {
+              "id": "run",
+              "label": "受伤奔跑",
+              "loop": true,
+              "frames": [
+                {
+                  "frameId": "master-higgins-damaged-run-01",
+                  "sourceAsset": "character_01__master_higgins.png",
+                  "sourceBox": {
+                    "x": 1,
+                    "y": 79,
+                    "width": 16,
+                    "height": 32
+                  },
+                  "origin": {
+                    "x": 8,
+                    "y": 31
+                  },
+                  "durationMs": 120
+                },
+                {
+                  "frameId": "master-higgins-damaged-run-02",
+                  "sourceAsset": "character_01__master_higgins.png",
+                  "sourceBox": {
+                    "x": 18,
+                    "y": 79,
+                    "width": 16,
+                    "height": 32
+                  },
+                  "origin": {
+                    "x": 8,
+                    "y": 31
+                  },
+                  "durationMs": 120
+                },
+                {
+                  "frameId": "master-higgins-damaged-run-03",
+                  "sourceAsset": "character_01__master_higgins.png",
+                  "sourceBox": {
+                    "x": 35,
+                    "y": 79,
+                    "width": 24,
+                    "height": 32
+                  },
+                  "origin": {
+                    "x": 10,
+                    "y": 29
+                  },
+                  "durationMs": 120
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

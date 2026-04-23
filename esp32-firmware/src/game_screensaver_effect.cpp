@@ -1229,6 +1229,11 @@ void init() {
   s_active = false;
 }
 
+void deactivate() {
+  s_active = false;
+  s_needsRender = false;
+}
+
 void applyConfig(const GameScreensaverConfig& config) {
   s_config = config;
   s_active = true;

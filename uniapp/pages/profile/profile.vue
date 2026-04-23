@@ -388,11 +388,11 @@ export default {
   width: 120rpx;
   height: 120rpx;
   border-radius: 60rpx;
-  background-color: #edf4ff;
+  background-color: var(--nb-blue);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--nb-blue);
+  color: var(--nb-ink);
 }
 
 .prompt-text {
@@ -448,7 +448,7 @@ export default {
   font-size: 24rpx;
   font-weight: 900;
   background-color: var(--nb-blue);
-  color: #ffffff;
+  color: var(--nb-ink);
 }
 
 .edit-btn text,
@@ -505,7 +505,7 @@ export default {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 32rpx;
+  padding: 24rpx 26rpx;
   transition: all 0.2s ease;
   min-height: 100rpx;
   box-shadow: var(--nb-shadow-strong);
@@ -518,7 +518,7 @@ export default {
 .menu-left {
   display: flex;
   align-items: center;
-  gap: 24rpx;
+  gap: 28rpx;
   flex: 1;
 }
 
@@ -528,29 +528,29 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: #f5f6f8 !important;
+  background-color: var(--nb-surface);
   border: 2rpx solid var(--nb-ink);
   box-shadow: var(--nb-shadow-soft);
 }
 
 .menu-icon--works {
-  background-color: #fff1b8 !important;
+  background-color: var(--nb-yellow);
 }
 
 .menu-icon--favorites {
-  background-color: #ffe1db !important;
+  background-color: var(--nb-coral);
 }
 
 .menu-icon--achievements {
-  background-color: #e3f0ff !important;
+  background-color: var(--nb-blue);
 }
 
 .menu-icon--sync {
-  background-color: #e2f8ee !important;
+  background-color: var(--nb-green);
 }
 
 .menu-icon--settings {
-  background-color: #eee8ff !important;
+  background-color: var(--nb-yellow);
 }
 
 .menu-info {
@@ -598,13 +598,14 @@ export default {
   align-items: center;
   justify-content: center;
   gap: 16rpx;
-  padding: 32rpx;
+  min-height: 88rpx;
+  padding: 18rpx 22rpx;
   background-color: var(--nb-coral);
   border: 2rpx solid var(--nb-ink);
   border-radius: 0;
-  color: #ffffff;
+  color: var(--nb-ink);
   font-size: 28rpx;
-  font-weight: 600;
+  font-weight: 800;
   transition: background-color 0.2s ease;
   box-shadow: var(--nb-shadow-soft);
 }
@@ -620,5 +621,6 @@ export default {
 .logout-btn text,
 .logout-btn .iconfont {
   color: inherit !important;
+  font-weight: 800;
 }
 </style>

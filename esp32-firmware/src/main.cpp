@@ -5,10 +5,13 @@
 #include "display_manager.h"
 #include "animation_manager.h"
 #include "board_native_effect.h"
+#include "config.h"
 #include "mode_tags.h"
 #include "websocket_handler.h"
 #include "web_server.h"
 #include "ota_manager.h"
+#include "runtime_command_bus.h"
+#include "runtime_mode_coordinator.h"
 #include "tetris_effect.h"
 #include "eyes_effect.h"
 #include "game_screensaver_effect.h"
@@ -16,143 +19,195 @@
 
 namespace {
 constexpr unsigned long kWebSocketIdleWarnMs = 180000;
-bool gStartupRestorePending = false;
-bool gStartupRestoreDone = false;
 
-void renderStartupRestoredFrame();
+enum class BootPhase : uint8_t {
+  BOOT_MINIMAL = 0,
+  STA_CONNECTING = 1,
+  PORTAL_ACTIVE = 2,
+  RESTART_PENDING = 3,
+  RUNTIME_STARTING = 4,
+  RUNTIME_ACTIVE = 5
+};
 
-void finishStartupRestoreIfReady() {
-  if (gStartupRestoreDone || !gStartupRestorePending) {
+BootPhase gBootPhase = BootPhase::BOOT_MINIMAL;
+bool gPortalServerInitialized = false;
+bool gRuntimeInitialized = false;
+bool gTimeSyncRestorePending = false;
+
+const char* bootPhaseLabel(BootPhase phase) {
+  switch (phase) {
+    case BootPhase::BOOT_MINIMAL:
+      return "BOOT_MINIMAL";
+    case BootPhase::STA_CONNECTING:
+      return "STA_CONNECTING";
+    case BootPhase::PORTAL_ACTIVE:
+      return "PORTAL_ACTIVE";
+    case BootPhase::RESTART_PENDING:
+      return "RESTART_PENDING";
+    case BootPhase::RUNTIME_STARTING:
+      return "RUNTIME_STARTING";
+    case BootPhase::RUNTIME_ACTIVE:
+      return "RUNTIME_ACTIVE";
+    default:
+      return "UNKNOWN";
+  }
+}
+
+void setBootPhase(BootPhase nextPhase, const char* reason) {
+  if (gBootPhase == nextPhase) {
+    return;
+  }
+
+  Serial.printf("[BOOT] Phase %s -> %s (%s)\n",
+                bootPhaseLabel(gBootPhase),
+                bootPhaseLabel(nextPhase),
+                reason == nullptr ? "no reason" : reason);
+  gBootPhase = nextPhase;
+}
+
+void blankMatrixOutputsEarly() {
+  pinMode(OE_PIN, OUTPUT);
+  digitalWrite(OE_PIN, HIGH);
+
+  const uint8_t lowPins[] = {
+    R1_PIN, G1_PIN, B1_PIN,
+    R2_PIN, G2_PIN, B2_PIN,
+    A_PIN, B_PIN, C_PIN, D_PIN, E_PIN,
+    LAT_PIN, CLK_PIN
+  };
+
+  for (uint8_t pin : lowPins) {
+    pinMode(pin, OUTPUT);
+    digitalWrite(pin, LOW);
+  }
+}
+
+void showRestoreWaitScreen() {
+  if (DisplayManager::dma_display == nullptr) {
+    return;
+  }
+
+  DisplayManager::dma_display->clearScreen();
+  DisplayManager::drawLogo(12, 8);
+  DisplayManager::drawTinyTextCentered("STARTING", 46, DisplayManager::dma_display->color565(220, 220, 220));
+  DisplayManager::drawTinyTextCentered("RESTORE WAIT", 54, DisplayManager::dma_display->color565(150, 150, 150));
+  DisplayManager::dma_display->flipDMABuffer();
+}
+
+bool renderStartupRestoredFrame() {
+  return RuntimeModeCoordinator::restoreCurrentModeFrame();
+}
+
+void restoreRuntimeFrame() {
+  gTimeSyncRestorePending = !WiFiManager::isTimeSynced();
+  if (gTimeSyncRestorePending) {
+    Serial.println("[BOOT] 时间未同步，先停留在 WiFi 已连接 IP 页面");
+    WiFiManager::showStationConnectedScreen();
+    return;
+  }
+
+  Serial.printf("[BOOT] 准备恢复业务态画面，模式=%d，业务模式=%s\n",
+                DisplayManager::currentMode,
+                DisplayManager::currentBusinessModeTag.c_str());
+
+  if (renderStartupRestoredFrame()) {
+    Serial.println("[BOOT] 业务态画面已恢复");
+    return;
+  }
+
+  gTimeSyncRestorePending = false;
+  Serial.println("[BOOT] 无法精确恢复当前业务态，显示 RESTORE WAIT");
+  showRestoreWaitScreen();
+}
+
+void finishClockRestoreIfReady() {
+  if (!gTimeSyncRestorePending) {
     return;
   }
   if (!WiFiManager::isTimeSynced()) {
     return;
   }
 
-  if (!DisplayManager::doubleBufferEnabled) {
-    DisplayManager::enableDoubleBuffer();
+  gTimeSyncRestorePending = false;
+  Serial.println("[BOOT] 时间同步完成，恢复业务态画面");
+
+  if (renderStartupRestoredFrame()) {
+    Serial.println("[BOOT] 时间同步后的业务态画面已恢复");
+    return;
   }
 
-  Serial.printf("[BOOT] 时间同步完成，开始恢复模式首帧，模式=%d，业务模式=%s\n",
-                DisplayManager::currentMode,
-                DisplayManager::currentBusinessModeTag.c_str());
-  renderStartupRestoredFrame();
-  Serial.printf("[BOOT] 恢复模式首帧已完成，耗时=%lu ms\n", millis());
-
-  gStartupRestorePending = false;
-  gStartupRestoreDone = true;
+  Serial.println("[BOOT] 时间同步后仍无法恢复业务态，显示 RESTORE WAIT");
+  showRestoreWaitScreen();
 }
 
-void renderStartupRestoredFrame() {
-  auto renderTimeOrSyncHint = []() {
-    if (WiFiManager::isTimeSynced()) {
-      DisplayManager::displayClock(true);
-      return;
-    }
-    WiFiManager::showTimeSyncScreen();
-  };
+void printPortalReadyBanner() {
+  Serial.println("\n=================================");
+  Serial.println("系统就绪！");
+  Serial.println("WiFi 热点配网模式已启动");
+  Serial.print("热点名称: ");
+  Serial.println(WiFiManager::getConfigPortalSSID());
+  Serial.print("配网页地址: http://");
+  Serial.println(WiFiManager::getConfigPortalIP());
+  Serial.println("=================================\n");
+}
 
-  if (DisplayManager::currentMode == MODE_CLOCK) {
-    DisplayManager::displayClock(true);
+void printRuntimeReadyBanner() {
+  Serial.println("\n=================================");
+  Serial.println("系统就绪！");
+  Serial.print("STA模式访问地址: http://");
+  Serial.println(WiFiManager::getDeviceIP());
+  Serial.println("WebSocket 路径: ws://" + WiFiManager::getDeviceIP() + "/ws");
+  Serial.println("=================================\n");
+}
+
+void startPortalIfNeeded() {
+  if (!gPortalServerInitialized) {
+    setBootPhase(BootPhase::PORTAL_ACTIVE, "进入热点配网模式");
+    WebServer::initConfigPortal();
+    gPortalServerInitialized = true;
+    printPortalReadyBanner();
     return;
   }
 
-  if (DisplayManager::currentMode == MODE_THEME) {
-    DisplayManager::displayTheme(true);
+  if (WiFiManager::isPortalRestartScheduled()) {
+    setBootPhase(BootPhase::RESTART_PENDING, "门户已保存凭据，等待重启");
     return;
   }
 
-  if (DisplayManager::currentMode == MODE_CANVAS) {
-    DisplayManager::renderCanvas();
+  setBootPhase(BootPhase::PORTAL_ACTIVE, "保持热点配网模式");
+}
+
+void startRuntimeIfNeeded() {
+  if (gRuntimeInitialized || !WiFiManager::isStationConnected()) {
     return;
   }
 
-  if (DisplayManager::currentMode == MODE_ANIMATION &&
-      DisplayManager::currentBusinessModeTag == ModeTags::GAME_SCREENSAVER) {
-    GameScreensaverEffect::applyConfig(ConfigManager::gameScreensaverConfig);
-    GameScreensaverEffect::render();
-    return;
-  }
+  setBootPhase(BootPhase::RUNTIME_STARTING, "STA 已连接，开始启动运行态");
 
-  if (DisplayManager::currentMode == MODE_ANIMATION &&
-      DisplayManager::currentBusinessModeTag == ModeTags::GIF_PLAYER) {
-    if (AnimationManager::currentGIF != nullptr) {
-      AnimationManager::currentGIF->isPlaying = true;
-      AnimationManager::currentGIF->currentFrame = 0;
-      AnimationManager::currentGIF->lastFrameTime = millis();
-      AnimationManager::renderGIFFrame(0);
-      return;
-    }
-    renderTimeOrSyncHint();
-    return;
-  }
+  ConfigManager::init();
+  WebSocketHandler::init();
+  WebServer::initRuntime();
 
-  if (DisplayManager::currentMode == MODE_ANIMATION &&
-      (DisplayManager::currentBusinessModeTag == ModeTags::TEXT_DISPLAY ||
-       DisplayManager::currentBusinessModeTag == ModeTags::WEATHER ||
-       DisplayManager::currentBusinessModeTag == ModeTags::COUNTDOWN ||
-       DisplayManager::currentBusinessModeTag == ModeTags::STOPWATCH ||
-       DisplayManager::currentBusinessModeTag == ModeTags::NOTIFICATION)) {
-    if (BoardNativeEffect::isActive()) {
-      BoardNativeEffect::render();
-      return;
-    }
-  }
+  AnimationManager::init();
+  EyesEffect::init();
+  GameScreensaverEffect::init();
+  BoardNativeEffect::init();
 
-  if (DisplayManager::currentMode == MODE_ANIMATION &&
-      DisplayManager::currentBusinessModeTag == ModeTags::PLANET_SCREENSAVER) {
-    BoardNativeEffect::applyPlanetScreensaverConfig(
-      BoardNativeEffect::getPlanetScreensaverConfig()
-    );
-    BoardNativeEffect::render();
-    return;
-  }
+  OTAManager::init();
+  OTAManager::checkUpdate();
 
-  if (DisplayManager::currentMode == MODE_ANIMATION &&
-      DisplayManager::currentBusinessModeTag == ModeTags::EYES) {
-    DisplayManager::activateEyesEffect(ConfigManager::eyesConfig);
-    DisplayManager::renderNativeEffect();
-    return;
-  }
+  gRuntimeInitialized = true;
+  restoreRuntimeFrame();
 
-  if (DisplayManager::currentMode == MODE_ANIMATION &&
-      (DisplayManager::currentBusinessModeTag == ModeTags::AMBIENT_EFFECT ||
-       DisplayManager::currentBusinessModeTag == ModeTags::LED_MATRIX_SHOWCASE)) {
-    DisplayManager::activateAmbientEffect(DisplayManager::ambientEffectConfig);
-    DisplayManager::renderNativeEffect();
-    return;
-  }
-
-  if (DisplayManager::currentMode == MODE_ANIMATION &&
-      DisplayManager::currentBusinessModeTag == ModeTags::BREATH_EFFECT) {
-    DisplayManager::activateBreathEffect(DisplayManager::breathEffectConfig);
-    DisplayManager::renderNativeEffect();
-    return;
-  }
-
-  if (DisplayManager::currentMode == MODE_ANIMATION &&
-      DisplayManager::currentBusinessModeTag == ModeTags::RHYTHM_EFFECT) {
-    DisplayManager::activateRhythmEffect(DisplayManager::rhythmEffectConfig);
-    DisplayManager::renderNativeEffect();
-    return;
-  }
-
-  if (DisplayManager::currentMode == MODE_ANIMATION &&
-      AnimationManager::currentGIF != nullptr) {
-    AnimationManager::currentGIF->isPlaying = true;
-    AnimationManager::currentGIF->currentFrame = 0;
-    AnimationManager::currentGIF->lastFrameTime = millis();
-    AnimationManager::renderGIFFrame(0);
-    return;
-  }
-
-  // 兜底：无论恢复到什么业务态，都保证启动时有可见画面，不出现黑屏等待。
-  renderTimeOrSyncHint();
+  setBootPhase(BootPhase::RUNTIME_ACTIVE, "运行态初始化完成");
+  printRuntimeReadyBanner();
 }
 }
 
 void setup() {
+  blankMatrixOutputsEarly();
   Serial.begin(115200);
+  Serial.println("[BOOT] 已提前关闭 HUB75 输出，避免上电瞬间乱亮");
   delay(2000);
   
   Serial.println("\n\n=================================");
@@ -166,77 +221,64 @@ void setup() {
   Serial.printf("PSRAM 总量: %d bytes (%.1f KB)\n", ESP.getPsramSize(), ESP.getPsramSize()/1024.0);
   Serial.printf("PSRAM 可用: %d bytes (%.1f KB)\n", ESP.getFreePsram(), ESP.getFreePsram()/1024.0);
   Serial.println("=================================");
-  
-  // 初始化各个模块
+
+  Serial.printf("[BOOT] 初始阶段=%s\n", bootPhaseLabel(gBootPhase));
+
   ConfigManager::preloadDeviceParamsConfig();
   DisplayManager::init();
-  ConfigManager::init();
   WiFiManager::init();
 
-  WebSocketHandler::init();
-  WebServer::init();
-
-  // 联网成功后恢复业务显示与 OTA；热点配网模式仅保留 AP 门户
-  if (!WiFiManager::isConfigMode()) {
-    AnimationManager::init();
-    EyesEffect::init();
-    GameScreensaverEffect::init();
-    BoardNativeEffect::init();
-
-    if (!DisplayManager::doubleBufferEnabled) {
-      DisplayManager::enableDoubleBuffer();
-    }
-
-    if (WiFiManager::isTimeSynced()) {
-      Serial.printf("[BOOT] 准备渲染恢复模式首帧，模式=%d，业务模式=%s\n",
-                    DisplayManager::currentMode,
-                    DisplayManager::currentBusinessModeTag.c_str());
-      renderStartupRestoredFrame();
-      Serial.printf("[BOOT] 恢复模式首帧已完成，耗时=%lu ms\n", millis());
-      gStartupRestoreDone = true;
-      gStartupRestorePending = false;
-    } else {
-      gStartupRestorePending = true;
-      gStartupRestoreDone = false;
-      Serial.println("[BOOT] 时间尚未同步，保持 WiFi 成功页，等待同步后再进入恢复模式");
-    }
-
-    // OTA 检查更新
-    OTAManager::init();
-    OTAManager::checkUpdate();
-  }
-  
-  Serial.println("\n=================================");
-  Serial.println("系统就绪！");
   if (WiFiManager::isConfigMode()) {
-    Serial.println("WiFi 热点配网模式已启动");
-    Serial.print("热点名称: ");
-    Serial.println(WiFiManager::getConfigPortalSSID());
-    Serial.print("配网页地址: http://");
-    Serial.println(WiFiManager::getConfigPortalIP());
+    startPortalIfNeeded();
   } else {
-    Serial.print("STA模式访问地址: http://");
-    Serial.println(WiFiManager::getDeviceIP());
-    Serial.println("WebSocket 路径: ws://" + WiFiManager::getDeviceIP() + "/ws");
+    setBootPhase(BootPhase::STA_CONNECTING, "最小启动完成，等待 STA 连接");
+    if (WiFiManager::isStationConnected()) {
+      startRuntimeIfNeeded();
+    } else {
+      Serial.println("[BOOT] 已进入 STA 连接等待态，运行态服务暂不启动");
+    }
   }
-  Serial.println("=================================\n");
 }
 
 void loop() {
-  // 配网模式下维护 AP 门户与 DNS，不进入业务显示循环
+  WiFiManager::tick();
+  WebSocketHandler::tick();
+  RuntimeCommandBus::tick();
+
   if (WiFiManager::isConfigMode()) {
-    WiFiManager::tick();
+    startPortalIfNeeded();
+    if (WiFiManager::isPortalRestartScheduled()) {
+      setBootPhase(BootPhase::RESTART_PENDING, "门户已保存凭据，等待重启");
+    }
     delay(10);
     return;
   }
 
-  WiFiManager::tick();
-  DisplayManager::refreshScheduledBrightness();
-  finishStartupRestoreIfReady();
+  if (!gRuntimeInitialized) {
+    if (WiFiManager::isStationConnecting()) {
+      setBootPhase(BootPhase::STA_CONNECTING, "继续等待 STA 连接");
+      delay(10);
+      return;
+    }
 
-  if (gStartupRestorePending && !gStartupRestoreDone) {
-    WebSocketHandler::ws.cleanupClients();
+    if (WiFiManager::isStationConnected()) {
+      startRuntimeIfNeeded();
+    }
+
+    if (!gRuntimeInitialized) {
+      delay(10);
+      return;
+    }
+  }
+
+  DisplayManager::lockRuntimeAccess();
+  DisplayManager::refreshScheduledBrightness();
+  finishClockRestoreIfReady();
+
+  if (gTimeSyncRestorePending) {
     DisplayManager::updateLoadingAnimation();
+    DisplayManager::unlockRuntimeAccess();
+    WebSocketHandler::ws.cleanupClients();
     yield();
     return;
   }
@@ -267,11 +309,11 @@ void loop() {
 
       // 保存完成后恢复显示刷新
       DisplayManager::receivingPixels = false;
+      WebSocketHandler::clearBinaryImageTransferBackup();
 
       // 保存完成后刷新显示
       if (DisplayManager::currentMode == MODE_CLOCK) {
-        DisplayManager::drawBackground();
-        DisplayManager::drawClockOverlay();
+        DisplayManager::displayClock(true);
       } else if (DisplayManager::currentMode == MODE_THEME) {
         DisplayManager::displayTheme(true);
       } else if (DisplayManager::currentMode == MODE_ANIMATION &&
@@ -354,11 +396,12 @@ void loop() {
     }
   }
 
-  // 清理WebSocket，防止内存泄漏
-  WebSocketHandler::ws.cleanupClients();
-
   // 更新 Loading 动画
   DisplayManager::updateLoadingAnimation();
+  DisplayManager::unlockRuntimeAccess();
+
+  // 清理WebSocket，防止内存泄漏
+  WebSocketHandler::ws.cleanupClients();
 
   yield();
 }

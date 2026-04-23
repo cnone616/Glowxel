@@ -531,7 +531,13 @@ export default {
         const ws = this.deviceStore.getWebSocket();
         const frames = pixelPreviewFramesToAnimationFrames(this.previewFrames, 180);
         await uploadAnimationFrames(ws, frames, "notification");
-        this.deviceStore.setDeviceMode("notification", { businessMode: true });
+        await this.deviceStore.syncAndRequireMode(
+          {
+            businessMode: "notification",
+            mode: "animation",
+          },
+          "设备未进入提醒模式",
+        );
         this.toast.showSuccess("已保存并发送");
       } catch (err) {
         console.error("发送提醒预览失败:", err);

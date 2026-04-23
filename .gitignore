@@ -12,6 +12,7 @@ unpackage/
 *.bin
 *.map
 dist/
+output/playwright/
 
 # 系统文件
 .DS_Store
@@ -34,3 +35,8 @@ npm-debug.log*
 
 # uni-app 本地配置
 .hbuilderx/
+
+# AI / 自动化调试产物
+.codex-backups/
+**/.playwright-cli/
+**/test-results/

@@ -3,43 +3,22 @@ function isSuccessStatus(resp) {
 }
 
 function sendAndWait(ws, data, matcher, timeoutMs) {
-  return new Promise((resolve, reject) => {
-    let done = false;
+  return ws.sendAndWait(data, timeoutMs, matcher);
+}
 
-    const handler = (msg) => {
-      if (done) {
-        return;
-      }
-      if (!matcher(msg)) {
-        return;
-      }
-      done = true;
-      ws.offMessage(handler);
-      clearTimeout(timer);
-      resolve(msg);
-    };
-
-    ws.onMessage(handler);
-
-    const timer = setTimeout(() => {
-      if (done) {
-        return;
-      }
-      done = true;
-      ws.offMessage(handler);
-      reject(new Error("设备响应超时"));
-    }, timeoutMs);
-
-    ws.send(data).catch((err) => {
-      if (done) {
-        return;
-      }
-      done = true;
-      ws.offMessage(handler);
-      clearTimeout(timer);
-      reject(err);
-    });
-  });
+function matchMessageOrError(expectedMessage, extraMatcher = null) {
+  return (msg) => {
+    if (!msg || typeof msg !== "object") {
+      return false;
+    }
+    if (msg.status === "error" || msg.error) {
+      return true;
+    }
+    if (typeof extraMatcher === "function" && extraMatcher(msg)) {
+      return true;
+    }
+    return msg.message === expectedMessage;
+  };
 }
 
 async function sendFrameBinary(ws, frameIndex, pixelBytes, totalPixels) {
@@ -48,10 +27,6 @@ async function sendFrameBinary(ws, frameIndex, pixelBytes, totalPixels) {
   }
   if (totalPixels * 5 !== pixelBytes.length) {
     throw new Error("帧像素长度不匹配");
-  }
-
-  if (totalPixels === 0) {
-    return;
   }
 
   const chunkPixels = 200;
@@ -77,20 +52,20 @@ async function sendFrameBinary(ws, frameIndex, pixelBytes, totalPixels) {
   const statusResp = await sendAndWait(
     ws,
     { cmd: "frame_status", index: frameIndex },
-    (msg) => {
+    matchMessageOrError("frame status", (msg) => {
       if (!msg || msg.index !== frameIndex) {
         return false;
       }
-      if (msg.message !== "frame status") {
-        return false;
-      }
-      return true;
-    },
+      return msg.message === "frame status";
+    }),
     10000,
   );
 
   if (!isSuccessStatus(statusResp)) {
     throw new Error("帧状态确认失败");
+  }
+  if (statusResp.count !== totalPixels) {
+    throw new Error(`帧状态数量不匹配: 期望 ${totalPixels}，实际 ${statusResp.count}`);
   }
 }
 
@@ -102,78 +77,85 @@ export async function uploadAnimationFrames(ws, frames, targetMode) {
     throw new Error("目标模式不能为空");
   }
 
-  const enterResp = await sendAndWait(
-    ws,
-    { cmd: "set_mode", mode: "transferring" },
-    (msg) => msg && msg.message === "entered transferring mode",
-    10000,
-  );
-  if (!isSuccessStatus(enterResp)) {
-    throw new Error("进入传输模式失败");
-  }
+  let loadingStarted = false;
 
-  const beginResp = await sendAndWait(
-    ws,
-    { cmd: "animation_begin", frameCount: frames.length },
-    (msg) => msg && msg.message === "ready to receive frames",
-    10000,
-  );
-  if (!isSuccessStatus(beginResp)) {
-    throw new Error("动画初始化失败");
-  }
+  try {
+    const loadingResp = await ws.startLoading();
+    if (!isSuccessStatus(loadingResp)) {
+      throw new Error("启动加载动画失败");
+    }
+    loadingStarted = true;
 
-  for (let i = 0; i < frames.length; i++) {
-    const frame = frames[i];
-    if (
-      !frame ||
-      frame.type === undefined ||
-      frame.delay === undefined ||
-      frame.totalPixels === undefined ||
-      frame.pixels === undefined
-    ) {
-      throw new Error(`第 ${i + 1} 帧字段不完整`);
+    const enterResp = await ws.setMode("transferring");
+    if (!isSuccessStatus(enterResp)) {
+      throw new Error("进入传输模式失败");
     }
 
-    const beginFrameResp = await sendAndWait(
+    const beginResp = await sendAndWait(
       ws,
-      {
-        cmd: "frame_begin",
-        index: i,
-        type: frame.type,
-        delay: frame.delay,
-        totalPixels: frame.totalPixels,
-      },
-      (msg) => msg && msg.index === i && msg.message === "frame initialized",
+      { cmd: "animation_begin", frameCount: frames.length },
+      matchMessageOrError("ready to receive frames"),
       10000,
     );
-
-    if (!isSuccessStatus(beginFrameResp)) {
-      throw new Error(`第 ${i + 1} 帧初始化失败`);
+    if (!isSuccessStatus(beginResp)) {
+      throw new Error("动画初始化失败");
     }
 
-    await sendFrameBinary(ws, i, frame.pixels, frame.totalPixels);
-  }
+    for (let i = 0; i < frames.length; i++) {
+      const frame = frames[i];
+      if (
+        !frame ||
+        frame.type === undefined ||
+        frame.delay === undefined ||
+        frame.totalPixels === undefined ||
+        frame.pixels === undefined
+      ) {
+        throw new Error(`第 ${i + 1} 帧字段不完整`);
+      }
 
-  const endResp = await sendAndWait(
-    ws,
-    { cmd: "animation_end" },
-    (msg) => msg && msg.message === "animation loaded and playing",
-    10000,
-  );
-  if (!isSuccessStatus(endResp)) {
-    throw new Error("动画结束确认失败");
-  }
+      const beginFrameResp = await sendAndWait(
+        ws,
+        {
+          cmd: "frame_begin",
+          index: i,
+          type: frame.type,
+          delay: frame.delay,
+          totalPixels: frame.totalPixels,
+        },
+        matchMessageOrError("frame initialized", (msg) => {
+          return msg && msg.index === i && msg.message === "frame initialized";
+        }),
+        10000,
+      );
 
-  const modeResp = await sendAndWait(
-    ws,
-    { cmd: "set_mode", mode: targetMode },
-    (msg) =>
-      msg &&
-      typeof msg.message === "string" &&
-      msg.message.indexOf("switched to") === 0,
-    10000,
-  );
-  if (!isSuccessStatus(modeResp)) {
-    throw new Error("切换目标模式失败");
+      if (!isSuccessStatus(beginFrameResp)) {
+        throw new Error(`第 ${i + 1} 帧初始化失败`);
+      }
+
+      await sendFrameBinary(ws, i, frame.pixels, frame.totalPixels);
+    }
+
+    const endResp = await sendAndWait(
+      ws,
+      { cmd: "animation_end" },
+      matchMessageOrError("animation upload ready"),
+      10000,
+    );
+    if (!isSuccessStatus(endResp)) {
+      throw new Error("动画结束确认失败");
+    }
+
+    const modeResp = await ws.setMode(targetMode);
+    if (!isSuccessStatus(modeResp)) {
+      throw new Error("切换目标模式失败");
+    }
+  } finally {
+    if (loadingStarted) {
+      try {
+        await ws.stopLoading();
+      } catch (err) {
+        console.error("停止设备 loading 失败:", err);
+      }
+    }
   }
 }

@@ -67,7 +67,7 @@ PlanetScreensaverNativeConfig s_planetConfig = {
   "gas_giant_1",
   "medium",
   "right",
-  6,
+  3,
   20260415UL,
   20260415UL
 };
@@ -92,6 +92,8 @@ struct PlanetRgb {
 
 PlanetRgb s_planetTintColor = { 210, 184, 168 };
 float s_planetTintMix = 0.12f;
+float s_planetHueShift = 0.0f;
+float s_planetSaturationScale = 1.0f;
 float s_planetTintBrightness = 1.0f;
 
 struct HourglassPoint {
@@ -213,6 +215,14 @@ float fractFloat(float value) {
   return value - floorf(value);
 }
 
+float wrapPlanetUnit(float value) {
+  float wrapped = fmodf(value, 1.0f);
+  if (wrapped < 0.0f) {
+    wrapped += 1.0f;
+  }
+  return wrapped;
+}
+
 float mixFloat(float left, float right, float amount) {
   return left * (1.0f - amount) + right * amount;
 }
@@ -248,6 +258,68 @@ PlanetRgb scalePlanetRgb(const PlanetRgb& color, float factor) {
   );
 }
 
+void rgbToPlanetHsv(const PlanetRgb& color, float& hue, float& saturation, float& value) {
+  float red = (float)color.r / 255.0f;
+  float green = (float)color.g / 255.0f;
+  float blue = (float)color.b / 255.0f;
+  float maxValue = fmaxf(red, fmaxf(green, blue));
+  float minValue = fminf(red, fminf(green, blue));
+  float delta = maxValue - minValue;
+
+  hue = 0.0f;
+  if (delta > 0.0f) {
+    if (maxValue == red) {
+      hue = wrapPlanetUnit(((green - blue) / delta) / 6.0f);
+    } else if (maxValue == green) {
+      hue = (((blue - red) / delta) + 2.0f) / 6.0f;
+    } else {
+      hue = (((red - green) / delta) + 4.0f) / 6.0f;
+    }
+  }
+
+  saturation = maxValue <= 0.0f ? 0.0f : delta / maxValue;
+  value = maxValue;
+}
+
+PlanetRgb hsvToPlanetRgb(float hue, float saturation, float value) {
+  float normalizedHue = wrapPlanetUnit(hue);
+  float clampedSaturation = clampFloat(saturation, 0.0f, 1.0f);
+  float clampedValue = clampFloat(value, 0.0f, 1.0f);
+  float segment = normalizedHue * 6.0f;
+  float chroma = clampedValue * clampedSaturation;
+  float xValue = chroma * (1.0f - fabsf(fmodf(segment, 2.0f) - 1.0f));
+  float match = clampedValue - chroma;
+  float red = 0.0f;
+  float green = 0.0f;
+  float blue = 0.0f;
+
+  if (segment < 1.0f) {
+    red = chroma;
+    green = xValue;
+  } else if (segment < 2.0f) {
+    red = xValue;
+    green = chroma;
+  } else if (segment < 3.0f) {
+    green = chroma;
+    blue = xValue;
+  } else if (segment < 4.0f) {
+    green = xValue;
+    blue = chroma;
+  } else if (segment < 5.0f) {
+    red = chroma;
+    blue = xValue;
+  } else {
+    red = chroma;
+    blue = xValue;
+  }
+
+  return makePlanetRgb(
+    (uint8_t)roundf(clampFloat((red + match) * 255.0f, 0.0f, 255.0f)),
+    (uint8_t)roundf(clampFloat((green + match) * 255.0f, 0.0f, 255.0f)),
+    (uint8_t)roundf(clampFloat((blue + match) * 255.0f, 0.0f, 255.0f))
+  );
+}
+
 PlanetRgb brightenPlanetRgb(const PlanetRgb& color, float amount) {
   return mixPlanetRgb(color, makePlanetRgb(255, 255, 255), clampFloat(amount, 0.0f, 1.0f));
 }
@@ -269,6 +341,27 @@ uint32_t hashPlanet(uint32_t value) {
   return value;
 }
 
+uint32_t hashPlanetString(const char* value) {
+  uint32_t hash = 2166136261UL;
+  if (value == nullptr) {
+    return hash;
+  }
+  while (*value != '\0') {
+    hash ^= (uint8_t)(*value);
+    hash *= 16777619UL;
+    value += 1;
+  }
+  return hash;
+}
+
+float nextPlanetSeededRandom(uint32_t& state) {
+  state = state * 1664525UL + 1013904223UL;
+  return (float)state / 4294967296.0f;
+}
+
+float seededPlanetRange(uint32_t seed, const char* key, float minValue, float maxValue);
+float seededPlanetRange(uint32_t seed, uint32_t salt, float minValue, float maxValue);
+
 float hashPlanetFloat(int x, int y, uint32_t seed) {
   uint32_t value = seed;
   value ^= (uint32_t)(x * 374761393);
@@ -284,16 +377,26 @@ float planetVariantUnit(uint32_t seed, uint32_t salt) {
 
 void refreshPlanetColorVariant() {
   uint32_t seed = s_planetConfig.colorSeed;
-  float tintR = 0.2f + planetVariantUnit(seed, 0x13579bdfUL) * 0.8f;
-  float tintG = 0.2f + planetVariantUnit(seed, 0x2468ace0UL) * 0.8f;
-  float tintB = 0.2f + planetVariantUnit(seed, 0x1b2c3d4eUL) * 0.8f;
+  char key[48];
+  snprintf(key, sizeof(key), "%s_color_variant_hue", s_planetConfig.preset);
+  s_planetHueShift = seededPlanetRange(seed, key, -0.32f, 0.32f);
+  snprintf(key, sizeof(key), "%s_color_variant_sat", s_planetConfig.preset);
+  s_planetSaturationScale = seededPlanetRange(seed, key, 0.68f, 1.42f);
+  snprintf(key, sizeof(key), "%s_color_variant_val", s_planetConfig.preset);
+  s_planetTintBrightness = seededPlanetRange(seed, key, 0.78f, 1.26f);
+  snprintf(key, sizeof(key), "%s_color_variant_r", s_planetConfig.preset);
+  float tintR = seededPlanetRange(seed, key, 0.2f, 1.0f);
+  snprintf(key, sizeof(key), "%s_color_variant_g", s_planetConfig.preset);
+  float tintG = seededPlanetRange(seed, key, 0.2f, 1.0f);
+  snprintf(key, sizeof(key), "%s_color_variant_b", s_planetConfig.preset);
+  float tintB = seededPlanetRange(seed, key, 0.2f, 1.0f);
   s_planetTintColor = makePlanetRgb(
     (uint8_t)roundf(tintR * 255.0f),
     (uint8_t)roundf(tintG * 255.0f),
     (uint8_t)roundf(tintB * 255.0f)
   );
-  s_planetTintMix = 0.04f + planetVariantUnit(seed, 0x5a5a5a5aUL) * 0.22f;
-  s_planetTintBrightness = 0.78f + planetVariantUnit(seed, 0x0f1e2d3cUL) * 0.48f;
+  snprintf(key, sizeof(key), "%s_color_variant_mix", s_planetConfig.preset);
+  s_planetTintMix = seededPlanetRange(seed, key, 0.04f, 0.26f);
 }
 
 float noisePlanet(float x, float y, uint32_t seed) {
@@ -326,18 +429,18 @@ float fbmPlanet(float x, float y, uint32_t seed, int octaves) {
   return value;
 }
 
-float resolvePlanetSizeScale(const String& size) {
-  if (size == "small") {
+float resolvePlanetSizeScale(const char* size) {
+  if (strcmp(size, "small") == 0) {
     return 0.82f;
   }
-  if (size == "large") {
+  if (strcmp(size, "large") == 0) {
     return 1.15f;
   }
   return 1.0f;
 }
 
-float resolvePlanetDirectionFactor(const String& direction) {
-  if (direction == "left") {
+float resolvePlanetDirectionFactor(const char* direction) {
+  if (strcmp(direction, "left") == 0) {
     return -1.0f;
   }
   return 1.0f;
@@ -347,7 +450,7 @@ unsigned long resolvePlanetFrameDelay(uint8_t speed) {
   static const unsigned long kPlanetDelayBySpeed[10] = {
     840UL, 720UL, 620UL, 530UL, 450UL, 380UL, 320UL, 270UL, 220UL, 180UL
   };
-  int index = clampInt((int)speed, 1, 10) - 1;
+  int index = clampInt((int)speed, 1, 7) - 1;
   return kPlanetDelayBySpeed[index];
 }
 
@@ -365,9 +468,17 @@ float resolvePlanetFlow() {
 }
 
 void drawPlanetPixel(MatrixPanel_I2S_DMA* display, int x, int y, const PlanetRgb& color) {
-  PlanetRgb mixed = mixPlanetRgb(color, s_planetTintColor, s_planetTintMix);
-  PlanetRgb adjusted = scalePlanetRgb(mixed, s_planetTintBrightness);
-  display->drawPixel(x, y, planetColor565(adjusted));
+  float hue = 0.0f;
+  float saturation = 0.0f;
+  float value = 0.0f;
+  rgbToPlanetHsv(color, hue, saturation, value);
+  PlanetRgb remapped = hsvToPlanetRgb(
+    hue + s_planetHueShift,
+    clampFloat(saturation * s_planetSaturationScale, 0.0f, 1.0f),
+    clampFloat(value * s_planetTintBrightness, 0.0f, 1.0f)
+  );
+  PlanetRgb mixed = mixPlanetRgb(remapped, s_planetTintColor, s_planetTintMix);
+  display->drawPixel(x, y, planetColor565(mixed));
 }
 
 int countdownRegionIndex(const CountdownRegion& region, int x, int y) {
@@ -1153,63 +1264,212 @@ float planetRadius() {
 }
 
 bool planetPresetEquals(const char* preset) {
-  return s_planetConfig.preset == preset;
+  return strcmp(s_planetConfig.preset, preset) == 0;
 }
 
 float planetFlowSign() {
   return resolvePlanetDirectionFactor(s_planetConfig.direction);
 }
 
+constexpr float kPlanetPreviewDiameter = 52.0f;
+constexpr float kPlanetTwoPi = 6.2831853f;
+
+float distancePlanet(float x1, float y1, float x2, float y2) {
+  float dx = x1 - x2;
+  float dy = y1 - y2;
+  return sqrtf(dx * dx + dy * dy);
+}
+
+void rotatePlanetUv(float x, float y, float angle, float& outX, float& outY) {
+  float cosValue = cosf(angle);
+  float sinValue = sinf(angle);
+  float dx = x - 0.5f;
+  float dy = y - 0.5f;
+  outX = dx * cosValue - dy * sinValue + 0.5f;
+  outY = dx * sinValue + dy * cosValue + 0.5f;
+}
+
+float resolvePlanetPresetRelativeScale() {
+  if (planetPresetEquals("gas_giant_2")) {
+    return 3.0f;
+  }
+  if (planetPresetEquals("black_hole") || planetPresetEquals("star")) {
+    return 2.0f;
+  }
+  return 1.0f;
+}
+
+float resolvePlanetPreviewPlaneSize(float planeScale) {
+  return kPlanetPreviewDiameter * resolvePlanetSizeScale(s_planetConfig.size) * planeScale /
+         resolvePlanetPresetRelativeScale();
+}
+
+bool mapPlanetPixelToUv(int x, int y, float planeSize, float& u, float& v) {
+  float inversePlaneSize = 1.0f / planeSize;
+  u = ((float)x + 0.5f - 32.0f) * inversePlaneSize + 0.5f;
+  v = ((float)y + 0.5f - 32.0f) * inversePlaneSize + 0.5f;
+  return u >= 0.0f && u <= 1.0f && v >= 0.0f && v <= 1.0f;
+}
+
+float resolvePlanetRotationTime() {
+  return resolvePlanetFlow() * kPlanetTwoPi;
+}
+
+float resolvePlanetBackgroundStarExclusionRadius() {
+  if (planetPresetEquals("galaxy")) {
+    return 30.0f;
+  }
+  if (planetPresetEquals("star")) {
+    return 28.0f;
+  }
+  if (planetPresetEquals("black_hole")) {
+    return 29.0f;
+  }
+
+  float radius = planetRadius() + 5.0f;
+  if (planetPresetEquals("gas_giant_2")) {
+    radius += 4.0f;
+  }
+  return clampFloat(radius, 22.0f, 30.0f);
+}
+
 PlanetRgb planetShade(const PlanetRgb& base, float light) {
-  float factor = clampFloat(0.32f + light * 0.9f, 0.0f, 1.45f);
+  float factor = clampFloat(0.24f + light * 0.72f, 0.0f, 1.0f);
   return scalePlanetRgb(base, factor);
+}
+
+PlanetRgb selectPlanetPalette3(float value, const PlanetRgb& color0, const PlanetRgb& color1, const PlanetRgb& color2) {
+  float clamped = clampFloat(value, 0.0f, 1.0f);
+  if (clamped > 0.66f) {
+    return color2;
+  }
+  if (clamped > 0.33f) {
+    return color1;
+  }
+  return color0;
+}
+
+PlanetRgb selectPlanetPalette4(float value, const PlanetRgb& color0, const PlanetRgb& color1, const PlanetRgb& color2, const PlanetRgb& color3) {
+  float clamped = clampFloat(value, 0.0f, 1.0f);
+  if (clamped > 0.75f) {
+    return color3;
+  }
+  if (clamped > 0.5f) {
+    return color2;
+  }
+  if (clamped > 0.25f) {
+    return color1;
+  }
+  return color0;
+}
+
+float seededPlanetRange(uint32_t seed, const char* key, float minValue, float maxValue) {
+  uint32_t state = seed ^ hashPlanetString(key);
+  return minValue + (maxValue - minValue) * nextPlanetSeededRandom(state);
+}
+
+float seededPlanetRange(uint32_t seed, uint32_t salt, float minValue, float maxValue) {
+  uint32_t state = seed ^ salt;
+  return minValue + (maxValue - minValue) * nextPlanetSeededRandom(state);
+}
+
+float getWetTerranCloudCover(uint32_t seed) {
+  return seededPlanetRange(seed, "wet_terran_cloud_cover", 0.35f, 0.60f);
+}
+
+float getIslandCloudCover(uint32_t seed) {
+  return seededPlanetRange(seed, "islands_cloud_cover", 0.35f, 0.60f);
+}
+
+float getGasGiantCloudCover(uint32_t seed) {
+  return seededPlanetRange(seed, "gas_giant_one_cloud_cover", 0.28f, 0.50f);
+}
+
+float samplePlanetCloudMask(float longitude, float latitude, float dx, float flow, uint32_t seed, float stretch, float scale, int octaves) {
+  float cloudLatitude = latitude * stretch + smoothstepFloat(0.0f, 0.55f, fabsf(dx));
+  float base = fbmPlanet(longitude * scale - flow * 1.8f + 31.0f, cloudLatitude * scale + 17.0f, seed + 43U, octaves);
+  float detail = fbmPlanet(
+    longitude * (scale + 2.4f) - flow * 0.95f + 59.0f,
+    cloudLatitude * (scale * 0.6f) + 73.0f,
+    seed + 59U,
+    octaves > 2 ? octaves - 1 : octaves
+  );
+  return clampFloat(base * 0.72f + detail * 0.28f, 0.0f, 1.0f);
+}
+
+float samplePlanetRiverMask(float longitude, float latitude, float flow, uint32_t seed, float scale) {
+  float base = fbmPlanet(longitude * scale + flow * 0.2f + 7.0f, latitude * scale + 13.0f, seed + 71U, 3);
+  float branch = fbmPlanet(
+    longitude * scale + base * 6.0f + 23.0f,
+    latitude * scale + base * 6.0f + 29.0f,
+    seed + 89U,
+    2
+  );
+  return clampFloat(branch, 0.0f, 1.0f);
+}
+
+float samplePlanetCraterMask(float longitude, float latitude, float flow, uint32_t seed, float scale) {
+  float field = fbmPlanet(longitude * scale + flow * 0.02f + 11.0f, latitude * scale + 7.0f, seed + 101U, 3);
+  float rim = fbmPlanet(longitude * (scale * 1.6f) + 37.0f, latitude * (scale * 1.6f) + 19.0f, seed + 113U, 2);
+  float cavity = smoothstepFloat(0.58f, 0.84f, field);
+  float rimShadow = 1.0f - smoothstepFloat(0.18f, 0.46f, rim);
+  return clampFloat(cavity * rimShadow, 0.0f, 1.0f);
+}
+
+float samplePlanetLakeMask(float longitude, float latitude, float flow, uint32_t seed, float scale) {
+  float lake = fbmPlanet(longitude * scale + flow * 0.25f + 41.0f, latitude * scale + 53.0f, seed + 131U, 3);
+  float detail = fbmPlanet(longitude * (scale * 1.4f) + 67.0f, latitude * (scale * 1.4f) + 79.0f, seed + 149U, 2);
+  return clampFloat(lake * 0.65f + detail * 0.35f, 0.0f, 1.0f);
+}
+
+float samplePlanetGasMask(float longitude, float latitude, float flow, uint32_t seed, float scale, float bandScale) {
+  float band = fbmPlanet(0.0f, latitude * scale * bandScale + 17.0f, seed + 163U, 4);
+  float turbulence = fbmPlanet(
+    longitude * scale * 0.35f - flow * 1.4f + 11.0f,
+    latitude * scale * 0.55f + 23.0f,
+    seed + 173U,
+    2
+  );
+  float gas = fbmPlanet(
+    longitude * scale - flow * 1.6f + turbulence * 2.4f + 31.0f,
+    latitude * scale * 1.2f,
+    seed + 181U,
+    3
+  );
+  return clampFloat(gas * 0.72f + band * 0.28f, 0.0f, 1.0f);
 }
 
 void drawPlanetBackground() {
   MatrixPanel_I2S_DMA* display = DisplayManager::dma_display;
+  display->fillScreen(color565(0, 0, 0));
+
   uint32_t seed = s_planetConfig.seed;
-  for (int y = 0; y < 64; y += 1) {
-    for (int x = 0; x < 64; x += 1) {
-      PlanetRgb color = makePlanetRgb(
-        (uint8_t)(4 + (x * 2 + y) / 48),
-        (uint8_t)(7 + y / 12),
-        (uint8_t)(14 + y / 8)
-      );
-
-      float glowA = smoothstepFloat(1.0f, 0.0f, sqrtf((float)((x - 10) * (x - 10) + (y - 11) * (y - 11))) / 18.0f);
-      float glowB = smoothstepFloat(1.0f, 0.0f, sqrtf((float)((x - 52) * (x - 52) + (y - 48) * (y - 48))) / 20.0f);
-      float glowC = smoothstepFloat(1.0f, 0.0f, sqrtf((float)((x - 35) * (x - 35) + (y - 8) * (y - 8))) / 15.0f);
-
-      color = mixPlanetRgb(color, makePlanetRgb(20, 42, 88), glowA * 0.22f);
-      color = mixPlanetRgb(color, makePlanetRgb(18, 68, 86), glowB * 0.18f);
-      color = mixPlanetRgb(color, makePlanetRgb(76, 28, 58), glowC * 0.14f);
-
-      drawPlanetPixel(display, x, y, color);
-    }
-  }
-
-  for (int index = 0; index < 14; index += 1) {
-    int sx = (int)(hashPlanetFloat(index, 3, seed) * 63.0f);
-    int sy = (int)(hashPlanetFloat(index, 9, seed) * 63.0f);
-    if ((sx - 32) * (sx - 32) + (sy - 32) * (sy - 32) < 18 * 18) {
+  float exclusionRadius = resolvePlanetBackgroundStarExclusionRadius();
+  uint32_t state = seed ^ hashPlanetString("planet_starfield_sparse");
+  int attempts = 0;
+  int placed = 0;
+  while (placed < 10 && attempts < 400) {
+    attempts += 1;
+    int sx = (int)floorf(nextPlanetSeededRandom(state) * 64.0f);
+    int sy = (int)floorf(nextPlanetSeededRandom(state) * 64.0f);
+    int dx = sx - 32;
+    int dy = sy - 32;
+    if (sqrtf((float)(dx * dx + dy * dy)) < exclusionRadius) {
       continue;
     }
-    PlanetRgb starColor = hashPlanetFloat(index, 17, seed) > 0.45f
-      ? makePlanetRgb(255, 255, 255)
-      : makePlanetRgb(255, 239, 158);
-    drawPlanetPixel(display, sx, sy, starColor);
-    if ((index % 5) == 0) {
-      if (sx > 0) drawPlanetPixel(display, sx - 1, sy, starColor);
-      if (sx < 63) drawPlanetPixel(display, sx + 1, sy, starColor);
-      if (sy > 0) drawPlanetPixel(display, sx, sy - 1, starColor);
-      if (sy < 63) drawPlanetPixel(display, sx, sy + 1, starColor);
-    }
+    PlanetRgb starColor = nextPlanetSeededRandom(state) > 0.45f
+      ? makePlanetRgb(188, 204, 255)
+      : makePlanetRgb(255, 214, 132);
+    float brightness = 0.44f + nextPlanetSeededRandom(state) * 0.24f;
+    PlanetRgb adjusted = scalePlanetRgb(starColor, brightness);
+    display->drawPixel(sx, sy, planetColor565(adjusted));
+    placed += 1;
   }
 }
 
 void drawAccretionDiskHalf(bool frontHalf) {
   MatrixPanel_I2S_DMA* display = DisplayManager::dma_display;
-  float flow = resolvePlanetFlow() * planetFlowSign();
+  float flow = resolvePlanetFlow();
   uint32_t seed = s_planetConfig.seed;
   for (int y = 0; y < 64; y += 1) {
     for (int x = 0; x < 64; x += 1) {
@@ -1245,7 +1505,7 @@ void drawAccretionDiskHalf(bool frontHalf) {
 
 void drawRingHalf(float ringRadius, float ringWidth, float perspective, uint32_t seed, bool frontHalf) {
   MatrixPanel_I2S_DMA* display = DisplayManager::dma_display;
-  float flow = resolvePlanetFlow() * planetFlowSign();
+  float flow = resolvePlanetFlow();
   for (int y = 0; y < 64; y += 1) {
     for (int x = 0; x < 64; x += 1) {
       float dx = ((float)x + 0.5f - 32.0f) / ringRadius;
@@ -1281,7 +1541,7 @@ void drawAsteroidPlanet() {
   MatrixPanel_I2S_DMA* display = DisplayManager::dma_display;
   uint32_t seed = s_planetConfig.seed;
   float radius = planetRadius() * 0.9f;
-  float angleOffset = resolvePlanetFlow() * planetFlowSign() * 0.9f;
+  float angleOffset = resolvePlanetFlow() * 0.9f;
 
   for (int y = 0; y < 64; y += 1) {
     for (int x = 0; x < 64; x += 1) {
@@ -1314,30 +1574,60 @@ void drawAsteroidPlanet() {
 void drawGalaxyPlanet() {
   MatrixPanel_I2S_DMA* display = DisplayManager::dma_display;
   uint32_t seed = s_planetConfig.seed;
-  float flow = resolvePlanetFlow() * planetFlowSign();
+  float planeSize = resolvePlanetPreviewPlaneSize(1.0f);
+  float time = resolvePlanetRotationTime();
+  const PlanetRgb palette[] = {
+    makePlanetRgb(255, 255, 235),
+    makePlanetRgb(255, 233, 141),
+    makePlanetRgb(181, 224, 102),
+    makePlanetRgb(101, 165, 102),
+    makePlanetRgb(57, 93, 100),
+    makePlanetRgb(50, 57, 77),
+    makePlanetRgb(50, 41, 71)
+  };
   for (int y = 0; y < 64; y += 1) {
     for (int x = 0; x < 64; x += 1) {
-      float dx = ((float)x + 0.5f - 32.0f) / 22.0f;
-      float dy = ((float)y + 0.5f - 32.0f) / 22.0f;
-      float dist = sqrtf(dx * dx + dy * dy);
-      if (dist > 1.45f) {
+      float u = 0.0f;
+      float v = 0.0f;
+      if (!mapPlanetPixelToUv(x, y, planeSize, u, v)) {
         continue;
       }
-      float angle = atan2f(dy, dx);
-      float swirl = angle + dist * 8.2f - flow * 2.3f;
-      float arm = 0.5f + 0.5f * cosf(swirl * 2.0f);
-      float dust = fbmPlanet(dx * 6.0f + 10.0f, dy * 6.0f + 10.0f, seed + 433U, 3);
-      float alpha = clampFloat((1.0f - dist / 1.45f) * (arm * 0.75f + dust * 0.55f), 0.0f, 1.0f);
-      if (alpha < 0.08f) {
-        continue;
-      }
-      PlanetRgb color = mixPlanetRgb(
-        makePlanetRgb(88, 56, 126),
-        makePlanetRgb(255, 233, 178),
-        clampFloat(arm * 0.55f + (1.0f - dist) * 0.45f, 0.0f, 1.0f)
+
+      float zoomedU = u * 1.375f - 0.1875f;
+      float zoomedV = v * 1.375f - 0.1875f;
+      float rotatedU = 0.0f;
+      float rotatedV = 0.0f;
+      rotatePlanetUv(zoomedU, zoomedV, 0.674f, rotatedU, rotatedV);
+
+      float layerU = rotatedU;
+      float layerV = rotatedV * 3.0f - 1.0f;
+      float distanceOne = distancePlanet(layerU, layerV, 0.5f, 0.5f);
+      float swirlOne = -9.0f * powf(distanceOne, 0.4f);
+      float rotatedLayerU = 0.0f;
+      float rotatedLayerV = 0.0f;
+      rotatePlanetUv(layerU, layerV, swirlOne + time, rotatedLayerU, rotatedLayerV);
+      float f1 = fbmPlanet(rotatedLayerU * 7.0f, rotatedLayerV * 7.0f, seed + 433U, 1);
+      f1 = floorf(f1 * 4.0f) / 4.0f;
+
+      float galaxyU = rotatedU;
+      float galaxyV = rotatedV * 3.0f - 1.0f - f1 * 0.4f;
+      float distanceTwo = distancePlanet(galaxyU, galaxyV, 0.5f, 0.5f);
+      float swirlTwo = -9.0f * powf(distanceTwo, 0.4f);
+      float rotatedGalaxyU = 0.0f;
+      float rotatedGalaxyV = 0.0f;
+      rotatePlanetUv(galaxyU, galaxyV, swirlTwo + time, rotatedGalaxyU, rotatedGalaxyV);
+      float f2 = fbmPlanet(
+        rotatedGalaxyU * 7.0f + f1 * 10.0f,
+        rotatedGalaxyV * 7.0f + f1 * 10.0f,
+        seed + 467U,
+        1
       );
-      color = mixPlanetRgb(color, makePlanetRgb(94, 192, 138), clampFloat(dust * 0.28f, 0.0f, 1.0f));
-      drawPlanetPixel(display, x, y, scalePlanetRgb(color, alpha));
+      if (f2 + distanceTwo > 0.7f) {
+        continue;
+      }
+
+      int colorIndex = clampInt((int)floorf(f2 * 2.3f * 6.0f), 0, 6);
+      drawPlanetPixel(display, x, y, palette[colorIndex]);
     }
   }
 }
@@ -1345,49 +1635,134 @@ void drawGalaxyPlanet() {
 void drawStarPlanet() {
   MatrixPanel_I2S_DMA* display = DisplayManager::dma_display;
   uint32_t seed = s_planetConfig.seed;
-  float flow = resolvePlanetFlow() * planetFlowSign();
+  bool evenSeed = (s_planetConfig.colorSeed & 1UL) == 0;
+  PlanetRgb starPalette[4];
+  PlanetRgb flarePalette[2];
+  if (evenSeed) {
+    starPalette[0] = makePlanetRgb(245, 255, 232);
+    starPalette[1] = makePlanetRgb(255, 216, 50);
+    starPalette[2] = makePlanetRgb(255, 130, 59);
+    starPalette[3] = makePlanetRgb(124, 25, 26);
+    flarePalette[0] = makePlanetRgb(255, 216, 50);
+    flarePalette[1] = makePlanetRgb(245, 255, 232);
+  } else {
+    starPalette[0] = makePlanetRgb(245, 255, 232);
+    starPalette[1] = makePlanetRgb(119, 214, 193);
+    starPalette[2] = makePlanetRgb(28, 146, 167);
+    starPalette[3] = makePlanetRgb(3, 62, 94);
+    flarePalette[0] = makePlanetRgb(119, 214, 193);
+    flarePalette[1] = makePlanetRgb(245, 255, 232);
+  }
+
+  float outerPlaneSize = resolvePlanetPreviewPlaneSize(2.0f);
+  float corePlaneSize = resolvePlanetPreviewPlaneSize(1.0f);
+  float flow = resolvePlanetRotationTime();
+
   for (int y = 0; y < 64; y += 1) {
     for (int x = 0; x < 64; x += 1) {
-      float dx = ((float)x + 0.5f - 32.0f) / 21.0f;
-      float dy = ((float)y + 0.5f - 32.0f) / 21.0f;
+      float outerU = 0.0f;
+      float outerV = 0.0f;
+      if (mapPlanetPixelToUv(x, y, outerPlaneSize, outerU, outerV)) {
+        float outerDx = outerU - 0.5f;
+        float outerDy = outerV - 0.5f;
+        float outerDist = sqrtf(outerDx * outerDx + outerDy * outerDy);
+        if (outerDist < 0.37f) {
+          float outerAngle = atan2f(outerDx, outerDy);
+          float blobNoise = fbmPlanet(
+            outerDist * 4.93f - flow * 0.05f + 11.0f,
+            outerAngle * 4.93f + 31.0f,
+            seed + 271U,
+            3
+          );
+          float halo = clampFloat((0.37f - outerDist) * 3.6f, 0.0f, 1.0f);
+          float blobAlpha = clampFloat((blobNoise - 0.54f) * 2.2f, 0.0f, 1.0f) * halo;
+          if (blobAlpha > 0.08f) {
+            PlanetRgb blobColor = makePlanetRgb(255, 255, 228);
+            drawPlanetPixel(display, x, y, scalePlanetRgb(blobColor, blobAlpha));
+          }
+        }
+      }
+
+      float u = 0.0f;
+      float v = 0.0f;
+      if (!mapPlanetPixelToUv(x, y, corePlaneSize, u, v)) {
+        continue;
+      }
+
+      float dx = u - 0.5f;
+      float dy = v - 0.5f;
       float dist = sqrtf(dx * dx + dy * dy);
-      if (dist > 1.32f) {
+      if (dist > 0.5f) {
         continue;
       }
-      float angle = atan2f(dy, dx);
-      float flare = 0.5f + 0.5f * cosf(angle * 4.0f - flow * 3.1f);
-      float plasma = fbmPlanet(dx * 7.0f - flow * 2.0f + 20.0f, dy * 7.0f + 20.0f, seed + 307U, 3);
-      float alpha = clampFloat((1.0f - dist / 1.32f) * 1.2f + flare * 0.22f - dist * 0.25f, 0.0f, 1.0f);
-      if (alpha < 0.05f) {
-        continue;
+
+      float cellNoise = fbmPlanet(u * 10.0f - flow * 0.12f + 17.0f, v * 10.0f + 23.0f, seed + 307U, 3);
+      int colorIndex = clampInt((int)floorf(cellNoise * 4.0f), 0, 3);
+      PlanetRgb color = starPalette[colorIndex];
+
+      float angle = atan2f(dx, dy);
+      float flareNoise = fbmPlanet(dist * 1.6f - flow * 0.05f + 43.0f, angle * 1.6f + 79.0f, seed + 331U, 4);
+      float flareAlpha = clampFloat((flareNoise - 0.66f) * 2.0f, 0.0f, 1.0f);
+      if (flareAlpha > 0.0f && dist > 0.18f) {
+        PlanetRgb flareColor = flareNoise > 0.82f ? flarePalette[1] : flarePalette[0];
+        color = mixPlanetRgb(color, flareColor, clampFloat(flareAlpha * 0.65f, 0.0f, 0.72f));
       }
-      PlanetRgb color = mixPlanetRgb(
-        makePlanetRgb(255, 132, 48),
-        makePlanetRgb(255, 251, 204),
-        clampFloat((1.0f - dist) * 0.7f + plasma * 0.3f, 0.0f, 1.0f)
+
+      float light = clampFloat((1.0f - dist * 1.35f) + (1.0f - dist) * 0.18f, 0.0f, 1.0f);
+      drawPlanetPixel(
+        display,
+        x,
+        y,
+        scalePlanetRgb(color, clampFloat(0.78f + light * 0.38f, 0.0f, 1.0f))
       );
-      drawPlanetPixel(display, x, y, scalePlanetRgb(color, alpha));
     }
   }
 }
 
 PlanetRgb sampleSphereColor(float dx, float dy, float dz, float light, uint32_t seed) {
-  float flow = resolvePlanetFlow() * planetFlowSign();
+  float flow = resolvePlanetFlow();
   float longitude = atan2f(dx, dz) / 6.2831853f + 0.5f + flow;
   float latitude = dy * 0.5f + 0.5f;
   float n1 = fbmPlanet(longitude * 4.0f + 3.0f, latitude * 4.0f + 7.0f, seed + 11U, 3);
   float n2 = fbmPlanet(longitude * 8.0f + 13.0f, latitude * 8.0f + 19.0f, seed + 23U, 2);
-  float cloud = fbmPlanet(longitude * 6.0f - flow * 1.5f + 31.0f, latitude * 5.0f + 17.0f, seed + 43U, 3);
+  float n3 = fbmPlanet(longitude * 6.0f + flow * 0.45f + 41.0f, latitude * 6.0f + 29.0f, seed + 31U, 2);
 
   if (planetPresetEquals("terran_wet")) {
-    PlanetRgb base = n1 < 0.44f
-      ? mixPlanetRgb(makePlanetRgb(38, 98, 176), makePlanetRgb(18, 46, 96), n2)
-      : mixPlanetRgb(makePlanetRgb(96, 176, 86), makePlanetRgb(42, 96, 60), n2);
-    if (fabsf(n2 - 0.52f) < 0.04f) {
-      base = mixPlanetRgb(base, makePlanetRgb(92, 192, 220), 0.6f);
+    float landMask = clampFloat(n1 - n2 * 0.18f + n3 * 0.12f, 0.0f, 1.0f);
+    float riverMask = samplePlanetRiverMask(longitude, latitude, flow, seed, 4.6f);
+    float cloudMask = samplePlanetCloudMask(longitude, latitude, dx, flow, seed, 2.0f, 7.3f, 2);
+    PlanetRgb ocean = selectPlanetPalette3(
+      clampFloat(n2 * 0.75f + (1.0f - light) * 0.35f, 0.0f, 1.0f),
+      makePlanetRgb(79, 164, 184),
+      makePlanetRgb(64, 73, 115),
+      makePlanetRgb(40, 53, 64)
+    );
+    if (landMask < 0.43f && landMask > 0.37f) {
+      ocean = mixPlanetRgb(ocean, makePlanetRgb(92, 192, 220), 0.45f);
     }
-    if (cloud > 0.68f) {
-      base = mixPlanetRgb(base, makePlanetRgb(242, 248, 255), clampFloat((cloud - 0.68f) * 2.2f, 0.0f, 0.65f));
+    PlanetRgb land = selectPlanetPalette4(
+      clampFloat(n2 * 0.7f + n3 * 0.3f + (1.0f - light) * 0.2f, 0.0f, 1.0f),
+      makePlanetRgb(99, 171, 63),
+      makePlanetRgb(59, 125, 79),
+      makePlanetRgb(47, 87, 83),
+      makePlanetRgb(40, 53, 64)
+    );
+    PlanetRgb base = landMask >= 0.41f ? land : ocean;
+    if (landMask >= 0.41f && riverMask > 0.58f) {
+      PlanetRgb river = mixPlanetRgb(makePlanetRgb(79, 164, 184), makePlanetRgb(64, 73, 115), clampFloat((riverMask - 0.58f) * 2.0f, 0.0f, 1.0f));
+      base = mixPlanetRgb(base, river, clampFloat((riverMask - 0.58f) * 1.35f, 0.0f, 0.82f));
+    }
+    float cloudCover = getWetTerranCloudCover(seed);
+    if (cloudMask > cloudCover) {
+      PlanetRgb cloudColor = selectPlanetPalette4(
+        1.0f - light,
+        makePlanetRgb(245, 255, 232),
+        makePlanetRgb(223, 224, 232),
+        makePlanetRgb(104, 111, 153),
+        makePlanetRgb(64, 73, 115)
+      );
+      float cloudAlpha = clampFloat((cloudMask - cloudCover) * 2.2f, 0.0f, 0.72f);
+      base = mixPlanetRgb(base, cloudColor, cloudAlpha);
     }
     return planetShade(base, light);
   }
@@ -1398,42 +1773,152 @@ PlanetRgb sampleSphereColor(float dx, float dy, float dz, float light, uint32_t 
   }
 
   if (planetPresetEquals("islands")) {
-    PlanetRgb base = n1 < 0.62f
-      ? mixPlanetRgb(makePlanetRgb(36, 132, 172), makePlanetRgb(14, 38, 78), n2)
-      : mixPlanetRgb(makePlanetRgb(140, 208, 124), makePlanetRgb(70, 126, 72), n2);
-    if (cloud > 0.72f) {
-      base = mixPlanetRgb(base, makePlanetRgb(246, 250, 255), clampFloat((cloud - 0.72f) * 2.4f, 0.0f, 0.58f));
+    float islandMask = clampFloat(n1 + n3 * 0.12f - n2 * 0.08f, 0.0f, 1.0f);
+    float cloudMask = samplePlanetCloudMask(longitude, latitude, dx, flow * 1.8f, seed, 2.0f, 7.7f, 2);
+    PlanetRgb ocean = selectPlanetPalette3(
+      clampFloat(n2 * 0.85f + (1.0f - light) * 0.3f, 0.0f, 1.0f),
+      makePlanetRgb(146, 232, 192),
+      makePlanetRgb(79, 164, 184),
+      makePlanetRgb(44, 53, 77)
+    );
+    PlanetRgb land = selectPlanetPalette4(
+      clampFloat(n2 * 0.65f + n3 * 0.35f + (1.0f - light) * 0.18f, 0.0f, 1.0f),
+      makePlanetRgb(200, 212, 93),
+      makePlanetRgb(99, 171, 63),
+      makePlanetRgb(47, 87, 83),
+      makePlanetRgb(40, 53, 64)
+    );
+    PlanetRgb base = islandMask > 0.58f ? land : ocean;
+    if (islandMask > 0.52f && islandMask <= 0.58f) {
+      base = mixPlanetRgb(ocean, makePlanetRgb(146, 232, 192), 0.38f);
+    }
+    float cloudCover = getIslandCloudCover(seed);
+    if (cloudMask > cloudCover) {
+      PlanetRgb cloudColor = selectPlanetPalette4(
+        1.0f - light,
+        makePlanetRgb(223, 224, 232),
+        makePlanetRgb(163, 167, 194),
+        makePlanetRgb(104, 111, 153),
+        makePlanetRgb(64, 73, 115)
+      );
+      float cloudAlpha = clampFloat((cloudMask - cloudCover) * 2.1f, 0.0f, 0.68f);
+      base = mixPlanetRgb(base, cloudColor, cloudAlpha);
     }
     return planetShade(base, light);
   }
 
   if (planetPresetEquals("no_atmosphere")) {
-    PlanetRgb base = mixPlanetRgb(makePlanetRgb(168, 154, 148), makePlanetRgb(96, 88, 84), clampFloat(n1, 0.0f, 1.0f));
-    if (n2 > 0.74f) {
-      base = darkenPlanetRgb(base, 0.32f);
+    float craterMask = samplePlanetCraterMask(longitude, latitude, flow, seed, 5.0f);
+    PlanetRgb base = selectPlanetPalette3(
+      clampFloat(n1 * 0.78f + n2 * 0.22f + (1.0f - light) * 0.28f, 0.0f, 1.0f),
+      makePlanetRgb(163, 167, 194),
+      makePlanetRgb(76, 104, 133),
+      makePlanetRgb(58, 63, 94)
+    );
+    if (craterMask > 0.42f) {
+      PlanetRgb crater = mixPlanetRgb(makePlanetRgb(76, 104, 133), makePlanetRgb(58, 63, 94), clampFloat((craterMask - 0.42f) * 1.7f, 0.0f, 1.0f));
+      base = mixPlanetRgb(base, crater, clampFloat((craterMask - 0.42f) * 1.6f, 0.0f, 0.74f));
     }
     return planetShade(base, light);
   }
 
-  if (planetPresetEquals("gas_giant_1") || planetPresetEquals("gas_giant_2")) {
-    float band = 0.5f + 0.5f * sinf(latitude * 22.0f + n1 * 5.0f - flow * 3.0f);
-    PlanetRgb base = mixPlanetRgb(makePlanetRgb(240, 198, 138), makePlanetRgb(172, 112, 74), clampFloat(band * 0.8f + n2 * 0.2f, 0.0f, 1.0f));
+  if (planetPresetEquals("gas_giant_1")) {
+    float darkMask = samplePlanetGasMask(longitude, latitude, flow * 1.45f, seed, 9.0f, 1.0f);
+    float warmMask = samplePlanetGasMask(longitude, latitude, flow, seed + 17U, 9.0f, 1.0f);
+    PlanetRgb base = selectPlanetPalette4(
+      clampFloat(darkMask + (1.0f - light) * 0.2f, 0.0f, 1.0f),
+      makePlanetRgb(59, 32, 39),
+      makePlanetRgb(59, 32, 39),
+      makePlanetRgb(0, 0, 0),
+      makePlanetRgb(33, 24, 27)
+    );
+    float cloudCover = getGasGiantCloudCover(seed);
+    if (warmMask > cloudCover) {
+      PlanetRgb cloudColor = selectPlanetPalette4(
+        clampFloat(warmMask * 0.8f + (1.0f - light) * 0.2f, 0.0f, 1.0f),
+        makePlanetRgb(240, 181, 65),
+        makePlanetRgb(207, 117, 43),
+        makePlanetRgb(171, 81, 48),
+        makePlanetRgb(125, 56, 51)
+      );
+      base = mixPlanetRgb(base, cloudColor, clampFloat((warmMask - cloudCover) * 1.85f, 0.0f, 0.88f));
+    }
+    return planetShade(base, light);
+  }
+
+  if (planetPresetEquals("gas_giant_2")) {
+    float bandMask = samplePlanetGasMask(longitude, latitude, flow * 0.55f, seed, 10.1f, 0.89f);
+    PlanetRgb base = selectPlanetPalette3(
+      clampFloat(bandMask + (1.0f - light) * 0.24f, 0.0f, 1.0f),
+      makePlanetRgb(238, 195, 154),
+      makePlanetRgb(217, 160, 102),
+      makePlanetRgb(143, 86, 59)
+    );
+    if (bandMask > 0.63f) {
+      PlanetRgb darkBand = selectPlanetPalette3(
+        clampFloat((bandMask - 0.63f) * 2.7f, 0.0f, 1.0f),
+        makePlanetRgb(102, 57, 49),
+        makePlanetRgb(69, 40, 60),
+        makePlanetRgb(34, 32, 52)
+      );
+      base = mixPlanetRgb(base, darkBand, clampFloat((bandMask - 0.63f) * 1.5f, 0.0f, 0.72f));
+    }
     return planetShade(base, light);
   }
 
   if (planetPresetEquals("ice_world")) {
-    PlanetRgb base = mixPlanetRgb(makePlanetRgb(232, 246, 255), makePlanetRgb(90, 156, 202), clampFloat(n1 * 0.7f + n2 * 0.3f, 0.0f, 1.0f));
-    if (cloud > 0.74f) {
-      base = brightenPlanetRgb(base, 0.18f);
+    float lakeMask = samplePlanetLakeMask(longitude, latitude, flow, seed, 10.0f);
+    float cloudMask = samplePlanetCloudMask(longitude, latitude, dx, flow, seed, 2.5f, 4.0f, 4);
+    PlanetRgb base = selectPlanetPalette3(
+      clampFloat(n1 * 0.72f + n2 * 0.28f + (1.0f - light) * 0.22f, 0.0f, 1.0f),
+      makePlanetRgb(250, 255, 255),
+      makePlanetRgb(199, 212, 225),
+      makePlanetRgb(146, 143, 184)
+    );
+    if (lakeMask > 0.55f) {
+      PlanetRgb lake = selectPlanetPalette3(
+        clampFloat(lakeMask * 0.9f + (1.0f - light) * 0.22f, 0.0f, 1.0f),
+        makePlanetRgb(79, 164, 184),
+        makePlanetRgb(76, 104, 133),
+        makePlanetRgb(58, 63, 94)
+      );
+      base = mixPlanetRgb(base, lake, clampFloat((lakeMask - 0.55f) * 1.7f, 0.0f, 0.86f));
+    }
+    if (cloudMask > 0.546f) {
+      PlanetRgb cloudColor = selectPlanetPalette4(
+        1.0f - light,
+        makePlanetRgb(225, 242, 255),
+        makePlanetRgb(192, 227, 255),
+        makePlanetRgb(94, 112, 165),
+        makePlanetRgb(64, 73, 115)
+      );
+      float cloudAlpha = clampFloat((cloudMask - 0.546f) * 2.0f, 0.0f, 0.64f);
+      base = mixPlanetRgb(base, cloudColor, cloudAlpha);
     }
     return planetShade(base, light);
   }
 
   if (planetPresetEquals("lava_world")) {
-    float crack = fabsf(n2 - 0.5f);
-    PlanetRgb base = mixPlanetRgb(makePlanetRgb(56, 28, 32), makePlanetRgb(138, 46, 26), clampFloat(n1, 0.0f, 1.0f));
-    if (crack < 0.06f) {
-      base = mixPlanetRgb(makePlanetRgb(255, 202, 72), makePlanetRgb(255, 92, 22), clampFloat(crack / 0.06f, 0.0f, 1.0f));
+    float craterMask = samplePlanetCraterMask(longitude, latitude, flow, seed + 19U, 3.5f);
+    float lavaMask = samplePlanetRiverMask(longitude, latitude, flow, seed + 29U, 10.0f);
+    PlanetRgb base = selectPlanetPalette3(
+      clampFloat(n1 * 0.72f + n2 * 0.28f + (1.0f - light) * 0.24f, 0.0f, 1.0f),
+      makePlanetRgb(143, 77, 87),
+      makePlanetRgb(82, 51, 63),
+      makePlanetRgb(61, 41, 54)
+    );
+    if (craterMask > 0.4f) {
+      PlanetRgb crater = mixPlanetRgb(makePlanetRgb(82, 51, 63), makePlanetRgb(61, 41, 54), clampFloat((craterMask - 0.4f) * 1.8f, 0.0f, 1.0f));
+      base = mixPlanetRgb(base, crater, clampFloat((craterMask - 0.4f) * 1.5f, 0.0f, 0.68f));
+    }
+    if (lavaMask > 0.58f) {
+      PlanetRgb lava = selectPlanetPalette3(
+        clampFloat(lavaMask + light * 0.18f, 0.0f, 1.0f),
+        makePlanetRgb(255, 137, 51),
+        makePlanetRgb(230, 69, 57),
+        makePlanetRgb(173, 47, 69)
+      );
+      base = mixPlanetRgb(base, lava, clampFloat((lavaMask - 0.58f) * 2.0f, 0.0f, 0.92f));
     }
     return planetShade(base, light);
   }
@@ -1478,23 +1963,95 @@ void drawSpherePlanet() {
 
 void drawBlackHolePlanet() {
   MatrixPanel_I2S_DMA* display = DisplayManager::dma_display;
-  drawAccretionDiskHalf(false);
-  drawAccretionDiskHalf(true);
+  uint32_t seed = s_planetConfig.seed;
+  float planeSize = resolvePlanetPreviewPlaneSize(3.0f);
+  float wobble = sinf(resolvePlanetRotationTime() * 0.4f) * 0.01f;
+  const PlanetRgb diskPalette[] = {
+    makePlanetRgb(255, 255, 235),
+    makePlanetRgb(255, 245, 64),
+    makePlanetRgb(255, 184, 74),
+    makePlanetRgb(237, 123, 57),
+    makePlanetRgb(189, 64, 53)
+  };
 
   for (int y = 0; y < 64; y += 1) {
     for (int x = 0; x < 64; x += 1) {
-      float dx = ((float)x + 0.5f - 32.0f) / 11.0f;
-      float dy = ((float)y + 0.5f - 32.0f) / 11.0f;
-      float dist = sqrtf(dx * dx + dy * dy);
-      if (dist > 1.0f) {
+      float u = 0.0f;
+      float v = 0.0f;
+      if (!mapPlanetPixelToUv(x, y, planeSize, u, v)) {
         continue;
       }
-      PlanetRgb color = makePlanetRgb(16, 18, 28);
-      if (dist > 0.72f) {
-        color = mixPlanetRgb(makePlanetRgb(255, 247, 192), makePlanetRgb(242, 114, 40), clampFloat((dist - 0.72f) / 0.28f, 0.0f, 1.0f));
+
+      float rotatedU = 0.0f;
+      float rotatedV = 0.0f;
+      rotatePlanetUv(u, v, 0.766f, rotatedU, rotatedV);
+      float preservedU = rotatedU;
+      float preservedV = rotatedV;
+
+      float compressedX = (rotatedU - 0.5f) * 1.3f + 0.5f;
+      float compressedU = 0.0f;
+      float compressedV = 0.0f;
+      rotatePlanetUv(compressedX, rotatedV, wobble, compressedU, compressedV);
+
+      float lightOriginX = 0.5f;
+      float lightOriginY = 0.5f;
+      float diskWidth = 0.065f;
+      float distanceToCenter = distancePlanet(compressedU, compressedV, 0.5f, 0.5f);
+      if (compressedV < 0.5f) {
+        float lift = smoothstepFloat(distanceToCenter, 0.5f, 0.2f);
+        compressedV += lift;
+        diskWidth += smoothstepFloat(distanceToCenter, 0.5f, 0.3f);
+        lightOriginY -= lift;
+      } else if (compressedV > 0.53f) {
+        float drop = smoothstepFloat(distanceToCenter, 0.4f, 0.17f);
+        compressedV -= drop;
+        diskWidth += smoothstepFloat(distanceToCenter, 0.5f, 0.2f);
+        lightOriginY += smoothstepFloat(distanceToCenter, 0.5f, 0.2f);
       }
-      if (dist < 0.55f) {
-        color = makePlanetRgb(4, 4, 8);
+
+      float lightDistance = distancePlanet(
+        preservedU,
+        preservedV * 14.0f,
+        lightOriginX,
+        lightOriginY * 14.0f
+      ) * 0.3f;
+      float centerX = compressedU;
+      float centerY = (compressedV - 0.5f) * 14.0f;
+      float centerDistance = distancePlanet(centerX, centerY, 0.5f, 0.0f);
+      float disk = smoothstepFloat(0.1f - diskWidth * 2.0f, 0.5f - diskWidth, centerDistance);
+      disk *= smoothstepFloat(centerDistance - diskWidth, centerDistance, 0.4f);
+
+      float materialU = 0.0f;
+      float materialV = 0.0f;
+      rotatePlanetUv(centerX, centerY + 0.5f, resolvePlanetRotationTime() * 3.0f, materialU, materialV);
+      disk *= sqrtf(clampFloat(fbmPlanet(materialU * 6.598f, materialV * 6.598f, seed + 137U, 3), 0.0f, 1.0f));
+      if (disk <= 0.15f) {
+        continue;
+      }
+
+      int colorIndex = clampInt((int)floorf((disk + lightDistance) * 4.0f), 0, 4);
+      drawPlanetPixel(display, x, y, diskPalette[colorIndex]);
+    }
+  }
+
+  float corePlaneSize = resolvePlanetPreviewPlaneSize(1.0f);
+  for (int y = 0; y < 64; y += 1) {
+    for (int x = 0; x < 64; x += 1) {
+      float u = 0.0f;
+      float v = 0.0f;
+      if (!mapPlanetPixelToUv(x, y, corePlaneSize, u, v)) {
+        continue;
+      }
+      float dist = distancePlanet(u, v, 0.5f, 0.5f);
+      if (dist > 0.247f) {
+        continue;
+      }
+      PlanetRgb color = makePlanetRgb(39, 39, 54);
+      if (dist > 0.219f) {
+        color = makePlanetRgb(255, 255, 235);
+      }
+      if (dist > 0.233f) {
+        color = makePlanetRgb(237, 123, 57);
       }
       drawPlanetPixel(display, x, y, color);
     }

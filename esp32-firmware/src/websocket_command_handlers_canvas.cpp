@@ -1,6 +1,8 @@
 #include "websocket_command_handlers.h"
+
 #include "config_manager.h"
 #include "display_manager.h"
+#include "runtime_command_bus.h"
 
 namespace {
 void setErrorResponse(StaticJsonDocument<768>& response, const char* message) {
@@ -12,7 +14,8 @@ void setErrorResponse(StaticJsonDocument<768>& response, const char* message) {
 bool WebSocketCommandHandlers::handleCanvasCommand(
   AsyncWebSocketClient* client,
   JsonDocument& doc,
-  StaticJsonDocument<768>& response
+  StaticJsonDocument<768>& response,
+  bool& responseSent
 ) {
   String cmd = doc["cmd"].as<String>();
 
@@ -23,177 +26,216 @@ bool WebSocketCommandHandlers::handleCanvasCommand(
   }
 
   if (cmd == "load_canvas") {
-    ConfigManager::loadCanvasPixels();
-    if (DisplayManager::currentMode == MODE_CANVAS) {
-      DisplayManager::renderCanvas();
+    RuntimeCommandBus::RuntimeCommand* command =
+      RuntimeCommandBus::createCommand(
+        RuntimeCommandBus::RuntimeCommandSource::WEBSOCKET,
+        client != nullptr ? client->id() : 0
+      );
+    if (command == nullptr) {
+      setErrorResponse(response, "out of memory");
+      return true;
     }
-    response["message"] = "canvas loaded";
-    response["initialized"] = DisplayManager::canvasInitialized;
+    command->type = RuntimeCommandBus::RuntimeCommandType::LOAD_CANVAS;
+    if (!RuntimeCommandBus::enqueue(command)) {
+      RuntimeCommandBus::destroyCommand(command);
+      setErrorResponse(response, "device busy");
+      return true;
+    }
+    responseSent = true;
     return true;
   }
 
   if (cmd == "clear_canvas") {
-    DisplayManager::clearCanvas();
-    ConfigManager::clearCanvasPixels();
-    if (DisplayManager::currentMode == MODE_CANVAS) {
-      DisplayManager::dma_display->clearScreen();
+    RuntimeCommandBus::RuntimeCommand* command =
+      RuntimeCommandBus::createCommand(
+        RuntimeCommandBus::RuntimeCommandSource::WEBSOCKET,
+        client != nullptr ? client->id() : 0
+      );
+    if (command == nullptr) {
+        setErrorResponse(response, "out of memory");
+        return true;
     }
-    response["message"] = "canvas cleared";
+    command->type = RuntimeCommandBus::RuntimeCommandType::CLEAR_CANVAS;
+    if (!RuntimeCommandBus::enqueue(command)) {
+      RuntimeCommandBus::destroyCommand(command);
+      setErrorResponse(response, "device busy");
+      return true;
+    }
+    responseSent = true;
     return true;
   }
 
   if (cmd == "highlight_color") {
-    if (DisplayManager::currentMode == MODE_CANVAS && DisplayManager::canvasInitialized) {
-      bool hasHighlight = doc.containsKey("color") && !doc["color"].isNull();
-      uint8_t highlightR = 0;
-      uint8_t highlightG = 0;
-      uint8_t highlightB = 0;
-
-      if (hasHighlight) {
-        JsonObject color = doc["color"];
-        highlightR = color["r"] | 0;
-        highlightG = color["g"] | 0;
-        highlightB = color["b"] | 0;
-
-        if (highlightR == 0 && highlightG == 0 && highlightB == 0) {
-          DisplayManager::highlightCanvasColor(0, 0, 0);
-        } else {
-          DisplayManager::highlightCanvasColor(highlightR, highlightG, highlightB);
-        }
-      } else {
-        DisplayManager::renderCanvas();
-      }
-
-      response["message"] = hasHighlight ? "color highlighted" : "highlight cleared";
-    } else {
+    if (DisplayManager::currentMode != MODE_CANVAS || !DisplayManager::canvasInitialized) {
       setErrorResponse(response, "not in canvas mode or canvas not initialized");
+      return true;
     }
+
+    bool hasHighlight = doc.containsKey("color") && !doc["color"].isNull();
+    RuntimeCommandBus::RuntimeCommand* command =
+      RuntimeCommandBus::createCommand(
+        RuntimeCommandBus::RuntimeCommandSource::WEBSOCKET,
+        client != nullptr ? client->id() : 0
+      );
+    if (command == nullptr) {
+      setErrorResponse(response, "out of memory");
+      return true;
+    }
+    command->type = RuntimeCommandBus::RuntimeCommandType::HIGHLIGHT_COLOR;
+    command->flag1 = hasHighlight;
+
+    if (hasHighlight) {
+      JsonObject color = doc["color"];
+      command->intValue1 = color["r"] | 0;
+      command->intValue2 = color["g"] | 0;
+      command->intValue3 = color["b"] | 0;
+    }
+
+    if (!RuntimeCommandBus::enqueue(command)) {
+      RuntimeCommandBus::destroyCommand(command);
+      setErrorResponse(response, "device busy");
+      return true;
+    }
+    responseSent = true;
     return true;
   }
 
   if (cmd == "highlight_row") {
-    if (DisplayManager::currentMode == MODE_CANVAS && DisplayManager::canvasInitialized) {
-      int highlightRow = doc["row"] | -1;
-      DisplayManager::highlightCanvasRow(highlightRow);
-      response["message"] = (highlightRow >= 0) ? "row highlighted" : "highlight cleared";
-    } else {
+    if (DisplayManager::currentMode != MODE_CANVAS || !DisplayManager::canvasInitialized) {
       setErrorResponse(response, "not in canvas mode or canvas not initialized");
+      return true;
     }
+
+    RuntimeCommandBus::RuntimeCommand* command =
+      RuntimeCommandBus::createCommand(
+        RuntimeCommandBus::RuntimeCommandSource::WEBSOCKET,
+        client != nullptr ? client->id() : 0
+      );
+    if (command == nullptr) {
+      setErrorResponse(response, "out of memory");
+      return true;
+    }
+    command->type = RuntimeCommandBus::RuntimeCommandType::HIGHLIGHT_ROW;
+    command->intValue1 = doc["row"] | -1;
+    if (!RuntimeCommandBus::enqueue(command)) {
+      RuntimeCommandBus::destroyCommand(command);
+      setErrorResponse(response, "device busy");
+      return true;
+    }
+    responseSent = true;
     return true;
   }
 
   if (cmd == "text") {
-    String text = doc["text"].as<String>();
-    int x = doc["x"] | 0;
-    int y = doc["y"] | 0;
-    DisplayManager::dma_display->clearScreen();
-    DisplayManager::dma_display->setCursor(x, y);
-    DisplayManager::dma_display->setTextColor(DisplayManager::dma_display->color565(255, 255, 255));
-    DisplayManager::dma_display->print(text);
-    response["message"] = "text displayed";
+    RuntimeCommandBus::RuntimeCommand* command =
+      RuntimeCommandBus::createCommand(
+        RuntimeCommandBus::RuntimeCommandSource::WEBSOCKET,
+        client != nullptr ? client->id() : 0
+      );
+    if (command == nullptr) {
+      setErrorResponse(response, "out of memory");
+      return true;
+    }
+    command->type = RuntimeCommandBus::RuntimeCommandType::TEXT;
+    command->stringValue1 = doc["text"].as<String>();
+    command->intValue1 = doc["x"] | 0;
+    command->intValue2 = doc["y"] | 0;
+    if (!RuntimeCommandBus::enqueue(command)) {
+      RuntimeCommandBus::destroyCommand(command);
+      setErrorResponse(response, "device busy");
+      return true;
+    }
+    responseSent = true;
     return true;
   }
 
   if (cmd == "pixel") {
-    int x = doc["x"];
-    int y = doc["y"];
-    int r = doc["r"] | 255;
-    int g = doc["g"] | 255;
-    int b = doc["b"] | 255;
-    if (x >= 0 && x < DisplayManager::PANEL_RES_X && y >= 0 && y < DisplayManager::PANEL_RES_Y) {
-      DisplayManager::dma_display->drawPixelRGB888(x, y, r, g, b);
-      response["message"] = "pixel set";
-    } else {
-      setErrorResponse(response, "pixel out of range");
+    RuntimeCommandBus::RuntimeCommand* command =
+      RuntimeCommandBus::createCommand(
+        RuntimeCommandBus::RuntimeCommandSource::WEBSOCKET,
+        client != nullptr ? client->id() : 0
+      );
+    if (command == nullptr) {
+      setErrorResponse(response, "out of memory");
+      return true;
     }
+    command->type = RuntimeCommandBus::RuntimeCommandType::PIXEL;
+    command->intValue1 = doc["x"];
+    command->intValue2 = doc["y"];
+    command->intValue3 = doc["r"] | 255;
+    command->intValue4 = doc["g"] | 255;
+    command->intValue5 = doc["b"] | 255;
+    if (!RuntimeCommandBus::enqueue(command)) {
+      RuntimeCommandBus::destroyCommand(command);
+      setErrorResponse(response, "device busy");
+      return true;
+    }
+    responseSent = true;
     return true;
   }
 
   if (cmd == "image") {
-    JsonArray pixels = doc["pixels"];
-    int width = doc["width"] | DisplayManager::PANEL_RES_X;
-    int height = doc["height"] | DisplayManager::PANEL_RES_Y;
-
-    DisplayManager::dma_display->clearScreen();
-    int idx = 0;
-    for (int y = 0; y < height && y < DisplayManager::PANEL_RES_Y; y++) {
-      for (int x = 0; x < width && x < DisplayManager::PANEL_RES_X; x++) {
-        if (idx + 2 < pixels.size()) {
-          uint8_t r = pixels[idx++];
-          uint8_t g = pixels[idx++];
-          uint8_t b = pixels[idx++];
-          DisplayManager::dma_display->drawPixelRGB888(x, y, r, g, b);
-        }
-      }
-      if (y % 8 == 0) {
-        yield();
-      }
+    RuntimeCommandBus::RuntimeCommand* command =
+      RuntimeCommandBus::createCommand(
+        RuntimeCommandBus::RuntimeCommandSource::WEBSOCKET,
+        client != nullptr ? client->id() : 0
+      );
+    if (command == nullptr) {
+      setErrorResponse(response, "out of memory");
+      return true;
     }
-    response["message"] = "image displayed";
+    command->type = RuntimeCommandBus::RuntimeCommandType::IMAGE;
+    serializeJson(doc, command->rawJsonPayload);
+    if (!RuntimeCommandBus::enqueue(command)) {
+      RuntimeCommandBus::destroyCommand(command);
+      setErrorResponse(response, "device busy");
+      return true;
+    }
+    responseSent = true;
     return true;
   }
 
   if (cmd == "image_sparse") {
-    JsonArray pixels = doc["pixels"];
-
-    for (JsonVariant pixel : pixels) {
-      int x = pixel["x"];
-      int y = pixel["y"];
-      uint8_t r = pixel["r"];
-      uint8_t g = pixel["g"];
-      uint8_t b = pixel["b"];
-
-      if (x >= 0 && x < DisplayManager::PANEL_RES_X && y >= 0 && y < DisplayManager::PANEL_RES_Y) {
-        DisplayManager::dma_display->drawPixelRGB888(x, y, r, g, b);
-      }
+    RuntimeCommandBus::RuntimeCommand* command =
+      RuntimeCommandBus::createCommand(
+        RuntimeCommandBus::RuntimeCommandSource::WEBSOCKET,
+        client != nullptr ? client->id() : 0
+      );
+    if (command == nullptr) {
+      setErrorResponse(response, "out of memory");
+      return true;
     }
-
-    response["message"] = "sparse pixels drawn";
-    response["count"] = pixels.size();
+    command->type = RuntimeCommandBus::RuntimeCommandType::IMAGE_SPARSE;
+    serializeJson(doc, command->rawJsonPayload);
+    if (!RuntimeCommandBus::enqueue(command)) {
+      RuntimeCommandBus::destroyCommand(command);
+      setErrorResponse(response, "device busy");
+      return true;
+    }
+    responseSent = true;
     return true;
   }
 
   if (cmd == "image_chunk") {
-    JsonArray pixels = doc["pixels"];
-    int width = doc["width"];
-    int offsetX = doc["offsetX"] | 0;
-    int offsetY = doc["offsetY"] | 0;
-    int height = doc["height"];
-    int chunk = doc["chunk"] | 0;
-    int total = doc["total"] | 1;
-
-    if (chunk == 0) {
-      DisplayManager::dma_display->clearScreen();
+    RuntimeCommandBus::RuntimeCommand* command =
+      RuntimeCommandBus::createCommand(
+        RuntimeCommandBus::RuntimeCommandSource::WEBSOCKET,
+        client != nullptr ? client->id() : 0
+      );
+    if (command == nullptr) {
+      setErrorResponse(response, "out of memory");
+      return true;
     }
-
-    int idx = 0;
-    for (int y = 0; y < height; y++) {
-      for (int x = 0; x < width; x++) {
-        if (idx + 2 < pixels.size()) {
-          uint8_t r = pixels[idx++];
-          uint8_t g = pixels[idx++];
-          uint8_t b = pixels[idx++];
-
-          int drawX = x + offsetX;
-          int drawY = y + offsetY;
-
-          if (drawX >= 0 && drawX < DisplayManager::PANEL_RES_X &&
-              drawY >= 0 && drawY < DisplayManager::PANEL_RES_Y) {
-            DisplayManager::dma_display->drawPixelRGB888(drawX, drawY, r, g, b);
-          }
-        }
-      }
-      if (y % 8 == 0) {
-        yield();
-      }
+    command->type = RuntimeCommandBus::RuntimeCommandType::IMAGE_CHUNK;
+    serializeJson(doc, command->rawJsonPayload);
+    if (!RuntimeCommandBus::enqueue(command)) {
+      RuntimeCommandBus::destroyCommand(command);
+      setErrorResponse(response, "device busy");
+      return true;
     }
-
-    response["message"] = "chunk displayed";
-    response["chunk"] = chunk;
-    response["total"] = total;
+    responseSent = true;
     return true;
   }
 
-  (void)client;
   return false;
 }

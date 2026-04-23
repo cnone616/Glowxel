@@ -8,9 +8,8 @@ const PLANET_PREVIEW_MIN_PIXELS = 12;
 const PLANET_PREVIEW_MAX_PIXELS = 5000;
 const MAX_PLANET_PREVIEW_SEED = 999999999;
 const PLANET_PREVIEW_MIN_SPEED = 1;
-const PLANET_PREVIEW_MAX_SPEED = 10;
+const PLANET_PREVIEW_MAX_SPEED = 7;
 const PLANET_PREVIEW_PLAYBACK_INTERVAL_MS = 100;
-
 const PLANET_SIZE_OPTIONS = [
   { id: "small", label: "小" },
   { id: "medium", label: "中" },
@@ -190,7 +189,7 @@ function createDefaultPlanetPreviewConfig() {
     seed: 20260415,
     colorSeed: 20260415,
     direction: "right",
-    speed: 6,
+    speed: 3,
     dither: true,
   };
 }
@@ -559,6 +558,7 @@ function applyColorVariant(buffer, frame) {
 function renderPresetFrame(buffer, frame) {
   renderPresetToBuffer(buffer, frame);
   applyColorVariant(buffer, frame);
+  renderBackgroundStars(buffer, frame);
 }
 
 function createLayerIterator(relativeScale, planeScale, sizeScale, callback) {
@@ -592,6 +592,24 @@ function getSizeScale(sizeId) {
   return 1;
 }
 
+function getBackgroundStarExclusionRadius(frame) {
+  if (frame.preset.id === "galaxy") {
+    return 30;
+  }
+  if (frame.preset.id === "star") {
+    return 28;
+  }
+  if (frame.preset.id === "black_hole") {
+    return 29;
+  }
+
+  let radius = PREVIEW_DIAMETER * frame.sizeScale * 0.5 + 5;
+  if (frame.preset.id === "gas_giant_2") {
+    radius += 4;
+  }
+  return clamp(radius, 22, 30);
+}
+
 function getDirectionFactor(directionId) {
   if (directionId === "left") {
     return -1;
@@ -620,33 +638,18 @@ function getPlanetPreviewCycleDuration(speedId) {
   return getFrameDelay(speedId) * (FRAME_COUNT - 1);
 }
 
-function renderBackgroundStars(buffer, seed) {
-  const cacheKey = String(seed);
+function renderBackgroundStars(buffer, frame) {
+  const cacheKey = `${frame.config.seed}:${frame.preset.id}:${frame.config.size}`;
   let background = STARFIELD_CACHE.get(cacheKey);
   if (!background) {
-    background = {
-      glows: [],
-      stars: [],
-    };
-    const random = createSeededRandom(seed >>> 0, hashString("planet_starfield"));
-    const exclusionRadius = 18;
-    const glowColors = [COLOR_SPACE_BLUE, COLOR_SPACE_TEAL, COLOR_SPACE_ROSE];
-
-    for (let index = 0; index < 3; index += 1) {
-      const anchorX = index === 0 ? 9 : index === 1 ? 52 : 32;
-      const anchorY = index === 0 ? 13 : index === 1 ? 50 : 8;
-      background.glows.push({
-        x: anchorX + Math.floor(random() * 9) - 4,
-        y: anchorY + Math.floor(random() * 9) - 4,
-        radius: 9 + Math.floor(random() * 7),
-        alpha: 0.016 + random() * 0.014,
-        color: glowColors[index],
-      });
-    }
-
-    let placed = 0;
+    background = [];
+    const random = createSeededRandom(
+      frame.config.seed >>> 0,
+      hashString("planet_starfield_sparse"),
+    );
+    const exclusionRadius = getBackgroundStarExclusionRadius(frame);
     let attempts = 0;
-    while (placed < 14 && attempts < 400) {
+    while (background.length < 10 && attempts < 400) {
       attempts += 1;
       const x = Math.floor(random() * CANVAS_SIZE);
       const y = Math.floor(random() * CANVAS_SIZE);
@@ -656,65 +659,25 @@ function renderBackgroundStars(buffer, seed) {
         continue;
       }
 
-      const patternIndex = Math.floor(random() * SMALL_STAR_PATTERNS.length);
-      const color = random() > 0.45 ? COLOR_WHITE : COLOR_WARM_WHITE;
-      const alpha = 0.4 + random() * 0.55;
-      background.stars.push({
+      background.push({
         x,
         y,
-        pattern: SMALL_STAR_PATTERNS[patternIndex],
-        color,
-        alpha,
-      });
-      placed += 1;
-    }
-
-    for (let index = 0; index < 2; index += 1) {
-      const x = index === 0 ? 10 + Math.floor(random() * 12) : 42 + Math.floor(random() * 12);
-      const y = 8 + Math.floor(random() * 48);
-      const patternIndex = Math.floor(random() * SPECIAL_STAR_PATTERNS.length);
-      background.stars.push({
-        x,
-        y,
-        pattern: SPECIAL_STAR_PATTERNS[patternIndex],
-        color: random() > 0.5 ? COLOR_WHITE : COLOR_WARM_WHITE,
-        alpha: 0.28 + random() * 0.3,
+        color: random() > 0.45 ? COLOR_WHITE : COLOR_WARM_WHITE,
+        alpha: 0.44 + random() * 0.24,
       });
     }
 
     STARFIELD_CACHE.set(cacheKey, background);
   }
 
-  for (let glowIndex = 0; glowIndex < background.glows.length; glowIndex += 1) {
-    const glow = background.glows[glowIndex];
-    for (let y = 0; y < CANVAS_SIZE; y += 1) {
-      for (let x = 0; x < CANVAS_SIZE; x += 1) {
-        const distanceValue = distance2(x, y, glow.x, glow.y);
-        if (distanceValue > glow.radius) {
-          continue;
-        }
-        const intensity = 1 - distanceValue / glow.radius;
-        blendPixel(
-          buffer,
-          (y * CANVAS_SIZE + x) * 3,
-          glow.color,
-          intensity * intensity * glow.alpha,
-        );
-      }
-    }
-  }
-
-  for (let index = 0; index < background.stars.length; index += 1) {
-    const star = background.stars[index];
-    for (let pixelIndex = 0; pixelIndex < star.pattern.length; pixelIndex += 1) {
-      const pixel = star.pattern[pixelIndex];
-      const x = star.x + pixel[0];
-      const y = star.y + pixel[1];
-      if (x < 0 || x >= CANVAS_SIZE || y < 0 || y >= CANVAS_SIZE) {
-        continue;
-      }
-      blendPixel(buffer, (y * CANVAS_SIZE + x) * 3, star.color, star.alpha);
-    }
+  for (let index = 0; index < background.length; index += 1) {
+    const star = background[index];
+    blendPixel(
+      buffer,
+      (star.y * CANVAS_SIZE + star.x) * 3,
+      star.color,
+      star.alpha,
+    );
   }
 }
 
@@ -2218,8 +2181,6 @@ function renderStarPreset(buffer, frame) {
 }
 
 function renderPresetToBuffer(buffer, frame) {
-  renderBackgroundStars(buffer, frame.config.seed);
-
   switch (frame.preset.id) {
     case "terran_wet":
       renderTerranWet(buffer, frame);

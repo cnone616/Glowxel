@@ -6,8 +6,8 @@
 
 class WebServer {
 public:
-  static void init();
-  static void setupServer();
+  static void initConfigPortal();
+  static void initRuntime();
   static void handleLoop();
   
   static AsyncWebServer server;
@@ -17,7 +17,8 @@ public:
   static size_t imageSize;
   
 private:
-  static void setupRoutes();
+  static void setupPortalRoutes();
+  static void setupRuntimeRoutes();
   static void setupAPIRoutes();
 };
 

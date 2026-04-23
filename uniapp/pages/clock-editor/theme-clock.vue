@@ -61,16 +61,23 @@
       </view>
     </scroll-view>
 
-    <!-- 传输遮罩弹窗 -->
-    <view v-if="isSending" class="sending-overlay" @touchmove.stop.prevent>
-      <view class="sending-modal">
-        <view class="sending-spinner"></view>
-        <text class="sending-title">正在传输数据...</text>
-        <text class="sending-tip">请勿切换网络或关闭程序</text>
+    <view
+      v-if="isSending"
+      class="glx-device-sending-overlay"
+      @touchmove.stop.prevent
+    >
+      <view class="glx-device-sending-card">
+        <view class="glx-device-sending-spinner"></view>
+        <text class="glx-device-sending-title">{{ sendOverlayTitle }}</text>
+        <text class="glx-device-sending-tip">{{ sendOverlayTip }}</text>
       </view>
     </view>
 
-    <Toast ref="toastRef" @show="canvasHidden = true" @hide="onToastHide" />
+    <Toast
+      ref="toastRef"
+      @show="handleToastShow"
+      @hide="handleToastHide"
+    />
   </view>
 </template>
 
@@ -81,6 +88,7 @@ import statusBarMixin from "../../mixins/statusBar.js";
 import clockPreviewMixin from "./mixins/clockPreviewMixin.js";
 import imageGifMixin from "./mixins/imageGifMixin.js";
 import deviceSyncMixin from "./mixins/deviceSyncMixin.js";
+import deviceSendUxMixin from "../../mixins/deviceSendUxMixin.js";
 import Icon from "../../components/Icon.vue";
 import Toast from "../../components/Toast.vue";
 import ClockThemePanel from "../../components/clock-editor/ClockThemePanel.vue";
@@ -93,7 +101,13 @@ import {
 const CLOCK_DEVICE_THEME_ID_KEY = "clock_device_theme_id";
 
 export default {
-  mixins: [statusBarMixin, clockPreviewMixin, imageGifMixin, deviceSyncMixin],
+  mixins: [
+    statusBarMixin,
+    clockPreviewMixin,
+    imageGifMixin,
+    deviceSyncMixin,
+    deviceSendUxMixin,
+  ],
   components: {
     Icon,
     Toast,
@@ -113,14 +127,11 @@ export default {
       gifPlaySpeed: 1.0, // 播放速度倍率
       lastAppliedClockThemeId: "",
       deviceThemeId: "",
-      isSending: false, // 传输锁，防止传输过程中操作
       _gifParser: null, // GIF 解析器实例，改宽高时重新生成数据
       _imageConvertToken: 0,
 
       contentHeight: "calc(100vh - 112rpx - 120rpx - 80rpx)",
 
-      // Canvas 相关
-      canvasHidden: false,
       imagePixels: null,
 
       // PixelCanvas 视图控制
@@ -178,13 +189,6 @@ export default {
   },
 
   watch: {
-    canvasHidden(newVal) {
-      if (!newVal) {
-        this.$nextTick(() => {
-          this.drawCanvas();
-        });
-      }
-    },
     canvasReady(newVal) {
       if (newVal) {
         this.$nextTick(() => {
@@ -265,9 +269,6 @@ export default {
   },
 
   onShow() {
-    if (!this.isSending) {
-      this.canvasHidden = false;
-    }
   },
 
   methods: {
@@ -310,11 +311,6 @@ export default {
       });
     },
 
-    onToastHide() {
-      if (!this.isSending) {
-        this.canvasHidden = false;
-      }
-    },
     cleanupTransientState() {
       this.stopGifAnimation();
       this.stopLoading();

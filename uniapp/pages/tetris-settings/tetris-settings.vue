@@ -133,13 +133,6 @@
         </view>
 
         <view class="card glx-panel-card glx-editor-card tetris-section-card">
-          <view class="card-title-section glx-panel-head inline-row">
-            <text class="card-title glx-panel-title">显示时间</text>
-            <GlxSwitch class="glx-row-switch" :checked="config.showClock" @change="config.showClock = $event.detail.value" />
-          </view>
-        </view>
-
-        <view class="card glx-panel-card glx-editor-card tetris-section-card">
           <view class="card-title-section glx-panel-head">
             <text class="card-title glx-panel-title">方块类型</text>
           </view>
@@ -171,7 +164,6 @@ import statusBarMixin from "../../mixins/statusBar.js";
 import Icon from "../../components/Icon.vue";
 import Toast from "../../components/Toast.vue";
 import PixelCanvas from "../../components/PixelCanvas.vue";
-import GlxSwitch from "../../components/GlxSwitch.vue";
 import {
   createTetrisScreensaverPreviewState,
   renderTetrisScreensaverPreviewState,
@@ -189,7 +181,7 @@ function createDefaultConfig() {
     clearMode: true,
     cellSize: 2,
     speed: "normal",
-    showClock: true,
+    showClock: false,
     pieces: [0, 1, 2, 3, 4, 5, 6],
   };
 }
@@ -210,9 +202,6 @@ function normalizeSavedConfig(saved) {
   if (saved.speed === "slow" || saved.speed === "normal" || saved.speed === "fast") {
     normalized.speed = saved.speed;
   }
-  if (typeof saved.showClock === "boolean") {
-    normalized.showClock = saved.showClock;
-  }
   if (Array.isArray(saved.pieces)) {
     const pieces = saved.pieces
       .map((item) => Number(item))
@@ -226,7 +215,7 @@ function normalizeSavedConfig(saved) {
 
 export default {
   mixins: [statusBarMixin],
-  components: { Icon, Toast, PixelCanvas, GlxSwitch },
+  components: { Icon, Toast, PixelCanvas },
   data() {
     return {
       deviceStore: null,
@@ -401,33 +390,17 @@ export default {
       uni.setStorageSync("tetris_config", this.config);
       try {
         const ws = this.deviceStore.getWebSocket();
-        await ws.waitForCommand(
-          {
-            cmd: "set_mode",
-            mode: "tetris",
-            clearMode: this.config.clearMode,
-            cellSize: this.config.cellSize,
-            speed: TETRIS_SPEED_OPTIONS[this.config.speed],
-            showClock: this.config.showClock,
-            pieces: this.config.pieces,
-          },
-          "tetris started",
-          5000,
+        await ws.startTetris({
+          clearMode: this.config.clearMode,
+          cellSize: this.config.cellSize,
+          speed: TETRIS_SPEED_OPTIONS[this.config.speed],
+          pieces: this.config.pieces,
+        });
+        await this.deviceStore.syncAndRequireBusinessMode(
+          "tetris",
+          "设备未进入俄罗斯方块屏保",
         );
-        const status = await ws.getStatus();
-        if (status.effectMode !== "tetris") {
-          throw new Error("设备未进入俄罗斯方块屏保");
-        }
-        this.deviceStore.setDeviceMode("tetris", { businessMode: true });
         this.toast.showSuccess("已应用");
-        const pages = getCurrentPages();
-        if (pages.length >= 2) {
-          const prev = pages[pages.length - 2];
-          if (prev && prev.deviceMode !== undefined) {
-            prev.deviceMode = "tetris";
-            uni.setStorageSync("device_mode", "tetris");
-          }
-        }
       } catch (err) {
         console.error("发送失败:", err);
         this.toast.showError("发送失败");
@@ -489,12 +462,6 @@ export default {
 .option-btn.glx-feature-option.active text {
   color: var(--nb-ink) !important;
   font-weight: 900 !important;
-}
-
-.inline-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
 }
 
 .piece-grid {

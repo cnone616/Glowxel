@@ -4,12 +4,14 @@
 #include "mode_tags.h"
 #include "theme_renderer.h"
 #include "wifi_manager.h"
+#include <freertos/FreeRTOS.h>
+#include <freertos/semphr.h>
 #include <time.h>
 #include <math.h>
 
 // 静态成员初始化
 CaptureMatrixPanel* DisplayManager::dma_display = nullptr;
-DeviceMode DisplayManager::currentMode = MODE_CANVAS;
+DeviceMode DisplayManager::currentMode = MODE_CLOCK;
 DeviceMode DisplayManager::lastBusinessMode = MODE_CLOCK;
 String DisplayManager::currentBusinessModeTag = ModeTags::CLOCK;
 String DisplayManager::lastBusinessModeTag = ModeTags::CLOCK;
@@ -59,8 +61,16 @@ const int DisplayManager::MAX_PIXELS = PANEL_RES_X * PANEL_RES_Y;
 static BufferMatrixPanel* s_offscreenDisplay = nullptr;
 static uint16_t* s_redirectFrameBuffer = nullptr;
 static bool s_redirectFrameActive = false;
+static SemaphoreHandle_t s_runtimeAccessMutex = nullptr;
+static bool s_forceStaticClockOverlayRefresh = false;
 
 namespace {
+void ensureRuntimeAccessMutex() {
+  if (s_runtimeAccessMutex == nullptr) {
+    s_runtimeAccessMutex = xSemaphoreCreateRecursiveMutex();
+  }
+}
+
 bool isValidDriver(uint8_t driver) {
   return driver <= 5;
 }
@@ -166,6 +176,12 @@ void destroyOffscreenDisplay() {
 
 bool isRedirectFrameReady() {
   return s_redirectFrameActive && s_redirectFrameBuffer != nullptr;
+}
+
+bool modePrefersDoubleBuffer() {
+  // 当前量产硬件没有足够的 DMA 内存稳定启用底层双缓冲。
+  // 保留底层实现，统一关闭自动尝试，固定走单缓冲渲染链。
+  return false;
 }
 
 void writeRedirectPixel(int16_t x, int16_t y, uint16_t color) {
@@ -384,7 +400,21 @@ void DisplayManager::presentOffscreenFrame(const uint16_t* targetBuffer) {
 
 void DisplayManager::init() {
   Serial.println("1. 初始化LED灯板...");
+  ensureRuntimeAccessMutex();
   setupMatrix();
+}
+
+void DisplayManager::lockRuntimeAccess() {
+  ensureRuntimeAccessMutex();
+  if (s_runtimeAccessMutex != nullptr) {
+    xSemaphoreTakeRecursive(s_runtimeAccessMutex, portMAX_DELAY);
+  }
+}
+
+void DisplayManager::unlockRuntimeAccess() {
+  if (s_runtimeAccessMutex != nullptr) {
+    xSemaphoreGiveRecursive(s_runtimeAccessMutex);
+  }
 }
 
 void DisplayManager::setupMatrix() {
@@ -433,10 +463,20 @@ bool DisplayManager::rebuildMatrix(bool doubleBuffered, bool showBootLogo) {
   Serial.println("显示开机Logo...");
   drawLogo(12, 7);  // 开机 logo 偏上
   // 开机 logo 额外显示品牌名
+  const char* brandText = "RenLight";
+  int16_t textBoundsX = 0;
+  int16_t textBoundsY = 0;
+  uint16_t textWidth = 0;
+  uint16_t textHeight = 0;
   dma_display->setTextSize(1);
   dma_display->setTextColor(dma_display->color565(220, 220, 220));
-  dma_display->setCursor(11, 52);
-  dma_display->print("RenLight");
+  dma_display->getTextBounds(brandText, 0, 52, &textBoundsX, &textBoundsY, &textWidth, &textHeight);
+  int textX = (PANEL_RES_X - (int)textWidth) / 2;
+  if (textX < 0) {
+    textX = 0;
+  }
+  dma_display->setCursor(textX, 52);
+  dma_display->print(brandText);
   presentFrame();
   delay(2000);
   Serial.println("LED灯板初始化完成");
@@ -465,7 +505,50 @@ bool DisplayManager::enableDoubleBuffer() {
     backgroundValid = false;
     animationBufferValid = false;
   }
-  return false;
+  return fallbackOk;
+}
+
+bool DisplayManager::disableDoubleBuffer() {
+  if (!doubleBufferEnabled) {
+    return true;
+  }
+
+  Serial.println("切换为单缓冲显示...");
+  bool ok = rebuildMatrix(false, false);
+  if (ok) {
+    clearLiveFrame();
+    backgroundValid = false;
+    animationBufferValid = false;
+    return true;
+  }
+
+  Serial.println("单缓冲恢复失败，尝试保留双缓冲");
+  bool fallbackOk = rebuildMatrix(true, false);
+  if (fallbackOk) {
+    clearLiveFrame();
+    backgroundValid = false;
+    animationBufferValid = false;
+  }
+  return fallbackOk;
+}
+
+bool DisplayManager::syncBufferStrategyForCurrentMode() {
+  if (dma_display == nullptr) {
+    return false;
+  }
+
+  bool shouldUseDoubleBuffer = modePrefersDoubleBuffer();
+  if (shouldUseDoubleBuffer == doubleBufferEnabled) {
+    return true;
+  }
+
+  Serial.printf("[Display] 当前模式=%d，目标缓冲=%s\n",
+                currentMode,
+                shouldUseDoubleBuffer ? "double" : "single");
+  if (shouldUseDoubleBuffer) {
+    return enableDoubleBuffer();
+  }
+  return disableDoubleBuffer();
 }
 
 void DisplayManager::drawLogo(int x, int y) {
@@ -982,6 +1065,9 @@ void DisplayManager::displayClock(bool force) {
     dma_display->clearScreen();
     memset(backgroundBuffer, 0, sizeof(backgroundBuffer));
     backgroundValid = true;
+    if (currentMode == MODE_CLOCK) {
+      s_forceStaticClockOverlayRefresh = true;
+    }
   }
 
   if (currentMode == MODE_CLOCK || currentMode == MODE_ANIMATION) {
@@ -1097,7 +1183,7 @@ static void drawStaticClockOverlayDirty(const ClockConfig& c, const struct tm& t
   static int s_prevWeekX = -1, s_prevWeekY = -1, s_prevWeekFont = -1;
   static DeviceMode s_prevMode = MODE_CANVAS;
 
-  if (DisplayManager::currentMode != s_prevMode) {
+  if (s_forceStaticClockOverlayRefresh || DisplayManager::currentMode != s_prevMode) {
     s_prevTime[0] = '\0';
     s_prevDate[0] = '\0';
     s_prevWeek[0] = '\0';
@@ -1108,6 +1194,7 @@ static void drawStaticClockOverlayDirty(const ClockConfig& c, const struct tm& t
     s_prevWeekX = -1;
     s_prevWeekY = -1;
     s_prevMode = DisplayManager::currentMode;
+    s_forceStaticClockOverlayRefresh = false;
   }
 
   if (c.time.show) {
@@ -3601,6 +3688,12 @@ void DisplayManager::renderNativeEffect() {
     return;
   }
 
+  // Eyes 自己维护离屏绘制与提交，避免和通用 native guard 叠成两套帧链。
+  if (nativeEffectType == NATIVE_EFFECT_EYES) {
+    EyesEffect::render();
+    return;
+  }
+
   unsigned long now = millis();
   unsigned long elapsed = now - nativeEffectStartTime;
   static unsigned long s_lastBreathRenderAt = 0;
@@ -4404,7 +4497,4 @@ void DisplayManager::renderNativeEffect() {
     return;
   }
 
-  if (nativeEffectType == NATIVE_EFFECT_EYES) {
-    EyesEffect::render();
-  }
 }

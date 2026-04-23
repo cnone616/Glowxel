@@ -6,6 +6,7 @@
 
 namespace GameScreensaverEffect {
   void init();
+  void deactivate();
   void applyConfig(const GameScreensaverConfig& config);
   void update();
   void render();
