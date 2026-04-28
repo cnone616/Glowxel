@@ -1,483 +1,199 @@
 <template>
-  <div class="device-page">
-    <div class="container">
-      <div class="page-header">
-        <h1 class="page-title">设备控制</h1>
-        <p class="page-desc">适用于已经完成配网的设备，在网页中直接连接并进行基础控制。</p>
+  <div class="glx-page-shell">
+    <section class="glx-page-shell__hero">
+      <span class="glx-page-shell__eyebrow">Device Control</span>
+      <h1 class="glx-page-shell__title">设备控制</h1>
+      <p class="glx-page-shell__desc">
+        网站端只保留基础设备链与桌面创作强相关入口：连接、热点配网、设备参数、画板模式和拼豆工作台统一从这里进入。
+      </p>
+      <div class="glx-hero-metrics">
+        <article class="glx-hero-metric">
+          <span class="glx-hero-metric__label">连接状态</span>
+          <strong class="glx-hero-metric__value">{{ connectedText }}</strong>
+        </article>
+        <article class="glx-hero-metric">
+          <span class="glx-hero-metric__label">当前 mode</span>
+          <strong class="glx-hero-metric__value">{{ modeText }}</strong>
+        </article>
+        <article class="glx-hero-metric">
+          <span class="glx-hero-metric__label">当前 businessMode</span>
+          <strong class="glx-hero-metric__value">{{ businessModeText }}</strong>
+        </article>
+        <article class="glx-hero-metric">
+          <span class="glx-hero-metric__label">设备地址</span>
+          <strong class="glx-hero-metric__value">{{ hostText }}</strong>
+        </article>
       </div>
+    </section>
 
-      <div class="notice-card">
-        <div class="notice-copy">
-          <strong>首次使用先完成热点配网</strong>
-          <span>网页端目前不直接提供 WiFi 配网表单。请先连接设备热点，在浏览器中打开 `192.168.4.1` 完成 WiFi 配置，再回到这里输入设备 IP 连接。</span>
+    <section class="glx-grid glx-grid--two">
+      <article class="glx-section-card glx-section-card--stack">
+        <div class="glx-section-head">
+          <h2 class="glx-section-title">连接设备</h2>
+          <span class="glx-section-meta">WebSocket</span>
         </div>
-        <a class="notice-link" href="/hardware-guide.html" target="_self">查看连接说明</a>
-      </div>
-
-      <div class="card">
-        <h2 class="card-title">设备连接</h2>
-        <div class="connection-form">
-          <label class="field">
-            <span>设备地址</span>
-            <input v-model="host" placeholder="例如 192.168.1.88" />
+        <div class="glx-form-grid glx-form-grid--two">
+          <label class="glx-field">
+            <span class="glx-field__label">设备地址</span>
+            <input v-model="host" class="glx-input" placeholder="例如 192.168.1.88" />
           </label>
-          <label class="field field-port">
-            <span>端口</span>
-            <input v-model.number="port" type="number" min="1" max="65535" />
-          </label>
-          <label class="secure-switch">
-            <input v-model="secure" type="checkbox" />
-            <span>使用 `wss`</span>
+          <label class="glx-field">
+            <span class="glx-field__label">端口</span>
+            <input v-model.number="port" type="number" min="1" max="65535" class="glx-input" />
           </label>
         </div>
-
-        <div class="actions">
-          <button class="btn btn-primary" :disabled="deviceStore.connecting" @click="handleConnect">
-            {{ deviceStore.connected ? "重新连接" : deviceStore.connecting ? "连接中..." : "连接设备" }}
+        <label class="glx-field">
+          <span class="glx-field__label">协议</span>
+          <select v-model="secureValue" class="glx-select">
+            <option value="0">ws</option>
+            <option value="1">wss</option>
+          </select>
+        </label>
+        <div class="glx-inline-actions">
+          <button type="button" class="glx-button glx-button--primary" :disabled="deviceStore.connecting" @click="handleConnect">
+            {{ deviceStore.connecting ? "连接中..." : deviceStore.connected ? "重新连接" : "连接设备" }}
           </button>
-          <button class="btn btn-outline" :disabled="!deviceStore.connected" @click="handleDisconnect">断开连接</button>
-          <button class="btn btn-outline" :disabled="!deviceStore.connected" @click="handleStatus">刷新状态</button>
+          <button type="button" class="glx-button glx-button--ghost" :disabled="!deviceStore.connected" @click="handleDisconnect">
+            断开连接
+          </button>
+          <button type="button" class="glx-button glx-button--ghost" :disabled="!deviceStore.connected" @click="refreshStatus">
+            刷新状态
+          </button>
         </div>
+      </article>
 
-        <div class="status">
-          <span class="dot" :class="{ online: deviceStore.connected }"></span>
-          <span>{{ deviceStore.connected ? "已连接" : "未连接" }}</span>
-          <span v-if="deviceStore.mode" class="mode">模式：{{ deviceStore.mode }}</span>
+      <article class="glx-section-card glx-section-card--stack">
+        <div class="glx-section-head">
+          <h2 class="glx-section-title">设备入口</h2>
+          <span class="glx-section-meta">主链入口</span>
         </div>
-        <p v-if="message" class="msg">{{ message }}</p>
-        <p v-if="deviceStore.error" class="msg error">{{ deviceStore.error }}</p>
+        <div class="glx-stack">
+          <div class="glx-list-card">
+            <div class="glx-list-card__copy">
+              <strong class="glx-list-card__title">设备参数</strong>
+              <span class="glx-list-card__desc">亮度、旋转、色彩顺序、NTP 和驱动参数统一在这里读写。</span>
+            </div>
+            <router-link to="/device-params" class="glx-button glx-button--ghost">打开</router-link>
+          </div>
+          <div class="glx-list-card">
+            <div class="glx-list-card__copy">
+              <strong class="glx-list-card__title">热点配网</strong>
+              <span class="glx-list-card__desc">首次使用时先连接设备热点，再打开本地门户完成配网。</span>
+            </div>
+            <router-link to="/ble-config" class="glx-button glx-button--ghost">打开</router-link>
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <section class="glx-section-card glx-section-card--stack">
+      <div class="glx-section-head">
+        <h2 class="glx-section-title">关键模式与发送</h2>
+        <span class="glx-section-meta">{{ modeCatalog.length }} 个入口</span>
       </div>
-
-      <div class="grid">
-        <div class="card">
-          <h2 class="card-title">模式切换</h2>
-          <div class="mode-group">
-            <button class="mode-btn" :class="{ active: deviceStore.mode === 'clock' }" :disabled="!deviceStore.connected" @click="switchMode('clock')">静态时钟</button>
-            <button class="mode-btn" :class="{ active: deviceStore.mode === 'animation' }" :disabled="!deviceStore.connected" @click="switchMode('animation')">动态时钟</button>
-            <button class="mode-btn" :class="{ active: deviceStore.mode === 'canvas' }" :disabled="!deviceStore.connected" @click="switchMode('canvas')">画板模式</button>
-          </div>
-        </div>
-
-        <div class="card">
-          <h2 class="card-title">屏幕操作</h2>
-          <div class="brightness-row">
-            <label>亮度：{{ brightness }}</label>
-            <input v-model.number="brightness" type="range" min="0" max="178" />
-          </div>
-          <div class="actions">
-            <button class="btn btn-primary" :disabled="!deviceStore.connected" @click="handleBrightness">应用亮度</button>
-            <button class="btn btn-outline" :disabled="!deviceStore.connected" @click="handleClear">清屏</button>
-          </div>
-        </div>
+      <div class="glx-grid glx-grid--three">
+        <router-link
+          v-for="entry in modeCatalog"
+          :key="entry.key"
+          :to="entry.to"
+          class="glx-section-card glx-section-card--stack"
+          style="text-decoration:none;"
+        >
+          <span class="glx-chip" :class="entry.chipClass">{{ entry.category }}</span>
+          <strong class="glx-section-title" style="font-size:18px;">{{ entry.title }}</strong>
+          <p class="glx-page-shell__desc">{{ entry.desc }}</p>
+        </router-link>
       </div>
-    </div>
+      <p class="glx-page-shell__desc">
+        静态时钟、动态时钟、主题模式、桌面宠物和屏保类模式继续由 uniapp 负责，网站端本轮不再保留对应独立设置页。
+      </p>
+    </section>
   </div>
 </template>
 
 <script setup>
-import { onMounted, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { useDeviceStore } from "@/stores/device.js";
+import { useFeedback } from "@/composables/useFeedback.js";
 
 const deviceStore = useDeviceStore();
+const feedback = useFeedback();
+
 const host = ref("");
 const port = ref(80);
-const secure = ref(false);
-const brightness = ref(50);
-const message = ref("");
+const secureValue = ref("0");
 
-onMounted(() => {
-  deviceStore.init();
-  host.value = deviceStore.host;
-  port.value = deviceStore.port || 80;
-  secure.value = deviceStore.secure;
+const modeCatalog = [
+  { key: "canvas", title: "画板模式", desc: "先把设备切到 `canvas`，再回编辑器继续像素创作。", to: "/canvas-editor", category: "关键模式", chipClass: "glx-chip--green" },
+  { key: "pattern", title: "拼豆工作台", desc: "上传图片或带编号图纸，整理拼豆图案后再进入发送链。", to: "/pattern-workbench", category: "桌面创作", chipClass: "glx-chip--blue" },
+];
+
+const connectedText = computed(() => {
+  return deviceStore.connected ? "已连接" : "未连接";
+});
+
+const modeText = computed(() => {
+  if (deviceStore.mode.length > 0) {
+    return deviceStore.mode;
+  }
+  return "--";
+});
+
+const businessModeText = computed(() => {
+  if (deviceStore.businessMode.length > 0) {
+    return deviceStore.businessMode;
+  }
+  return "--";
+});
+
+const hostText = computed(() => {
+  if (deviceStore.host.length > 0) {
+    return deviceStore.host;
+  }
+  return "--";
 });
 
 async function handleConnect() {
-  message.value = "";
   try {
+    feedback.showBlocking("连接设备", "正在建立 WebSocket 连接并读取当前设备状态。");
     await deviceStore.connect({
       host: host.value,
       port: port.value,
-      secure: secure.value,
+      secure: secureValue.value === "1",
     });
-    message.value = "设备连接成功";
+
+    if (deviceStore.deviceInfo) {
+      feedback.success("连接成功", "设备状态已经同步到网站端。");
+      return;
+    }
+
+    feedback.warning("连接已建立", "WebSocket 已打开，状态快照暂未返回，可稍后手动刷新。");
   } catch (error) {
-    message.value = error.message || "连接失败";
+    feedback.error("连接失败", error.message);
+  } finally {
+    feedback.hideBlocking();
   }
 }
 
 function handleDisconnect() {
   deviceStore.disconnect();
-  message.value = "已断开设备连接";
+  feedback.info("已断开连接", "设备 WebSocket 已关闭。");
 }
 
-async function handleStatus() {
-  message.value = "";
+async function refreshStatus() {
   try {
-    const resp = await deviceStore.requestStatus();
-    message.value = resp?.message || "状态已刷新";
+    await deviceStore.syncDeviceStatus();
+    feedback.success("状态已刷新", "设备当前状态已经重新读取。");
   } catch (error) {
-    message.value = error.message || "刷新状态失败";
+    feedback.error("刷新失败", error.message);
   }
 }
 
-async function switchMode(mode) {
-  message.value = "";
-  try {
-    const resp = await deviceStore.setMode(mode);
-    message.value = resp?.message || "模式切换成功";
-  } catch (error) {
-    message.value = error.message || "模式切换失败";
+onMounted(() => {
+  host.value = deviceStore.host;
+  if (deviceStore.port > 0) {
+    port.value = deviceStore.port;
   }
-}
-
-async function handleBrightness() {
-  message.value = "";
-  try {
-    const value = Number(brightness.value);
-    if (!Number.isFinite(value)) {
-      throw new Error("亮度值无效");
-    }
-    const boundedValue = Math.max(0, Math.min(178, Math.round(value)));
-    brightness.value = boundedValue;
-    await deviceStore.setBrightness(boundedValue);
-    message.value = "亮度设置成功";
-  } catch (error) {
-    message.value = error.message || "亮度设置失败";
-  }
-}
-
-async function handleClear() {
-  message.value = "";
-  try {
-    await deviceStore.clearScreen();
-    message.value = "已清屏";
-  } catch (error) {
-    message.value = error.message || "清屏失败";
-  }
-}
+  secureValue.value = deviceStore.secure ? "1" : "0";
+});
 </script>
-
-<style scoped>
-.device-page {
-  padding: 28px 0 72px;
-}
-
-.page-header {
-  margin-bottom: 20px;
-  padding: 24px 24px 20px;
-  border: 3px solid var(--nb-ink);
-  border-radius: 0;
-  background:
-    linear-gradient(90deg, rgba(255, 243, 196, 0.7), rgba(255, 255, 255, 0.98) 56%, rgba(220, 235, 255, 0.62));
-  box-shadow: var(--nb-shadow-card);
-}
-
-.page-title {
-  font-size: 34px;
-  font-weight: 700;
-  line-height: 1.05;
-  color: var(--nb-ink);
-  letter-spacing: -0.03em;
-}
-
-.page-desc {
-  max-width: 640px;
-  margin-top: 10px;
-  color: var(--text-secondary);
-  font-size: 15px;
-  line-height: 1.6;
-}
-
-.notice-card {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 16px;
-  padding: 20px 22px;
-  border: 3px solid var(--nb-ink);
-  border-radius: 0;
-  background: var(--tone-paper-soft);
-  box-shadow: var(--nb-shadow-soft);
-}
-
-.notice-copy {
-  display: grid;
-  gap: 6px;
-}
-
-.notice-copy strong {
-  font-size: 16px;
-  font-weight: 700;
-  color: var(--nb-ink);
-}
-
-.notice-copy span {
-  font-size: 14px;
-  line-height: 1.7;
-  color: var(--text-secondary);
-}
-
-.notice-link {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 42px;
-  padding: 0 16px;
-  border: 2px solid var(--nb-ink);
-  border-radius: 0;
-  background: var(--tone-blue-soft);
-  color: var(--nb-ink);
-  font-size: 14px;
-  font-weight: 800;
-  text-decoration: none;
-  white-space: nowrap;
-  box-shadow: var(--nb-shadow-soft);
-}
-
-.card {
-  position: relative;
-  margin-bottom: 16px;
-  padding: 22px;
-  border: 3px solid var(--nb-ink);
-  border-radius: 0;
-  background: var(--tone-paper-soft);
-  box-shadow: var(--nb-shadow-card);
-}
-
-.card-title {
-  display: inline-flex;
-  align-items: center;
-  min-height: 40px;
-  margin-bottom: 16px;
-  padding: 6px 14px;
-  border: 2px solid var(--nb-ink);
-  border-radius: 0;
-  background: var(--tone-yellow-soft);
-  color: var(--nb-ink);
-  font-size: 18px;
-  font-weight: 800;
-  letter-spacing: 0.01em;
-  box-shadow: var(--nb-shadow-soft);
-}
-
-.connection-form {
-  display: grid;
-  grid-template-columns: minmax(0, 1.4fr) 120px auto;
-  gap: 12px;
-  margin-bottom: 14px;
-  align-items: end;
-}
-
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.field span {
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  color: var(--text-secondary);
-  text-transform: uppercase;
-}
-
-.field input {
-  min-height: 46px;
-  padding: 0 14px;
-  font-size: 14px;
-  font-weight: 700;
-}
-
-.field-port input {
-  text-align: center;
-}
-
-.secure-switch {
-  min-height: 46px;
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  padding: 0 14px;
-  border: 2px solid var(--nb-ink);
-  border-radius: 0;
-  background: var(--tone-paper-soft);
-  color: var(--nb-ink);
-  font-size: 13px;
-  font-weight: 700;
-  white-space: nowrap;
-  box-shadow: var(--nb-shadow-soft);
-}
-
-.secure-switch input {
-  width: 16px;
-  height: 16px;
-  accent-color: var(--nb-yellow);
-}
-
-.actions {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.status {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 16px;
-  color: var(--text-secondary);
-  font-size: 13px;
-  font-weight: 700;
-}
-
-.dot {
-  width: 14px;
-  height: 14px;
-  border: 2px solid var(--nb-ink);
-  background: var(--text-tertiary);
-  flex: 0 0 auto;
-  border-radius: 0;
-}
-
-.dot.online {
-  background: var(--nb-green);
-}
-
-.mode {
-  display: inline-flex;
-  align-items: center;
-  min-height: 34px;
-  padding: 6px 12px;
-  border: 2px solid var(--nb-ink);
-  border-radius: 0;
-  background: var(--tone-paper-soft);
-  color: var(--nb-ink);
-  white-space: nowrap;
-  box-shadow: var(--nb-shadow-soft);
-}
-
-.msg {
-  margin-top: 14px;
-  padding: 10px 12px;
-  border: 2px solid var(--nb-ink);
-  border-radius: 0;
-  background: var(--tone-paper-soft);
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--text-secondary);
-  box-shadow: var(--nb-shadow-soft);
-}
-
-.msg.error {
-  background: var(--tone-coral-soft);
-  color: var(--nb-ink);
-}
-
-.grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
-}
-
-.mode-group {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
-}
-
-.mode-btn {
-  min-height: 54px;
-  padding: 10px 14px;
-  border: 2px solid var(--nb-ink);
-  border-radius: 0;
-  background: var(--tone-paper-soft);
-  cursor: pointer;
-  font-size: 14px;
-  font-weight: 700;
-  line-height: 1.35;
-  color: var(--nb-ink);
-  box-shadow: var(--nb-shadow-soft);
-  transition: background-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
-  white-space: nowrap;
-}
-
-.mode-btn:hover:not(:disabled) {
-  background: var(--nb-muted);
-}
-
-.mode-btn.active {
-  background: var(--tone-blue-soft);
-  color: var(--nb-ink);
-}
-
-.mode-btn:disabled {
-  cursor: not-allowed;
-  background: var(--nb-muted);
-  color: #7a7a7a;
-  box-shadow: none;
-}
-
-.brightness-row {
-  margin-bottom: 14px;
-  padding: 14px;
-  border: 2px solid var(--nb-ink);
-  border-radius: 0;
-  background: var(--tone-paper-soft);
-  box-shadow: var(--nb-shadow-soft);
-}
-
-.brightness-row label {
-  display: block;
-  margin-bottom: 10px;
-  color: var(--nb-ink);
-  font-size: 13px;
-  font-weight: 700;
-}
-
-.brightness-row input {
-  width: 100%;
-}
-
-@media (max-width: 900px) {
-  .grid {
-    grid-template-columns: 1fr;
-  }
-
-  .mode-group {
-    grid-template-columns: 1fr;
-  }
-
-  .connection-form {
-    grid-template-columns: 1fr;
-  }
-
-  .notice-card {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-}
-
-@media (max-width: 640px) {
-  .device-page {
-    padding: 20px 0 56px;
-  }
-
-  .page-header,
-  .card {
-    padding: 18px;
-  }
-
-  .page-title {
-    font-size: 28px;
-  }
-
-  .actions .btn,
-  .actions .mode-btn {
-    width: 100%;
-  }
-}
-</style>

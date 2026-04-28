@@ -1,4 +1,4 @@
-import { drawClockTextToPixels } from "./clockCanvas.js";
+import { drawClockTextToPixels, getCurrentTimeText } from "./clockCanvas.js";
 
 const PANEL_SIZE = 64;
 const PIECES = [
@@ -391,23 +391,23 @@ function drawActivePiece(map, piece, cols, rows, cellSize) {
   }
 }
 
-function buildClockText() {
-  const now = new Date();
-  const hour = `${now.getHours()}`.padStart(2, "0");
-  const minute = `${now.getMinutes()}`.padStart(2, "0");
-  return `${hour}:${minute}`;
+function buildClockText(clockConfig) {
+  return getCurrentTimeText(clockConfig.showSeconds, clockConfig.hourFormat);
 }
 
-function drawClockOverlay(map) {
+function drawClockOverlay(map, clockConfig) {
+  if (!clockConfig.time.show) {
+    return;
+  }
   drawClockTextToPixels(
-    buildClockText(),
-    32,
-    2,
-    "#ffffff",
+    buildClockText(clockConfig),
+    clockConfig.time.x,
+    clockConfig.time.y,
+    clockConfig.time.color,
     map,
-    "classic_5x7",
-    1,
-    "center",
+    clockConfig.font,
+    clockConfig.time.fontSize,
+    clockConfig.time.align,
   );
 }
 
@@ -428,7 +428,7 @@ function renderFrame(state, piece, showClock) {
   drawBoard(map, state.board, state.cols, state.rows, state.cellSize);
   drawActivePiece(map, piece, state.cols, state.rows, state.cellSize);
   if (showClock) {
-    drawClockOverlay(map);
+    drawClockOverlay(map, state.clockConfig);
   }
   return map;
 }
@@ -445,7 +445,7 @@ function normalizeConfig(config) {
   };
 }
 
-function createTetrisScreensaverPreviewState(config) {
+function createTetrisScreensaverPreviewState(config, clockConfig) {
   const safeConfig = normalizeConfig(config);
   const state = {
     clearMode: safeConfig.clearMode,
@@ -464,6 +464,7 @@ function createTetrisScreensaverPreviewState(config) {
         (safeConfig.showClock ? 1 : 0) * 59,
     ),
     showClock: safeConfig.showClock,
+    clockConfig,
     frameDelay: resolveFrameDelay(safeConfig.speed),
     currentPiece: null,
   };
@@ -557,8 +558,8 @@ function stepTetrisScreensaverPreviewState(state) {
   return state;
 }
 
-function buildTetrisScreensaverPreviewSequence(config) {
-  const state = createTetrisScreensaverPreviewState(config);
+function buildTetrisScreensaverPreviewSequence(config, clockConfig) {
+  const state = createTetrisScreensaverPreviewState(config, clockConfig);
   const maps = [];
   const delays = [];
   for (let frameIndex = 0; frameIndex < 32; frameIndex += 1) {

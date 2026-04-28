@@ -85,8 +85,8 @@
           <router-link to="/device-control" class="btn btn-primary"
             >连接设备</router-link
           >
-          <router-link to="/clock-editor" class="btn btn-outline"
-            >时钟配置</router-link
+          <router-link to="/pattern-workbench" class="btn btn-outline"
+            >拼豆工作台</router-link
           >
         </div>
       </div>
@@ -116,8 +116,8 @@ const features = [
   },
   {
     icon: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`,
-    title: "设备时钟",
-    desc: "网页与小程序都可配置时钟样式并同步到设备",
+    title: "拼豆图纸",
+    desc: "桌面端优先保留图纸识别、拼豆整理和发送前检查能力",
   },
   {
     icon: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>`,
@@ -178,9 +178,9 @@ const hardwareSpecs = [
 
 const setupSteps = [
   "首次使用先连接设备热点并打开 192.168.4.1 完成配网",
-  "选择图片、像素内容或时钟样式",
-  "一键同步到设备并立即预览效果",
-  "在网页或小程序中继续调整和控制",
+  "选择图片、拼豆图纸或画板内容进入桌面创作链",
+  "连接设备后发送到画板模式并立即确认效果",
+  "复杂设备模式继续保留给 uniapp 负责",
 ];
 
 onMounted(async () => {

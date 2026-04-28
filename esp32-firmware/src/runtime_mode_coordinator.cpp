@@ -3,12 +3,30 @@
 #include "animation_manager.h"
 #include "board_native_effect.h"
 #include "config_manager.h"
-#include "game_screensaver_effect.h"
+#include "maze_effect.h"
 #include "mode_tags.h"
+#include "snake_effect.h"
+#include "tetris_clock_effect.h"
 #include "tetris_effect.h"
 
 namespace {
+bool shouldClearScreenBeforeBusinessModeEntryInternal(const String& businessModeTag) {
+  return businessModeTag == ModeTags::THEME ||
+         businessModeTag == ModeTags::GIF_PLAYER ||
+         businessModeTag == ModeTags::AMBIENT_EFFECT ||
+         businessModeTag == ModeTags::LED_MATRIX_SHOWCASE ||
+         businessModeTag == ModeTags::MAZE ||
+         businessModeTag == ModeTags::SNAKE ||
+         businessModeTag == ModeTags::PLANET_SCREENSAVER ||
+         businessModeTag == ModeTags::TETRIS ||
+         businessModeTag == ModeTags::TETRIS_CLOCK;
+}
+
 bool canRestoreGifBusinessMode() {
+  if (AnimationManager::currentGIF == nullptr && !AnimationManager::loadAnimation()) {
+    return false;
+  }
+
   return AnimationManager::currentGIF != nullptr &&
          AnimationManager::currentGIF->frameCount > 0;
 }
@@ -20,22 +38,6 @@ bool canRestoreBoardNativeMode(const String& businessModeTag) {
 
   if (businessModeTag == ModeTags::TEXT_DISPLAY) {
     BoardNativeEffect::applyTextDisplayConfig(BoardNativeEffect::getTextDisplayConfig());
-    return BoardNativeEffect::isActive();
-  }
-  if (businessModeTag == ModeTags::WEATHER) {
-    BoardNativeEffect::applyWeatherConfig(BoardNativeEffect::getWeatherConfig());
-    return BoardNativeEffect::isActive();
-  }
-  if (businessModeTag == ModeTags::COUNTDOWN) {
-    BoardNativeEffect::applyCountdownConfig(BoardNativeEffect::getCountdownConfig());
-    return BoardNativeEffect::isActive();
-  }
-  if (businessModeTag == ModeTags::STOPWATCH) {
-    BoardNativeEffect::applyStopwatchConfig(BoardNativeEffect::getStopwatchConfig());
-    return BoardNativeEffect::isActive();
-  }
-  if (businessModeTag == ModeTags::NOTIFICATION) {
-    BoardNativeEffect::applyNotificationConfig(BoardNativeEffect::getNotificationConfig());
     return BoardNativeEffect::isActive();
   }
   if (businessModeTag == ModeTags::PLANET_SCREENSAVER) {
@@ -77,30 +79,50 @@ bool renderAnimationBusinessFrame(const String& businessModeTag) {
     return true;
   }
 
-  if (businessModeTag == ModeTags::TETRIS ||
-      businessModeTag == ModeTags::TETRIS_CLOCK) {
+  if (businessModeTag == ModeTags::TETRIS) {
     TetrisEffect::init(
-      TetrisEffect::doClearLines,
-      TetrisEffect::cellSize,
-      TetrisEffect::dropSpeed,
-      TetrisEffect::showClock,
-      TetrisEffect::piecesMask
+      ConfigManager::tetrisConfig.clearMode,
+      ConfigManager::tetrisConfig.cellSize,
+      ConfigManager::tetrisConfig.speed,
+      ConfigManager::tetrisConfig.showClock,
+      ConfigManager::tetrisConfig.pieces
     );
     TetrisEffect::render(DisplayManager::dma_display);
     return true;
   }
 
-  if (businessModeTag == ModeTags::GAME_SCREENSAVER) {
-    GameScreensaverEffect::applyConfig(ConfigManager::gameScreensaverConfig);
-    if (!GameScreensaverEffect::isActive()) {
+  if (businessModeTag == ModeTags::TETRIS_CLOCK) {
+    TetrisClockEffect::init(
+      ConfigManager::tetrisClockConfig.speed,
+      ConfigManager::tetrisClockConfig.cellSize,
+      ConfigManager::tetrisClockConfig.hourFormat
+    );
+    TetrisClockEffect::render(DisplayManager::dma_display);
+    return true;
+  }
+
+  if (businessModeTag == ModeTags::MAZE) {
+    MazeEffect::applyConfig(ConfigManager::mazeConfig);
+    if (!MazeEffect::isActive()) {
       return false;
     }
-    GameScreensaverEffect::render();
+    MazeEffect::render();
+    return true;
+  }
+
+  if (businessModeTag == ModeTags::SNAKE) {
+    SnakeEffect::applyConfig(ConfigManager::snakeConfig);
+    if (!SnakeEffect::isActive()) {
+      return false;
+    }
+    SnakeEffect::render();
     return true;
   }
 
   if (businessModeTag == ModeTags::EYES) {
+    DisplayManager::clearScreen();
     DisplayManager::activateEyesEffect(ConfigManager::eyesConfig);
+    DisplayManager::renderNativeEffect();
     return true;
   }
 
@@ -161,9 +183,6 @@ DeviceMode resolveTopLevelMode(const String& businessModeTag) {
   if (businessModeTag == ModeTags::CANVAS) {
     return MODE_CANVAS;
   }
-  if (businessModeTag == ModeTags::TRANSFERRING) {
-    return MODE_TRANSFERRING;
-  }
   return MODE_ANIMATION;
 }
 
@@ -174,10 +193,12 @@ bool isRecoverableBusinessModeTag(const String& businessModeTag) {
       businessModeTag == ModeTags::ANIMATION ||
       businessModeTag == ModeTags::TETRIS ||
       businessModeTag == ModeTags::TETRIS_CLOCK ||
+      businessModeTag == ModeTags::MAZE ||
+      businessModeTag == ModeTags::SNAKE ||
       businessModeTag == ModeTags::EYES ||
       businessModeTag == ModeTags::AMBIENT_EFFECT ||
       businessModeTag == ModeTags::LED_MATRIX_SHOWCASE ||
-      businessModeTag == ModeTags::GAME_SCREENSAVER) {
+      businessModeTag == ModeTags::PLANET_SCREENSAVER) {
     return true;
   }
 
@@ -193,12 +214,15 @@ bool isReturnTargetBusinessModeTag(const String& businessModeTag) {
     return false;
   }
 
-  return businessModeTag != ModeTags::CANVAS &&
-         businessModeTag != ModeTags::TRANSFERRING;
+  return businessModeTag != ModeTags::CANVAS;
 }
 
 bool isTransientRuntimeMode(DeviceMode mode) {
   return mode == MODE_CANVAS || mode == MODE_TRANSFERRING;
+}
+
+bool shouldClearScreenBeforeBusinessModeEntry(const String& businessModeTag) {
+  return shouldClearScreenBeforeBusinessModeEntryInternal(businessModeTag);
 }
 
 void captureModeState(ModeStateSnapshot& snapshot) {
@@ -221,14 +245,25 @@ void restoreModeState(const ModeStateSnapshot& snapshot, bool renderFrame) {
 
 void deactivateRuntimeContent() {
   TetrisEffect::deactivate();
-  GameScreensaverEffect::deactivate();
-  AnimationManager::pauseAnimation();
+  TetrisClockEffect::deactivate();
+  MazeEffect::deactivate();
+  SnakeEffect::deactivate();
+  if (DisplayManager::currentBusinessModeTag == ModeTags::ANIMATION ||
+      DisplayManager::currentBusinessModeTag == ModeTags::GIF_PLAYER) {
+    AnimationManager::freeGIFAnimation();
+  } else {
+    AnimationManager::pauseAnimation();
+  }
   BoardNativeEffect::deactivate();
   DisplayManager::setNativeEffectNone();
   DisplayManager::receivingPixels = false;
 }
 
 bool restoreCurrentModeFrame(bool syncBufferStrategy) {
+  if (DisplayManager::isLoadingActive) {
+    DisplayManager::stopLoadingAnimation();
+  }
+
   if (syncBufferStrategy && !DisplayManager::syncBufferStrategyForCurrentMode()) {
     return false;
   }
@@ -249,10 +284,6 @@ bool restoreCurrentModeFrame(bool syncBufferStrategy) {
 
   if (DisplayManager::currentMode == MODE_CANVAS) {
     DisplayManager::renderCanvas();
-    return true;
-  }
-
-  if (DisplayManager::currentMode == MODE_TRANSFERRING) {
     return true;
   }
 

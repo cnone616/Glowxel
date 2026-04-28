@@ -1039,7 +1039,7 @@ export default {
 }
 
 .export-button--utility {
-  background-color: var(--nb-blue);
+  background-color: var(--nb-green);
   color: var(--nb-ink);
 }
 
@@ -1260,9 +1260,15 @@ export default {
 }
 
 /* 工具/导出按钮：蓝底深色字深色图标 */
-.modal-action-btn--assist,
-.modal-action-btn--export {
+.modal-action-btn--assist {
   background-color: var(--nb-blue);
+  border: 2rpx solid var(--nb-ink);
+  color: var(--nb-ink);
+  box-shadow: var(--nb-shadow-soft);
+}
+
+.modal-action-btn--export {
+  background-color: var(--nb-green);
   border: 2rpx solid var(--nb-ink);
   color: var(--nb-ink);
   box-shadow: var(--nb-shadow-soft);

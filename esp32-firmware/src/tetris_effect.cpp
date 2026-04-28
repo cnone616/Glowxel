@@ -18,6 +18,7 @@ int TetrisEffect::curY = 0;
 int TetrisEffect::targetX = 0;
 uint8_t TetrisEffect::curColor = 1;
 unsigned long TetrisEffect::lastDropTime = 0;
+unsigned long TetrisEffect::lastClockRefreshTime = 0;
 bool TetrisEffect::needsRender = true;
 
 const uint16_t TetrisEffect::pieces[7][4] = {
@@ -51,6 +52,7 @@ void TetrisEffect::init(bool clearMode, int cellSz, int speed, bool clock, uint8
   resetBoard();
   spawnPiece();
   lastDropTime = millis();
+  lastClockRefreshTime = millis();
   needsRender = true;
   isActive = true;
 }
@@ -94,6 +96,204 @@ bool TetrisEffect::canMove(int type, int rot, int x, int y) {
   return true;
 }
 
+int TetrisEffect::scorePlacement(int type, int rot, int x, int y) {
+  int cells[4][2];
+  getPieceCells(type, rot, cells);
+  const uint8_t testColor = static_cast<uint8_t>(type + 1);
+
+  for (int i = 0; i < 4; i++) {
+    int nx = x + cells[i][0];
+    int ny = y + cells[i][1];
+    if (ny >= 0 && ny < rows && nx >= 0 && nx < cols) {
+      board[ny][nx] = testColor;
+    }
+  }
+
+  int score = 0;
+  score += y * 20;
+
+  for (int row = 0; row < rows; row++) {
+    bool full = true;
+    int filled = 0;
+    for (int col = 0; col < cols; col++) {
+      if (board[row][col] != 0) {
+        filled++;
+      } else {
+        full = false;
+      }
+    }
+    if (full) {
+      score += 5000;
+    }
+    score += filled * 2;
+  }
+
+  for (int col = 0; col < cols; col++) {
+    bool blocked = false;
+    for (int row = 0; row < rows; row++) {
+      if (board[row][col] != 0) {
+        blocked = true;
+      } else if (blocked) {
+        score -= 500;
+      }
+    }
+  }
+
+  for (int i = 0; i < 4; i++) {
+    int nx = x + cells[i][0];
+    int ny = y + cells[i][1];
+    if (ny + 1 >= rows) {
+      score += 10;
+    } else if (ny + 1 >= 0 && board[ny + 1][nx] != 0 && board[ny + 1][nx] != testColor) {
+      score += 10;
+    }
+    if (nx - 1 < 0 || (board[ny][nx - 1] != 0 && board[ny][nx - 1] != testColor)) {
+      score += 5;
+    }
+    if (nx + 1 >= cols || (board[ny][nx + 1] != 0 && board[ny][nx + 1] != testColor)) {
+      score += 5;
+    }
+  }
+
+  int maxH[TETRIS_MAX];
+  for (int col = 0; col < cols; col++) {
+    maxH[col] = rows;
+    for (int row = 0; row < rows; row++) {
+      if (board[row][col] != 0) {
+        maxH[col] = row;
+        break;
+      }
+    }
+  }
+
+  for (int col = 1; col < cols; col++) {
+    int diff = abs(maxH[col] - maxH[col - 1]);
+    score -= diff * 30;
+  }
+
+  for (int i = 0; i < 4; i++) {
+    int nx = x + cells[i][0];
+    int ny = y + cells[i][1];
+    if (ny >= 0 && ny < rows && nx >= 0 && nx < cols) {
+      board[ny][nx] = 0;
+    }
+  }
+
+  return score;
+}
+
+bool TetrisEffect::findBestPlacement(
+  const int enabledTypes[7],
+  int enabledCount,
+  int& bestType,
+  int& bestRot,
+  int& bestX
+) {
+  int bestScore = 0;
+  bool found = false;
+
+  for (int typeIndex = 0; typeIndex < enabledCount; typeIndex++) {
+    int type = enabledTypes[typeIndex];
+    for (int rot = 0; rot < 4; rot++) {
+      for (int x = -2; x < cols; x++) {
+        int y = -2;
+        if (!canMove(type, rot, x, y)) {
+          continue;
+        }
+        while (canMove(type, rot, x, y + 1)) {
+          y++;
+        }
+
+        int cells[4][2];
+        getPieceCells(type, rot, cells);
+        bool valid = true;
+        for (int i = 0; i < 4; i++) {
+          int ny = y + cells[i][1];
+          if (ny < 0) {
+            valid = false;
+            break;
+          }
+        }
+        if (!valid) {
+          continue;
+        }
+
+        int spawnCells[4][2];
+        getPieceCells(type, rot, spawnCells);
+        int maxSpawnRow = spawnCells[0][1];
+        for (int index = 1; index < 4; index++) {
+          if (spawnCells[index][1] > maxSpawnRow) {
+            maxSpawnRow = spawnCells[index][1];
+          }
+        }
+        const int spawnY = -maxSpawnRow - 1;
+        int spawnX = 0;
+        if (!findReachableSpawnX(type, rot, x, spawnY, spawnX)) {
+          continue;
+        }
+
+        int score = scorePlacement(type, rot, x, y);
+        if (!found || score > bestScore) {
+          bestScore = score;
+          bestType = type;
+          bestRot = rot;
+          bestX = x;
+          found = true;
+        }
+      }
+    }
+  }
+
+  return found;
+}
+
+bool TetrisEffect::findReachableSpawnX(int type, int rot, int targetX, int spawnY, int& spawnX) {
+  const int preferredSpawnX = constrain(cols / 2 - 2, 0, max(0, cols - 1));
+  const int maxSpawnX = max(0, cols - 1);
+
+  for (int delta = 0; delta <= cols; delta++) {
+    int candidates[2] = {
+      preferredSpawnX - delta,
+      preferredSpawnX + delta
+    };
+    int candidateCount = delta == 0 ? 1 : 2;
+
+    for (int index = 0; index < candidateCount; index++) {
+      int candidateX = candidates[index];
+      if (candidateX < 0 || candidateX > maxSpawnX) {
+        continue;
+      }
+      if (!canMove(type, rot, candidateX, spawnY)) {
+        continue;
+      }
+
+      bool reachable = true;
+      if (candidateX < targetX) {
+        for (int pathX = candidateX + 1; pathX <= targetX; pathX++) {
+          if (!canMove(type, rot, pathX, spawnY)) {
+            reachable = false;
+            break;
+          }
+        }
+      } else if (candidateX > targetX) {
+        for (int pathX = candidateX - 1; pathX >= targetX; pathX--) {
+          if (!canMove(type, rot, pathX, spawnY)) {
+            reachable = false;
+            break;
+          }
+        }
+      }
+
+      if (reachable) {
+        spawnX = candidateX;
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
 void TetrisEffect::spawnPiece() {
   int enabled[7];
   int count = 0;
@@ -107,157 +307,35 @@ void TetrisEffect::spawnPiece() {
     count = 1;
   }
 
-  curType = enabled[random(count)];
-  curColor = curType + 1;
-
+  const int chosenType = enabled[random(count)];
+  int placementTypes[7] = {chosenType, 0, 0, 0, 0, 0, 0};
+  int bestType = chosenType;
   int bestRot = 0;
   int bestX = 0;
-  int bestScore = -99999;
-
-  for (int rot = 0; rot < 4; rot++) {
-    for (int x = -2; x < cols; x++) {
-      int y = -2;
-      if (!canMove(curType, rot, x, y)) {
-        continue;
-      }
-      while (canMove(curType, rot, x, y + 1)) {
-        y++;
-      }
-
-      int cells[4][2];
-      getPieceCells(curType, rot, cells);
-      bool valid = true;
-      for (int i = 0; i < 4; i++) {
-        int ny = y + cells[i][1];
-        if (ny < 0) {
-          valid = false;
-          break;
-        }
-      }
-      if (!valid) {
-        continue;
-      }
-
-      for (int i = 0; i < 4; i++) {
-        int nx = x + cells[i][0];
-        int ny = y + cells[i][1];
-        if (ny >= 0 && ny < rows && nx >= 0 && nx < cols) {
-          board[ny][nx] = curColor;
-        }
-      }
-
-      int score = 0;
-      score += y * 20;
-
-      for (int row = 0; row < rows; row++) {
-        bool full = true;
-        int filled = 0;
-        for (int col = 0; col < cols; col++) {
-          if (board[row][col] != 0) {
-            filled++;
-          } else {
-            full = false;
-          }
-        }
-        if (full) {
-          score += 5000;
-        }
-        score += filled * 2;
-      }
-
-      for (int col = 0; col < cols; col++) {
-        bool blocked = false;
-        for (int row = 0; row < rows; row++) {
-          if (board[row][col] != 0) {
-            blocked = true;
-          } else if (blocked) {
-            score -= 500;
-          }
-        }
-      }
-
-      for (int i = 0; i < 4; i++) {
-        int nx = x + cells[i][0];
-        int ny = y + cells[i][1];
-        if (ny + 1 >= rows) {
-          score += 10;
-        } else if (ny + 1 >= 0 && board[ny + 1][nx] != 0 && board[ny + 1][nx] != curColor) {
-          score += 10;
-        }
-        if (nx - 1 < 0 || (board[ny][nx - 1] != 0 && board[ny][nx - 1] != curColor)) {
-          score += 5;
-        }
-        if (nx + 1 >= cols || (board[ny][nx + 1] != 0 && board[ny][nx + 1] != curColor)) {
-          score += 5;
-        }
-      }
-
-      int maxH[TETRIS_MAX];
-      for (int col = 0; col < cols; col++) {
-        maxH[col] = rows;
-        for (int row = 0; row < rows; row++) {
-          if (board[row][col] != 0) {
-            maxH[col] = row;
-            break;
-          }
-        }
-      }
-
-      for (int col = 1; col < cols; col++) {
-        int diff = abs(maxH[col] - maxH[col - 1]);
-        score -= diff * 30;
-      }
-
-      for (int i = 0; i < 4; i++) {
-        int nx = x + cells[i][0];
-        int ny = y + cells[i][1];
-        if (ny >= 0 && ny < rows && nx >= 0 && nx < cols) {
-          board[ny][nx] = 0;
-        }
-      }
-
-      if (score > bestScore) {
-        bestScore = score;
-        bestRot = rot;
-        bestX = x;
-      }
-    }
+  if (!findBestPlacement(placementTypes, 1, bestType, bestRot, bestX)) {
+    resetBoard();
+    findBestPlacement(placementTypes, 1, bestType, bestRot, bestX);
   }
 
+  curType = bestType;
+  curColor = curType + 1;
   targetRot = bestRot;
   targetX = bestX;
-  curRot = 0;
-  curY = 0;
-
-  const int preferredSpawnX = constrain(cols / 2 - 2, 0, max(0, cols - 1));
-  curX = preferredSpawnX;
-
-  if (!canMove(curType, curRot, curX, curY)) {
-    bool foundSpawn = false;
-    const int maxSpawnX = max(0, cols - 1);
-    for (int delta = 1; delta <= cols; delta++) {
-      const int leftX = preferredSpawnX - delta;
-      if (leftX >= 0 && leftX <= maxSpawnX &&
-          canMove(curType, curRot, leftX, curY)) {
-        curX = leftX;
-        foundSpawn = true;
-        break;
-      }
-
-      const int rightX = preferredSpawnX + delta;
-      if (rightX >= 0 && rightX <= maxSpawnX &&
-          canMove(curType, curRot, rightX, curY)) {
-        curX = rightX;
-        foundSpawn = true;
-        break;
-      }
+  curRot = bestRot;
+  int spawnCells[4][2];
+  getPieceCells(curType, curRot, spawnCells);
+  int maxSpawnRow = spawnCells[0][1];
+  for (int index = 1; index < 4; index++) {
+    if (spawnCells[index][1] > maxSpawnRow) {
+      maxSpawnRow = spawnCells[index][1];
     }
+  }
+  curY = -maxSpawnRow - 1;
 
-    if (!foundSpawn) {
-      resetBoard();
-      spawnPiece();
-      return;
-    }
+  if (!findReachableSpawnX(curType, curRot, targetX, curY, curX)) {
+    resetBoard();
+    spawnPiece();
+    return;
   }
 
   needsRender = true;
@@ -303,6 +381,10 @@ void TetrisEffect::update() {
   }
 
   unsigned long now = millis();
+  if (showClock && now - lastClockRefreshTime >= 1000UL) {
+    lastClockRefreshTime = now;
+    needsRender = true;
+  }
   if (now - lastDropTime < (unsigned long)dropSpeed) {
     return;
   }
@@ -368,29 +450,25 @@ void TetrisEffect::render(MatrixPanel_I2S_DMA* display) {
     return;
   }
 
+  memset(DisplayManager::backgroundBuffer, 0, sizeof(DisplayManager::backgroundBuffer));
+  DisplayManager::backgroundValid = true;
+
   for (int y = 0; y < rows; y++) {
     for (int x = 0; x < cols; x++) {
       uint8_t c = board[y][x];
-      uint16_t blockColor565 = 0;
-      if (c > 0) {
-        const uint8_t* rgb = colors[c - 1];
-        blockColor565 = display->color565(rgb[0], rgb[1], rgb[2]);
-        for (int dy = 0; dy < cellSize; dy++) {
-          for (int dx = 0; dx < cellSize; dx++) {
-            int px = x * cellSize + dx;
-            int py = y * cellSize + dy;
-            display->drawPixelRGB888(px, py, rgb[0], rgb[1], rgb[2]);
-            DisplayManager::backgroundBuffer[py][px] = blockColor565;
-          }
-        }
-      } else {
-        for (int dy = 0; dy < cellSize; dy++) {
-          for (int dx = 0; dx < cellSize; dx++) {
-            int px = x * cellSize + dx;
-            int py = y * cellSize + dy;
-            display->drawPixelRGB888(px, py, 0, 0, 0);
-            DisplayManager::backgroundBuffer[py][px] = 0;
-          }
+      if (c <= 0) {
+        continue;
+      }
+      const uint8_t* rgb = colors[c - 1];
+      const uint16_t blockColor565 = display->color565(rgb[0], rgb[1], rgb[2]);
+      for (int dy = 0; dy < cellSize; dy++) {
+        for (int dx = 0; dx < cellSize; dx++) {
+          int px = x * cellSize + dx;
+          int py = y * cellSize + dy;
+          // 这里必须走 drawPixel()，这样 beginRedirectedFrame() 才能拦截到
+          // tetris 屏保的整帧合成；drawPixelRGB888() 在底层库里不是虚函数。
+          display->drawPixel(px, py, blockColor565);
+          DisplayManager::backgroundBuffer[py][px] = blockColor565;
         }
       }
     }
@@ -408,7 +486,7 @@ void TetrisEffect::render(MatrixPanel_I2S_DMA* display) {
         for (int dx = 0; dx < cellSize; dx++) {
           int drawX = px * cellSize + dx;
           int drawY = py * cellSize + dy;
-          display->drawPixelRGB888(drawX, drawY, rgb[0], rgb[1], rgb[2]);
+          display->drawPixel(drawX, drawY, pieceColor565);
           DisplayManager::backgroundBuffer[drawY][drawX] = pieceColor565;
         }
       }

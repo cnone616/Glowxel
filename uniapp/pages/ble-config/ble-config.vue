@@ -22,7 +22,7 @@
             <text class="step-title">连接设备热点</text>
             <text class="step-desc">
               在系统 WiFi 列表里选择
-              <text class="inline-strong">Glowxel-设备序列号</text>。
+              <text class="inline-strong">Glowxel PixelBoard-设备序列号</text>。
             </text>
           </view>
         </view>

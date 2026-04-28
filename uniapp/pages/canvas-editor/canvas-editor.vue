@@ -17,9 +17,9 @@
     </view>
 
     <view class="canvas-section">
-      <view v-if="!shouldHidePreview" class="canvas-container">
+      <view class="canvas-container">
         <PixelCanvas
-          v-if="canvasReady"
+          v-if="canvasReady && !shouldShowSendingSnapshot"
           :width="64"
           :height="64"
           :pixels="pixels"
@@ -36,8 +36,19 @@
           @pan="handlePan"
           @zoom="handlePinchZoom"
         />
+        <PixelPreviewBoard
+          v-else-if="canvasReady && shouldShowSendingSnapshot"
+          :width="64"
+          :height="64"
+          :pixels="sendingPreviewPixels"
+          :refresh-token="sendingPreviewTick"
+          :zoom="zoom"
+          :offset-x="pan.x"
+          :offset-y="pan.y"
+          :grid-visible="true"
+          :is-dark-mode="true"
+        />
       </view>
-      <view v-else class="canvas-container canvas-placeholder"></view>
 
       <view class="preview-caption glx-preview-panel">
         <view class="preview-caption-info glx-preview-panel__info">
@@ -163,7 +174,11 @@
       @touchmove.stop.prevent
     >
       <view class="glx-device-sending-card">
-        <view class="glx-device-sending-spinner"></view>
+        <GlxInlineLoader
+          class="glx-device-sending-spinner"
+          variant="chase"
+          size="lg"
+        />
         <text class="glx-device-sending-title">{{ sendOverlayTitle }}</text>
         <text class="glx-device-sending-tip">{{ sendOverlayTip }}</text>
       </view>
@@ -182,7 +197,9 @@ import statusBarMixin from "../../mixins/statusBar.js";
 import deviceSendUxMixin from "../../mixins/deviceSendUxMixin.js";
 import Icon from "../../components/Icon.vue";
 import Toast from "../../components/Toast.vue";
+import GlxInlineLoader from "../../components/GlxInlineLoader.vue";
 import PixelCanvas from "../../components/PixelCanvas.vue";
+import PixelPreviewBoard from "../../components/PixelPreviewBoard.vue";
 import ColorPanelPicker from "../../components/ColorPanelPicker.vue";
 import { useDeviceStore } from "../../store/device.js";
 import { useToast } from "../../composables/useToast.js";
@@ -194,7 +211,9 @@ export default {
   components: {
     Icon,
     Toast,
+    GlxInlineLoader,
     PixelCanvas,
+    PixelPreviewBoard,
     ColorPanelPicker,
   },
   data() {
@@ -202,11 +221,7 @@ export default {
       deviceStore: null,
       toast: null,
       contentHeight: "calc(100vh - 88rpx - 520rpx)",
-      sendPreviewKind: "native",
-      livePreviewEnabled: true,
       deviceCanvasModeReady: false,
-      syncQueue: [],
-      syncTimer: null,
       currentTool: "pencil",
       brushSize: 1,
       brushSizeOptions: [1, 2, 3, 4],
@@ -216,12 +231,13 @@ export default {
       containerSize: { width: 320, height: 320 },
       canvasReady: false,
       pixels: new Map(),
+      sendingPreviewPixels: new Map(),
+      sendingPreviewTick: 0,
       history: [],
       historyIndex: -1,
     };
   },
-  computed: {
-  },
+  computed: {},
   onLoad() {
     this.deviceStore = useDeviceStore();
     this.deviceStore.init();
@@ -235,6 +251,21 @@ export default {
     this.initCanvas();
   },
   methods: {
+    captureSendingPreview() {
+      this.sendingPreviewPixels = new Map(this.pixels);
+      this.sendingPreviewTick += 1;
+    },
+    clearSendingPreview() {
+      this.sendingPreviewPixels = new Map();
+      this.sendingPreviewTick += 1;
+    },
+    beginSendUi() {
+      this.captureSendingPreview();
+      deviceSendUxMixin.methods.beginSendUi.call(this);
+    },
+    endSendUi() {
+      deviceSendUxMixin.methods.endSendUi.call(this);
+    },
     setTool(newTool) {
       if (this.currentTool !== newTool) {
         this.currentTool = newTool;
@@ -242,7 +273,6 @@ export default {
     },
 
     handleBack() {
-      this.cleanupCanvasSync();
       uni.navigateBack();
     },
 
@@ -360,7 +390,6 @@ export default {
       this.pixels = newPixels;
       this.pushHistory(newPixels);
       this.persistPixels();
-      this.queuePixelBatchSync(updates);
     },
 
     handleUndo() {
@@ -370,7 +399,6 @@ export default {
       this.historyIndex -= 1;
       this.pixels = new Map(this.history[this.historyIndex]);
       this.persistPixels();
-      this.syncCurrentCanvasToDevice();
     },
 
     handleRedo() {
@@ -380,7 +408,6 @@ export default {
       this.historyIndex += 1;
       this.pixels = new Map(this.history[this.historyIndex]);
       this.persistPixels();
-      this.syncCurrentCanvasToDevice();
     },
 
     handleZoom(delta) {
@@ -431,7 +458,6 @@ export default {
       this.pixels = new Map();
       this.pushHistory(this.pixels);
       this.persistPixels();
-      this.queueClearSync();
       this.toast.showInfo("画板已清空");
     },
 
@@ -458,20 +484,13 @@ export default {
         return;
       }
 
+      const previousMode = this.deviceStore.deviceMode;
       this.beginSendUi();
       try {
         await this.ensureDeviceCanvasMode();
-        const ws = this.deviceStore.getWebSocket();
 
         if (this.pixels.size === 0) {
-          await ws.clearCanvas();
-          await this.deviceStore.syncAndRequireBusinessMode(
-            "canvas",
-            "设备未保持在画板模式",
-            {
-              requireTopLevelMode: true,
-            },
-          );
+          await this.deviceStore.sendSparseImage([], 64, 64);
           this.showSendSuccess();
           return;
         }
@@ -484,138 +503,15 @@ export default {
         });
 
         await this.deviceStore.sendSparseImage(sparsePixels, 64, 64);
-        await ws.saveCanvas();
-        await this.deviceStore.syncAndRequireBusinessMode(
-          "canvas",
-          "设备未保持在画板模式",
-          {
-            requireTopLevelMode: true,
-          },
-        );
         this.showSendSuccess();
       } catch (err) {
+        await this.deviceStore.rollbackBusinessMode(previousMode, {
+          expectedMode: "canvas",
+        });
         console.error("画板发送失败:", err);
         this.showSendFailure(err);
       } finally {
         this.endSendUi();
-      }
-    },
-
-    queuePixelBatchSync(updates) {
-      if (!this.livePreviewEnabled || !this.deviceStore.connected) {
-        return;
-      }
-
-      const mergedUpdates = new Map();
-      this.syncQueue.forEach((item) => {
-        mergedUpdates.set(`${item.x},${item.y}`, item);
-      });
-      updates.forEach((item) => {
-        const rgb = this.hexToRgb(item.color);
-        mergedUpdates.set(`${item.x},${item.y}`, {
-          x: item.x,
-          y: item.y,
-          r: rgb.r,
-          g: rgb.g,
-          b: rgb.b,
-        });
-      });
-      this.syncQueue = Array.from(mergedUpdates.values());
-
-      if (this.syncTimer) {
-        clearTimeout(this.syncTimer);
-      }
-
-      this.syncTimer = setTimeout(() => {
-        this.flushQueuedSync();
-      }, 80);
-    },
-
-    queueClearSync() {
-      if (!this.livePreviewEnabled || !this.deviceStore.connected) {
-        return;
-      }
-
-      if (this.syncTimer) {
-        clearTimeout(this.syncTimer);
-        this.syncTimer = null;
-      }
-
-      this.syncQueue = [];
-      this.flushQueuedSync(true);
-    },
-
-    async flushQueuedSync(clearOnly = false) {
-      if (!this.deviceStore.connected) {
-        return;
-      }
-
-      if (!clearOnly && this.syncQueue.length === 0) {
-        return;
-      }
-
-      if (this.syncTimer) {
-        clearTimeout(this.syncTimer);
-        this.syncTimer = null;
-      }
-
-      try {
-        await this.ensureDeviceCanvasMode();
-
-        if (clearOnly) {
-          await this.deviceStore.clear();
-          return;
-        }
-
-        const queue = this.syncQueue.slice();
-        this.syncQueue = [];
-        const pixelData = [];
-        queue.forEach((item) => {
-          pixelData.push(item.x, item.y, item.r, item.g, item.b);
-        });
-        await this.deviceStore.sendPartialUpdate(pixelData, 64, 64);
-      } catch (err) {
-        console.error("实时预览同步失败:", err);
-      }
-    },
-    cleanupCanvasSync() {
-      this.flushQueuedSync();
-      if (this.syncTimer) {
-        clearTimeout(this.syncTimer);
-        this.syncTimer = null;
-      }
-    },
-
-    async syncCurrentCanvasToDevice() {
-      if (!this.livePreviewEnabled || !this.deviceStore.connected) {
-        return;
-      }
-
-      if (this.syncTimer) {
-        clearTimeout(this.syncTimer);
-        this.syncTimer = null;
-      }
-
-      this.syncQueue = [];
-
-      try {
-        await this.ensureDeviceCanvasMode();
-
-        if (this.pixels.size === 0) {
-          await this.deviceStore.clear();
-          return;
-        }
-
-        const sparsePixels = [];
-        this.pixels.forEach((color, key) => {
-          const [x, y] = key.split(",").map(Number);
-          const rgb = this.hexToRgb(color);
-          sparsePixels.push(x, y, rgb.r, rgb.g, rgb.b);
-        });
-
-        await this.deviceStore.sendSparseImage(sparsePixels, 64, 64);
-      } catch (err) {
-        console.error("整屏同步失败:", err);
       }
     },
 
@@ -628,15 +524,7 @@ export default {
         return;
       }
 
-      const ws = this.deviceStore.getWebSocket();
-      await ws.setMode("canvas");
-      await this.deviceStore.syncAndRequireBusinessMode(
-        "canvas",
-        "设备未进入画板模式",
-        {
-          requireTopLevelMode: true,
-        },
-      );
+      await this.deviceStore.ensureCanvasMode();
       this.deviceCanvasModeReady = true;
     },
 
@@ -653,11 +541,9 @@ export default {
   },
 
   onUnload() {
-    this.cleanupCanvasSync();
   },
 
   onHide() {
-    this.cleanupCanvasSync();
   },
 };
 </script>
@@ -682,10 +568,6 @@ export default {
   overflow: hidden;
   background-color: #000000;
   touch-action: none;
-}
-
-.canvas-placeholder {
-  background-color: #000000;
 }
 
 .action-btn-sm.disabled,
@@ -715,12 +597,11 @@ export default {
 }
 
 .sending-spinner {
-  width: 60rpx;
-  height: 60rpx;
-  border-radius: 50%;
-  border: 6rpx solid rgba(79, 127, 255, 0.2);
-  border-top-color: var(--nb-yellow);
-  animation: spin 0.8s linear infinite;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  line-height: 1;
 }
 
 .sending-title {
@@ -732,12 +613,6 @@ export default {
 .sending-tip {
   font-size: 24rpx;
   color: var(--text-secondary);
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
 }
 
 .content {

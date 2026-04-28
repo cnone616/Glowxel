@@ -125,7 +125,7 @@
         
         <!-- 加载更多 -->
         <view v-if="isLoading" class="loading-more">
-          <Icon name="loading" :size="48" color="currentColor" class="loading-icon" />
+          <GlxInlineLoader class="loading-inline-loader" variant="flip" size="sm" />
           <text class="loading-text">加载中...</text>
         </view>
         
@@ -173,6 +173,7 @@ import ArtworkCard from '../../components/ArtworkCard.vue'
 import ConfirmDialogHost from '../../components/ConfirmDialogHost.vue'
 import Modal from '../../components/Modal.vue'
 import Toast from '../../components/Toast.vue'
+import GlxInlineLoader from '../../components/GlxInlineLoader.vue'
 
 const dialog = useDialog()
 const toast = useToast()
@@ -185,7 +186,8 @@ export default {
     ArtworkCard,
     ConfirmDialogHost,
     Modal,
-    Toast
+    Toast,
+    GlxInlineLoader
   },
   
   data() {
@@ -771,13 +773,8 @@ export default {
   color: var(--nb-blue);
 }
 
-.loading-icon {
-  animation: rotate 1s linear infinite;
-}
-
-@keyframes rotate {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+.loading-inline-loader {
+  flex-shrink: 0;
 }
 
 .loading-text {

@@ -1,5 +1,5 @@
 {
-  "name": "renlight-uniapp",
+  "name": "glowxel-uniapp",
   "version": "1.0.0",
   "main": "main.js",
   "scripts": {
@@ -7,7 +7,8 @@
     "build:h5": "uni build",
     "dev:mp-weixin": "uni -p mp-weixin",
     "build:mp-weixin": "uni build -p mp-weixin",
-    "test": "node scripts/check-api-config.js"
+    "test": "node scripts/check-api-config.js",
+    "audit:dashboard": "node scripts/generate-project-dashboard.js"
   },
   "keywords": [],
   "author": "",

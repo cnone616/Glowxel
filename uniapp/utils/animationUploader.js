@@ -1,161 +1,132 @@
-function isSuccessStatus(resp) {
-  return resp && (resp.status === "ok" || resp.status === "success");
-}
-
-function sendAndWait(ws, data, matcher, timeoutMs) {
-  return ws.sendAndWait(data, timeoutMs, matcher);
-}
-
-function matchMessageOrError(expectedMessage, extraMatcher = null) {
-  return (msg) => {
-    if (!msg || typeof msg !== "object") {
-      return false;
+function normalizeCompactPixelBytes(pixels, totalPixels, frameIndex) {
+  if (pixels instanceof Uint8Array) {
+    if (pixels.length !== totalPixels * 5) {
+      throw new Error(`第 ${frameIndex + 1} 帧像素长度不匹配`);
     }
-    if (msg.status === "error" || msg.error) {
-      return true;
-    }
-    if (typeof extraMatcher === "function" && extraMatcher(msg)) {
-      return true;
-    }
-    return msg.message === expectedMessage;
-  };
-}
-
-async function sendFrameBinary(ws, frameIndex, pixelBytes, totalPixels) {
-  if (!(pixelBytes instanceof Uint8Array)) {
-    throw new Error("帧像素数据类型错误");
-  }
-  if (totalPixels * 5 !== pixelBytes.length) {
-    throw new Error("帧像素长度不匹配");
+    return pixels;
   }
 
-  const chunkPixels = 200;
-  for (let offsetPixels = 0; offsetPixels < totalPixels; offsetPixels += chunkPixels) {
-    const endPixels = Math.min(offsetPixels + chunkPixels, totalPixels);
-    const startByte = offsetPixels * 5;
-    const endByte = endPixels * 5;
-    const chunk = pixelBytes.slice(startByte, endByte);
-
-    await new Promise((resolve, reject) => {
-      ws.socket.send({
-        data: chunk.buffer,
-        success: resolve,
-        fail: reject,
-      });
-    });
-
-    if (endPixels < totalPixels) {
-      await new Promise((resolve) => setTimeout(resolve, 80));
-    }
+  if (!Array.isArray(pixels)) {
+    throw new Error(`第 ${frameIndex + 1} 帧像素数据类型错误`);
+  }
+  if (pixels.length !== totalPixels) {
+    throw new Error(`第 ${frameIndex + 1} 帧像素数量不匹配`);
   }
 
-  const statusResp = await sendAndWait(
-    ws,
-    { cmd: "frame_status", index: frameIndex },
-    matchMessageOrError("frame status", (msg) => {
-      if (!msg || msg.index !== frameIndex) {
-        return false;
+  const bytes = new Uint8Array(totalPixels * 5);
+  pixels.forEach((pixel, pixelIndex) => {
+    if (!Array.isArray(pixel) || pixel.length < 5) {
+      throw new Error(`第 ${frameIndex + 1} 帧第 ${pixelIndex + 1} 个像素格式错误`);
+    }
+
+    const offset = pixelIndex * 5;
+    for (let channelIndex = 0; channelIndex < 5; channelIndex += 1) {
+      const value = Number(pixel[channelIndex]);
+      if (!Number.isInteger(value) || value < 0 || value > 255) {
+        throw new Error(`第 ${frameIndex + 1} 帧第 ${pixelIndex + 1} 个像素数据无效`);
       }
-      return msg.message === "frame status";
-    }),
-    10000,
-  );
-
-  if (!isSuccessStatus(statusResp)) {
-    throw new Error("帧状态确认失败");
-  }
-  if (statusResp.count !== totalPixels) {
-    throw new Error(`帧状态数量不匹配: 期望 ${totalPixels}，实际 ${statusResp.count}`);
-  }
+      bytes[offset + channelIndex] = value;
+    }
+  });
+  return bytes;
 }
 
-export async function uploadAnimationFrames(ws, frames, targetMode) {
+function normalizeCompactFrame(frame, frameIndex) {
+  let type;
+  let delay;
+  let totalPixels;
+  let pixels;
+
+  if (Array.isArray(frame)) {
+    if (frame.length < 4) {
+      throw new Error(`第 ${frameIndex + 1} 帧数据格式错误`);
+    }
+    type = frame[0];
+    delay = frame[1];
+    totalPixels = frame[2];
+    pixels = frame[3];
+  } else if (frame && typeof frame === "object") {
+    if (
+      frame.type === undefined ||
+      frame.delay === undefined ||
+      frame.totalPixels === undefined ||
+      frame.pixels === undefined
+    ) {
+      throw new Error(`第 ${frameIndex + 1} 帧字段不完整`);
+    }
+    type = frame.type;
+    delay = frame.delay;
+    totalPixels = frame.totalPixels;
+    pixels = frame.pixels;
+  } else {
+    throw new Error(`第 ${frameIndex + 1} 帧数据格式错误`);
+  }
+
+  if (!Number.isInteger(type) || (type !== 0 && type !== 1)) {
+    throw new Error(`第 ${frameIndex + 1} 帧类型无效`);
+  }
+  if (!Number.isFinite(Number(delay)) || Number(delay) < 0) {
+    throw new Error(`第 ${frameIndex + 1} 帧延迟无效`);
+  }
+  if (!Number.isInteger(totalPixels) || totalPixels < 0) {
+    throw new Error(`第 ${frameIndex + 1} 帧像素数量无效`);
+  }
+
+  return [
+    type,
+    Number(delay),
+    totalPixels,
+    normalizeCompactPixelBytes(pixels, totalPixels, frameIndex),
+  ];
+}
+
+export function buildCompactAnimationData(frames) {
   if (!Array.isArray(frames) || frames.length === 0) {
     throw new Error("动画帧不能为空");
   }
+
+  return frames.map((frame, frameIndex) =>
+    normalizeCompactFrame(frame, frameIndex),
+  );
+}
+
+export function buildCompactAnimationBinaryBuffer(frames) {
+  const animationData = buildCompactAnimationData(frames);
+  let totalBytes = 2;
+
+  animationData.forEach((frame) => {
+    totalBytes += 5 + frame[2] * 5;
+  });
+
+  const buffer = new ArrayBuffer(totalBytes);
+  const bytes = new Uint8Array(buffer);
+  const view = new DataView(buffer);
+  let offset = 0;
+
+  view.setUint16(offset, animationData.length, true);
+  offset += 2;
+
+  animationData.forEach((frame) => {
+    bytes[offset++] = frame[0];
+    view.setUint16(offset, frame[1], true);
+    offset += 2;
+    view.setUint16(offset, frame[2], true);
+    offset += 2;
+    bytes.set(frame[3], offset);
+    offset += frame[3].length;
+  });
+
+  return buffer;
+}
+
+export async function applyCompactAnimation(ws, frames, targetMode) {
   if (typeof targetMode !== "string" || targetMode.length === 0) {
     throw new Error("目标模式不能为空");
   }
 
-  let loadingStarted = false;
-
-  try {
-    const loadingResp = await ws.startLoading();
-    if (!isSuccessStatus(loadingResp)) {
-      throw new Error("启动加载动画失败");
-    }
-    loadingStarted = true;
-
-    const enterResp = await ws.setMode("transferring");
-    if (!isSuccessStatus(enterResp)) {
-      throw new Error("进入传输模式失败");
-    }
-
-    const beginResp = await sendAndWait(
-      ws,
-      { cmd: "animation_begin", frameCount: frames.length },
-      matchMessageOrError("ready to receive frames"),
-      10000,
-    );
-    if (!isSuccessStatus(beginResp)) {
-      throw new Error("动画初始化失败");
-    }
-
-    for (let i = 0; i < frames.length; i++) {
-      const frame = frames[i];
-      if (
-        !frame ||
-        frame.type === undefined ||
-        frame.delay === undefined ||
-        frame.totalPixels === undefined ||
-        frame.pixels === undefined
-      ) {
-        throw new Error(`第 ${i + 1} 帧字段不完整`);
-      }
-
-      const beginFrameResp = await sendAndWait(
-        ws,
-        {
-          cmd: "frame_begin",
-          index: i,
-          type: frame.type,
-          delay: frame.delay,
-          totalPixels: frame.totalPixels,
-        },
-        matchMessageOrError("frame initialized", (msg) => {
-          return msg && msg.index === i && msg.message === "frame initialized";
-        }),
-        10000,
-      );
-
-      if (!isSuccessStatus(beginFrameResp)) {
-        throw new Error(`第 ${i + 1} 帧初始化失败`);
-      }
-
-      await sendFrameBinary(ws, i, frame.pixels, frame.totalPixels);
-    }
-
-    const endResp = await sendAndWait(
-      ws,
-      { cmd: "animation_end" },
-      matchMessageOrError("animation upload ready"),
-      10000,
-    );
-    if (!isSuccessStatus(endResp)) {
-      throw new Error("动画结束确认失败");
-    }
-
-    const modeResp = await ws.setMode(targetMode);
-    if (!isSuccessStatus(modeResp)) {
-      throw new Error("切换目标模式失败");
-    }
-  } finally {
-    if (loadingStarted) {
-      try {
-        await ws.stopLoading();
-      } catch (err) {
-        console.error("停止设备 loading 失败:", err);
-      }
-    }
-  }
+  return ws.runModeTransaction({
+    mode: targetMode,
+    params: {},
+    binary: buildCompactAnimationBinaryBuffer(frames),
+  });
 }

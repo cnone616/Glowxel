@@ -1,8 +1,8 @@
-// 设备数据Mock - RenLight 像素设备
+// 设备数据 Mock - Glowxel PixelBoard
 export const mockDevices = [
   {
     id: 1,
-    name: "RenLight-01",
+    name: "Glowxel PixelBoard-01",
     type: "52x52",
     icon: "electronics",
     status: "connected", // connected, disconnected, connecting

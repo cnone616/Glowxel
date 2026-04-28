@@ -67,7 +67,11 @@
       @touchmove.stop.prevent
     >
       <view class="glx-device-sending-card">
-        <view class="glx-device-sending-spinner"></view>
+        <GlxInlineLoader
+          class="glx-device-sending-spinner"
+          variant="chase"
+          size="lg"
+        />
         <text class="glx-device-sending-title">{{ sendOverlayTitle }}</text>
         <text class="glx-device-sending-tip">{{ sendOverlayTip }}</text>
       </view>
@@ -91,6 +95,7 @@ import deviceSyncMixin from "./mixins/deviceSyncMixin.js";
 import deviceSendUxMixin from "../../mixins/deviceSendUxMixin.js";
 import Icon from "../../components/Icon.vue";
 import Toast from "../../components/Toast.vue";
+import GlxInlineLoader from "../../components/GlxInlineLoader.vue";
 import ClockThemePanel from "../../components/clock-editor/ClockThemePanel.vue";
 import {
   applyClockThemePreset,
@@ -111,6 +116,7 @@ export default {
   components: {
     Icon,
     Toast,
+    GlxInlineLoader,
     ClockThemePanel,
   },
   data() {
@@ -1077,18 +1083,11 @@ export default {
 }
 
 .sending-spinner {
-  width: 60rpx;
-  height: 60rpx;
-  border: 6rpx solid rgba(0, 0, 0, 0.16);
-  border-top-color: var(--nb-ink);
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  line-height: 1;
 }
 
 .sending-title {

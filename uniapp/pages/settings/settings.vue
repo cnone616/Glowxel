@@ -341,7 +341,7 @@ export default {
       await this.dialog.alert({
         title: "隐私设置",
         content:
-          "Glowxel 会在本地保存登录状态、项目草稿、应用设置和设备连接信息，用于创作、同步与设备控制。",
+          "光格像素工坊会在本地保存登录状态、项目草稿、应用设置和设备连接信息，用于创作、同步与设备控制。",
       });
     },
 
@@ -355,8 +355,8 @@ export default {
 
     async goToAbout() {
       await this.dialog.alert({
-        title: "关于 Glowxel",
-        content: `Glowxel 是面向像素创作与设备联动的创作平台。当前应用版本 v${this.appVersion}。`,
+        title: "关于光格像素工坊",
+        content: `光格像素工坊是面向像素创作与设备联动的创作平台。当前应用版本 v${this.appVersion}。`,
       });
     },
 

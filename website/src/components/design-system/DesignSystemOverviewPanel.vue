@@ -230,7 +230,7 @@ const coverageGroups = [
     title: "本轮冻结的视觉资产来源",
     items: [
       "uniapp/components",
-      "uniapp/components/clock-editor",
+      "uniapp/pages/*",
       "uniapp-rebuild/components",
       "uniapp/static/iconfont/*",
     ],
@@ -243,7 +243,7 @@ const coverageGroups = [
       "官网导航、LegacyTabBar、品牌 Logo",
       "输入、开关、滑块、步进器、调色板、色彩拾取器",
       "Project / Artwork / Template / Challenge 卡片家族",
-      "PixelPreviewBoard、PixelCanvas、ImageCropper、时钟配置面板",
+      "PixelPreviewBoard、PixelCanvas、ImageCropper、设备控制面板",
       "Toast、Modal、ConnectModal、JsonImportModal、LoadingOverlay",
       "九宫格 loader 与动作轻遮罩",
     ],

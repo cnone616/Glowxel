@@ -3,6 +3,7 @@
 #include "display_manager.h"
 #include "runtime_command_bus.h"
 #include "runtime_mode_coordinator.h"
+#include "websocket_async_command_response.h"
 
 namespace {
 void setErrorResponse(StaticJsonDocument<768>& response, const char* message) {
@@ -82,8 +83,7 @@ bool handleModeUtilityCommand(
       setErrorResponse(response, "device busy");
       return true;
     }
-    responseSent = true;
-    return true;
+    return wsSendAcceptedResponse(client, response, responseSent);
   }
 
   if (cmd == "stop_loading") {
@@ -102,8 +102,7 @@ bool handleModeUtilityCommand(
       setErrorResponse(response, "device busy");
       return true;
     }
-    responseSent = true;
-    return true;
+    return wsSendAcceptedResponse(client, response, responseSent);
   }
 
   if (cmd == "show_loading") {

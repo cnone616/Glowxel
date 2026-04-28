@@ -23,7 +23,6 @@ const LOCAL_ONLY_AMBIENT_PRESETS = new Set([
   "watermelon_plasma",
   "rain_scene",
   "sparks",
-  "countdown_scene",
   "reaction_diffusion",
 ]);
 
@@ -677,34 +676,6 @@ function buildBouncingLogoFrame(frameMap, frameIndex, scale) {
   drawBrandLogo(frameMap, current.x, current.y, logoScale, BRAND_LOGO_MAIN_PALETTE);
 }
 
-function buildCountdownSceneFrame(frameMap, elapsed, speedUnit) {
-  fillRect(frameMap, 0, 0, 64, 64, { r: 8, g: 10, b: 18 });
-  const totalSeconds = 5 * 60;
-  const spent = Math.floor((elapsed / 1000) * (0.4 + speedUnit * 1.2)) % totalSeconds;
-  const remaining = totalSeconds - spent;
-  const minutes = Math.floor(remaining / 60);
-  const seconds = remaining % 60;
-  const text = `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
-  const progress = remaining / totalSeconds;
-  const warning = progress < 0.25;
-  const accent = warning ? { r: 255, g: 108, b: 82 } : { r: 255, g: 212, b: 82 };
-  const border = warning ? { r: 124, g: 48, b: 44 } : { r: 108, g: 84, b: 40 };
-  drawPanelFrame(frameMap, 5, 13, 54, 38, { r: 10, g: 16, b: 28 }, border, scaleRgb(accent, 0.55));
-  drawGlyphText(frameMap, "TIMER", 10, 17, 1, scaleRgb(accent, 0.86));
-  drawChip(frameMap, 42, 17, 10, scaleRgb(accent, 0.7));
-  drawGlyphTextCentered(frameMap, text, 26, 2, accent);
-  strokeRect(frameMap, 10, 43, 44, 5, border);
-  fillRect(
-    frameMap,
-    11,
-    44,
-    Math.max(2, Math.round(progress * 42)),
-    3,
-    accent,
-  );
-  drawGlow(frameMap, 11 + Math.round(progress * 42), 45, accent, 0.28, 1);
-}
-
 function buildGameOfLifeFrame(frameMap, frameIndex, intensityUnit) {
   fillRect(frameMap, 0, 0, 64, 64, { r: 4, g: 9, b: 13 });
   let grid = createEmptyGrid(16, 0.42);
@@ -832,10 +803,6 @@ function buildSpecialSceneFrame(
     buildClockSceneAmbientFrame(frameMap, elapsed, intensityUnit);
     return true;
   }
-  if (preset === "countdown_scene") {
-    buildCountdownSceneFrame(frameMap, elapsed, speedUnit);
-    return true;
-  }
   if (preset === "game_of_life") {
     buildGameOfLifeFrame(frameMap, frameIndex, intensityUnit);
     return true;
@@ -895,7 +862,6 @@ function resolveAmbientPreviewFramePlan(preset, loop, bouncingLogoScale) {
     rain_scene: { frameCount: 108, elapsedStep: 85 },
     boids: { frameCount: 120, elapsedStep: 85 },
     clock_scene: { frameCount: 120, elapsedStep: 100 },
-    countdown_scene: { frameCount: 90, elapsedStep: 100 },
     falling_sand: { frameCount: 108, elapsedStep: 85 },
     sparks: { frameCount: 96, elapsedStep: 80 },
     game_of_life: { frameCount: 84, elapsedStep: 95 },

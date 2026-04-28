@@ -18,44 +18,47 @@ export default {
     return {
       isSending: false,
       isToastVisible: false,
-      sendPreviewKind: "dom",
+      isSendPreviewFrozen: false,
       sendOverlayTitle: SEND_OVERLAY_TITLE,
       sendOverlayTip: SEND_OVERLAY_TIP,
     };
   },
 
   computed: {
-    shouldHidePreview() {
-      return (
-        this.sendPreviewKind === "native" &&
-        (this.isSending || this.isToastVisible)
-      );
-    },
-  },
-
-  watch: {
-    shouldHidePreview(nextValue, previousValue) {
-      if (
-        previousValue === true &&
-        nextValue === false &&
-        typeof this.handleDeviceSendPreviewRestored === "function"
-      ) {
-        this.$nextTick(() => {
-          this.handleDeviceSendPreviewRestored();
-        });
-      }
+    shouldShowSendingSnapshot() {
+      return this.isSendPreviewFrozen;
     },
   },
 
   methods: {
-    beginSendUi() {
+    ensureSendPreviewSnapshot() {
+      if (this.isSendPreviewFrozen) {
+        return;
+      }
+
+      if (typeof this.captureSendingPreview === "function") {
+        this.captureSendingPreview();
+      }
+
+      this.isSendPreviewFrozen = true;
+    },
+
+    prepareSendToastUi() {
       this.sendOverlayTitle = SEND_OVERLAY_TITLE;
       this.sendOverlayTip = SEND_OVERLAY_TIP;
+      this.ensureSendPreviewSnapshot();
+    },
+
+    beginSendUi() {
+      this.prepareSendToastUi();
       this.isSending = true;
     },
 
     endSendUi() {
       this.isSending = false;
+      if (!this.isToastVisible) {
+        this.releaseSendingSnapshot();
+      }
     },
 
     handleToastShow() {
@@ -64,6 +67,20 @@ export default {
 
     handleToastHide() {
       this.isToastVisible = false;
+      if (!this.isSending) {
+        this.releaseSendingSnapshot();
+      }
+    },
+
+    releaseSendingSnapshot() {
+      if (!this.isSendPreviewFrozen) {
+        return;
+      }
+
+      this.isSendPreviewFrozen = false;
+      if (typeof this.clearSendingPreview === "function") {
+        this.clearSendingPreview();
+      }
     },
 
     guardBeforeSend(
@@ -79,6 +96,8 @@ export default {
       }
 
       if (!connected) {
+        this.prepareSendToastUi();
+
         if (
           disconnectedType === "info" &&
           this.toast &&

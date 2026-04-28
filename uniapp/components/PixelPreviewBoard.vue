@@ -69,11 +69,21 @@ export default {
       return this.height * this.boardPixelSize;
     },
     surfaceStyle() {
+      const boardBackground = this.isDarkMode ? "#05090d" : "#f7f8fa";
+      const boardFrame = this.isDarkMode
+        ? "rgba(238, 246, 255, 0.18)"
+        : "rgba(90, 100, 114, 0.12)";
+      const boardBorder = this.isDarkMode
+        ? "rgba(238, 246, 255, 0.34)"
+        : "rgba(90, 100, 114, 0.22)";
+
       return {
         width: `${this.boardWidth}px`,
         height: `${this.boardHeight}px`,
         left: `${Math.round(this.offsetX)}px`,
         top: `${Math.round(this.offsetY)}px`,
+        backgroundColor: boardBackground,
+        boxShadow: `0 0 0 1px ${boardFrame}, inset 0 0 0 1px ${boardBorder}`,
       };
     },
     gridStyle() {

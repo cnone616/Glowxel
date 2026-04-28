@@ -1,7 +1,7 @@
 const CLOCK_THEME_PRESETS = [
   {
     id: "glowxel_minimal_digital",
-    name: "Glowxel 极简数字",
+    name: "极简数字",
     description: "保留大时间主体，弱化装饰信息，适合常亮桌面和低干扰展示。",
     accentColor: "#7bf2d0",
     styleTag: "极简数字",
@@ -46,7 +46,7 @@ const CLOCK_THEME_PRESETS = [
   },
   {
     id: "glowxel_frame_clock",
-    name: "Glowxel 边框时钟",
+    name: "边框时钟",
     description: "用整屏像素边框包住时间区域，画面更完整，适合做常驻主题。",
     accentColor: "#ffcf5a",
     styleTag: "边框时钟",
@@ -91,7 +91,7 @@ const CLOCK_THEME_PRESETS = [
   },
   {
     id: "glowxel_centerpiece_badge",
-    name: "Glowxel 中央主视觉",
+    name: "中央主视觉",
     description: "中间保留一块主视觉徽章，时间收在角标位，适合主题化展示。",
     accentColor: "#ff7f96",
     styleTag: "主视觉角标",
@@ -136,7 +136,7 @@ const CLOCK_THEME_PRESETS = [
   },
   {
     id: "glowxel_topbar_motion",
-    name: "Glowxel 顶栏波形",
+    name: "顶栏波形",
     description: "把时间压到顶部横栏，底部用波形和状态点补氛围，适合科技感主题。",
     accentColor: "#5ecbff",
     styleTag: "顶栏动感",
@@ -181,7 +181,7 @@ const CLOCK_THEME_PRESETS = [
   },
   {
     id: "glowxel_festival_poster",
-    name: "Glowxel 节日海报",
+    name: "节日海报",
     description: "偏节庆海报式的整屏排版，强调氛围图形和暖色块组合。",
     accentColor: "#ff6c4d",
     styleTag: "节日海报",
@@ -226,7 +226,7 @@ const CLOCK_THEME_PRESETS = [
   },
   {
     id: "glowxel_pixel_arcade",
-    name: "Glowxel 像素游戏",
+    name: "像素游戏",
     description: "借游戏 HUD 的信息排布做成整屏主题，适合偏活跃的像素展示。",
     accentColor: "#8dff6a",
     styleTag: "像素游戏",
@@ -271,7 +271,7 @@ const CLOCK_THEME_PRESETS = [
   },
   {
     id: "glowxel_fireworks_bloom",
-    name: "Glowxel 烟花绽放",
+    name: "烟花绽放",
     description: "引用已入库烟花素材做成节庆主题，适合做气氛更强的展示页面。",
     accentColor: "#ffb347",
     styleTag: "素材烟花",
@@ -316,7 +316,7 @@ const CLOCK_THEME_PRESETS = [
   },
   {
     id: "glowxel_fireworks_rise",
-    name: "Glowxel 烟花升空",
+    name: "烟花升空",
     description: "引用已入库烟花升空素材，适合搭配夜空底色和角标式时间布局。",
     accentColor: "#7ec8ff",
     styleTag: "素材夜空",

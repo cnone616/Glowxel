@@ -10,7 +10,7 @@
       
       <view class="modal-body">
         <text class="modal-description">{{ description }}</text>
-        
+
         <view class="input-wrapper">
           <textarea
             v-model="inputValue"
@@ -21,6 +21,11 @@
             :disabled="sending"
             auto-height
           />
+        </view>
+
+        <view v-if="sending" class="status-box sending">
+          <GlxInlineLoader class="loading-spinner" variant="chase" size="xs" />
+          <text class="status-text">传输中...</text>
         </view>
       </view>
       
@@ -37,7 +42,13 @@
 </template>
 
 <script>
+import GlxInlineLoader from "./GlxInlineLoader.vue";
+
 export default {
+  components: {
+    GlxInlineLoader,
+  },
+
   props: {
     visible: {
       type: Boolean,
@@ -122,6 +133,44 @@ export default {
 
 .json-input:disabled {
   opacity: 0.6;
+}
+
+.status-box {
+  margin-top: 20rpx;
+  padding: 18rpx 20rpx;
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  border-radius: 0;
+  border: var(--nb-border-width-control) solid var(--nb-ink);
+  box-shadow: var(--nb-shadow-soft);
+  animation: fadeIn 0.3s ease-out;
+  box-sizing: border-box;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10rpx);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.status-box.sending {
+  background-color: #e7f0ff;
+}
+
+.loading-spinner {
+  flex-shrink: 0;
+}
+
+.status-text {
+  font-size: 24rpx;
+  font-weight: 800;
+  color: var(--nb-ink);
 }
 
 .modal-container {

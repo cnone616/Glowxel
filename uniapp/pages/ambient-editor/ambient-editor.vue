@@ -12,14 +12,14 @@
           color="var(--nb-ink)"
         />
       </view>
-      <text class="nav-title glx-topbar__title">像素屏保</text>
+      <text class="nav-title glx-topbar__title">像素场景集</text>
       <view class="nav-right"></view>
     </view>
 
     <view class="canvas-section">
       <view class="preview-canvas-container" :style="previewCanvasBoxStyle">
         <PixelCanvas
-          v-if="previewCanvasReady"
+          v-if="previewCanvasReady && !shouldShowSendingSnapshot"
           :width="64"
           :height="64"
           :pixels="currentPreviewPixels"
@@ -33,6 +33,18 @@
           :touch-enabled="false"
           canvas-id="ambientPreviewCanvas"
         />
+        <PixelPreviewBoard
+          v-else-if="previewCanvasReady && shouldShowSendingSnapshot"
+          :width="64"
+          :height="64"
+          :pixels="sendingPreviewPixels"
+          :refresh-token="sendingPreviewTick"
+          :zoom="previewZoom"
+          :offset-x="previewOffset.x"
+          :offset-y="previewOffset.y"
+          :grid-visible="true"
+          :is-dark-mode="true"
+        />
       </view>
       <view class="preview-caption glx-preview-panel">
         <view class="preview-caption-info glx-preview-panel__info">
@@ -45,7 +57,7 @@
             @click="saveAndApply"
           >
             <Icon name="link" :size="36" color="var(--nb-ink)" />
-            <text>{{ isSending ? "发送中" : "发送" }}</text>
+            <text>发送</text>
           </view>
         </view>
       </view>
@@ -55,7 +67,7 @@
       <view class="content-wrapper glx-scroll-stack">
         <view class="card glx-panel-card glx-editor-card">
           <view class="card-title-section glx-panel-head">
-            <text class="card-title glx-panel-title">屏保选择</text>
+            <text class="card-title glx-panel-title">场景选择</text>
           </view>
           <view class="scene-grid">
             <view
@@ -126,7 +138,27 @@
       </view>
     </scroll-view>
 
-    <Toast ref="toastRef" />
+    <view
+      v-if="isSending"
+      class="glx-device-sending-overlay"
+      @touchmove.stop.prevent
+    >
+      <view class="glx-device-sending-card">
+        <GlxInlineLoader
+          class="glx-device-sending-spinner"
+          variant="chase"
+          size="lg"
+        />
+        <text class="glx-device-sending-title">正在发送场景...</text>
+        <text class="glx-device-sending-tip">设备应用完成前请勿切换页面</text>
+      </view>
+    </view>
+
+    <Toast
+      ref="toastRef"
+      @show="handleToastShow"
+      @hide="handleToastHide"
+    />
   </view>
 </template>
 
@@ -134,7 +166,9 @@
 import statusBarMixin from "../../mixins/statusBar.js";
 import Icon from "../../components/Icon.vue";
 import Toast from "../../components/Toast.vue";
+import GlxInlineLoader from "../../components/GlxInlineLoader.vue";
 import PixelCanvas from "../../components/PixelCanvas.vue";
+import PixelPreviewBoard from "../../components/PixelPreviewBoard.vue";
 import GlxSlider from "../../components/GlxSlider.vue";
 import GlxStepper from "../../components/GlxStepper.vue";
 import ColorPanelPicker from "../../components/ColorPanelPicker.vue";
@@ -147,7 +181,7 @@ const AMBIENT_CONFIG_KEY = "ambient_effect_config";
 const SOURCE_AMBIENT_PRESETS = [
   { value: "clock_scene", label: "场景时钟" },
   { value: "starfield", label: "星空漂移" },
-  { value: "metablob", label: "流体团块" },
+  { value: "metablob", label: "液体模拟" },
   { value: "digital_rain", label: "数字雨" },
   { value: "neon_tunnel", label: "霓虹隧道" },
   { value: "boids", label: "群游粒子" },
@@ -232,7 +266,9 @@ export default {
   components: {
     Icon,
     Toast,
+    GlxInlineLoader,
     PixelCanvas,
+    PixelPreviewBoard,
     GlxSlider,
     GlxStepper,
     ColorPanelPicker,
@@ -243,11 +279,15 @@ export default {
       deviceStore: null,
       toast: null,
       isSending: false,
+      isToastVisible: false,
+      isSendPreviewFrozen: false,
       contentHeight: "calc(100vh - 88rpx - 520rpx)",
       previewCanvasReady: false,
       previewZoom: 4,
       previewOffset: { x: 0, y: 0 },
       previewContainerSize: { width: 320, height: 320 },
+      sendingPreviewPixels: new Map(),
+      sendingPreviewTick: 0,
       previewFrameMaps: [],
       previewFrameIndex: 0,
       previewTimer: null,
@@ -275,6 +315,9 @@ export default {
     },
     previewInterval() {
       return Math.max(70, 164 - Number(this.config.speed) * 10);
+    },
+    shouldShowSendingSnapshot() {
+      return this.isSendPreviewFrozen;
     },
     previewCanvasBoxStyle() {
       const size = this.previewContainerSize && this.previewContainerSize.height
@@ -312,8 +355,53 @@ export default {
     this.stopPreview();
   },
   methods: {
+    captureSendingPreview() {
+      this.sendingPreviewPixels = new Map(this.currentPreviewPixels);
+      this.sendingPreviewTick += 1;
+    },
+    clearSendingPreview() {
+      this.sendingPreviewPixels = new Map();
+      this.sendingPreviewTick += 1;
+    },
+    ensureSendPreviewSnapshot() {
+      if (this.isSendPreviewFrozen) {
+        return;
+      }
+
+      this.captureSendingPreview();
+      this.isSendPreviewFrozen = true;
+    },
+    prepareSendToastUi() {
+      this.ensureSendPreviewSnapshot();
+    },
+    beginSendUi() {
+      this.prepareSendToastUi();
+      this.isSending = true;
+    },
+    endSendUi() {
+      this.isSending = false;
+      if (!this.isToastVisible) {
+        this.releaseSendingSnapshot();
+      }
+    },
     handleBack() {
       uni.navigateBack();
+    },
+    handleToastShow() {
+      this.isToastVisible = true;
+    },
+    handleToastHide() {
+      this.isToastVisible = false;
+      if (!this.isSending) {
+        this.releaseSendingSnapshot();
+      }
+    },
+    releaseSendingSnapshot() {
+      if (!this.isSendPreviewFrozen) {
+        return;
+      }
+      this.isSendPreviewFrozen = false;
+      this.clearSendingPreview();
     },
     initPreviewCanvas() {
       const query = uni.createSelectorQuery().in(this);
@@ -381,25 +469,26 @@ export default {
         return;
       }
       if (!this.deviceStore.connected) {
+        this.prepareSendToastUi();
         this.toast.showError("设备未连接");
         return;
       }
 
-      this.isSending = true;
+      const previousMode = this.deviceStore.deviceMode;
+      this.beginSendUi();
       try {
         const ws = this.deviceStore.getWebSocket();
         await ws.setAmbientEffect(this.config);
-        await this.deviceStore.syncAndRequireBusinessMode(
-          "led_matrix_showcase",
-          "设备未进入像素场景模式",
-        );
         uni.setStorageSync(AMBIENT_CONFIG_KEY, this.config);
         this.toast.showSuccess("已保存并应用");
       } catch (error) {
+        await this.deviceStore.rollbackBusinessMode(previousMode, {
+          expectedMode: "led_matrix_showcase",
+        });
         console.error("应用场景失败:", error);
         this.toast.showError("发送失败：" + error.message);
       } finally {
-        this.isSending = false;
+        this.endSendUi();
       }
     },
   },

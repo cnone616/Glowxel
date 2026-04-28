@@ -80,7 +80,7 @@
         
         <!-- 加载更多 -->
         <view v-if="isLoading" class="loading-more">
-          <Icon name="loading" :size="48" color="currentColor" class="loading-icon" />
+          <GlxInlineLoader class="loading-inline-loader" variant="flip" size="sm" />
           <text class="loading-text">加载中...</text>
         </view>
         
@@ -106,6 +106,7 @@ import Icon from '../../components/Icon.vue'
 import Avatar from '../../components/Avatar.vue'
 import Input from '../../components/Input.vue'
 import Toast from '../../components/Toast.vue'
+import GlxInlineLoader from '../../components/GlxInlineLoader.vue'
 
 const toast = useToast()
 
@@ -115,7 +116,8 @@ export default {
     Icon,
     Avatar,
     Input,
-    Toast
+    Toast,
+    GlxInlineLoader
   },
   
   data() {
@@ -520,13 +522,8 @@ export default {
   color: var(--nb-blue);
 }
 
-.loading-icon {
-  animation: rotate 1s linear infinite;
-}
-
-@keyframes rotate {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+.loading-inline-loader {
+  flex-shrink: 0;
 }
 
 .loading-text {

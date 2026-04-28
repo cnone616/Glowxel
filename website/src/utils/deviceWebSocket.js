@@ -6,6 +6,55 @@ const DEFAULT_IGNORE_MESSAGES = new Set([
   "pixels_received",
 ]);
 
+function buildSocketError(event, fallbackMessage) {
+  if (event instanceof Error) {
+    return event;
+  }
+
+  if (event && typeof event.message === "string" && event.message.length > 0) {
+    return new Error(event.message);
+  }
+
+  return new Error(fallbackMessage);
+}
+
+function buildMessageError(message) {
+  const errorText =
+    typeof message?.error === "string" && message.error
+      ? message.error
+      : typeof message?.message === "string" && message.message
+        ? message.message
+        : "设备返回错误";
+
+  return new Error(
+    `${errorText}${message && message.details ? ` - ${message.details}` : ""}`,
+  );
+}
+
+function isDefaultResponseMessage(message, ignoreMessages) {
+  if (typeof message === "string") {
+    return message.length > 0 && !ignoreMessages.has(message);
+  }
+
+  if (!message || typeof message !== "object") {
+    return false;
+  }
+
+  const text = typeof message.message === "string" ? message.message : "";
+  if (ignoreMessages.has(text)) {
+    return false;
+  }
+
+  if (message.error || message.status === "error") {
+    return true;
+  }
+
+  return (
+    (message.status === "ok" || message.status === "success") &&
+    text.length > 0
+  );
+}
+
 export class DeviceWebSocket {
   constructor(endpoint) {
     this.endpoint = endpoint;
@@ -15,6 +64,7 @@ export class DeviceWebSocket {
     this._openHandlers = new Set();
     this._closeHandlers = new Set();
     this._errorHandlers = new Set();
+    this._commandQueue = Promise.resolve();
   }
 
   onMessage(handler) {
@@ -37,7 +87,21 @@ export class DeviceWebSocket {
     return () => this._errorHandlers.delete(handler);
   }
 
-  connect({ timeoutMs = 8000 } = {}) {
+  _enqueueCommand(task) {
+    const queuedTask = this._commandQueue
+      .catch(() => {})
+      .then(() => {
+        if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
+          throw new Error("设备未连接");
+        }
+        return task();
+      });
+
+    this._commandQueue = queuedTask.catch(() => {});
+    return queuedTask;
+  }
+
+  connect({ timeoutMs = 12000 } = {}) {
     if (this.connected && this.socket && this.socket.readyState === WebSocket.OPEN) {
       return Promise.resolve();
     }
@@ -48,7 +112,9 @@ export class DeviceWebSocket {
 
     return new Promise((resolve, reject) => {
       const ws = new WebSocket(this.endpoint);
+      this.socket = ws;
       let timer = null;
+      let settled = false;
 
       const cleanup = () => {
         if (timer) {
@@ -57,12 +123,28 @@ export class DeviceWebSocket {
         }
       };
 
-      ws.onopen = () => {
+      const finishResolve = () => {
+        if (settled) {
+          return;
+        }
+        settled = true;
         cleanup();
-        this.socket = ws;
+        resolve();
+      };
+
+      const finishReject = (error) => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        cleanup();
+        reject(error);
+      };
+
+      ws.onopen = () => {
         this.connected = true;
         this._openHandlers.forEach((handler) => handler());
-        resolve();
+        finishResolve();
       };
 
       ws.onmessage = (event) => {
@@ -80,12 +162,16 @@ export class DeviceWebSocket {
       ws.onclose = () => {
         cleanup();
         this.connected = false;
-        this.socket = null;
+        if (this.socket === ws) {
+          this.socket = null;
+        }
         this._closeHandlers.forEach((handler) => handler());
+        finishReject(new Error("WebSocket 连接已关闭"));
       };
 
       ws.onerror = (event) => {
         this._errorHandlers.forEach((handler) => handler(event));
+        finishReject(buildSocketError(event, "连接设备失败"));
       };
 
       timer = window.setTimeout(() => {
@@ -94,7 +180,7 @@ export class DeviceWebSocket {
         } catch (error) {
           // ignore
         }
-        reject(new Error("连接设备超时"));
+        finishReject(new Error("连接设备超时"));
       }, timeoutMs);
     });
   }
@@ -148,28 +234,46 @@ export class DeviceWebSocket {
     const timeoutMs = options.timeoutMs ?? 10000;
     return new Promise((resolve, reject) => {
       let settled = false;
-      const off = this.onMessage((message) => {
+
+      const finishResolve = (message) => {
         if (settled) {
           return;
         }
+        settled = true;
+        offMessage();
+        offClose();
+        offError();
+        window.clearTimeout(timer);
+        resolve(message);
+      };
+
+      const finishReject = (error) => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        offMessage();
+        offClose();
+        offError();
+        window.clearTimeout(timer);
+        reject(error);
+      };
+
+      const offMessage = this.onMessage((message) => {
         if (!predicate(message)) {
           return;
         }
-        settled = true;
-        off();
-        if (timer !== null) {
-          window.clearTimeout(timer);
-        }
-        resolve(message);
+        finishResolve(message);
+      });
+      const offClose = this.onClose(() => {
+        finishReject(new Error("WebSocket 连接已关闭"));
+      });
+      const offError = this.onError((event) => {
+        finishReject(buildSocketError(event, "WebSocket 连接异常"));
       });
 
       const timer = window.setTimeout(() => {
-        if (settled) {
-          return;
-        }
-        settled = true;
-        off();
-        reject(new Error("等待设备响应超时"));
+        finishReject(new Error("等待设备响应超时"));
       }, timeoutMs);
     });
   }
@@ -177,67 +281,69 @@ export class DeviceWebSocket {
   sendAndWait(payload, options = {}) {
     const timeoutMs = options.timeoutMs || 10000;
     const ignoreMessages = new Set(options.ignoreMessages || DEFAULT_IGNORE_MESSAGES);
+    const matcher =
+      typeof options.matcher === "function"
+        ? options.matcher
+        : (message) => isDefaultResponseMessage(message, ignoreMessages);
 
-    return new Promise((resolve, reject) => {
+    return this._enqueueCommand(() => new Promise((resolve, reject) => {
       let timer = null;
       let settled = false;
 
-      const off = this.onMessage((message) => {
+      const finishResolve = (message) => {
         if (settled) {
           return;
         }
-
-        if (typeof message === "object" && message) {
-          const text = typeof message.message === "string" ? message.message : "";
-          if (ignoreMessages.has(text)) {
-            return;
-          }
-          const hasError = message.error || message.status === "error";
-          if (hasError) {
-            settled = true;
-            off();
-            if (timer) {
-              window.clearTimeout(timer);
-            }
-            const errorText =
-              typeof message.error === "string" && message.error
-                ? message.error
-                : typeof message.message === "string" && message.message
-                  ? message.message
-                  : "设备返回错误";
-            reject(new Error(`${errorText}${message.details ? ` - ${message.details}` : ""}`));
-            return;
-          }
-        }
-
         settled = true;
-        off();
+        offMessage();
+        offClose();
+        offError();
         if (timer) {
           window.clearTimeout(timer);
         }
         resolve(message);
-      });
+      };
 
-      timer = window.setTimeout(() => {
+      const finishReject = (error) => {
         if (settled) {
           return;
         }
         settled = true;
-        off();
-        reject(new Error("等待设备响应超时"));
-      }, timeoutMs);
-
-      this.send(payload).catch((error) => {
-        if (settled) {
-          return;
-        }
-        settled = true;
-        off();
+        offMessage();
+        offClose();
+        offError();
         if (timer) {
           window.clearTimeout(timer);
         }
         reject(error);
+      };
+
+      const offMessage = this.onMessage((message) => {
+        if (!matcher(message)) {
+          return;
+        }
+
+        if (typeof message === "object" && message && (message.error || message.status === "error")) {
+          finishReject(buildMessageError(message));
+          return;
+        }
+
+        finishResolve(message);
       });
-    });
+      const offClose = this.onClose(() => {
+        finishReject(new Error("WebSocket 连接已关闭"));
+      });
+      const offError = this.onError((event) => {
+        finishReject(buildSocketError(event, "WebSocket 连接异常"));
+      });
+
+      timer = window.setTimeout(() => {
+        finishReject(new Error("等待设备响应超时"));
+      }, timeoutMs);
+
+      this.send(payload).catch((error) => {
+        finishReject(error);
+      });
+    }));
   }
 }

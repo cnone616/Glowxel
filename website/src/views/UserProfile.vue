@@ -1,54 +1,138 @@
 <template>
-  <div class="user-profile">
-    <div class="container">
-      <div class="profile-header">
-        <div class="avatar">{{ (user.name || '?')[0].toUpperCase() }}</div>
-        <div class="profile-info">
-          <h1>{{ user.name || '加载中...' }}</h1>
-          <p class="bio">{{ user.bio || '这个人很懒，什么都没写' }}</p>
-          <div class="stats">
-            <span>{{ user.works_count || 0 }} 作品</span>
-            <span>{{ user.followers_count || 0 }} 粉丝</span>
-            <span>{{ user.following_count || 0 }} 关注</span>
-          </div>
-        </div>
+  <div class="glx-page-shell">
+    <section class="glx-page-shell__hero">
+      <span class="glx-page-shell__eyebrow">User Profile</span>
+      <h1 class="glx-page-shell__title">{{ user.name || "用户主页" }}</h1>
+      <p class="glx-page-shell__desc">{{ user.bio || "这个用户还没有留下简介。" }}</p>
+      <div class="glx-hero-metrics">
+        <article class="glx-hero-metric">
+          <span class="glx-hero-metric__label">作品</span>
+          <strong class="glx-hero-metric__value">{{ user.works_count || 0 }}</strong>
+        </article>
+        <article class="glx-hero-metric">
+          <span class="glx-hero-metric__label">粉丝</span>
+          <strong class="glx-hero-metric__value">{{ user.followers_count || 0 }}</strong>
+        </article>
+        <article class="glx-hero-metric">
+          <span class="glx-hero-metric__label">关注</span>
+          <strong class="glx-hero-metric__value">{{ user.following_count || 0 }}</strong>
+        </article>
       </div>
-      <h2 class="section-title">TA 的作品</h2>
-      <div class="artwork-grid">
-        <div class="artwork-card" v-for="item in artworks" :key="item.id" @click="$router.push(`/artwork/${item.id}`)">
-          <div class="artwork-img" :style="item.cover_url ? `background-image:url(${item.cover_url});background-size:cover;background-position:center` : 'background:#f0f0f0'"></div>
-          <div class="artwork-info">
-            <span class="title">{{ item.title || '未命名' }}</span>
-            <span class="likes">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style="color:#e53e3e;vertical-align:-1px"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
-              {{ item.likes || 0 }}
-            </span>
-          </div>
-        </div>
+      <div class="glx-inline-actions">
+        <button
+          v-if="showFollowButton"
+          type="button"
+          class="glx-button glx-button--ghost"
+          @click="toggleFollowUser"
+        >
+          {{ isFollowing ? "取消关注" : "关注 TA" }}
+        </button>
+        <router-link :to="`/user/${route.params.id}/followers`" class="glx-button glx-button--ghost">看粉丝</router-link>
+        <router-link :to="`/user/${route.params.id}/following`" class="glx-button glx-button--ghost">看关注</router-link>
       </div>
-    </div>
+    </section>
+
+    <section class="glx-section-card glx-section-card--stack">
+      <div class="glx-section-head">
+        <h2 class="glx-section-title">TA 的作品</h2>
+        <span class="glx-section-meta">{{ artworks.length }} 件</span>
+      </div>
+      <div v-if="artworks.length === 0" class="glx-empty-card">
+        <strong class="glx-section-title">还没有公开作品</strong>
+        <p class="glx-page-shell__desc">等这个用户发布作品后，这里会自动展示对应列表。</p>
+      </div>
+      <div v-else class="glx-grid glx-grid--three">
+        <article v-for="item in artworks" :key="item.id" class="glx-section-card glx-section-card--stack">
+          <img
+            v-if="typeof item.cover_url === 'string' && item.cover_url.length > 0"
+            :src="item.cover_url"
+            alt="artwork"
+            class="artwork-cover"
+          />
+          <div v-else class="glx-empty-card">
+            <strong class="glx-section-title">暂无封面</strong>
+            <p class="glx-page-shell__desc">当前作品没有封面图。</p>
+          </div>
+          <strong class="glx-section-title">{{ item.title || "未命名作品" }}</strong>
+          <p class="glx-page-shell__desc">{{ typeof item.likes === "number" ? `${item.likes} 赞` : "0 赞" }}</p>
+          <div class="glx-inline-actions">
+            <router-link :to="`/artwork/${item.id}`" class="glx-button glx-button--ghost">查看作品</router-link>
+          </div>
+        </article>
+      </div>
+    </section>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from 'vue'
+import { computed, ref, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { userAPI, artworkAPI } from '@/api/index.js'
+import { followAPI, userAPI, artworkAPI } from '@/api/index.js'
+import { useFeedback } from '@/composables/useFeedback.js'
+import { useUserStore } from '@/stores/user.js'
 
 const route = useRoute()
+const feedback = useFeedback()
+const userStore = useUserStore()
 const user = ref({})
 const artworks = ref([])
+const isFollowing = ref(false)
+
+const showFollowButton = computed(() => {
+  if (userStore.userId == null) {
+    return true
+  }
+  return String(route.params.id) !== String(userStore.userId)
+})
 
 async function loadProfile() {
   const id = route.params.id
   user.value = {}
   artworks.value = []
   try {
-    const uRes = await userAPI.getUserDetail(id)
-    if (uRes.success) user.value = uRes.data?.user || {}
-    const aRes = await artworkAPI.getUserArtworks(id, { page: 1, limit: 20 })
+    const [uRes, aRes] = await Promise.all([
+      userAPI.getUserDetail(id),
+      artworkAPI.getUserArtworks(id, { page: 1, limit: 20 }),
+    ])
+
+    if (uRes.success) {
+      user.value = uRes.data?.user || {}
+      if (typeof user.value.isFollowing === 'boolean') {
+        isFollowing.value = user.value.isFollowing
+      }
+    }
     if (aRes.success) artworks.value = aRes.data?.list || []
-  } catch (e) { /* ignore */ }
+  } catch (e) {
+    user.value = {}
+    artworks.value = []
+  }
+}
+
+async function toggleFollowUser() {
+  if (!userStore.isLoggedIn) {
+    feedback.warning('需要登录', '登录后才能关注用户。')
+    return
+  }
+
+  const response = await followAPI.toggle(route.params.id)
+  if (!response.success) {
+    feedback.error('操作失败', '关注状态没有成功更新。')
+    return
+  }
+
+  if (response.data != null && typeof response.data.followed === 'boolean') {
+    isFollowing.value = response.data.followed
+  } else {
+    isFollowing.value = !isFollowing.value
+  }
+
+  if (typeof user.value.followers_count === 'number') {
+    if (isFollowing.value) {
+      user.value.followers_count += 1
+    } else {
+      user.value.followers_count = Math.max(0, user.value.followers_count - 1)
+    }
+  }
 }
 
 onMounted(loadProfile)
@@ -56,27 +140,11 @@ watch(() => route.params.id, loadProfile)
 </script>
 
 <style scoped>
-.container { max-width: 1200px; margin: 0 auto; padding: 24px 20px 56px; }
-
-.profile-header { display: flex; gap: 24px; align-items: center; padding: 24px; margin-bottom: 24px; border: 3px solid var(--nb-ink); background: var(--tone-paper-soft); box-shadow: var(--nb-shadow-card); }
-.avatar { width: 72px; height: 72px; border: 3px solid var(--nb-ink); border-radius: 0; background: var(--tone-blue-soft); display: flex; align-items: center; justify-content: center; font-size: 28px; font-weight: 800; color: var(--nb-ink); box-shadow: var(--nb-shadow-soft); }
-.profile-info h1 { font-size: 24px; font-weight: 800; color: var(--nb-ink); }
-.bio { font-size: 14px; color: var(--text-secondary); margin-top: 4px; }
-.stats { display: flex; gap: 20px; margin-top: 8px; font-size: 13px; color: var(--text-secondary); font-weight: 700; }
-
-.section-title { font-size: 24px; font-weight: 800; color: var(--nb-ink); margin-bottom: 20px; }
-
-.artwork-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 40px; }
-.artwork-card { background: var(--tone-paper-soft); border: 3px solid var(--nb-ink); border-radius: 0; overflow: hidden; cursor: pointer; transition: background-color 0.2s; box-shadow: var(--nb-shadow-soft); }
-.artwork-card:hover { background: #f8f8f8; }
-.artwork-img { width: 100%; height: 160px; border-bottom: 3px solid var(--nb-ink); }
-.artwork-info { padding: 12px; display: flex; justify-content: space-between; }
-.title { font-size: 14px; font-weight: 700; color: var(--nb-ink); }
-.likes { font-size: 12px; color: var(--text-secondary); font-weight: 700; }
-
-@media (max-width: 768px) {
-  .artwork-grid { grid-template-columns: repeat(2, 1fr); }
-  .profile-header { flex-direction: column; text-align: center; }
-  .stats { justify-content: center; }
+.artwork-cover {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border: 2px solid #111111;
 }
 </style>

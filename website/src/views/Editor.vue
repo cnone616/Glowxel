@@ -91,7 +91,7 @@ import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ARTKAL_COLORS_FULL as ARTKAL_COLORS, findClosestColor } from '@/data/artkal-colors.js'
 import { imageToPixels } from '@/utils/imageProcessor.js'
-import { artworkAPI, challengeAPI, projectAPI, templateAPI } from '@/api/index.js'
+import { projectAPI, templateAPI } from '@/api/index.js'
 
 const route = useRoute()
 const router = useRouter()
@@ -287,7 +287,7 @@ function confirmImport() {
 }
 
 // ---- save / publish ----
-async function handleSave() {
+async function handleSave(silent = false) {
   const canvas = canvasRef.value
   const thumbnail = canvas.toDataURL('image/png')
   const pixelData = Object.fromEntries(pixels.value)
@@ -307,37 +307,36 @@ async function handleSave() {
   const res = await projectAPI.sync(project, pixelData)
   if (res.success) {
     localStorage.setItem('editor_draft', JSON.stringify({ ...project, pixelData, challengeId: challengeId.value }))
-    alert('已保存到云端草稿')
+    if (!silent) {
+      alert('已保存到云端草稿')
+    }
   } else {
-    alert(res.message || '保存失败')
+    if (typeof res.message === 'string' && res.message.length > 0) {
+      alert(res.message)
+      return
+    }
+    alert('保存失败')
   }
 }
 
 async function handlePublish() {
-  if (!localStorage.getItem('auth_token')) { router.push('/login'); return }
   if (!projectId.value) {
-    await handleSave()
+    await handleSave(true)
   }
-  const canvas = canvasRef.value
-  const thumbnail = canvas.toDataURL('image/png')
-  const pixelData = Object.fromEntries(pixels.value)
-  const res = await artworkAPI.publish({
-    projectId: projectId.value || null,
-    title: projectName.value, width: width.value, height: height.value,
-    pixelData, thumbnail, colorCount: new Set(pixels.value.values()).size
+
+  if (!projectId.value) {
+    return
+  }
+
+  const query = {}
+  if (challengeId.value.length > 0) {
+    query.challengeId = challengeId.value
+  }
+
+  router.push({
+    path: `/publish-project/${projectId.value}`,
+    query,
   })
-  if (res.success) {
-    if (challengeId.value && res.data?.artworkId) {
-      const submitRes = await challengeAPI.submit(challengeId.value, res.data.artworkId)
-      if (!submitRes.success) {
-        alert(submitRes.message || '作品已发布，但挑战投稿失败')
-      }
-    }
-    localStorage.removeItem('editor_draft')
-    alert('发布成功！')
-    router.push('/community')
-  }
-  else alert(res.message || '发布失败')
 }
 
 // keyboard shortcuts
@@ -395,7 +394,9 @@ onMounted(() => {
           width.value = d.width || 32
           height.value = d.height || 32
           if (d.pixelData) pixels.value = new Map(Object.entries(d.pixelData))
-          if (d.challengeId) challengeId.value = d.challengeId
+          if (typeof d.challengeId === 'string') {
+            challengeId.value = d.challengeId
+          }
         } catch {}
       }
     }

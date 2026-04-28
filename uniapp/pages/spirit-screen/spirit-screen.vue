@@ -17,9 +17,9 @@
     </view>
 
     <view class="canvas-section">
-      <view v-if="!shouldHidePreview" class="preview-canvas-container">
+      <view class="preview-canvas-container">
         <PixelCanvas
-          v-if="previewCanvasReady"
+          v-if="previewCanvasReady && !shouldShowSendingSnapshot"
           :width="64"
           :height="64"
           :pixels="previewPixels"
@@ -33,11 +33,19 @@
           :touch-enabled="false"
           canvas-id="spiritPreviewCanvas"
         />
+        <PixelPreviewBoard
+          v-else-if="previewCanvasReady && shouldShowSendingSnapshot"
+          :width="64"
+          :height="64"
+          :pixels="sendingPreviewPixels"
+          :refresh-token="sendingPreviewTick"
+          :zoom="previewZoom"
+          :offset-x="previewOffset.x"
+          :offset-y="previewOffset.y"
+          :grid-visible="true"
+          :is-dark-mode="true"
+        />
       </view>
-      <view
-        v-else
-        class="preview-canvas-container preview-canvas-placeholder"
-      ></view>
       <view class="preview-caption glx-preview-panel">
         <view class="preview-caption-info glx-preview-panel__info">
           <text class="preview-title">预览效果</text>
@@ -87,6 +95,24 @@
                 @click="handleExpressionSelect(item.value)"
               >
                 <text class="expression-cn glx-feature-option__label">{{ item.label }}</text>
+              </view>
+            </view>
+          </view>
+
+          <view class="card glx-panel-card glx-editor-card spirit-section-card">
+            <view class="card-title-section glx-panel-head">
+              <text class="card-title glx-panel-title">自动节奏</text>
+              <text class="card-subtitle glx-panel-subtitle">只影响自动表情切换</text>
+            </view>
+            <view class="option-row option-row-triple">
+              <view
+                v-for="item in expressionRhythmOptions"
+                :key="item.value"
+                class="option-btn glx-feature-option"
+                :class="{ active: eyesConfig.behavior.expressionRhythm === item.value }"
+                @click="handleExpressionRhythmChange(item.value)"
+              >
+                <text class="glx-feature-option__label">{{ item.label }}</text>
               </view>
             </view>
           </view>
@@ -176,9 +202,12 @@
             :section="spiritTimeSection"
             :preset-colors="timeColorOptions"
             :show-font-size="true"
+            :show-seconds-control="true"
+            :show-seconds="eyesConfig.time.showSeconds"
             :min-font-size="1"
             :max-font-size="3"
             @toggle="toggleTimeShow"
+            @toggle-seconds="toggleTimeSeconds"
             @adjust="handleSpiritTimeAdjust"
             @update-color="handleTimeColorChange"
             @set-align="handleSpiritTimeAlign"
@@ -193,7 +222,6 @@
             :hour-format="24"
             :show-hour-format="false"
             @select-font="handleTimeFontChange"
-            @toggle-seconds="toggleTimeSeconds"
           />
         </view>
       </view>
@@ -210,7 +238,7 @@
         <Icon
           :name="tabIconNames[index]"
           :size="36"
-          :color="currentTab === index ? '#000000' : '#6b7280'"
+          :color="currentTab === index ? '#000000' : '#666666'"
         />
         <text class="glx-bottom-tab-text">{{ tab }}</text>
       </view>
@@ -222,7 +250,11 @@
       @touchmove.stop.prevent
     >
       <view class="glx-device-sending-card">
-        <view class="glx-device-sending-spinner"></view>
+        <GlxInlineLoader
+          class="glx-device-sending-spinner"
+          variant="chase"
+          size="lg"
+        />
         <text class="glx-device-sending-title">{{ sendOverlayTitle }}</text>
         <text class="glx-device-sending-tip">{{ sendOverlayTip }}</text>
       </view>
@@ -243,7 +275,9 @@ import statusBarMixin from "../../mixins/statusBar.js";
 import deviceSendUxMixin from "../../mixins/deviceSendUxMixin.js";
 import Icon from "../../components/Icon.vue";
 import Toast from "../../components/Toast.vue";
+import GlxInlineLoader from "../../components/GlxInlineLoader.vue";
 import PixelCanvas from "../../components/PixelCanvas.vue";
+import PixelPreviewBoard from "../../components/PixelPreviewBoard.vue";
 import ColorPanelPicker from "../../components/ColorPanelPicker.vue";
 import GlxStepper from "../../components/GlxStepper.vue";
 import ClockFontPanel from "../../components/clock-editor/ClockFontPanel.vue";
@@ -257,14 +291,222 @@ import {
 
 const EYES_CONFIG_STORAGE_KEY = "eyes_config";
 const EYES_EXPRESSION_STORAGE_KEY = "eyes_expression";
+const EYES_LOCAL_PREVIEW_STORAGE_KEY = "eyes_local_preview";
 const EYES_TIME_FONT_OPTIONS = getClockFontOptions();
 const EYES_TIME_FONT_IDS = new Set(
   EYES_TIME_FONT_OPTIONS.map((item) => item.id),
+);
+const EXPRESSION_RHYTHM_OPTIONS = [
+  { label: "慢速", value: "slow" },
+  { label: "标准", value: "standard" },
+  { label: "活泼", value: "lively" },
+];
+const VALID_EXPRESSION_RHYTHMS = new Set(
+  EXPRESSION_RHYTHM_OPTIONS.map((item) => item.value),
 );
 const BLINK_DURATION_MS = 150;
 const REFERENCE_EYE_SIZE = 20;
 const HEART_EXPRESSION_VALUE = "Heart";
 const HEART_EYE_COLOR = "#ff6fb3";
+const PREVIEW_ALLOWED_BASE_WEIGHT = 10;
+const PREVIEW_EXPRESSION_JITTER_MIN = 90;
+const PREVIEW_EXPRESSION_JITTER_MAX = 110;
+const LOCAL_PREVIEW_MOUTH_MIN_OFFSET = -3;
+const LOCAL_PREVIEW_MOUTH_MAX_OFFSET = 3;
+const PREVIEW_TIME_OF_DAY_POOLS = {
+  deepNight: ["Sleepy", "Squint", "Normal", "Worried", "Unimpressed"],
+  earlyMorning: ["Sleepy", "Confused", "Normal", "Happy", "Determined"],
+  morning: ["Normal", "Focused", "Happy", "Determined", "Glee"],
+  noon: ["Focused", "Normal", "Sleepy", "Unimpressed", "Frustrated"],
+  afternoon: ["Focused", "Determined", "Happy", "Skeptic", "Suspicious"],
+  evening: ["Happy", "Glee", "Awe", "Excited", "Normal"],
+  night: ["Sleepy", "Normal", "Unimpressed", "Worried", "Sad"],
+};
+const PREVIEW_SPECIAL_POOLS = {
+  midnightWindow: ["Sleepy", "Normal", "Squint", "Unimpressed", "Worried"],
+  wakeWindow: ["Sleepy", "Confused", "Normal", "Happy"],
+};
+const PREVIEW_SLEEPY_BIAS_POOL = [
+  "Sleepy",
+  "Squint",
+  "Unimpressed",
+  "Normal",
+  "Worried",
+];
+const PREVIEW_EXPRESSION_INTERVALS = {
+  slow: {
+    deepNight: 18000,
+    earlyMorning: 16000,
+    morning: 14000,
+    noon: 15000,
+    afternoon: 14000,
+    evening: 15000,
+    night: 17000,
+  },
+  standard: {
+    deepNight: 14000,
+    earlyMorning: 12000,
+    morning: 9500,
+    noon: 10500,
+    afternoon: 9500,
+    evening: 10500,
+    night: 12500,
+  },
+  lively: {
+    deepNight: 11000,
+    earlyMorning: 9000,
+    morning: 7000,
+    noon: 8000,
+    afternoon: 7000,
+    evening: 8200,
+    night: 9500,
+  },
+};
+const PREVIEW_DEDUPE_PROFILES = {
+  slow: {
+    currentMultiplier: 0.68,
+    historyPenalties: [0.72, 0.78, 0.84, 0.9],
+  },
+  standard: {
+    currentMultiplier: 0.52,
+    historyPenalties: [0.58, 0.66, 0.74, 0.82],
+  },
+  lively: {
+    currentMultiplier: 0.36,
+    historyPenalties: [0.42, 0.52, 0.62, 0.72],
+  },
+};
+const PREVIEW_SEGMENT_DURATIONS = {
+  slow: [70000, 120000],
+  standard: [45000, 90000],
+  lively: [28000, 55000],
+};
+const PREVIEW_CLUSTER_STAY_MULTIPLIER = {
+  slow: 1.82,
+  standard: 1.54,
+  lively: 1.36,
+};
+const PREVIEW_CLUSTER_BASE_WEIGHTS = {
+  calm: 1.34,
+  warm: 1.14,
+  sleepy: 1.02,
+  low: 0.84,
+  alert: 0.68,
+  intense: 0.34,
+};
+const PREVIEW_CLUSTER_LABELS = {
+  calm: "安静陪伴",
+  warm: "温和开心",
+  sleepy: "轻困放松",
+  low: "低落收敛",
+  alert: "轻警觉",
+  intense: "强瞬时",
+};
+const PREVIEW_EXPRESSION_CLUSTER_MAP = {
+  Normal: "calm",
+  Focused: "calm",
+  Determined: "calm",
+  Skeptic: "calm",
+  Unimpressed: "calm",
+  Happy: "warm",
+  Glee: "warm",
+  Awe: "warm",
+  Sleepy: "sleepy",
+  Confused: "sleepy",
+  Squint: "sleepy",
+  Worried: "low",
+  Sad: "low",
+  Frustrated: "low",
+  Annoyed: "alert",
+  Suspicious: "alert",
+  Angry: "intense",
+  Furious: "intense",
+  Surprised: "intense",
+  Scared: "intense",
+  Excited: "intense",
+  Heart: "intense",
+};
+const PREVIEW_EXPRESSION_MOUTH_CANDIDATES = {
+  Normal: ["flat"],
+  Focused: ["flat"],
+  Determined: ["flat"],
+  Skeptic: ["flat", "none"],
+  Unimpressed: ["flat", "none"],
+  Happy: ["softSmile", "flat"],
+  Glee: ["softSmile", "flat"],
+  Awe: ["softSmile", "triangle"],
+  Sleepy: ["microOpen", "none"],
+  Confused: ["microOpen", "flat"],
+  Squint: ["none", "microOpen"],
+  Worried: ["downArc", "flat"],
+  Sad: ["downArc", "flat"],
+  Frustrated: ["downArc", "none"],
+  Annoyed: ["flat", "none"],
+  Suspicious: ["none", "flat"],
+  Angry: ["none"],
+  Furious: ["none"],
+  Surprised: ["triangle"],
+  Scared: ["triangle", "none"],
+  Excited: ["omega", "softSmile"],
+  Heart: ["omega", "softSmile"],
+};
+const EXPRESSION_MOUTH_MAP = {
+  Normal: "flat",
+  Focused: "flat",
+  Determined: "flat",
+  Skeptic: "flat",
+  Unimpressed: "flat",
+  Annoyed: "flat",
+  Happy: "softSmile",
+  Glee: "softSmile",
+  Awe: "softSmile",
+  Excited: "omega",
+  Heart: "omega",
+  Sleepy: "microOpen",
+  Confused: "microOpen",
+  Sad: "downArc",
+  Worried: "downArc",
+  Frustrated: "downArc",
+  Surprised: "triangle",
+  Scared: "triangle",
+  Angry: "none",
+  Furious: "none",
+  Suspicious: "none",
+  Squint: "none",
+};
+const MOUTH_PIXEL_PATTERNS = {
+  flat: [
+    [0, 0],
+    [-1, 0],
+    [1, 0],
+  ],
+  softSmile: [
+    [-1, 0],
+    [0, 1],
+    [1, 0],
+  ],
+  downArc: [
+    [-1, 0],
+    [0, -1],
+    [1, 0],
+  ],
+  triangle: [
+    [0, -1],
+    [-1, 0],
+    [1, 0],
+  ],
+  omega: [
+    [-1, 0],
+    [-1, 1],
+    [0, 1],
+    [1, 1],
+    [1, 0],
+  ],
+  microOpen: [
+    [0, -1],
+    [0, 0],
+  ],
+};
 
 const EXPRESSION_OPTIONS = [
   { label: "正常", value: "Normal" },
@@ -288,6 +530,7 @@ const EXPRESSION_OPTIONS = [
   { label: "惊叹", value: "Awe" },
   { label: "兴奋", value: "Excited" },
   { label: "坚定", value: "Determined" },
+  { label: "迷糊", value: "Confused" },
 ];
 
 const ALL_EXPRESSION_VALUES = EXPRESSION_OPTIONS.map((item) => item.value);
@@ -373,6 +616,7 @@ const PRESETS = {
   Awe: { offsetX: 1, offsetY: 0, height: 18, width: 23, slopeTop: -0.1, slopeBottom: 0.1, radiusTop: 6, radiusBottom: 6 },
   Excited: { offsetX: 0, offsetY: -2, height: 24, width: 22, slopeTop: 0.05, slopeBottom: -0.05, radiusTop: 7, radiusBottom: 7 },
   Determined: { offsetX: 0, offsetY: 0, height: 15, width: 20, slopeTop: 0.3, slopeBottom: 0, radiusTop: 2, radiusBottom: 2 },
+  Confused: { offsetX: 0, offsetY: 0, height: 18, width: 20, slopeTop: -0.25, slopeBottom: 0.15, radiusTop: 5, radiusBottom: 5 },
 };
 
 function createDefaultEyesConfig() {
@@ -391,6 +635,7 @@ function createDefaultEyesConfig() {
       lookIntervalMs: 4200,
       idleMove: 2,
       sleepyAfterMs: 45000,
+      expressionRhythm: "standard",
     },
     interaction: {
       lookHoldMs: 1200,
@@ -407,6 +652,14 @@ function createDefaultEyesConfig() {
       eyeColor: "#9bdcff",
       timeColor: "#64c8ff",
     },
+  };
+}
+
+function createDefaultLocalPreviewState() {
+  return {
+    mouthEnabled: true,
+    mouthOffsetX: 0,
+    mouthOffsetY: 0,
   };
 }
 
@@ -432,7 +685,8 @@ function isValidEyesConfig(config) {
     config.behavior.blinkIntervalMs === undefined ||
     config.behavior.lookIntervalMs === undefined ||
     config.behavior.idleMove === undefined ||
-    config.behavior.sleepyAfterMs === undefined
+    config.behavior.sleepyAfterMs === undefined ||
+    !VALID_EXPRESSION_RHYTHMS.has(config.behavior.expressionRhythm)
   ) {
     return false;
   }
@@ -470,6 +724,67 @@ function isValidEyesConfig(config) {
   return true;
 }
 
+function mergeEyesConfigWithDefaults(sourceConfig) {
+  const nextConfig = createDefaultEyesConfig();
+  if (!sourceConfig || typeof sourceConfig !== "object") {
+    return nextConfig;
+  }
+
+  if (sourceConfig.layout && typeof sourceConfig.layout === "object") {
+    nextConfig.layout = {
+      ...nextConfig.layout,
+      ...sourceConfig.layout,
+    };
+  }
+  if (sourceConfig.behavior && typeof sourceConfig.behavior === "object") {
+    nextConfig.behavior = {
+      ...nextConfig.behavior,
+      ...sourceConfig.behavior,
+    };
+  }
+  if (sourceConfig.interaction && typeof sourceConfig.interaction === "object") {
+    nextConfig.interaction = {
+      ...nextConfig.interaction,
+      ...sourceConfig.interaction,
+    };
+  }
+  if (sourceConfig.time && typeof sourceConfig.time === "object") {
+    nextConfig.time = {
+      ...nextConfig.time,
+      ...sourceConfig.time,
+    };
+  }
+  if (sourceConfig.style && typeof sourceConfig.style === "object") {
+    if (sourceConfig.style.eyeColor !== undefined) {
+      nextConfig.style.eyeColor = sourceConfig.style.eyeColor;
+    }
+    if (sourceConfig.style.timeColor !== undefined) {
+      nextConfig.style.timeColor = sourceConfig.style.timeColor;
+    }
+  }
+
+  return nextConfig;
+}
+
+function mergeLocalPreviewWithDefaults(sourceConfig) {
+  const nextConfig = createDefaultLocalPreviewState();
+  if (!sourceConfig || typeof sourceConfig !== "object") {
+    return nextConfig;
+  }
+
+  if (sourceConfig.mouthEnabled !== undefined) {
+    nextConfig.mouthEnabled = Boolean(sourceConfig.mouthEnabled);
+  }
+  if (sourceConfig.mouthOffsetX !== undefined) {
+    nextConfig.mouthOffsetX = Number(sourceConfig.mouthOffsetX);
+  }
+  if (sourceConfig.mouthOffsetY !== undefined) {
+    nextConfig.mouthOffsetY = Number(sourceConfig.mouthOffsetY);
+  }
+
+  return nextConfig;
+}
+
 function resolveLegacyEyesTimeAnchorX(config) {
   const font = EYES_TIME_FONT_IDS.has(config?.time?.font)
     ? config.time.font
@@ -493,10 +808,124 @@ function jitteredInterval(baseMs, minPercent, maxPercent) {
   return baseMs * randomFloat(minPercent, maxPercent) / 100;
 }
 
+function scaleHexChannel(hexPair, factor) {
+  const channelValue = Number.parseInt(hexPair, 16);
+  if (Number.isNaN(channelValue)) {
+    return null;
+  }
+  return clamp(Math.round(channelValue * factor), 0, 255)
+    .toString(16)
+    .padStart(2, "0");
+}
+
+function scaleHexColor(hexColor, factor) {
+  if (typeof hexColor !== "string") {
+    return hexColor;
+  }
+  if (!/^#[0-9a-fA-F]{6}$/.test(hexColor)) {
+    return hexColor;
+  }
+
+  const red = scaleHexChannel(hexColor.slice(1, 3), factor);
+  const green = scaleHexChannel(hexColor.slice(3, 5), factor);
+  const blue = scaleHexChannel(hexColor.slice(5, 7), factor);
+
+  if (red === null || green === null || blue === null) {
+    return hexColor;
+  }
+
+  return `#${red}${green}${blue}`;
+}
+
+function previewClusterForExpression(expression) {
+  if (
+    Object.prototype.hasOwnProperty.call(
+      PREVIEW_EXPRESSION_CLUSTER_MAP,
+      expression,
+    )
+  ) {
+    return PREVIEW_EXPRESSION_CLUSTER_MAP[expression];
+  }
+  return "calm";
+}
+
+function previewMouthCandidatesForExpression(expression) {
+  if (
+    Object.prototype.hasOwnProperty.call(
+      PREVIEW_EXPRESSION_MOUTH_CANDIDATES,
+      expression,
+    )
+  ) {
+    return PREVIEW_EXPRESSION_MOUTH_CANDIDATES[expression];
+  }
+  return ["none"];
+}
+
+function previewPrimaryMouthForExpression(expression) {
+  const candidates = previewMouthCandidatesForExpression(expression);
+  if (candidates.length > 0) {
+    return candidates[0];
+  }
+  return "none";
+}
+
+function previewSegmentDurationMs(expressionRhythm) {
+  const bounds = PREVIEW_SEGMENT_DURATIONS[expressionRhythm];
+  return Math.round(randomFloat(bounds[0], bounds[1]));
+}
+
+function previewExpressionPoolForCluster(pool, clusterKey) {
+  const matches = [];
+  pool.forEach((expression) => {
+    if (previewClusterForExpression(expression) === clusterKey) {
+      matches.push(expression);
+    }
+  });
+  return matches;
+}
+
+function createPreviewClusterWeights(pool, currentCluster, expressionRhythm) {
+  const weights = {};
+  pool.forEach((expression) => {
+    const clusterKey = previewClusterForExpression(expression);
+    if (weights[clusterKey] === undefined) {
+      weights[clusterKey] = 0;
+    }
+    weights[clusterKey] += PREVIEW_CLUSTER_BASE_WEIGHTS[clusterKey];
+  });
+
+  Object.keys(weights).forEach((clusterKey) => {
+    if (clusterKey === currentCluster) {
+      weights[clusterKey] *= PREVIEW_CLUSTER_STAY_MULTIPLIER[expressionRhythm];
+    }
+  });
+
+  return weights;
+}
+
+function weightedObjectChoice(weightMap, fallbackValue) {
+  const entries = Object.entries(weightMap).filter(([, value]) => value > 0);
+  const totalWeight = entries.reduce((sum, [, value]) => sum + value, 0);
+  if (totalWeight <= 0) {
+    return fallbackValue;
+  }
+
+  let target = Math.random() * totalWeight;
+  for (const [key, value] of entries) {
+    target -= value;
+    if (target <= 0) {
+      return key;
+    }
+  }
+
+  return fallbackValue;
+}
+
 function createPreviewRuntime(expression) {
   const now = Date.now();
   return {
     expression,
+    clusterKey: previewClusterForExpression(expression),
     history: [expression],
     lookX: 0,
     lookY: 0,
@@ -510,6 +939,8 @@ function createPreviewRuntime(expression) {
     targetLeftLookOffsetY: 0,
     targetRightLookOffsetX: 0,
     targetRightLookOffsetY: 0,
+    mouthLookX: 0,
+    mouthLookY: 0,
     blinkActive: false,
     blinkStartAt: 0,
     leftBlinkDelayMs: 0,
@@ -522,16 +953,23 @@ function createPreviewRuntime(expression) {
     nextLookAfterMs: 0,
     lastExpressionAt: now,
     nextExpressionAfterMs: 0,
+    segmentStartAt: now,
+    segmentDurationMs: 0,
+    mouthType: previewPrimaryMouthForExpression(expression),
+    lastMouthAt: now,
+    mouthShiftAt: 0,
+    segmentMouthShifted: false,
     actionExpireAt: 0,
+    lastInteractionAt: now,
   };
 }
 
-function getPreviewTimeOfDay() {
-  const hour = new Date().getHours();
-  if (hour < 5) {
+function getPreviewTimeOfDay(date = new Date()) {
+  const hour = date.getHours();
+  if (hour >= 23 || hour < 6) {
     return "deepNight";
   }
-  if (hour < 8) {
+  if (hour < 9) {
     return "earlyMorning";
   }
   if (hour < 12) {
@@ -543,121 +981,65 @@ function getPreviewTimeOfDay() {
   if (hour < 18) {
     return "afternoon";
   }
-  if (hour < 22) {
+  if (hour < 21) {
     return "evening";
   }
   return "night";
 }
 
-function minPreviewExpressionInterval(timeOfDay) {
-  switch (timeOfDay) {
-    case "deepNight":
-      return 5800;
-    case "earlyMorning":
-      return 4200;
-    case "noon":
-      return 3600;
-    case "evening":
-      return 3200;
-    case "night":
-      return 4000;
-    case "morning":
-    case "afternoon":
-    default:
-      return 2800;
+function getPreviewSpecialWindow(date = new Date()) {
+  const hour = date.getHours();
+  const minute = date.getMinutes();
+  if (hour === 0 && minute < 10) {
+    return "midnightWindow";
   }
+  if (hour === 6 && minute < 30) {
+    return "wakeWindow";
+  }
+  return null;
 }
 
-function createPreviewWeights() {
+function getPreviewExpressionPool(now, config, lastInteractionAt) {
+  const currentDate = new Date(now);
+  const specialWindow = getPreviewSpecialWindow(currentDate);
+  if (specialWindow) {
+    return PREVIEW_SPECIAL_POOLS[specialWindow];
+  }
+
+  if (now - lastInteractionAt >= config.behavior.sleepyAfterMs) {
+    return PREVIEW_SLEEPY_BIAS_POOL;
+  }
+
+  return PREVIEW_TIME_OF_DAY_POOLS[getPreviewTimeOfDay(currentDate)];
+}
+
+function resolvePreviewSeedExpression(candidateExpression, config, now) {
+  const pool = getPreviewExpressionPool(now, config, now);
+  if (pool.includes(candidateExpression)) {
+    return candidateExpression;
+  }
+  if (pool.includes("Normal")) {
+    return "Normal";
+  }
+  if (pool.length > 0) {
+    return pool[0];
+  }
+  return "Normal";
+}
+
+function minPreviewExpressionInterval(timeOfDay, expressionRhythm) {
+  return PREVIEW_EXPRESSION_INTERVALS[expressionRhythm][timeOfDay];
+}
+
+function createPreviewWeights(pool) {
   const weights = {};
   ALL_EXPRESSION_VALUES.forEach((value) => {
-    weights[value] = 0.45;
+    weights[value] = 0;
   });
-  weights.Sleepy = 0.18;
-  weights.Scared = 0.2;
-  weights.Furious = 0.2;
-  weights.Angry = 0.24;
+  pool.forEach((value) => {
+    weights[value] = PREVIEW_ALLOWED_BASE_WEIGHT;
+  });
   return weights;
-}
-
-function fillPreviewTimeWeights(timeOfDay, weights) {
-  switch (timeOfDay) {
-    case "deepNight":
-      weights.Sleepy += 18;
-      weights.Squint += 11;
-      weights.Normal += 8;
-      weights.Worried += 7;
-      weights.Sad += 6;
-      weights.Unimpressed += 4;
-      break;
-    case "earlyMorning":
-      weights.Sleepy += 12;
-      weights.Normal += 8;
-      weights.Focused += 5;
-      weights.Worried += 5;
-      weights.Squint += 5;
-      weights.Unimpressed += 4;
-      weights.Happy += 3;
-      weights.Determined += 2;
-      break;
-    case "morning":
-      weights.Normal += 7;
-      weights.Focused += 9;
-      weights.Happy += 8;
-      weights.Determined += 8;
-      weights.Excited += 5;
-      weights.Glee += 4;
-      weights.Surprised += 3;
-      weights.Awe += 2;
-      weights.Suspicious += 2;
-      break;
-    case "noon":
-      weights.Focused += 7;
-      weights.Normal += 6;
-      weights.Happy += 5;
-      weights.Determined += 4;
-      weights.Sleepy += 4;
-      weights.Unimpressed += 4;
-      weights.Squint += 4;
-      weights.Frustrated += 3;
-      weights.Annoyed += 2;
-      break;
-    case "afternoon":
-      weights.Focused += 8;
-      weights.Determined += 7;
-      weights.Happy += 6;
-      weights.Normal += 5;
-      weights.Excited += 5;
-      weights.Skeptic += 4;
-      weights.Suspicious += 4;
-      weights.Surprised += 3;
-      weights.Annoyed += 3;
-      weights.Glee += 3;
-      break;
-    case "evening":
-      weights.Happy += 8;
-      weights.Glee += 7;
-      weights.Excited += 7;
-      weights.Surprised += 5;
-      weights.Awe += 5;
-      weights.Normal += 4;
-      weights.Determined += 3;
-      weights.Suspicious += 3;
-      weights.Focused += 2;
-      break;
-    case "night":
-      weights.Sleepy += 8;
-      weights.Normal += 6;
-      weights.Squint += 5;
-      weights.Unimpressed += 5;
-      weights.Worried += 4;
-      weights.Sad += 4;
-      weights.Happy += 2;
-      weights.Awe += 2;
-      break;
-    default:
-      break;
-  }
 }
 
 function applyPreviewTransitionWeights(currentExpression, weights) {
@@ -666,6 +1048,9 @@ function applyPreviewTransitionWeights(currentExpression, weights) {
     return;
   }
   transitions.forEach(([expression, transitionWeight]) => {
+    if (weights[expression] <= 0) {
+      return;
+    }
     weights[expression] = weights[expression] * 0.6 + transitionWeight * 0.4;
   });
 }
@@ -677,10 +1062,36 @@ function pushPreviewHistory(runtime, expression) {
   }
 }
 
-function weightedPreviewChoice(weights, fallbackExpression) {
-  const entries = Object.entries(weights);
+function applyPreviewHistoryPenalties(runtime, weights, expressionRhythm) {
+  const dedupeProfile = PREVIEW_DEDUPE_PROFILES[expressionRhythm];
+  if (weights[runtime.expression] > 0) {
+    weights[runtime.expression] *= dedupeProfile.currentMultiplier;
+  }
+
+  const historyEntries = runtime.history
+    .slice(0, -1)
+    .slice(-4)
+    .reverse();
+  historyEntries.forEach((expression, index) => {
+    if (weights[expression] <= 0) {
+      return;
+    }
+    weights[expression] *= dedupeProfile.historyPenalties[index];
+  });
+}
+
+function weightedPreviewChoice(weights, pool, fallbackExpression) {
+  const entries = pool
+    .map((expression) => [expression, weights[expression]])
+    .filter(([, value]) => value > 0);
   const totalWeight = entries.reduce((sum, [, value]) => sum + value, 0);
   if (totalWeight <= 0) {
+    if (pool.includes(fallbackExpression)) {
+      return fallbackExpression;
+    }
+    if (pool.length > 0) {
+      return pool[0];
+    }
     return fallbackExpression;
   }
 
@@ -756,7 +1167,9 @@ export default {
   components: {
     Icon,
     Toast,
+    GlxInlineLoader,
     PixelCanvas,
+    PixelPreviewBoard,
     ColorPanelPicker,
     GlxStepper,
     ClockFontPanel,
@@ -766,13 +1179,14 @@ export default {
     return {
       deviceStore: null,
       toast: null,
-      sendPreviewKind: "native",
       contentHeight: "calc(100vh - 88rpx - 520rpx - 112rpx)",
       previewCanvasReady: false,
       previewZoom: 4,
       previewOffset: { x: 16, y: 16 },
       previewContainerSize: { width: 320, height: 320 },
       previewPixels: new Map(),
+      sendingPreviewPixels: new Map(),
+      sendingPreviewTick: 0,
       previewTimer: null,
       currentTab: 0,
       tabs: ["表情", "时间", "字体"],
@@ -781,7 +1195,9 @@ export default {
         { label: "自动切换", value: "auto" },
         { label: "指定表情", value: "manual" },
       ],
+      expressionRhythmOptions: EXPRESSION_RHYTHM_OPTIONS,
       eyesConfig: createDefaultEyesConfig(),
+      localPreview: createDefaultLocalPreviewState(),
       selectedEyesExpression: "Normal",
       previewRuntime: createPreviewRuntime("Normal"),
       expressionOptions: EXPRESSION_OPTIONS,
@@ -808,35 +1224,11 @@ export default {
     };
   },
   computed: {
-    selectedExpressionLabel() {
-      const matched = this.expressionOptions.find(
-        (item) => item.value === this.selectedEyesExpression,
-      );
-      if (!matched) {
-        return "正常";
-      }
-      return matched.label;
-    },
-    previewSubtitle() {
-      if (this.eyesConfig.behavior.autoSwitch) {
-        return `自动：${this.previewExpressionLabel}`;
-      }
-      return `固定：${this.selectedExpressionLabel}`;
-    },
     expressionModeValue() {
       return this.eyesConfig.behavior.autoSwitch ? "auto" : "manual";
     },
     expressionModeLabel() {
       return this.eyesConfig.behavior.autoSwitch ? "自动切换" : "指定表情";
-    },
-    previewExpressionLabel() {
-      const matched = this.expressionOptions.find(
-        (item) => item.value === this.previewRuntime.expression,
-      );
-      if (!matched) {
-        return "正常";
-      }
-      return matched.label;
     },
     blinkRhythmLevel() {
       return this.intervalToRhythmLevel(
@@ -887,6 +1279,7 @@ export default {
     this.deviceStore.init();
     this.toast = useToast();
     this.loadEyesConfig();
+    this.loadLocalPreview();
     this.loadSelectedExpression();
     this.resetPreviewRuntime();
   },
@@ -901,6 +1294,21 @@ export default {
     this.stopPreviewLoop();
   },
   methods: {
+    captureSendingPreview() {
+      this.sendingPreviewPixels = new Map(this.previewPixels);
+      this.sendingPreviewTick += 1;
+    },
+    clearSendingPreview() {
+      this.sendingPreviewPixels = new Map();
+      this.sendingPreviewTick += 1;
+    },
+    beginSendUi() {
+      this.captureSendingPreview();
+      deviceSendUxMixin.methods.beginSendUi.call(this);
+    },
+    endSendUi() {
+      deviceSendUxMixin.methods.endSendUi.call(this);
+    },
     handleBack() {
       uni.navigateBack();
     },
@@ -953,30 +1361,12 @@ export default {
 
       try {
         const parsedConfig = JSON.parse(savedEyesConfig);
-        if (!isValidEyesConfig(parsedConfig)) {
+        const nextConfig = mergeEyesConfigWithDefaults(parsedConfig);
+        if (!isValidEyesConfig(nextConfig)) {
           this.eyesConfig = createDefaultEyesConfig();
           return;
         }
-        const nextConfig = createDefaultEyesConfig();
-        nextConfig.layout = {
-          ...nextConfig.layout,
-          ...parsedConfig.layout,
-        };
-        nextConfig.behavior = {
-          ...nextConfig.behavior,
-          ...parsedConfig.behavior,
-        };
-        nextConfig.interaction = {
-          ...nextConfig.interaction,
-          ...parsedConfig.interaction,
-        };
-        nextConfig.time = {
-          ...nextConfig.time,
-          ...parsedConfig.time,
-        };
-        nextConfig.style.eyeColor = parsedConfig.style.eyeColor;
-        nextConfig.style.timeColor = parsedConfig.style.timeColor;
-        if (parsedConfig.time.align === undefined) {
+        if (!parsedConfig.time || parsedConfig.time.align === undefined) {
           nextConfig.time.align = "center";
           nextConfig.layout.timeX = resolveLegacyEyesTimeAnchorX(nextConfig);
         }
@@ -985,6 +1375,33 @@ export default {
       } catch (error) {
         console.error("读取桌面宠物配置失败:", error);
         this.eyesConfig = createDefaultEyesConfig();
+      }
+    },
+
+    loadLocalPreview() {
+      const savedPreviewConfig = uni.getStorageSync(EYES_LOCAL_PREVIEW_STORAGE_KEY);
+      if (!savedPreviewConfig) {
+        this.localPreview = createDefaultLocalPreviewState();
+        return;
+      }
+
+      try {
+        const parsedConfig = JSON.parse(savedPreviewConfig);
+        const nextConfig = mergeLocalPreviewWithDefaults(parsedConfig);
+        nextConfig.mouthOffsetX = clamp(
+          Number(nextConfig.mouthOffsetX),
+          LOCAL_PREVIEW_MOUTH_MIN_OFFSET,
+          LOCAL_PREVIEW_MOUTH_MAX_OFFSET,
+        );
+        nextConfig.mouthOffsetY = clamp(
+          Number(nextConfig.mouthOffsetY),
+          LOCAL_PREVIEW_MOUTH_MIN_OFFSET,
+          LOCAL_PREVIEW_MOUTH_MAX_OFFSET,
+        );
+        this.localPreview = nextConfig;
+      } catch (error) {
+        console.error("读取桌面宠物本地预览配置失败:", error);
+        this.localPreview = createDefaultLocalPreviewState();
       }
     },
 
@@ -1015,6 +1432,13 @@ export default {
       );
     },
 
+    saveLocalPreview() {
+      uni.setStorageSync(
+        EYES_LOCAL_PREVIEW_STORAGE_KEY,
+        JSON.stringify(this.localPreview),
+      );
+    },
+
     async saveAndApply() {
       if (!this.guardBeforeSend(this.deviceStore.connected)) {
         return;
@@ -1024,11 +1448,6 @@ export default {
       try {
         this.normalizeTimeLayout();
         const ws = this.deviceStore.getWebSocket();
-        await ws.setMode("eyes");
-        await this.deviceStore.syncAndRequireBusinessMode(
-          "eyes",
-          "设备未进入桌面宠物模式",
-        );
         await ws.setEyesConfig(this.buildEyesConfigPayload());
         if (!this.eyesConfig.behavior.autoSwitch) {
           await ws.eyesInteract(`set_expression:${this.selectedEyesExpression}`);
@@ -1045,27 +1464,31 @@ export default {
     },
 
     handleExpressionSelect(value) {
+      const now = Date.now();
       this.selectedEyesExpression = value;
       this.saveSelectedExpression();
       this.previewRuntime.expression = value;
+      this.previewRuntime.clusterKey = previewClusterForExpression(value);
       this.previewRuntime.history = [value];
-      this.previewRuntime.lastExpressionAt = Date.now();
+      this.previewRuntime.lastExpressionAt = now;
+      this.startPreviewSegment(this.previewRuntime.clusterKey, now);
+      this.syncPreviewMouthForExpression(now, true);
       this.renderPreviewFrame();
     },
 
     handleExpressionModeChange(value) {
       this.eyesConfig.behavior.autoSwitch = value === "auto";
-      if (this.eyesConfig.behavior.autoSwitch) {
-        this.previewRuntime.expression = this.chooseNextPreviewExpression();
-        this.previewRuntime.history = [this.previewRuntime.expression];
-        this.previewRuntime.lastExpressionAt = Date.now();
-        this.scheduleNextExpression();
-        this.previewRuntime.actionExpireAt = 0;
-      } else {
-        this.previewRuntime.expression = this.selectedEyesExpression;
-        this.previewRuntime.history = [this.selectedEyesExpression];
-        this.previewRuntime.actionExpireAt = 0;
+      this.resetPreviewRuntime();
+      this.saveEyesConfig();
+      this.renderPreviewFrame();
+    },
+
+    handleExpressionRhythmChange(value) {
+      if (!VALID_EXPRESSION_RHYTHMS.has(value)) {
+        return;
       }
+      this.eyesConfig.behavior.expressionRhythm = value;
+      this.resetPreviewRuntime();
       this.saveEyesConfig();
       this.renderPreviewFrame();
     },
@@ -1302,6 +1725,7 @@ export default {
           lookIntervalMs: this.eyesConfig.behavior.lookIntervalMs,
           idleMove: this.eyesConfig.behavior.idleMove,
           sleepyAfterMs: this.eyesConfig.behavior.sleepyAfterMs,
+          expressionRhythm: this.eyesConfig.behavior.expressionRhythm,
         },
         interaction: {
           lookHoldMs: this.eyesConfig.interaction.lookHoldMs,
@@ -1350,6 +1774,7 @@ export default {
 
     triggerPreviewOnlyAction(action) {
       const now = Date.now();
+      this.previewRuntime.lastInteractionAt = now;
       if (action === "blink") {
         this.startPreviewBlink(now);
         return;
@@ -1370,13 +1795,134 @@ export default {
       this.previewRuntime.targetRightLookOffsetY = 0;
       this.previewRuntime.lastLookAt = now;
       this.previewRuntime.actionExpireAt =
-        now + this.eyesConfig.interaction.lookHoldMs;
+        now + this.previewLookHoldDurationMs();
     },
 
     resetPreviewRuntime() {
-      this.previewRuntime = createPreviewRuntime(this.selectedEyesExpression);
-      this.previewRuntime.expression = this.selectedEyesExpression;
-      this.previewRuntime.history = [this.selectedEyesExpression];
+      const now = Date.now();
+      const seedExpression = this.eyesConfig.behavior.autoSwitch
+        ? resolvePreviewSeedExpression(
+            this.selectedEyesExpression,
+            this.eyesConfig,
+            now,
+          )
+        : this.selectedEyesExpression;
+      this.previewRuntime = createPreviewRuntime(seedExpression);
+      this.previewRuntime.expression = seedExpression;
+      this.previewRuntime.clusterKey = previewClusterForExpression(seedExpression);
+      this.previewRuntime.history = [seedExpression];
+      this.startPreviewSegment(this.previewRuntime.clusterKey, now);
+      this.syncPreviewMouthForExpression(now, true);
+      if (this.eyesConfig.behavior.autoSwitch) {
+        this.scheduleNextExpression();
+      }
+    },
+
+    previewLookHoldDurationMs(expression = this.previewRuntime.expression) {
+      let minMs = 1400;
+      let maxMs = 2800;
+
+      if (this.eyesConfig.behavior.expressionRhythm === "slow") {
+        minMs = 1800;
+        maxMs = 3500;
+      } else if (this.eyesConfig.behavior.expressionRhythm === "lively") {
+        minMs = 1200;
+        maxMs = 2200;
+      }
+
+      if (
+        expression === "Sleepy" ||
+        expression === "Squint" ||
+        expression === "Confused"
+      ) {
+        minMs += 220;
+        maxMs += 520;
+      } else if (
+        expression === "Excited" ||
+        expression === "Heart" ||
+        expression === "Surprised" ||
+        expression === "Scared"
+      ) {
+        minMs -= 120;
+        maxMs -= 180;
+      }
+
+      return Math.round(randomFloat(minMs, maxMs));
+    },
+
+    startPreviewSegment(clusterKey, now = Date.now()) {
+      this.previewRuntime.clusterKey = clusterKey;
+      this.previewRuntime.segmentStartAt = now;
+      this.previewRuntime.segmentDurationMs = previewSegmentDurationMs(
+        this.eyesConfig.behavior.expressionRhythm,
+      );
+      this.previewRuntime.segmentMouthShifted = false;
+      this.previewRuntime.mouthShiftAt =
+        now +
+        Math.round(
+          this.previewRuntime.segmentDurationMs * randomFloat(0.48, 0.76),
+        );
+    },
+
+    chooseNextPreviewCluster(expressionPool) {
+      const clusterWeights = createPreviewClusterWeights(
+        expressionPool,
+        this.previewRuntime.clusterKey,
+        this.eyesConfig.behavior.expressionRhythm,
+      );
+      return weightedObjectChoice(
+        clusterWeights,
+        this.previewRuntime.clusterKey,
+      );
+    },
+
+    syncPreviewMouthForExpression(now, forcePrimary = false) {
+      const candidates = previewMouthCandidatesForExpression(
+        this.previewRuntime.expression,
+      );
+      const primary = previewPrimaryMouthForExpression(
+        this.previewRuntime.expression,
+      );
+
+      if (!this.eyesConfig.behavior.autoSwitch || forcePrimary) {
+        if (this.previewRuntime.mouthType !== primary) {
+          this.previewRuntime.mouthType = primary;
+          this.previewRuntime.lastMouthAt = now;
+        }
+        return;
+      }
+
+      if (!candidates.includes(this.previewRuntime.mouthType)) {
+        this.previewRuntime.mouthType = primary;
+        this.previewRuntime.lastMouthAt = now;
+        return;
+      }
+
+      if (this.previewRuntime.segmentMouthShifted) {
+        return;
+      }
+
+      if (this.previewRuntime.mouthShiftAt === 0) {
+        return;
+      }
+
+      if (now < this.previewRuntime.mouthShiftAt) {
+        return;
+      }
+
+      if (candidates.length < 2) {
+        this.previewRuntime.segmentMouthShifted = true;
+        return;
+      }
+
+      if (this.previewRuntime.mouthType !== primary) {
+        this.previewRuntime.segmentMouthShifted = true;
+        return;
+      }
+
+      this.previewRuntime.mouthType = candidates[1];
+      this.previewRuntime.lastMouthAt = now;
+      this.previewRuntime.segmentMouthShifted = true;
     },
 
     intervalToRhythmLevel(value, minInterval, maxInterval) {
@@ -1420,44 +1966,120 @@ export default {
     },
 
     scheduleNextBlink() {
+      let rhythmMultiplier = 1.45;
+      if (this.eyesConfig.behavior.expressionRhythm === "slow") {
+        rhythmMultiplier = 1.82;
+      } else if (this.eyesConfig.behavior.expressionRhythm === "lively") {
+        rhythmMultiplier = 1.24;
+      }
+
+      let expressionMultiplier = 1;
+      if (
+        this.previewRuntime.expression === "Sleepy" ||
+        this.previewRuntime.expression === "Squint" ||
+        this.previewRuntime.expression === "Confused"
+      ) {
+        expressionMultiplier = 1.16;
+      } else if (
+        this.previewRuntime.expression === "Excited" ||
+        this.previewRuntime.expression === "Heart" ||
+        this.previewRuntime.expression === "Surprised"
+      ) {
+        expressionMultiplier = 0.92;
+      }
+
       this.previewRuntime.nextBlinkAfterMs = jitteredInterval(
-        this.eyesConfig.behavior.blinkIntervalMs,
-        72,
-        138,
+        this.eyesConfig.behavior.blinkIntervalMs *
+          rhythmMultiplier *
+          expressionMultiplier,
+        96,
+        146,
       );
     },
 
     scheduleNextLook() {
+      let rhythmMultiplier = 1.62;
+      if (this.eyesConfig.behavior.expressionRhythm === "slow") {
+        rhythmMultiplier = 2.06;
+      } else if (this.eyesConfig.behavior.expressionRhythm === "lively") {
+        rhythmMultiplier = 1.36;
+      }
+
+      let expressionMultiplier = 1;
+      if (
+        this.previewRuntime.expression === "Sleepy" ||
+        this.previewRuntime.expression === "Squint"
+      ) {
+        expressionMultiplier = 1.18;
+      } else if (
+        this.previewRuntime.expression === "Excited" ||
+        this.previewRuntime.expression === "Heart"
+      ) {
+        expressionMultiplier = 0.9;
+      }
+
       this.previewRuntime.nextLookAfterMs = jitteredInterval(
-        this.eyesConfig.behavior.lookIntervalMs,
-        45,
-        100,
+        this.eyesConfig.behavior.lookIntervalMs *
+          rhythmMultiplier *
+          expressionMultiplier,
+        92,
+        155,
       );
     },
 
     scheduleNextExpression() {
       this.previewRuntime.nextExpressionAfterMs = jitteredInterval(
-        minPreviewExpressionInterval(getPreviewTimeOfDay()),
-        72,
-        130,
+        minPreviewExpressionInterval(
+          getPreviewTimeOfDay(new Date()),
+          this.eyesConfig.behavior.expressionRhythm,
+        ),
+        PREVIEW_EXPRESSION_JITTER_MIN,
+        PREVIEW_EXPRESSION_JITTER_MAX,
       );
     },
 
-    chooseNextPreviewExpression() {
-      const weights = createPreviewWeights();
-      fillPreviewTimeWeights(getPreviewTimeOfDay(), weights);
+    chooseNextPreviewExpression(now = Date.now()) {
+      const expressionPool = getPreviewExpressionPool(
+        now,
+        this.eyesConfig,
+        this.previewRuntime.lastInteractionAt,
+      );
+      const segmentExpired =
+        now - this.previewRuntime.segmentStartAt >=
+        this.previewRuntime.segmentDurationMs;
+
+      let clusterKey = this.previewRuntime.clusterKey;
+      let clusterPool = previewExpressionPoolForCluster(
+        expressionPool,
+        clusterKey,
+      );
+
+      if (clusterPool.length === 0 || segmentExpired) {
+        clusterKey = this.chooseNextPreviewCluster(expressionPool);
+        clusterPool = previewExpressionPoolForCluster(expressionPool, clusterKey);
+        this.startPreviewSegment(clusterKey, now);
+      }
+
+      if (clusterPool.length === 0) {
+        clusterPool = expressionPool;
+      }
+
+      const weights = createPreviewWeights(clusterPool);
       applyPreviewTransitionWeights(
         this.previewRuntime.expression,
         weights,
       );
-      weights[this.previewRuntime.expression] *= 0.12;
+      applyPreviewHistoryPenalties(
+        this.previewRuntime,
+        weights,
+        this.eyesConfig.behavior.expressionRhythm,
+      );
 
-      this.previewRuntime.history.slice(-4).forEach((expression, index) => {
-        const penalty = 0.05 + index * 0.03;
-        weights[expression] *= penalty;
-      });
-
-      return weightedPreviewChoice(weights, this.previewRuntime.expression);
+      return weightedPreviewChoice(
+        weights,
+        clusterPool,
+        this.previewRuntime.expression,
+      );
     },
 
     startPreviewBlink(now) {
@@ -1516,71 +2138,74 @@ export default {
 
     chooseIdleLook() {
       const activeExpression = this.previewRuntime.expression;
-      let amplitudeScale = 1;
+      let amplitudeScale = 0.86;
       if (
         activeExpression === "Sleepy" ||
-        activeExpression === "Squint"
+        activeExpression === "Squint" ||
+        activeExpression === "Confused"
       ) {
-        amplitudeScale = 0.72;
+        amplitudeScale = 0.58;
       } else if (
         activeExpression === "Excited" ||
         activeExpression === "Surprised"
       ) {
-        amplitudeScale = 1.08;
+        amplitudeScale = 0.96;
+      } else if (
+        activeExpression === "Skeptic" ||
+        activeExpression === "Suspicious"
+      ) {
+        amplitudeScale = 0.78;
       }
 
       const roll = Math.random() * 100;
       let baseX = 0;
       let baseY = 0;
 
-      if (roll < 10) {
+      if (roll < 28) {
+        baseX = randomFloat(-0.14, 0.14);
+        baseY = randomFloat(-0.08, 0.08);
+      } else if (roll < 56) {
+        const side = Math.random() < 0.5 ? -1 : 1;
+        baseX = side * randomFloat(0.22, 0.56);
+        baseY = randomFloat(-0.12, 0.14);
+      } else if (roll < 74) {
+        baseX = randomFloat(-0.24, 0.24);
+        baseY = randomFloat(-0.42, -0.16);
+      } else if (roll < 86) {
         baseX = randomFloat(-0.18, 0.18);
-        baseY = randomFloat(-0.10, 0.10);
-      } else if (roll < 42) {
-        const side = Math.random() < 0.5 ? -1 : 1;
-        baseX = side * randomFloat(0.42, 0.80);
-        baseY = randomFloat(-0.18, 0.20);
-      } else if (roll < 66) {
-        baseX = randomFloat(-0.36, 0.36);
-        baseY = randomFloat(-0.62, -0.22);
-      } else if (roll < 78) {
-        baseX = randomFloat(-0.28, 0.28);
-        baseY = randomFloat(0.12, 0.34);
-      } else if (roll < 92) {
-        const side = Math.random() < 0.5 ? -1 : 1;
-        baseX = side * randomFloat(0.32, 0.64);
-        baseY = Math.random() < 0.5
-          ? randomFloat(-0.42, -0.14)
-          : randomFloat(0.08, 0.24);
+        baseY = randomFloat(0.05, 0.22);
       } else {
         const side = Math.random() < 0.5 ? -1 : 1;
-        baseX = side * randomFloat(0.18, 0.30);
-        baseY = randomFloat(-0.08, 0.08);
+        baseX = side * randomFloat(0.18, 0.42);
+        baseY = Math.random() < 0.5
+          ? randomFloat(-0.28, -0.08)
+          : randomFloat(0.02, 0.16);
       }
 
-      this.previewRuntime.targetLookX = clamp(baseX * amplitudeScale, -0.9, 0.9);
-      this.previewRuntime.targetLookY = clamp(baseY * amplitudeScale, -0.82, 0.6);
+      this.previewRuntime.targetLookX = clamp(baseX * amplitudeScale, -0.64, 0.64);
+      this.previewRuntime.targetLookY = clamp(baseY * amplitudeScale, -0.48, 0.28);
 
       this.previewRuntime.targetLeftLookOffsetX = 0;
       this.previewRuntime.targetLeftLookOffsetY = 0;
       this.previewRuntime.targetRightLookOffsetX = 0;
       this.previewRuntime.targetRightLookOffsetY = 0;
 
-      let asymmetryChance = 30;
+      let asymmetryChance = 18;
       if (
         activeExpression === "Skeptic" ||
-        activeExpression === "Worried"
+        activeExpression === "Worried" ||
+        activeExpression === "Suspicious"
       ) {
-        asymmetryChance = 42;
+        asymmetryChance = 28;
       }
 
       if (Math.random() * 100 >= asymmetryChance) {
         return;
       }
 
-      const microX = randomFloat(-0.10, 0.10);
-      const microY = randomFloat(-0.05, 0.05);
-      const lagFactor = randomFloat(0.28, 0.58);
+      const microX = randomFloat(-0.06, 0.06);
+      const microY = randomFloat(-0.03, 0.03);
+      const lagFactor = randomFloat(0.32, 0.62);
       const leftLead = Math.random() < 0.5;
 
       if (leftLead) {
@@ -1599,6 +2224,11 @@ export default {
     updatePreviewRuntime(now) {
       if (!this.eyesConfig.behavior.autoSwitch) {
         this.previewRuntime.expression = this.selectedEyesExpression;
+        this.previewRuntime.clusterKey = previewClusterForExpression(
+          this.selectedEyesExpression,
+        );
+        this.previewRuntime.nextExpressionAfterMs = 0;
+        this.syncPreviewMouthForExpression(now, true);
       } else if (this.previewRuntime.nextExpressionAfterMs === 0) {
         this.scheduleNextExpression();
       }
@@ -1626,7 +2256,12 @@ export default {
         now - this.previewRuntime.lastBlinkAt >=
         this.previewRuntime.nextBlinkAfterMs
       ) {
-        this.startPreviewBlink(now);
+        if (now - this.previewRuntime.lastExpressionAt < 1600) {
+          this.previewRuntime.lastBlinkAt = now;
+          this.scheduleNextBlink();
+        } else {
+          this.startPreviewBlink(now);
+        }
       }
 
       if (
@@ -1648,10 +2283,18 @@ export default {
         now - this.previewRuntime.lastExpressionAt >=
           this.previewRuntime.nextExpressionAfterMs
       ) {
-        this.previewRuntime.expression = this.chooseNextPreviewExpression();
+        const previousClusterKey = this.previewRuntime.clusterKey;
+        this.previewRuntime.expression = this.chooseNextPreviewExpression(now);
+        this.previewRuntime.clusterKey = previewClusterForExpression(
+          this.previewRuntime.expression,
+        );
         pushPreviewHistory(this.previewRuntime, this.previewRuntime.expression);
         this.previewRuntime.lastExpressionAt = now;
         this.scheduleNextExpression();
+        this.syncPreviewMouthForExpression(
+          now,
+          previousClusterKey !== this.previewRuntime.clusterKey,
+        );
       }
 
       if (
@@ -1659,12 +2302,24 @@ export default {
           this.previewRuntime.nextLookAfterMs &&
         this.previewRuntime.actionExpireAt === 0
       ) {
-        this.previewRuntime.lastLookAt = now;
-        this.chooseIdleLook();
-        this.scheduleNextLook();
+        if (
+          now - this.previewRuntime.lastExpressionAt < 2200 ||
+          this.previewRuntime.blinkActive
+        ) {
+          this.previewRuntime.lastLookAt = now;
+          this.scheduleNextLook();
+        } else {
+          this.previewRuntime.lastLookAt = now;
+          this.chooseIdleLook();
+          this.previewRuntime.actionExpireAt =
+            now + this.previewLookHoldDurationMs();
+          this.scheduleNextLook();
+        }
       }
 
-      const lookEase = this.previewRuntime.actionExpireAt > 0 ? 0.24 : 0.14;
+      this.syncPreviewMouthForExpression(now);
+
+      const lookEase = this.previewRuntime.actionExpireAt > 0 ? 0.16 : 0.1;
       this.previewRuntime.lookX +=
         (this.previewRuntime.targetLookX - this.previewRuntime.lookX) * lookEase;
       this.previewRuntime.lookY +=
@@ -1672,19 +2327,25 @@ export default {
       this.previewRuntime.leftLookOffsetX +=
         (this.previewRuntime.targetLeftLookOffsetX -
           this.previewRuntime.leftLookOffsetX) *
-        0.18;
+        0.12;
       this.previewRuntime.leftLookOffsetY +=
         (this.previewRuntime.targetLeftLookOffsetY -
           this.previewRuntime.leftLookOffsetY) *
-        0.18;
+        0.12;
       this.previewRuntime.rightLookOffsetX +=
         (this.previewRuntime.targetRightLookOffsetX -
           this.previewRuntime.rightLookOffsetX) *
-        0.18;
+        0.12;
       this.previewRuntime.rightLookOffsetY +=
         (this.previewRuntime.targetRightLookOffsetY -
           this.previewRuntime.rightLookOffsetY) *
-        0.18;
+        0.12;
+      this.previewRuntime.mouthLookX +=
+        (this.previewRuntime.lookX * 0.52 - this.previewRuntime.mouthLookX) *
+        0.07;
+      this.previewRuntime.mouthLookY +=
+        (this.previewRuntime.lookY * 0.18 - this.previewRuntime.mouthLookY) *
+        0.05;
     },
 
     presetForEye(expression, isLeftEye, now) {
@@ -1996,6 +2657,82 @@ export default {
       );
     },
 
+    mouthTypeForExpression(expression) {
+      if (this.eyesConfig.behavior.autoSwitch) {
+        return this.previewRuntime.mouthType;
+      }
+      if (Object.prototype.hasOwnProperty.call(EXPRESSION_MOUTH_MAP, expression)) {
+        return previewPrimaryMouthForExpression(expression);
+      }
+      return "none";
+    },
+
+    setPreviewPixel(pixelMap, x, y, color) {
+      if (x < 0 || x > 63 || y < 0 || y > 63) {
+        return;
+      }
+      pixelMap.set(`${x},${y}`, color);
+    },
+
+    drawPreviewMouth(pixelMap, expression) {
+      if (!this.localPreview.mouthEnabled) {
+        return;
+      }
+
+      const mouthType = this.mouthTypeForExpression(expression);
+      if (mouthType === "none") {
+        return;
+      }
+
+      const mouthPattern = MOUTH_PIXEL_PATTERNS[mouthType];
+      if (!mouthPattern) {
+        return;
+      }
+
+      const mouthColorBase =
+        expression === HEART_EXPRESSION_VALUE
+          ? HEART_EYE_COLOR
+          : this.eyesConfig.style.eyeColor;
+      const mouthColor = scaleHexColor(mouthColorBase, 0.82);
+      let followX = 0;
+      if (this.previewRuntime.mouthLookX > 0.36) {
+        followX = 1;
+      } else if (this.previewRuntime.mouthLookX < -0.36) {
+        followX = -1;
+      }
+      let followY = 0;
+      if (this.previewRuntime.mouthLookY > 0.28) {
+        followY = 1;
+      } else if (this.previewRuntime.mouthLookY < -0.32) {
+        followY = -1;
+      }
+      const baseX = clamp(
+        32 + this.localPreview.mouthOffsetX + followX,
+        6,
+        57,
+      );
+      const baseY = clamp(
+        Math.round(
+          this.eyesConfig.layout.eyeY +
+            this.eyesConfig.layout.eyeHeight * 0.65 +
+            3 +
+            this.localPreview.mouthOffsetY +
+            followY,
+        ),
+        10,
+        50,
+      );
+
+      mouthPattern.forEach(([offsetX, offsetY]) => {
+        this.setPreviewPixel(
+          pixelMap,
+          baseX + offsetX,
+          baseY + offsetY,
+          mouthColor,
+        );
+      });
+    },
+
     renderPreviewFrame() {
       const now = Date.now();
       this.updatePreviewRuntime(now);
@@ -2035,7 +2772,6 @@ export default {
         rightBlinkAmount,
         now,
       );
-
       this.previewPixels = pixelMap;
     },
   },
@@ -2055,19 +2791,16 @@ export default {
   background-color: #1a1a1a;
 }
 
-.preview-canvas-placeholder {
-  background-color: #000000;
-}
-
 .preview-title {
   font-size: 24rpx;
   font-weight: 700;
   color: var(--text-primary);
 }
 
-.preview-subtitle {
-  font-size: 22rpx;
-  color: var(--text-secondary);
+.preview-caption-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
 }
 
 .content {
@@ -2077,6 +2810,61 @@ export default {
   box-sizing: border-box;
   background: var(--bg-tertiary);
   padding: 16rpx 20rpx 0;
+}
+
+.bottom-tabs {
+  display: flex !important;
+  flex-shrink: 0 !important;
+  align-items: stretch !important;
+  justify-content: flex-start !important;
+  padding: 2rpx 10rpx 0 !important;
+  padding-bottom: var(--layout-bottom-offset) !important;
+  background-color: var(--bg-elevated) !important;
+  border-top: 2rpx solid var(--nb-ink) !important;
+  gap: 2rpx !important;
+}
+
+.glx-bottom-tab-item {
+  flex: 1 !important;
+  min-width: 0 !important;
+  min-height: 68rpx !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 2rpx !important;
+  padding: 2rpx 0 !important;
+  background-color: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  box-sizing: border-box !important;
+  color: var(--text-secondary) !important;
+}
+
+.glx-bottom-tab-item:active {
+  background-color: transparent !important;
+}
+
+.glx-bottom-tab-item.active {
+  background-color: transparent !important;
+  color: #000000 !important;
+}
+
+.glx-bottom-tab-item .iconfont {
+  font-size: 36rpx !important;
+  color: currentColor !important;
+}
+
+.glx-bottom-tab-text {
+  font-size: 20rpx !important;
+  color: var(--text-secondary) !important;
+  font-weight: 400 !important;
+}
+
+.glx-bottom-tab-item.active .glx-bottom-tab-text {
+  color: #000000 !important;
+  font-weight: 900 !important;
+  font-size: 22rpx !important;
 }
 
 .tab-panel {
@@ -2101,6 +2889,26 @@ export default {
   justify-content: space-between;
 }
 
+.form-row-switch {
+  align-items: center;
+  justify-content: space-between;
+  gap: 20rpx;
+}
+
+.form-label-stack {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 8rpx;
+}
+
+.form-tip {
+  font-size: 20rpx;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
 .option-row,
 .expression-grid {
   overflow: visible;
@@ -2109,6 +2917,12 @@ export default {
 }
 
 .expression-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14rpx;
+}
+
+.option-row-triple {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 14rpx;

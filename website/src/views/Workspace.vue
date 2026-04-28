@@ -1,517 +1,218 @@
 <template>
-  <div class="workspace-page">
-    <div class="container">
-      <div class="header">
-        <div class="header-content">
-          <span class="header-kicker">Workspace</span>
-          <h1 class="header-title">创作中心</h1>
-          <p class="header-desc">从这里开始新建、导入图片，或者继续编辑已有画布。</p>
+  <div class="glx-page-shell">
+    <section class="glx-page-shell__hero">
+      <span class="glx-page-shell__eyebrow">Workspace</span>
+      <h1 class="glx-page-shell__title">创作中心</h1>
+      <p class="glx-page-shell__desc">
+        工作台需要继续承接创作入口、云端项目列表和项目管理，不应该被改成只剩说明文案的占位页。
+      </p>
+      <div class="glx-hero-metrics">
+        <article class="glx-hero-metric">
+          <span class="glx-hero-metric__label">云端项目</span>
+          <strong class="glx-hero-metric__value">{{ userStore.isLoggedIn ? projectStore.totalProjects : 0 }}</strong>
+        </article>
+        <article class="glx-hero-metric">
+          <span class="glx-hero-metric__label">草稿</span>
+          <strong class="glx-hero-metric__value">{{ userStore.isLoggedIn ? projectStore.draftProjects.length : 0 }}</strong>
+        </article>
+        <article class="glx-hero-metric">
+          <span class="glx-hero-metric__label">已发布</span>
+          <strong class="glx-hero-metric__value">{{ userStore.isLoggedIn ? projectStore.publishedProjects.length : 0 }}</strong>
+        </article>
+        <article class="glx-hero-metric">
+          <span class="glx-hero-metric__label">当前状态</span>
+          <strong class="glx-hero-metric__value">{{ userStore.isLoggedIn ? "已登录" : "未登录" }}</strong>
+        </article>
+      </div>
+    </section>
+
+    <section class="glx-grid glx-grid--two">
+      <router-link to="/create?mode=blank" class="workspace-entry">
+        <span class="glx-icon-chip glx-icon-chip--yellow workspace-entry__icon">+</span>
+        <strong class="workspace-entry__title">新建画布</strong>
+        <p class="workspace-entry__desc">从空白画布开始创作，继续走网站端正式创作链。</p>
+      </router-link>
+
+      <router-link to="/create?mode=image" class="workspace-entry">
+        <span class="glx-icon-chip glx-icon-chip--blue workspace-entry__icon">图</span>
+        <strong class="workspace-entry__title">导入图片</strong>
+        <p class="workspace-entry__desc">把现有图片送进像素编辑器，再继续细修和保存。</p>
+      </router-link>
+
+      <router-link to="/pattern-workbench" class="workspace-entry">
+        <span class="glx-icon-chip glx-icon-chip--green workspace-entry__icon">拼</span>
+        <strong class="workspace-entry__title">拼豆工作台</strong>
+        <p class="workspace-entry__desc">拼豆图纸导入、差异校对和分板整理继续保留。</p>
+      </router-link>
+
+      <router-link to="/device-control" class="workspace-entry">
+        <span class="glx-icon-chip glx-icon-chip--paper workspace-entry__icon">设</span>
+        <strong class="workspace-entry__title">设备发送</strong>
+        <p class="workspace-entry__desc">设备连接、配网、参数和画板模式入口继续留在网站端。</p>
+      </router-link>
+    </section>
+
+    <section class="glx-section-card glx-section-card--stack">
+      <div class="glx-section-head">
+        <h2 class="glx-section-title">我的云端项目</h2>
+        <span class="glx-section-meta">{{ userStore.isLoggedIn ? `${projectStore.totalProjects} 个` : "需登录" }}</span>
+      </div>
+
+      <div v-if="!userStore.isLoggedIn" class="glx-empty-card">
+        <strong class="glx-section-title">登录后可管理项目</strong>
+        <p class="glx-page-shell__desc">工作台的项目列表、总览、辅助处理和发布链路都需要登录后继续使用。</p>
+        <div class="glx-inline-actions">
+          <router-link to="/login" class="glx-button glx-button--primary">去登录</router-link>
         </div>
       </div>
 
-      <div class="main-content">
-        <section class="quick-actions">
-          <div class="section-intro">
-            <h2 class="section-title">快速开始</h2>
-            <span class="section-note">先选一种方式进入创作流程</span>
-          </div>
-          <div class="action-grid">
-            <router-link to="/create?mode=blank" class="action-card">
-              <div class="action-icon blue">
-                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-              </div>
-              <strong class="action-title">新建画布</strong>
-              <span class="action-subtitle">从空白开始创作</span>
-            </router-link>
-
-            <router-link to="/create?mode=image" class="action-card">
-              <div class="action-icon green">
-                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 4h16v16H4z"/><path d="M9 4v16"/><path d="M15 4v16"/><path d="M4 9h16"/><path d="M4 15h16"/></svg>
-              </div>
-              <strong class="action-title">导入图片</strong>
-              <span class="action-subtitle">转换为像素画</span>
-            </router-link>
-          </div>
-        </section>
-
-        <section class="my-projects">
-          <div class="section-header">
-            <h2 class="section-title">我的画布</h2>
-            <span class="project-count">{{ filteredProjects.length }} 个</span>
-          </div>
-
-          <div v-if="loading" class="state-box">
-            <div class="spinner"></div>
-            <p>加载中...</p>
-          </div>
-
-          <div v-else-if="!filteredProjects.length" class="empty-state">
-            <div class="empty-icon">
-              <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#9aa6b2" stroke-width="1.7"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>
-            </div>
-            <strong class="empty-title">还没有画布</strong>
-            <span class="empty-subtitle">开始您的第一个创作吧</span>
-            <router-link to="/create?mode=blank" class="empty-btn">立即创建</router-link>
-          </div>
-
-          <div v-else class="projects-grid">
-            <div class="project-card" v-for="project in filteredProjects" :key="project.id">
-              <div
-                class="project-thumb"
-                :style="project.thumbnail_url ? `background-image:url(${project.thumbnail_url})` : ''"
-                @click="openEditor(project)"
-              >
-                <div v-if="!project.thumbnail_url" class="thumb-placeholder">
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#c4ccd6" stroke-width="1.6"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-                </div>
-                <div class="project-actions">
-                  <button class="action-btn" type="button" @click.stop="openEditor(project)">编辑</button>
-                  <button class="action-btn danger" type="button" @click.stop="deleteProject(project)">删除</button>
-                </div>
-              </div>
-              <div class="project-info">
-                <strong class="project-name">{{ project.title || project.name || '未命名' }}</strong>
-                <span class="project-meta">{{ project.width }} × {{ project.height }}</span>
-                <span class="project-date">{{ formatDate(project.updated_at || project.created_at) }}</span>
-              </div>
-            </div>
-          </div>
-        </section>
+      <div v-else-if="projectStore.loading" class="glx-stack">
+        <article v-for="index in 3" :key="index" class="glx-skeleton-card">
+          <div class="glx-skeleton workspace-skeleton"></div>
+          <div class="glx-skeleton workspace-skeleton"></div>
+        </article>
       </div>
-    </div>
+
+      <div v-else-if="projectStore.projects.length === 0" class="glx-empty-card">
+        <strong class="glx-section-title">还没有云端项目</strong>
+        <p class="glx-page-shell__desc">先保存草稿或从模板开始创作，这里就会出现你的项目列表。</p>
+      </div>
+
+      <div v-else class="glx-stack">
+        <article v-for="item in projectStore.projects" :key="item.id" class="glx-list-card workspace-project-row">
+          <img
+            v-if="coverUrl(item.thumbnail_url).length > 0"
+            :src="coverUrl(item.thumbnail_url)"
+            alt="thumbnail"
+            class="workspace-project-row__cover"
+          />
+          <div v-else class="workspace-project-row__cover workspace-project-row__cover--empty">图</div>
+          <div class="glx-list-card__copy">
+            <strong class="glx-list-card__title">{{ projectName(item) }}</strong>
+            <span class="glx-list-card__desc">{{ projectMeta(item) }}</span>
+          </div>
+          <div class="glx-inline-actions">
+            <router-link :to="`/overview/${item.id}`" class="glx-button glx-button--ghost">总览</router-link>
+            <router-link :to="`/editor/${item.id}`" class="glx-button glx-button--ghost">编辑</router-link>
+            <button type="button" class="glx-button glx-button--danger" @click="removeProject(item.id)">删除</button>
+          </div>
+        </article>
+      </div>
+    </section>
   </div>
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
-import { projectAPI } from '@/api/index.js'
+import { onMounted } from "vue";
+import { useFeedback } from "@/composables/useFeedback.js";
+import { useProjectStore } from "@/stores/project.js";
+import { useUserStore } from "@/stores/user.js";
 
-const router = useRouter()
-const projects = ref([])
-const loading = ref(true)
+const feedback = useFeedback();
+const projectStore = useProjectStore();
+const userStore = useUserStore();
 
-const filteredProjects = computed(() => projects.value)
-
-function formatDate(dateStr) {
-  if (!dateStr) {
-    return ''
+function coverUrl(value) {
+  if (typeof value === "string" && value.length > 0) {
+    return value;
   }
-
-  const date = new Date(dateStr)
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+  return "";
 }
 
-function openEditor(project) {
-  router.push(`/editor/${project.id}`)
+function projectName(item) {
+  if (typeof item.name === "string" && item.name.length > 0) {
+    return item.name;
+  }
+  return "未命名项目";
 }
 
-async function deleteProject(project) {
-  if (!confirm(`确认删除「${project.title || project.name || '未命名'}」？`)) {
-    return
+function projectMeta(item) {
+  const parts = [];
+
+  if (typeof item.width === "number" && typeof item.height === "number") {
+    parts.push(`${item.width} × ${item.height}`);
   }
 
-  const response = await projectAPI.remove(project.id)
-  if (response.success || response.code === 0) {
-    projects.value = projects.value.filter((item) => item.id !== project.id)
+  if (typeof item.status === "string" && item.status.length > 0) {
+    parts.push(item.status);
   }
+
+  if (typeof item.updated_at === "string" && item.updated_at.length > 0) {
+    parts.push(item.updated_at.slice(0, 10));
+  }
+
+  return parts.join(" · ");
+}
+
+async function removeProject(id) {
+  const response = await projectStore.removeProject(id);
+  if (response.success) {
+    feedback.success("删除成功", "项目已经从云端项目列表中移除。");
+    return;
+  }
+
+  feedback.error("删除失败", "项目没有成功删除。");
 }
 
 onMounted(async () => {
-  try {
-    const token = localStorage.getItem('auth_token')
-    if (!token) {
-      loading.value = false
-      return
-    }
-
-    const response = await projectAPI.getList({ page: 1, limit: 50 })
-    if (response.success) {
-      projects.value = response.data?.list || []
-    }
-  } finally {
-    loading.value = false
+  await userStore.init();
+  if (userStore.isLoggedIn) {
+    await projectStore.loadProjects();
   }
-})
+});
 </script>
 
 <style scoped>
-.workspace-page {
-  min-height: calc(100vh - 60px);
-  padding: 24px 0 56px;
-}
-
-.container {
-  max-width: 1120px;
-  margin: 0 auto;
-  padding: 0 24px;
-}
-
-.header {
-  margin-bottom: 24px;
-  border: 3px solid var(--nb-ink);
-  border-radius: 0;
-  background:
-    linear-gradient(90deg, rgba(255, 243, 196, 0.64), rgba(255, 255, 255, 0.98) 54%, rgba(220, 235, 255, 0.7));
-  box-shadow: var(--nb-shadow-strong);
-}
-
-.header-content {
-  min-height: 168px;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  justify-content: center;
-  gap: 10px;
-  padding: 30px 32px;
-}
-
-.header-kicker {
-  display: inline-flex;
-  align-items: center;
-  min-height: 30px;
-  padding: 0 12px;
-  border: 2px solid var(--nb-ink);
-  border-radius: 0;
-  background: var(--tone-paper-soft);
-  color: var(--nb-ink);
-  font-size: 12px;
-  font-weight: 800;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  box-shadow: var(--nb-shadow-soft);
-}
-
-.header-title {
-  font-size: 34px;
-  font-weight: 700;
-  color: var(--nb-ink);
-}
-
-.header-desc {
-  max-width: 560px;
-  font-size: 15px;
-  line-height: 1.75;
-  color: var(--text-secondary);
-}
-
-.main-content {
-  display: grid;
-  gap: 28px;
-}
-
-.section-intro {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 16px;
-}
-
-.quick-actions,
-.my-projects {
-  padding: 24px;
-  border: 3px solid var(--nb-ink);
-  border-radius: 0;
-  background: var(--tone-paper-soft);
-  box-shadow: var(--nb-shadow-card);
-}
-
-.action-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 18px;
-}
-
-.action-card {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 28px 18px;
-  border: 3px solid var(--nb-ink);
-  border-radius: 0;
-  background: var(--tone-paper-soft);
+.workspace-entry {
+  border: var(--glx-shell-border-strong);
+  background: #ffffff;
+  box-shadow: var(--glx-shadow-card);
+  padding: 22px;
   text-decoration: none;
-  box-shadow: var(--nb-shadow-soft);
-  transition: background-color 0.18s ease;
+  color: inherit;
+  display: grid;
+  gap: 12px;
 }
 
-.action-card:hover {
-  background: #f8f8f8;
+.workspace-entry__icon {
+  font-size: 20px;
+  font-weight: 900;
 }
 
-.action-icon {
+.workspace-entry__title {
+  font-size: 22px;
+  font-weight: 900;
+  color: var(--nb-ink);
+}
+
+.workspace-entry__desc {
+  font-size: 14px;
+  line-height: 1.8;
+  color: var(--nb-text-secondary);
+}
+
+.workspace-project-row {
+  align-items: center;
+}
+
+.workspace-project-row__cover {
   width: 72px;
   height: 72px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 2px solid var(--nb-ink);
-  border-radius: 0;
-  box-shadow: var(--nb-shadow-soft);
+  object-fit: cover;
+  border: 2px solid #111111;
+  flex-shrink: 0;
 }
 
-.action-icon.blue {
-  background: rgba(136, 161, 186, 0.18);
-  color: var(--nb-ink);
-}
-
-.action-icon.green {
-  background: rgba(155, 179, 158, 0.2);
-  color: var(--nb-ink);
-}
-
-.action-title {
-  font-size: 18px;
-  color: var(--nb-ink);
-  font-weight: 700;
-}
-
-.action-subtitle {
-  font-size: 14px;
-  color: var(--text-secondary);
-}
-
-.section-note {
-  color: var(--text-secondary);
-  font-size: 14px;
-  font-weight: 700;
-}
-
-.section-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 16px;
-}
-
-.section-title {
-  font-size: 24px;
-  font-weight: 700;
-  color: var(--nb-ink);
-}
-
-.project-count {
-  color: var(--text-secondary);
-  font-size: 14px;
-  font-weight: 700;
-}
-
-.state-box,
-.empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  min-height: 260px;
-}
-
-.spinner {
-  width: 28px;
-  height: 28px;
-  border: 3px solid rgba(136, 161, 186, 0.2);
-  border-top-color: var(--nb-blue);
-  border-radius: 999px;
-  animation: spin 0.7s linear infinite;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-.empty-icon {
-  width: 72px;
-  height: 72px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 2px solid var(--nb-ink);
-  border-radius: 0;
-  background: var(--tone-blue-soft);
-  box-shadow: var(--nb-shadow-soft);
-}
-
-.empty-title {
-  font-size: 18px;
-  color: var(--nb-ink);
-  font-weight: 700;
-}
-
-.empty-subtitle {
-  font-size: 14px;
-  color: var(--text-secondary);
-}
-
-.empty-btn {
+.workspace-project-row__cover--empty {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 44px;
-  padding: 10px 18px;
-  border: 2px solid var(--nb-ink);
-  border-radius: 0;
-  background: var(--nb-yellow);
-  box-shadow: var(--nb-shadow-soft);
-  color: var(--nb-ink);
-  text-decoration: none;
-  font-size: 14px;
-  font-weight: 700;
+  background: #f0f0f0;
+  font-size: 20px;
+  font-weight: 900;
 }
 
-.projects-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 18px;
-}
-
-.project-card {
-  overflow: hidden;
-  border: 3px solid var(--nb-ink);
-  border-radius: 0;
-  background: var(--tone-paper-soft);
-  box-shadow: var(--nb-shadow-card);
-}
-
-.project-thumb {
-  position: relative;
-  aspect-ratio: 1;
-  background: #f5f5f5;
-  background-size: cover;
-  background-position: center;
-  cursor: pointer;
-  border-bottom: 3px solid var(--nb-ink);
-}
-
-.thumb-placeholder {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.project-actions {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  display: flex;
-  gap: 8px;
-}
-
-.action-btn {
-  height: 30px;
-  padding: 0 12px;
-  border: 2px solid var(--nb-ink);
-  border-radius: 0;
-  background: var(--tone-paper-soft);
-  color: var(--nb-ink);
-  font-size: 12px;
-  font-weight: 700;
-  cursor: pointer;
-  box-shadow: var(--nb-shadow-soft);
-}
-
-.action-btn.danger {
-  background: var(--tone-coral-soft);
-  color: var(--nb-ink);
-}
-
-.project-info {
-  display: grid;
-  gap: 6px;
-  padding: 14px;
-}
-
-.project-name {
-  font-size: 15px;
-  color: var(--nb-ink);
-  font-weight: 700;
-}
-
-.project-meta,
-.project-date {
-  font-size: 12px;
-  color: var(--text-secondary);
-}
-
-@media (max-width: 768px) {
-  .workspace-page {
-    min-height: calc(100vh - 56px);
-    padding: 10px 0 28px;
-  }
-
-  .container {
-    padding: 0 16px;
-  }
-
-  .header {
-    margin-bottom: 12px;
-  }
-
-  .header-content {
-    min-height: 128px;
-    padding: 22px 20px;
-  }
-
-  .header-title {
-    font-size: 26px;
-  }
-
-  .header-desc {
-    font-size: 14px;
-  }
-
-  .quick-actions,
-  .my-projects {
-    padding: 14px;
-  }
-
-  .action-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 12px;
-  }
-
-  .action-card {
-    padding: 18px 10px;
-    align-items: center;
-  }
-
-  .action-icon {
-    width: 56px;
-    height: 56px;
-  }
-
-  .action-title {
-    font-size: 16px;
-  }
-
-  .action-subtitle {
-    font-size: 12px;
-    text-align: center;
-  }
-
-  .section-title {
-    font-size: 20px;
-  }
-
-  .section-intro,
-  .section-header {
-    margin-bottom: 14px;
-  }
-
-  .section-note,
-  .project-count {
-    font-size: 12px;
-  }
-
-  .projects-grid {
-    grid-template-columns: 1fr;
-    gap: 12px;
-  }
+.workspace-skeleton {
+  min-height: 18px;
 }
 </style>

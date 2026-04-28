@@ -15,7 +15,7 @@
     <view class="canvas-section">
       <view class="preview-canvas-container" :style="previewCanvasBoxStyle">
         <PixelCanvas
-          v-if="previewCanvasReady && !shouldHidePreview"
+          v-if="previewCanvasReady && !shouldShowSendingSnapshot"
           :width="64"
           :height="64"
           :pixels="currentPreviewPixels"
@@ -28,6 +28,18 @@
           :is-dark-mode="true"
           :touch-enabled="false"
           canvas-id="ledMatrixPreviewCanvas"
+        />
+        <PixelPreviewBoard
+          v-else-if="previewCanvasReady && shouldShowSendingSnapshot"
+          :width="64"
+          :height="64"
+          :pixels="sendingPreviewPixels"
+          :refresh-token="sendingPreviewTick"
+          :zoom="previewZoom"
+          :offset-x="previewOffset.x"
+          :offset-y="previewOffset.y"
+          :grid-visible="previewGridVisible"
+          :is-dark-mode="true"
         />
       </view>
       <view class="preview-caption glx-preview-panel">
@@ -131,7 +143,11 @@
       @touchmove.stop.prevent
     >
       <view class="glx-device-sending-card">
-        <view class="glx-device-sending-spinner"></view>
+        <GlxInlineLoader
+          class="glx-device-sending-spinner"
+          variant="chase"
+          size="lg"
+        />
         <text class="glx-device-sending-title">{{ sendOverlayTitle }}</text>
         <text class="glx-device-sending-tip">{{ sendOverlayTip }}</text>
       </view>
@@ -150,7 +166,9 @@ import statusBarMixin from "../../mixins/statusBar.js";
 import deviceSendUxMixin from "../../mixins/deviceSendUxMixin.js";
 import Icon from "../../components/Icon.vue";
 import Toast from "../../components/Toast.vue";
+import GlxInlineLoader from "../../components/GlxInlineLoader.vue";
 import PixelCanvas from "../../components/PixelCanvas.vue";
+import PixelPreviewBoard from "../../components/PixelPreviewBoard.vue";
 import GlxSlider from "../../components/GlxSlider.vue";
 import GlxStepper from "../../components/GlxStepper.vue";
 import ColorPanelPicker from "../../components/ColorPanelPicker.vue";
@@ -170,7 +188,9 @@ export default {
   components: {
     Icon,
     Toast,
+    GlxInlineLoader,
     PixelCanvas,
+    PixelPreviewBoard,
     GlxSlider,
     GlxStepper,
     ColorPanelPicker,
@@ -179,13 +199,14 @@ export default {
     return {
       deviceStore: null,
       toast: null,
-      sendPreviewKind: "native",
       contentHeight: "calc(100vh - 88rpx - 520rpx)",
       previewCanvasReady: false,
       previewZoom: 4,
       previewOffset: { x: 0, y: 0 },
       previewContainerSize: { width: 320, height: 320 },
       previewFrameMaps: [],
+      sendingPreviewPixels: new Map(),
+      sendingPreviewTick: 0,
       previewFrameDelays: [],
       previewFrameIndex: 0,
       previewTimer: null,
@@ -316,6 +337,21 @@ export default {
     this.cleanupPreviewTimers();
   },
   methods: {
+    captureSendingPreview() {
+      this.sendingPreviewPixels = new Map(this.currentPreviewPixels);
+      this.sendingPreviewTick += 1;
+    },
+    clearSendingPreview() {
+      this.sendingPreviewPixels = new Map();
+      this.sendingPreviewTick += 1;
+    },
+    beginSendUi() {
+      this.captureSendingPreview();
+      deviceSendUxMixin.methods.beginSendUi.call(this);
+    },
+    endSendUi() {
+      deviceSendUxMixin.methods.endSendUi.call(this);
+    },
     handleBack() {
       uni.navigateBack();
     },
@@ -323,9 +359,6 @@ export default {
       uni.navigateTo({
         url: "/pages/github-scene-preview/index",
       });
-    },
-    handleDeviceSendPreviewRestored() {
-      this.schedulePreviewRefresh();
     },
     initPreviewCanvas() {
       const systemInfo = uni.getSystemInfoSync();
@@ -500,6 +533,8 @@ export default {
         return;
       }
 
+      const previousMode = this.deviceStore.deviceMode;
+      let expectedMode = "led_matrix_showcase";
       this.beginSendUi();
       try {
         const ws = this.deviceStore.getWebSocket();
@@ -513,6 +548,7 @@ export default {
         if (sendPlan.type !== "command") {
           throw new Error("LED 演示集仅支持板载原生命令");
         }
+        expectedMode = sendPlan.deviceMode;
 
         if (sendPlan.command.cmd === "set_ambient_effect") {
           await ws.setAmbientEffect(sendPlan.command);
@@ -531,14 +567,12 @@ export default {
           throw new Error("未支持的像素场景发送命令");
         }
 
-        await this.deviceStore.syncAndRequireBusinessMode(
-          sendPlan.deviceMode,
-          "设备未进入对应像素场景",
-        );
-
         this.saveConfig();
         this.showSendSuccess();
       } catch (error) {
+        await this.deviceStore.rollbackBusinessMode(previousMode, {
+          expectedMode,
+        });
         console.error("发送 LED Matrix 演示失败:", error);
         this.showSendFailure(error);
       } finally {

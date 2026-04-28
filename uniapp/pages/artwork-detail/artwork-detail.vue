@@ -18,163 +18,251 @@
 
     <!-- 主要内容 -->
     <scroll-view scroll-y class="main-content glx-scroll-region glx-page-shell__content">
-      <!-- 作品展示区域 -->
-      <view class="artwork-section">
-        <view class="artwork-container">
-          <image
-            :src="artwork.cover_url"
-            class="artwork-image"
-            mode="aspectFit"
-            @click="previewImage"
-          />
-          <view class="zoom-hint">
-            <Icon name="zoom-in" :size="32" color="currentColor" />
-            <text class="zoom-text">点击查看大图</text>
+      <view v-if="isLoading" class="artwork-detail-skeleton">
+        <view class="artwork-section">
+          <view class="artwork-container artwork-container--skeleton">
+            <view class="artwork-skeleton-block artwork-skeleton-block--poster"></view>
           </view>
         </view>
+
+        <view class="info-section">
+          <view class="artwork-info glx-panel-card artwork-skeleton-card">
+            <view class="artwork-skeleton-bar artwork-skeleton-bar--title"></view>
+            <view class="artwork-skeleton-meta">
+              <view class="artwork-skeleton-pill"></view>
+              <view class="artwork-skeleton-pill"></view>
+              <view class="artwork-skeleton-pill"></view>
+            </view>
+            <view class="artwork-skeleton-tags">
+              <view class="artwork-skeleton-pill artwork-skeleton-pill--tag"></view>
+              <view class="artwork-skeleton-pill artwork-skeleton-pill--tag artwork-skeleton-pill--tag-short"></view>
+            </view>
+          </view>
+
+          <view class="author-section glx-panel-card artwork-skeleton-card">
+            <view class="author-info">
+              <view class="artwork-skeleton-avatar"></view>
+              <view class="artwork-skeleton-author">
+                <view class="artwork-skeleton-bar artwork-skeleton-bar--name"></view>
+                <view class="artwork-skeleton-bar artwork-skeleton-bar--desc"></view>
+              </view>
+            </view>
+            <view class="artwork-skeleton-button"></view>
+          </view>
+        </view>
+
+        <view class="action-section">
+          <view class="action-buttons">
+            <view
+              v-for="index in 4"
+              :key="`action-skeleton-${index}`"
+              class="action-btn glx-action-tile action-btn--skeleton"
+            >
+              <view class="artwork-skeleton-icon"></view>
+              <view class="artwork-skeleton-bar artwork-skeleton-bar--action"></view>
+            </view>
+          </view>
+        </view>
+
+        <view class="comment-section artwork-skeleton-card">
+          <view class="section-header glx-section-head">
+            <view class="artwork-skeleton-bar artwork-skeleton-bar--section"></view>
+          </view>
+          <view class="artwork-skeleton-comment-list">
+            <view
+              v-for="index in 2"
+              :key="`comment-skeleton-${index}`"
+              class="artwork-skeleton-comment"
+            >
+              <view class="artwork-skeleton-avatar artwork-skeleton-avatar--small"></view>
+              <view class="artwork-skeleton-comment-copy">
+                <view class="artwork-skeleton-bar artwork-skeleton-bar--comment-name"></view>
+                <view class="artwork-skeleton-bar artwork-skeleton-bar--comment-line"></view>
+                <view class="artwork-skeleton-bar artwork-skeleton-bar--comment-line artwork-skeleton-bar--comment-line-short"></view>
+              </view>
+            </view>
+          </view>
+        </view>
+
+        <view class="related-section artwork-skeleton-card">
+          <view class="section-header">
+            <view class="artwork-skeleton-bar artwork-skeleton-bar--section"></view>
+          </view>
+          <view class="related-grid">
+            <view
+              v-for="index in 2"
+              :key="`related-skeleton-${index}`"
+              class="artwork-skeleton-related"
+            >
+              <view class="artwork-skeleton-block artwork-skeleton-block--related"></view>
+              <view class="artwork-skeleton-bar artwork-skeleton-bar--related-title"></view>
+              <view class="artwork-skeleton-bar artwork-skeleton-bar--related-meta"></view>
+            </view>
+          </view>
+        </view>
+
+        <view class="content-spacer"></view>
       </view>
 
-      <!-- 作品信息 -->
-      <view class="info-section">
-        <view class="artwork-info glx-panel-card">
-          <text class="artwork-title">{{ artwork.title }}</text>
-          <view class="artwork-meta">
-            <view class="meta-item">
-              <Icon name="modular" :size="28" color="currentColor" />
-              <text class="meta-text"
-                >{{ artwork.width }}×{{ artwork.height }}</text
-              >
-            </view>
-            <view class="meta-item">
-              <Icon name="picture" :size="28" color="currentColor" />
-              <text class="meta-text">{{ artwork.color_count }}色</text>
-            </view>
-            <view class="meta-item">
-              <Icon name="calendar" :size="28" color="currentColor" />
-              <text class="meta-text">{{ formatDate(artwork.created_at) }}</text>
-            </view>
-          </view>
-
-          <!-- 标签 -->
-          <view
-            v-if="artwork.tags && artwork.tags.length"
-            class="tags-container"
-          >
-            <view v-for="tag in artwork.tags" :key="tag" class="tag-item">
-              <text class="tag-text">#{{ tag }}</text>
-            </view>
-          </view>
-        </view>
-
-        <!-- 作者信息 -->
-        <view class="author-section glx-panel-card">
-          <view class="author-info" @click="goToUserProfile">
-            <Avatar :src="artwork.author_avatar" :size="80" />
-            <view class="author-details">
-              <text class="author-name">{{ artwork.author_name }}</text>
-              <text class="author-stats"
-                >{{ artwork.author_works_count }}个作品</text
-              >
-            </view>
-          </view>
-          <view
-            class="follow-btn glx-cta-button"
-            :class="{ following: artwork.isFollowing }"
-            @click="toggleFollow"
-          >
-            <text class="follow-text">
-              {{ artwork.isFollowing ? "已关注" : "关注" }}
-            </text>
-          </view>
-        </view>
-      </view>
-
-      <!-- 交互按钮 -->
-      <view class="action-section">
-        <view class="action-buttons">
-          <view
-            class="action-btn glx-action-tile"
-            :class="{ active: isLiked }"
-            @click="toggleLike"
-          >
-            <Icon
-              :name="isLiked ? 'favorite-filling' : 'favorite'"
-              :size="40"
-              color="var(--nb-ink)"
+      <view v-else>
+        <!-- 作品展示区域 -->
+        <view class="artwork-section">
+          <view class="artwork-container">
+            <image
+              :src="artwork.cover_url"
+              class="artwork-image"
+              mode="aspectFit"
+              @click="previewImage"
             />
-            <text class="action-text">{{ artwork.likes || 0 }}</text>
+            <view class="zoom-hint">
+              <Icon name="zoom-in" :size="32" color="currentColor" />
+              <text class="zoom-text">点击查看大图</text>
+            </view>
+          </view>
+        </view>
+
+        <!-- 作品信息 -->
+        <view class="info-section">
+          <view class="artwork-info glx-panel-card">
+            <text class="artwork-title">{{ artwork.title }}</text>
+            <view class="artwork-meta">
+              <view class="meta-item">
+                <Icon name="modular" :size="28" color="currentColor" />
+                <text class="meta-text"
+                  >{{ artwork.width }}×{{ artwork.height }}</text
+                >
+              </view>
+              <view class="meta-item">
+                <Icon name="picture" :size="28" color="currentColor" />
+                <text class="meta-text">{{ artwork.color_count }}色</text>
+              </view>
+              <view class="meta-item">
+                <Icon name="calendar" :size="28" color="currentColor" />
+                <text class="meta-text">{{ formatDate(artwork.created_at) }}</text>
+              </view>
+            </view>
+
+            <!-- 标签 -->
+            <view
+              v-if="artwork.tags && artwork.tags.length"
+              class="tags-container"
+            >
+              <view v-for="tag in artwork.tags" :key="tag" class="tag-item">
+                <text class="tag-text">#{{ tag }}</text>
+              </view>
+            </view>
           </view>
 
-          <view
-            class="action-btn glx-action-tile"
-            :class="{ active: isCollected }"
-            @click="toggleCollect"
-          >
-            <Icon
-              :name="isCollected ? 'file-common-filling' : 'file-common'"
-              :size="40"
-              color="var(--nb-ink)"
+          <!-- 作者信息 -->
+          <view class="author-section glx-panel-card">
+            <view class="author-info" @click="goToUserProfile">
+              <Avatar :src="artwork.author_avatar" :size="80" />
+              <view class="author-details">
+                <text class="author-name">{{ artwork.author_name }}</text>
+                <text class="author-stats"
+                  >{{ artwork.author_works_count }}个作品</text
+                >
+              </view>
+            </view>
+            <view
+              class="follow-btn glx-cta-button"
+              :class="{ following: artwork.isFollowing }"
+              @click="toggleFollow"
+            >
+              <text class="follow-text">
+                {{ artwork.isFollowing ? "已关注" : "关注" }}
+              </text>
+            </view>
+          </view>
+        </view>
+
+        <!-- 交互按钮 -->
+        <view class="action-section">
+          <view class="action-buttons">
+            <view
+              class="action-btn glx-action-tile"
+              :class="{ active: isLiked }"
+              @click="toggleLike"
+            >
+              <Icon
+                :name="isLiked ? 'favorite-filling' : 'favorite'"
+                :size="40"
+                color="var(--nb-ink)"
+              />
+              <text class="action-text">{{ artwork.likes || 0 }}</text>
+            </view>
+
+            <view
+              class="action-btn glx-action-tile"
+              :class="{ active: isCollected }"
+              @click="toggleCollect"
+            >
+              <Icon
+                :name="isCollected ? 'file-common-filling' : 'file-common'"
+                :size="40"
+                color="var(--nb-ink)"
+              />
+              <text class="action-text">{{ artwork.collects || 0 }}</text>
+            </view>
+
+            <view class="action-btn glx-action-tile" @click="showCommentInput">
+              <Icon name="comment" :size="40" color="var(--nb-ink)" />
+              <text class="action-text">{{ artwork.comments_count || 0 }}</text>
+            </view>
+
+            <view class="action-btn glx-action-tile" @click="shareArtwork">
+              <Icon name="share" :size="40" color="var(--nb-ink)" />
+              <text class="action-text">分享</text>
+            </view>
+          </view>
+        </view>
+
+        <!-- 评论区域 -->
+        <view class="comment-section">
+          <view class="section-header glx-section-head">
+            <text class="section-title glx-section-title">评论 ({{ comments.length }})</text>
+          </view>
+
+          <!-- 评论列表 -->
+          <view v-if="comments.length > 0" class="comment-list">
+            <Comment
+              v-for="comment in comments"
+              :key="comment.id"
+              :comment="comment"
+              @reply="handleReply"
+              @like="handleCommentLike"
+              @delete="handleCommentDelete"
             />
-            <text class="action-text">{{ artwork.collects || 0 }}</text>
           </view>
 
-          <view class="action-btn glx-action-tile" @click="showCommentInput">
-            <Icon name="comment" :size="40" color="var(--nb-ink)" />
-            <text class="action-text">{{ artwork.comments_count || 0 }}</text>
-          </view>
-
-          <view class="action-btn glx-action-tile" @click="shareArtwork">
-            <Icon name="share" :size="40" color="var(--nb-ink)" />
-            <text class="action-text">分享</text>
+          <!-- 空状态 -->
+          <view v-else class="empty-comments">
+            <Icon name="comment" :size="80" color="var(--text-tertiary)" />
+            <text class="empty-text">还没有评论，快来抢沙发吧！</text>
           </view>
         </view>
+
+        <!-- 相关推荐 -->
+        <view class="related-section">
+          <view class="section-header">
+            <text class="section-title">相关推荐</text>
+          </view>
+          <view class="related-grid">
+            <ArtworkCard
+              v-for="item in relatedArtworks"
+              :key="item.id"
+              :artwork="item"
+              @click="goToArtwork"
+            />
+          </view>
+        </view>
+
+        <view class="content-spacer"></view>
       </view>
-
-      <!-- 评论区域 -->
-      <view class="comment-section">
-        <view class="section-header glx-section-head">
-          <text class="section-title glx-section-title">评论 ({{ comments.length }})</text>
-        </view>
-
-        <!-- 评论列表 -->
-        <view v-if="comments.length > 0" class="comment-list">
-          <Comment
-            v-for="comment in comments"
-            :key="comment.id"
-            :comment="comment"
-            @reply="handleReply"
-            @like="handleCommentLike"
-            @delete="handleCommentDelete"
-          />
-        </view>
-
-        <!-- 空状态 -->
-        <view v-else class="empty-comments">
-          <Icon name="comment" :size="80" color="var(--text-tertiary)" />
-          <text class="empty-text">还没有评论，快来抢沙发吧！</text>
-        </view>
-      </view>
-
-      <!-- 相关推荐 -->
-      <view class="related-section">
-        <view class="section-header">
-          <text class="section-title">相关推荐</text>
-        </view>
-        <view class="related-grid">
-          <ArtworkCard
-            v-for="item in relatedArtworks"
-            :key="item.id"
-            :artwork="item"
-            @click="goToArtwork"
-          />
-        </view>
-      </view>
-
-      <view class="content-spacer"></view>
     </scroll-view>
 
     <!-- 底部评论输入 -->
-    <view v-if="showCommentBar" class="comment-input-bar">
+    <view v-if="!isLoading && showCommentBar" class="comment-input-bar">
       <view class="comment-input-container">
         <Input
           v-model="commentText"
@@ -194,7 +282,7 @@
       </view>
     </view>
 
-    <view v-else class="bottom-action-bar glx-page-shell__fixed">
+    <view v-else-if="!isLoading" class="bottom-action-bar glx-page-shell__fixed">
       <view class="bottom-action-shell">
         <view class="bottom-action-main">
           <text class="bottom-action-title">更多操作</text>
@@ -727,6 +815,10 @@ export default {
   overflow-y: auto;
 }
 
+.artwork-detail-skeleton {
+  padding-bottom: 0;
+}
+
 /* 作品展示区域 */
 .artwork-section {
   padding: 24rpx 32rpx 0;
@@ -746,6 +838,164 @@ export default {
   height: 560rpx;
   display: block;
   background: #e9edf6;
+}
+
+.artwork-container--skeleton {
+  padding: 24rpx;
+  background: #ffffff;
+}
+
+.artwork-skeleton-card {
+  background: #ffffff;
+}
+
+.artwork-skeleton-block,
+.artwork-skeleton-bar,
+.artwork-skeleton-pill,
+.artwork-skeleton-avatar,
+.artwork-skeleton-button,
+.artwork-skeleton-icon {
+  background: #d7d7d7;
+  box-sizing: border-box;
+}
+
+.artwork-skeleton-block--poster {
+  width: 100%;
+  height: 512rpx;
+  background: #111111;
+}
+
+.artwork-skeleton-meta,
+.artwork-skeleton-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16rpx;
+}
+
+.artwork-skeleton-bar {
+  height: 24rpx;
+}
+
+.artwork-skeleton-bar--title {
+  width: 72%;
+  height: 40rpx;
+  margin-bottom: 24rpx;
+}
+
+.artwork-skeleton-bar--name {
+  width: 220rpx;
+  height: 32rpx;
+  margin-bottom: 14rpx;
+}
+
+.artwork-skeleton-bar--desc {
+  width: 168rpx;
+}
+
+.artwork-skeleton-bar--action {
+  width: 56rpx;
+  height: 20rpx;
+}
+
+.artwork-skeleton-bar--section {
+  width: 200rpx;
+  height: 32rpx;
+}
+
+.artwork-skeleton-bar--comment-name {
+  width: 132rpx;
+  margin-bottom: 16rpx;
+}
+
+.artwork-skeleton-bar--comment-line {
+  width: 100%;
+  margin-bottom: 12rpx;
+}
+
+.artwork-skeleton-bar--comment-line-short {
+  width: 76%;
+  margin-bottom: 0;
+}
+
+.artwork-skeleton-bar--related-title {
+  width: 86%;
+  margin-top: 16rpx;
+  margin-bottom: 12rpx;
+}
+
+.artwork-skeleton-bar--related-meta {
+  width: 54%;
+}
+
+.artwork-skeleton-pill {
+  width: 160rpx;
+  height: 48rpx;
+  border: 2rpx solid rgba(0, 0, 0, 0.08);
+}
+
+.artwork-skeleton-pill--tag {
+  width: 116rpx;
+  height: 40rpx;
+}
+
+.artwork-skeleton-pill--tag-short {
+  width: 84rpx;
+}
+
+.artwork-skeleton-avatar {
+  width: 80rpx;
+  height: 80rpx;
+  border: 2rpx solid rgba(0, 0, 0, 0.08);
+}
+
+.artwork-skeleton-avatar--small {
+  width: 64rpx;
+  height: 64rpx;
+}
+
+.artwork-skeleton-author {
+  flex: 1;
+}
+
+.artwork-skeleton-button {
+  width: 136rpx;
+  height: 64rpx;
+  border: 2rpx solid rgba(0, 0, 0, 0.08);
+}
+
+.action-btn--skeleton {
+  pointer-events: none;
+}
+
+.artwork-skeleton-icon {
+  width: 40rpx;
+  height: 40rpx;
+}
+
+.artwork-skeleton-comment-list {
+  display: flex;
+  flex-direction: column;
+  gap: 24rpx;
+}
+
+.artwork-skeleton-comment {
+  display: flex;
+  align-items: flex-start;
+  gap: 18rpx;
+}
+
+.artwork-skeleton-comment-copy {
+  flex: 1;
+}
+
+.artwork-skeleton-related {
+  min-width: 0;
+}
+
+.artwork-skeleton-block--related {
+  width: 100%;
+  height: 220rpx;
+  background: #111111;
 }
 
 .zoom-hint {

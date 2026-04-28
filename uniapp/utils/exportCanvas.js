@@ -471,14 +471,14 @@ function drawCanvas(ctx, canvasWidth, canvasHeight, options) {
     ctx.textAlign = "left";
     ctx.textBaseline = "alphabetic";
     const textY = logoY + iconSize / 2 + 16; // 从 8 改为 16
-    ctx.fillText("RenLight", logoX + iconSize + 20, textY); // 从 10 改为 20
+    ctx.fillText("光格像素工坊", logoX + iconSize + 20, textY); // 从 10 改为 20
   }
 
   // 叠加水印（如果传入了 watermark 参数）
   if (watermark && watermark.username) {
     drawWatermark(ctx, canvasWidth, canvasHeight, {
       username: watermark.username,
-      logoText: "RenLight",
+      logoText: "光格像素工坊",
     });
   }
 }
@@ -491,7 +491,7 @@ function drawCanvas(ctx, canvasWidth, canvasHeight, options) {
  * @param {object} options - { username, logoText }
  */
 export function drawWatermark(ctx, canvasWidth, canvasHeight, options = {}) {
-  const { username = "RenLight", logoText = "RenLight" } = options;
+  const { username = "光格像素工坊", logoText = "光格像素工坊" } = options;
   const text = `${logoText} · ${username}`;
 
   ctx.save();
@@ -521,7 +521,7 @@ export function drawWatermark(ctx, canvasWidth, canvasHeight, options = {}) {
  * 复用 exportCanvasAsImage 逻辑，额外叠加水印层
  */
 export async function exportWithWatermark(options) {
-  const { username = "RenLight", ...exportOptions } = options;
+  const { username = "光格像素工坊", ...exportOptions } = options;
 
   // 先生成原始图纸
   const tempFilePath = await exportCanvasAsImage(exportOptions);

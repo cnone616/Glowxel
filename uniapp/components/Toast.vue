@@ -53,10 +53,10 @@ export default {
       this.message = message
       this.type = type
       
-      // 通知父组件显示toast（用于隐藏canvas）
+      // 通知父组件进入 toast 展示态，便于页面同步发送反馈层状态
       this.$emit('show')
 
-      // 让页面先完成 canvas 隐藏/卸载，再显示 toast，避免被原生 canvas 遮挡
+      // 给页面一帧时间完成遮罩和层级更新，再显示 toast
       this.showTimer = setTimeout(() => {
         this.visible = true
         this.showTimer = null
@@ -75,7 +75,7 @@ export default {
         this.showTimer = null
       }
       this.visible = false
-      // 通知父组件隐藏toast（用于显示canvas）
+      // 通知父组件退出 toast 展示态
       this.$emit('hide')
       
       if (this.timer) {

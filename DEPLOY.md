@@ -148,6 +148,6 @@ cd esp32-firmware && pio run --target upload
 | 芯片         | ESP32                |
 | 屏幕         | 64x64 HUB75 LED 矩阵 |
 | 固件版本     | 1.0.0                |
-| 热点配网名称 | Glowxel-设备序列号   |
+| 热点配网名称 | Glowxel PixelBoard-设备序列号 |
 | 配网方式     | AP 热点门户写入 WiFi |
 | WebSocket    | ws://设备IP/ws       |

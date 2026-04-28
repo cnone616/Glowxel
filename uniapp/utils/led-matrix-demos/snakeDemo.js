@@ -1,4 +1,25 @@
-import { clamp, fillRect, normalizeSpeed } from "./common.js";
+import {
+  drawClockTextToPixels,
+  getClockFontOptions,
+  getClockTextHeight,
+  getClockTextWidth,
+  getCurrentTimeText,
+} from "../clockCanvas.js";
+import { clamp, fillRect, normalizeSpeed, setPixel } from "./common.js";
+
+const PANEL_SIZE = 64;
+const CLOCK_TEXT_TOP = 2;
+const CLOCK_PADDING_X = 1;
+const CLOCK_PADDING_Y = 1;
+const DEFAULT_FONT = "minimal_3x5";
+const DEFAULT_SNAKE_SKIN = "gradient";
+const CLOCK_FONT_IDS = getClockFontOptions().map((item) => item.id);
+const DIRECTIONS = [
+  { x: 0, y: -1 },
+  { x: 1, y: 0 },
+  { x: 0, y: 1 },
+  { x: -1, y: 0 },
+];
 
 function createSeededRandom(seed) {
   let state = seed >>> 0;
@@ -8,207 +29,157 @@ function createSeededRandom(seed) {
   };
 }
 
-function hsvToRgb(hue) {
-  let safeHue = hue % 360;
-  if (safeHue < 0) {
-    safeHue += 360;
+function positiveModulo(value, base) {
+  if (base <= 0) {
+    return 0;
   }
-  const chroma = 0.9;
-  const x = chroma * (1 - Math.abs(((safeHue / 60) % 2) - 1));
+  const result = value % base;
+  return result < 0 ? result + base : result;
+}
 
-  if (safeHue < 60) {
-    return { r: chroma * 255, g: x * 255, b: 0 };
+function normalizeHexColor(value) {
+  if (typeof value !== "string") {
+    throw new Error("snake color value is invalid");
   }
-  if (safeHue < 120) {
-    return { r: x * 255, g: chroma * 255, b: 0 };
+  const body = value.trim().replace(/^#/, "");
+  if (!/^[0-9a-fA-F]{6}$/.test(body)) {
+    throw new Error("snake color value is invalid");
   }
-  if (safeHue < 180) {
-    return { r: 0, g: chroma * 255, b: x * 255 };
-  }
-  if (safeHue < 240) {
-    return { r: 0, g: x * 255, b: chroma * 255 };
-  }
-  if (safeHue < 300) {
-    return { r: x * 255, g: 0, b: chroma * 255 };
-  }
-  return { r: chroma * 255, g: 0, b: x * 255 };
+  return `#${body.toLowerCase()}`;
+}
+
+function hexToRgb(hex) {
+  const normalized = normalizeHexColor(hex);
+  return {
+    r: parseInt(normalized.slice(1, 3), 16),
+    g: parseInt(normalized.slice(3, 5), 16),
+    b: parseInt(normalized.slice(5, 7), 16),
+  };
 }
 
 function resolveSnakeWidth(options) {
   if (!options || !Number.isFinite(Number(options.snakeWidth))) {
     return 2;
   }
-  return clamp(Math.round(Number(options.snakeWidth)), 1, 4);
+  return clamp(Math.round(Number(options.snakeWidth)), 2, 4);
 }
 
-function resolveCellSize(sizeLevel) {
-  return clamp(Math.round(sizeLevel), 1, 4);
+function resolveSnakeColor(options) {
+  return hexToRgb(options.snakeColor);
 }
 
-function toKey(x, y) {
-  return `${x},${y}`;
+function resolveFoodColor(options) {
+  return hexToRgb(options.foodColor);
 }
 
-function clonePoint(point) {
-  return { x: point.x, y: point.y };
+function resolveShowSeconds(options) {
+  return options && options.showSeconds === true;
 }
 
-function drawBoardFrame(map, originX, originY, boardWidth, boardHeight) {
-  const left = Math.max(0, originX - 1);
-  const top = Math.max(0, originY - 1);
-  const right = Math.min(63, originX + boardWidth);
-  const bottom = Math.min(63, originY + boardHeight);
-
-  for (let x = left; x <= right; x += 1) {
-    map.set(`${x},${top}`, "rgb(24, 28, 38)");
-    map.set(`${x},${bottom}`, "rgb(24, 28, 38)");
+function resolveFont(options) {
+  if (!options || typeof options.font !== "string") {
+    return DEFAULT_FONT;
   }
-  for (let y = top; y <= bottom; y += 1) {
-    map.set(`${left},${y}`, "rgb(24, 28, 38)");
-    map.set(`${right},${y}`, "rgb(24, 28, 38)");
-  }
+  return CLOCK_FONT_IDS.includes(options.font) ? options.font : DEFAULT_FONT;
 }
 
-function drawCell(map, x, y, originX, originY, cellSize, color) {
-  fillRect(
-    map,
-    originX + x * cellSize,
-    originY + y * cellSize,
-    cellSize,
-    cellSize,
-    color.r,
-    color.g,
-    color.b,
+function resolveSnakeSkin(options) {
+  if (!options || typeof options.snakeSkin !== "string") {
+    return DEFAULT_SNAKE_SKIN;
+  }
+  if (
+    options.snakeSkin === "solid" ||
+    options.snakeSkin === "gradient" ||
+    options.snakeSkin === "spotted"
+  ) {
+    return options.snakeSkin;
+  }
+  return DEFAULT_SNAKE_SKIN;
+}
+
+function buildClockLayout(font, showSeconds) {
+  const sampleText = showSeconds ? "88:88:88" : "88:88";
+  const textWidth = getClockTextWidth(sampleText, font, 1);
+  const textHeight = getClockTextHeight(font, 1);
+  const textX = Math.floor((PANEL_SIZE - textWidth) / 2);
+  const textY = CLOCK_TEXT_TOP;
+  return {
+    active: true,
+    font,
+    textX,
+    textY,
+    reservedLeft: clamp(textX - CLOCK_PADDING_X, 0, PANEL_SIZE - 1),
+    reservedTop: clamp(textY - CLOCK_PADDING_Y, 0, PANEL_SIZE - 1),
+    reservedRight: clamp(
+      textX + textWidth - 1 + CLOCK_PADDING_X,
+      0,
+      PANEL_SIZE - 1,
+    ),
+    reservedBottom: clamp(
+      textY + textHeight - 1 + CLOCK_PADDING_Y,
+      0,
+      PANEL_SIZE - 1,
+    ),
+  };
+}
+
+function isReservedCell(x, y, size, originX, originY, clockLayout) {
+  if (!clockLayout || !clockLayout.active) {
+    return false;
+  }
+
+  const cellLeft = originX + x * size;
+  const cellTop = originY + y * size;
+  const cellRight = cellLeft + size - 1;
+  const cellBottom = cellTop + size - 1;
+
+  return !(
+    cellRight < clockLayout.reservedLeft ||
+    cellLeft > clockLayout.reservedRight ||
+    cellBottom < clockLayout.reservedTop ||
+    cellTop > clockLayout.reservedBottom
   );
 }
 
-function getNextPosition(position, direction) {
-  if (direction === "UP") {
-    return { x: position.x, y: position.y - 1 };
+function countPlayableCells(gridWidth, gridHeight, size, originX, originY, clockLayout) {
+  let count = 0;
+  for (let y = 0; y < gridHeight; y += 1) {
+    for (let x = 0; x < gridWidth; x += 1) {
+      if (!isReservedCell(x, y, size, originX, originY, clockLayout)) {
+        count += 1;
+      }
+    }
   }
-  if (direction === "DOWN") {
-    return { x: position.x, y: position.y + 1 };
-  }
-  if (direction === "LEFT") {
-    return { x: position.x - 1, y: position.y };
-  }
-  return { x: position.x + 1, y: position.y };
+  return count;
 }
 
-function isOppositeDirection(currentDirection, nextDirection) {
-  return (
-    (currentDirection === "UP" && nextDirection === "DOWN") ||
-    (currentDirection === "DOWN" && nextDirection === "UP") ||
-    (currentDirection === "LEFT" && nextDirection === "RIGHT") ||
-    (currentDirection === "RIGHT" && nextDirection === "LEFT")
-  );
-}
-
-function checkCollision(position, snake, gridWidth, gridHeight) {
-  if (position.x < 0 || position.x >= gridWidth || position.y < 0 || position.y >= gridHeight) {
-    return true;
-  }
-  for (let index = 0; index < snake.length; index += 1) {
-    if (snake[index].x === position.x && snake[index].y === position.y) {
+function isSnakeCellOccupied(snake, x, y, ignoreTailCount = 0) {
+  const limit = snake.length - ignoreTailCount;
+  for (let index = 0; index < limit; index += 1) {
+    if (snake[index].x === x && snake[index].y === y) {
       return true;
     }
   }
   return false;
 }
 
-function buildDistanceMap(target, snake, gridWidth, gridHeight) {
-  const map = Array.from({ length: gridWidth }, () => Array(gridHeight).fill(-1));
-  const queue = [clonePoint(target)];
-  map[target.x][target.y] = 0;
-  let queueIndex = 0;
-
-  while (queueIndex < queue.length) {
-    const current = queue[queueIndex];
-    queueIndex += 1;
-    const directions = ["UP", "DOWN", "LEFT", "RIGHT"];
-    for (let index = 0; index < directions.length; index += 1) {
-      const next = getNextPosition(current, directions[index]);
-      if (next.x < 0 || next.x >= gridWidth || next.y < 0 || next.y >= gridHeight) {
-        continue;
-      }
-      if (map[next.x][next.y] !== -1) {
-        continue;
-      }
-
-      let blocked = false;
-      for (let segmentIndex = 0; segmentIndex < snake.length; segmentIndex += 1) {
-        if (snake[segmentIndex].x === next.x && snake[segmentIndex].y === next.y) {
-          blocked = true;
-          break;
-        }
-      }
-      if (blocked) {
-        continue;
-      }
-
-      map[next.x][next.y] = map[current.x][current.y] + 1;
-      queue.push(next);
-    }
-  }
-
-  return map;
-}
-
-function willCauseSelfTrap(direction, snake, gridWidth, gridHeight) {
-  const next = getNextPosition(snake[0], direction);
-  if (checkCollision(next, snake, gridWidth, gridHeight)) {
-    return true;
-  }
-
-  let availableMoves = 0;
-  const directions = ["UP", "DOWN", "LEFT", "RIGHT"];
-  for (let index = 0; index < directions.length; index += 1) {
-    const test = getNextPosition(next, directions[index]);
-    if (!checkCollision(test, snake, gridWidth, gridHeight)) {
-      availableMoves += 1;
-    }
-  }
-  return availableMoves < 2;
-}
-
-function findPathDirection(currentDirection, snake, food, gridWidth, gridHeight) {
-  const distanceMap = buildDistanceMap(food, snake, gridWidth, gridHeight);
-  const directions = ["UP", "DOWN", "LEFT", "RIGHT"];
-  let bestDirection = currentDirection;
-  let bestDistance = Number.MAX_SAFE_INTEGER;
-
-  for (let index = 0; index < directions.length; index += 1) {
-    const direction = directions[index];
-    if (isOppositeDirection(currentDirection, direction)) {
-      continue;
-    }
-    const next = getNextPosition(snake[0], direction);
-    if (checkCollision(next, snake, gridWidth, gridHeight)) {
-      continue;
-    }
-    if (distanceMap[next.x][next.y] !== -1 && distanceMap[next.x][next.y] < bestDistance) {
-      bestDistance = distanceMap[next.x][next.y];
-      bestDirection = direction;
-    }
-  }
-
-  if (!isOppositeDirection(currentDirection, bestDirection) &&
-      !willCauseSelfTrap(bestDirection, snake, gridWidth, gridHeight)) {
-    return bestDirection;
-  }
-  return currentDirection;
-}
-
-function generateFood(rand, snake, gridWidth, gridHeight) {
-  const occupied = new Set();
-  for (let index = 0; index < snake.length; index += 1) {
-    occupied.add(toKey(snake[index].x, snake[index].y));
-  }
-
+function placeSnakeFood(
+  rand,
+  snake,
+  gridWidth,
+  gridHeight,
+  size,
+  originX,
+  originY,
+  clockLayout,
+) {
   const candidates = [];
   for (let y = 0; y < gridHeight; y += 1) {
     for (let x = 0; x < gridWidth; x += 1) {
-      if (!occupied.has(toKey(x, y))) {
+      if (isReservedCell(x, y, size, originX, originY, clockLayout)) {
+        continue;
+      }
+      if (!isSnakeCellOccupied(snake, x, y, 0)) {
         candidates.push({ x, y });
       }
     }
@@ -217,171 +188,489 @@ function generateFood(rand, snake, gridWidth, gridHeight) {
   if (candidates.length === 0) {
     return null;
   }
+
   return candidates[Math.floor(rand() * candidates.length)];
 }
 
-function getSnakeColor(segmentIndex, frameCounter) {
-  const hue = (segmentIndex * 30 + frameCounter * 0.8) % 360;
-  const rgb = hsvToRgb(hue);
-  return {
-    r: Math.round(rgb.r),
-    g: Math.round(rgb.g),
-    b: Math.round(rgb.b),
-  };
+function buildSnakeDistanceMap(
+  food,
+  snake,
+  gridWidth,
+  gridHeight,
+  size,
+  originX,
+  originY,
+  clockLayout,
+) {
+  if (!food) {
+    return null;
+  }
+
+  const distance = Array.from({ length: gridHeight }, () =>
+    Array(gridWidth).fill(-1),
+  );
+  const visited = Array.from({ length: gridHeight }, () =>
+    Array(gridWidth).fill(false),
+  );
+  const queue = [{ x: food.x, y: food.y }];
+
+  visited[food.y][food.x] = true;
+  distance[food.y][food.x] = 0;
+
+  for (let index = 0; index < queue.length; index += 1) {
+    const current = queue[index];
+    for (let dirIndex = 0; dirIndex < DIRECTIONS.length; dirIndex += 1) {
+      const direction = DIRECTIONS[dirIndex];
+      const nextX = current.x + direction.x;
+      const nextY = current.y + direction.y;
+      if (nextX < 0 || nextX >= gridWidth || nextY < 0 || nextY >= gridHeight) {
+        continue;
+      }
+      if (isReservedCell(nextX, nextY, size, originX, originY, clockLayout)) {
+        continue;
+      }
+      if (isSnakeCellOccupied(snake, nextX, nextY, 1)) {
+        continue;
+      }
+      if (visited[nextY][nextX]) {
+        continue;
+      }
+
+      visited[nextY][nextX] = true;
+      distance[nextY][nextX] = distance[current.y][current.x] + 1;
+      queue.push({ x: nextX, y: nextY });
+    }
+  }
+
+  return distance;
 }
 
-function getFoodColor(frameCounter) {
-  const pulse = (Math.sin(frameCounter * 0.2) + 1) / 2;
-  const intensity = Math.round(150 + pulse * 105);
-  return {
-    r: intensity,
-    g: 50,
-    b: 50,
+function canSnakeMoveTo(
+  snake,
+  food,
+  x,
+  y,
+  gridWidth,
+  gridHeight,
+  size,
+  originX,
+  originY,
+  clockLayout,
+) {
+  if (x < 0 || x >= gridWidth || y < 0 || y >= gridHeight) {
+    return false;
+  }
+  if (isReservedCell(x, y, size, originX, originY, clockLayout)) {
+    return false;
+  }
+  const eating = !!food && food.x === x && food.y === y;
+  return !isSnakeCellOccupied(snake, x, y, eating ? 0 : 1);
+}
+
+function pickSnakeDirection(
+  snake,
+  food,
+  gridWidth,
+  gridHeight,
+  size,
+  originX,
+  originY,
+  clockLayout,
+) {
+  const distanceMap = buildSnakeDistanceMap(
+    food,
+    snake,
+    gridWidth,
+    gridHeight,
+    size,
+    originX,
+    originY,
+    clockLayout,
+  );
+  let bestDirection = -1;
+  let bestDistance = Number.MAX_SAFE_INTEGER;
+
+  for (let dirIndex = 0; dirIndex < DIRECTIONS.length; dirIndex += 1) {
+    const direction = DIRECTIONS[dirIndex];
+    const nextX = snake[0].x + direction.x;
+    const nextY = snake[0].y + direction.y;
+    if (
+      !canSnakeMoveTo(
+        snake,
+        food,
+        nextX,
+        nextY,
+        gridWidth,
+        gridHeight,
+        size,
+        originX,
+        originY,
+        clockLayout,
+      )
+    ) {
+      continue;
+    }
+
+    const nextDistance =
+      distanceMap &&
+      nextY >= 0 &&
+      nextY < gridHeight &&
+      nextX >= 0 &&
+      nextX < gridWidth
+        ? distanceMap[nextY][nextX]
+        : -1;
+
+    if (nextDistance >= 0 && nextDistance < bestDistance) {
+      bestDistance = nextDistance;
+      bestDirection = dirIndex;
+    }
+  }
+
+  if (bestDirection >= 0) {
+    return bestDirection;
+  }
+
+  for (let dirIndex = 0; dirIndex < DIRECTIONS.length; dirIndex += 1) {
+    const direction = DIRECTIONS[dirIndex];
+    const nextX = snake[0].x + direction.x;
+    const nextY = snake[0].y + direction.y;
+    if (
+      canSnakeMoveTo(
+        snake,
+        food,
+        nextX,
+        nextY,
+        gridWidth,
+        gridHeight,
+        size,
+        originX,
+        originY,
+        clockLayout,
+      )
+    ) {
+      return dirIndex;
+    }
+  }
+
+  return -1;
+}
+
+function drawGlowPixel(map, x, y, r, g, b) {
+  setPixel(map, x, y, r, g, b);
+}
+
+function drawSnakeCellBorder(map, x, y, size, color, emphasize) {
+  if (size < 2) {
+    return;
+  }
+
+  const light = {
+    r: clamp(Math.round(color.r + (emphasize ? 56 : 28)), 0, 255),
+    g: clamp(Math.round(color.g + (emphasize ? 56 : 28)), 0, 255),
+    b: clamp(Math.round(color.b + (emphasize ? 56 : 28)), 0, 255),
   };
+  const dark = {
+    r: clamp(Math.round(color.r - (emphasize ? 34 : 18)), 0, 255),
+    g: clamp(Math.round(color.g - (emphasize ? 34 : 18)), 0, 255),
+    b: clamp(Math.round(color.b - (emphasize ? 34 : 18)), 0, 255),
+  };
+
+  for (let offset = 0; offset < size; offset += 1) {
+    drawGlowPixel(map, x + offset, y, light.r, light.g, light.b);
+    drawGlowPixel(map, x, y + offset, light.r, light.g, light.b);
+    drawGlowPixel(map, x + offset, y + size - 1, dark.r, dark.g, dark.b);
+    drawGlowPixel(map, x + size - 1, y + offset, dark.r, dark.g, dark.b);
+  }
+}
+
+function drawSnakeCellSpots(map, x, y, size, color, patternSeed) {
+  if (size < 2) {
+    return;
+  }
+
+  const spot = {
+    r: clamp(Math.round(color.r - 46), 0, 255),
+    g: clamp(Math.round(color.g - 46), 0, 255),
+    b: clamp(Math.round(color.b - 46), 0, 255),
+  };
+  const spotCount = size >= 4 ? 3 : 2;
+
+  for (let index = 0; index < spotCount; index += 1) {
+    const seed = patternSeed + index * 19;
+    const localX = positiveModulo(seed * 3 + 1, size);
+    const localY = positiveModulo(seed * 5 + 2, size);
+    drawGlowPixel(map, x + localX, y + localY, spot.r, spot.g, spot.b);
+    if (size >= 4 && index === 0) {
+      const mirrorX = positiveModulo(localX + 1, size);
+      drawGlowPixel(map, x + mirrorX, y + localY, spot.r, spot.g, spot.b);
+    }
+  }
+}
+
+function drawSnakeSegment(map, x, y, size, color, emphasize, drawSpots, patternSeed) {
+  fillRect(map, x, y, size, size, color.r, color.g, color.b);
+
+  if (size === 1) {
+    const halo = emphasize
+      ? {
+          r: clamp(Math.round(color.r / 2 + 48), 0, 255),
+          g: clamp(Math.round(color.g / 2 + 48), 0, 255),
+          b: clamp(Math.round(color.b / 2 + 48), 0, 255),
+        }
+      : {
+          r: clamp(Math.round(color.r / 3), 0, 255),
+          g: clamp(Math.round(color.g / 3), 0, 255),
+          b: clamp(Math.round(color.b / 3), 0, 255),
+        };
+
+    const orthogonalOffsets = [
+      { x: -1, y: 0 },
+      { x: 1, y: 0 },
+      { x: 0, y: -1 },
+      { x: 0, y: 1 },
+    ];
+
+    for (let index = 0; index < orthogonalOffsets.length; index += 1) {
+      const offset = orthogonalOffsets[index];
+      drawGlowPixel(map, x + offset.x, y + offset.y, halo.r, halo.g, halo.b);
+    }
+
+    if (!emphasize) {
+      return;
+    }
+
+    const corner = {
+      r: clamp(Math.round(halo.r / 2), 0, 255),
+      g: clamp(Math.round(halo.g / 2), 0, 255),
+      b: clamp(Math.round(halo.b / 2), 0, 255),
+    };
+    const diagonalOffsets = [
+      { x: -1, y: -1 },
+      { x: 1, y: -1 },
+      { x: -1, y: 1 },
+      { x: 1, y: 1 },
+    ];
+
+    for (let index = 0; index < diagonalOffsets.length; index += 1) {
+      const offset = diagonalOffsets[index];
+      drawGlowPixel(map, x + offset.x, y + offset.y, corner.r, corner.g, corner.b);
+    }
+    return;
+  }
+
+  drawSnakeCellBorder(map, x, y, size, color, emphasize);
+  if (drawSpots) {
+    drawSnakeCellSpots(map, x, y, size, color, patternSeed);
+  }
+}
+
+function getSnakeSegmentColor(segmentIndex, snakeColor, snakeLength, snakeSkin, dead, won) {
+  if (dead) {
+    return { r: 255, g: 80, b: 80 };
+  }
+  if (won) {
+    return { r: 120, g: 210, b: 255 };
+  }
+
+  const color = {
+    r: snakeColor.r,
+    g: snakeColor.g,
+    b: snakeColor.b,
+  };
+
+  if (snakeSkin === "gradient" && snakeLength > 1) {
+    const gradientSpan = Math.max(1, snakeLength - 1);
+    const factorPercent = 120 - Math.floor((segmentIndex * 55) / gradientSpan);
+    color.r = clamp(Math.round((color.r * factorPercent) / 100), 0, 255);
+    color.g = clamp(Math.round((color.g * factorPercent) / 100), 0, 255);
+    color.b = clamp(Math.round((color.b * factorPercent) / 100), 0, 255);
+  }
+
+  if (segmentIndex === 0) {
+    color.r = clamp(Math.round(color.r + (255 - color.r) * 0.35), 0, 255);
+    color.g = clamp(Math.round(color.g + (255 - color.g) * 0.35), 0, 255);
+    color.b = clamp(Math.round(color.b + (255 - color.b) * 0.35), 0, 255);
+  }
+
+  return color;
+}
+
+function drawClock(map, clockLayout, font, showSeconds) {
+  const timeText = getCurrentTimeText(showSeconds, 24);
+  drawClockTextToPixels(
+    timeText,
+    clockLayout.textX,
+    clockLayout.textY,
+    "#ffffff",
+    map,
+    font,
+    1,
+    "left",
+  );
 }
 
 export function buildSnakeDemoMaps(speed, intensity, options) {
   const safeSpeed = normalizeSpeed(speed);
   const snakeWidth = resolveSnakeWidth(options);
-  const cellSize = resolveCellSize(snakeWidth);
-  const gridWidth = Math.max(8, Math.floor(64 / cellSize));
-  const gridHeight = Math.max(8, Math.floor(64 / cellSize));
-  const boardWidth = gridWidth * cellSize;
-  const boardHeight = gridHeight * cellSize;
-  const originX = Math.floor((64 - boardWidth) / 2);
-  const originY = Math.floor((64 - boardHeight) / 2);
+  const snakeColor = resolveSnakeColor(options);
+  const foodColor = resolveFoodColor(options);
+  const showSeconds = resolveShowSeconds(options);
+  const font = resolveFont(options);
+  const snakeSkin = resolveSnakeSkin(options);
+  const gridWidth = Math.floor(PANEL_SIZE / snakeWidth);
+  const gridHeight = Math.floor(PANEL_SIZE / snakeWidth);
+  const originX = Math.floor((PANEL_SIZE - gridWidth * snakeWidth) / 2);
+  const originY = Math.floor((PANEL_SIZE - gridHeight * snakeWidth) / 2);
+  const clockLayout = buildClockLayout(font, showSeconds);
+  const playableCellCount = countPlayableCells(
+    gridWidth,
+    gridHeight,
+    snakeWidth,
+    originX,
+    originY,
+    clockLayout,
+  );
   const rand = createSeededRandom(20260423 + safeSpeed * 17 + snakeWidth * 31);
   const maps = [];
   const maxFrames = 900;
-  const updateEvery = Math.max(2, Math.round((0.2 + Math.max(0, 10 - safeSpeed) * 0.05) * 30));
+  const updateEvery = Math.max(
+    2,
+    Math.round((0.2 + Math.max(0, 10 - safeSpeed) * 0.05) * 30),
+  );
 
   let snake = [];
   let food = null;
-  let currentDirection = "RIGHT";
-  let nextDirection = "RIGHT";
-  let gameOver = false;
-  let gameWon = false;
-  let score = 0;
-  let level = 1;
-  let gameSpeed = 0.2;
-  let deathAnimationFrame = 0;
-  let winAnimationFrame = 0;
+  let direction = 1;
+  let dead = false;
+  let won = false;
+  let holdTicks = 0;
   let frameCounter = 0;
 
-  function initializeGame() {
-    snake = [];
-    gameOver = false;
-    gameWon = false;
-    score = 0;
-    level = 1;
-    currentDirection = "RIGHT";
-    nextDirection = "RIGHT";
-    deathAnimationFrame = 0;
-    winAnimationFrame = 0;
-    frameCounter = 0;
-
+  function initSnake() {
     const startX = Math.floor(gridWidth / 2);
     const startY = Math.floor(gridHeight / 2);
-    snake.push({ x: startX, y: startY });
-    snake.push({ x: startX - 1, y: startY });
-    snake.push({ x: startX - 2, y: startY });
-    food = generateFood(rand, snake, gridWidth, gridHeight);
-    gameSpeed = 0.2;
+    snake = [
+      { x: startX, y: startY },
+      { x: startX - 1, y: startY },
+      { x: startX - 2, y: startY },
+      { x: startX - 3, y: startY },
+    ];
+    food = placeSnakeFood(
+      rand,
+      snake,
+      gridWidth,
+      gridHeight,
+      snakeWidth,
+      originX,
+      originY,
+      clockLayout,
+    );
+    direction = 1;
+    dead = false;
+    won = false;
+    holdTicks = 0;
   }
 
-  function calculateLevel() {
-    level = Math.floor(score / 5) + 1;
-    gameSpeed = Math.min(0.2 + (level - 1) * 0.05, 0.8);
-  }
-
-  function moveSnake() {
-    const head = snake[0];
-    const nextHead = getNextPosition(head, currentDirection);
-    const bodyWithoutTail = snake.slice(0, snake.length - 1);
-
-    if (checkCollision(nextHead, bodyWithoutTail, gridWidth, gridHeight)) {
-      gameOver = true;
-      deathAnimationFrame = 0;
+  function updateSnake() {
+    if (won || dead) {
+      holdTicks += 1;
+      if (holdTicks >= 20) {
+        initSnake();
+      }
       return;
     }
 
-    snake.unshift(nextHead);
-    if (food && nextHead.x === food.x && nextHead.y === food.y) {
-      score += 1;
-      food = generateFood(rand, snake, gridWidth, gridHeight);
-      calculateLevel();
-    } else {
-      snake.pop();
+    const nextDirection = pickSnakeDirection(
+      snake,
+      food,
+      gridWidth,
+      gridHeight,
+      snakeWidth,
+      originX,
+      originY,
+      clockLayout,
+    );
+    if (nextDirection < 0) {
+      dead = true;
+      holdTicks = 0;
+      return;
     }
 
-    const reasonableMaxSize = Math.min(gridWidth * gridHeight - 1, Math.floor(gridWidth * gridHeight * 0.75));
-    if (snake.length >= reasonableMaxSize) {
-      gameWon = true;
-      winAnimationFrame = 0;
+    direction = nextDirection;
+    const nextHead = {
+      x: snake[0].x + DIRECTIONS[direction].x,
+      y: snake[0].y + DIRECTIONS[direction].y,
+    };
+    const eating = !!food && nextHead.x === food.x && nextHead.y === food.y;
+
+    snake.unshift(nextHead);
+    if (eating) {
+      if (snake.length >= playableCellCount) {
+        won = true;
+        holdTicks = 0;
+      } else {
+        food = placeSnakeFood(
+          rand,
+          snake,
+          gridWidth,
+          gridHeight,
+          snakeWidth,
+          originX,
+          originY,
+          clockLayout,
+        );
+      }
+      return;
     }
+
+    snake.pop();
   }
 
-  initializeGame();
+  initSnake();
 
   while (maps.length < maxFrames) {
     const map = new Map();
-    drawBoardFrame(map, originX, originY, boardWidth, boardHeight);
-
     frameCounter += 1;
 
-    if (gameOver) {
-      deathAnimationFrame += 1;
-      const flashIntensity = deathAnimationFrame % 10 < 5 ? 255 : 100;
-      for (let y = 0; y < gridHeight; y += 1) {
-        for (let x = 0; x < gridWidth; x += 1) {
-          drawCell(map, x, y, originX, originY, cellSize, { r: flashIntensity, g: 0, b: 0 });
-        }
-      }
-      for (let index = 0; index < snake.length; index += 1) {
-        drawCell(map, snake[index].x, snake[index].y, originX, originY, cellSize, { r: 255, g: 255, b: 255 });
-      }
-      if (deathAnimationFrame >= 60) {
-        initializeGame();
-      }
-      maps.push(map);
-      continue;
+    if (frameCounter > 1 && frameCounter % updateEvery === 0) {
+      updateSnake();
     }
 
-    if (gameWon) {
-      winAnimationFrame += 1;
-      const hueOffset = winAnimationFrame * 0.1;
-      for (let y = 0; y < gridHeight; y += 1) {
-        for (let x = 0; x < gridWidth; x += 1) {
-          const rgb = hsvToRgb((hueOffset * 180 + (x + y) * 20) % 360);
-          drawCell(map, x, y, originX, originY, cellSize, {
-            r: Math.round(rgb.r * 0.8),
-            g: Math.round(rgb.g * 0.8),
-            b: Math.round(rgb.b * 0.8),
-          });
-        }
-      }
-      if (winAnimationFrame > 120) {
-        initializeGame();
-      }
-      maps.push(map);
-      continue;
-    }
-
-    if (frameCounter % Math.max(1, Math.round(updateEvery * gameSpeed)) === 0) {
-      if (food) {
-        nextDirection = findPathDirection(currentDirection, snake, food, gridWidth, gridHeight);
-      }
-      currentDirection = nextDirection;
-      moveSnake();
-    }
-
+    const drawSpots = snakeSkin === "spotted" && !dead && !won;
     for (let index = 0; index < snake.length; index += 1) {
-      const color = getSnakeColor(index, frameCounter);
-      drawCell(map, snake[index].x, snake[index].y, originX, originY, cellSize, color);
+      drawSnakeSegment(
+        map,
+        originX + snake[index].x * snakeWidth,
+        originY + snake[index].y * snakeWidth,
+        snakeWidth,
+        getSnakeSegmentColor(
+          index,
+          snakeColor,
+          snake.length,
+          snakeSkin,
+          dead,
+          won,
+        ),
+        index === 0,
+        drawSpots,
+        snake[index].x * 31 + snake[index].y * 17 + index * 13,
+      );
     }
-    if (food) {
-      drawCell(map, food.x, food.y, originX, originY, cellSize, getFoodColor(frameCounter));
+
+    if (!won && food) {
+      drawSnakeSegment(
+        map,
+        originX + food.x * snakeWidth,
+        originY + food.y * snakeWidth,
+        snakeWidth,
+        foodColor,
+        true,
+        false,
+        0,
+      );
     }
+
+    drawClock(map, clockLayout, font, showSeconds);
     maps.push(map);
   }
 

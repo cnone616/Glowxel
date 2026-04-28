@@ -1,127 +1,114 @@
 <template>
-  <div class="login">
-    <div class="login-card">
-      <h1>登录光格像素工坊</h1>
-      <p class="subtitle">当前 Web 端使用账号密码登录</p>
-      <form @submit.prevent="handleLogin">
-        <input
-          v-model="form.username"
-          type="text"
-          placeholder="用户名"
-          required
-        />
-        <input
-          v-model="form.password"
-          type="password"
-          placeholder="密码"
-          required
-        />
-        <button type="submit" class="login-btn" :disabled="loading">
-          {{ loading ? "登录中..." : "登录" }}
+  <div class="glx-page-shell login-page">
+    <section class="glx-page-shell__hero">
+      <span class="glx-page-shell__eyebrow">Login</span>
+      <h1 class="glx-page-shell__title">登录光格像素工坊</h1>
+      <p class="glx-page-shell__desc">
+        网站的登录入口需要保留，登录后才能进入作品管理、发布和个人中心。当前页面继续承接仓库里已经存在的账号密码链路。
+      </p>
+    </section>
+
+    <section class="glx-section-card glx-section-card--stack login-card">
+      <div class="glx-form-grid">
+        <label class="glx-field">
+          <span class="glx-field__label">用户名</span>
+          <input
+            v-model="form.username"
+            class="glx-input"
+            type="text"
+            autocomplete="username"
+            placeholder="请输入用户名"
+          />
+        </label>
+
+        <label class="glx-field">
+          <span class="glx-field__label">密码</span>
+          <input
+            v-model="form.password"
+            class="glx-input"
+            type="password"
+            autocomplete="current-password"
+            placeholder="请输入密码"
+          />
+        </label>
+      </div>
+
+      <div class="glx-inline-actions">
+        <button
+          type="button"
+          class="glx-button glx-button--primary"
+          :disabled="userStore.loading"
+          @click="handleLogin"
+        >
+          {{ userStore.loading ? "登录中..." : "登录" }}
         </button>
-      </form>
-      <p class="error" v-if="error">{{ error }}</p>
-    </div>
+      </div>
+
+      <p v-if="errorMessage.length > 0" class="login-error">{{ errorMessage }}</p>
+    </section>
   </div>
 </template>
 
 <script setup>
-import { ref } from "vue";
-import { useRouter } from "vue-router";
-import { userAPI } from "@/api/index.js";
+import { reactive, ref } from "vue";
+import { useRoute, useRouter } from "vue-router";
+import { useUserStore } from "@/stores/user.js";
 
+const route = useRoute();
 const router = useRouter();
-const form = ref({ username: "", password: "" });
-const loading = ref(false);
-const error = ref("");
+const userStore = useUserStore();
+
+const form = reactive({
+  username: "",
+  password: "",
+});
+const errorMessage = ref("");
 
 async function handleLogin() {
-  loading.value = true;
-  error.value = "";
-  try {
-    const res = await userAPI.adminLogin(form.value);
-    if (res.success) {
-      localStorage.setItem("auth_token", res.data.token);
-      localStorage.setItem("user_info", JSON.stringify(res.data.user));
-      router.push("/");
-    } else {
-      error.value = res.message;
-    }
-  } catch (e) {
-    error.value = "网络错误";
+  errorMessage.value = "";
+
+  if (form.username.trim().length === 0 || form.password.trim().length === 0) {
+    errorMessage.value = "请输入用户名和密码";
+    return;
   }
-  loading.value = false;
+
+  const response = await userStore.loginWithAdmin({
+    username: form.username.trim(),
+    password: form.password,
+  });
+
+  if (response.success) {
+    if (typeof route.query.redirect === "string" && route.query.redirect.length > 0) {
+      router.push(route.query.redirect);
+      return;
+    }
+    router.push("/profile");
+    return;
+  }
+
+  if (typeof response.message === "string" && response.message.length > 0) {
+    errorMessage.value = response.message;
+    return;
+  }
+
+  errorMessage.value = "登录失败";
 }
 </script>
 
 <style scoped>
-.login {
-  min-height: calc(100vh - 120px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
+.login-page {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 48px 24px 80px;
 }
+
 .login-card {
-  width: 100%;
-  max-width: 380px;
-  background: var(--tone-paper-soft);
-  border: 3px solid var(--nb-ink);
-  border-radius: 0;
-  padding: 40px 32px;
-  box-shadow: var(--nb-shadow-card);
+  max-width: 420px;
 }
-.login-card h1 {
-  font-size: 24px;
-  font-weight: 800;
-  color: var(--nb-ink);
-  text-align: center;
-}
-.subtitle {
-  text-align: center;
-  color: var(--text-secondary);
-  font-size: 14px;
-  margin: 8px 0 28px;
-}
-form {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-input {
-  padding: 12px 14px;
-  border: 2px solid var(--nb-ink);
-  border-radius: 0;
-  font-size: 14px;
-  outline: none;
-  color: var(--nb-ink);
-  background: var(--tone-paper-soft);
-}
-input:focus {
-  border-color: var(--nb-ink);
-}
-.login-btn {
-  padding: 12px;
-  border: 2px solid var(--nb-ink);
-  border-radius: 0;
-  background: var(--nb-yellow);
-  color: var(--nb-ink);
-  font-size: 15px;
-  font-weight: 800;
-  cursor: pointer;
-  box-shadow: var(--nb-shadow-soft);
-}
-.login-btn:hover {
-  background: var(--color-primary-hover);
-}
-.login-btn:disabled {
-  background: #ccc;
-  cursor: not-allowed;
-}
-.error {
-  text-align: center;
+
+.login-error {
   color: var(--nb-coral);
   font-size: 13px;
-  margin-top: 12px;
+  font-weight: 800;
 }
 </style>

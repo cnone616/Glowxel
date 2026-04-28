@@ -245,7 +245,7 @@
                   <view class="demo-logo-core"></view>
                 </view>
                 <view class="demo-device-copy">
-                  <text class="demo-device-name">Glowxel Pro</text>
+                  <text class="demo-device-name">Glowxel PixelBoard</text>
                   <view class="demo-device-status">
                     <view class="demo-status-dot"></view>
                     <text class="demo-status-text">设备在线</text>

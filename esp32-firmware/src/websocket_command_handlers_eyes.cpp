@@ -5,6 +5,7 @@
 #include "eyes_effect.h"
 #include "mode_tags.h"
 #include "runtime_command_bus.h"
+#include "websocket_async_command_response.h"
 #include <string.h>
 
 namespace {
@@ -48,7 +49,8 @@ bool ensureEyesBehaviorObject(JsonObject behavior) {
          behavior.containsKey("blinkIntervalMs") &&
          behavior.containsKey("lookIntervalMs") &&
          behavior.containsKey("idleMove") &&
-         behavior.containsKey("sleepyAfterMs");
+         behavior.containsKey("sleepyAfterMs") &&
+         behavior.containsKey("expressionRhythm");
 }
 
 bool ensureEyesInteractionObject(JsonObject interaction) {
@@ -66,6 +68,25 @@ bool ensureEyesTimeObject(JsonObject time) {
 bool ensureEyesStyleObject(JsonObject style) {
   return style.containsKey("eyeColor") &&
          style.containsKey("timeColor");
+}
+
+bool parseEyesExpressionRhythm(const char* value, uint8_t& expressionRhythm) {
+  if (value == nullptr) {
+    return false;
+  }
+  if (strcmp(value, "slow") == 0) {
+    expressionRhythm = EyesConfig::EXPRESSION_RHYTHM_SLOW;
+    return true;
+  }
+  if (strcmp(value, "standard") == 0) {
+    expressionRhythm = EyesConfig::EXPRESSION_RHYTHM_STANDARD;
+    return true;
+  }
+  if (strcmp(value, "lively") == 0) {
+    expressionRhythm = EyesConfig::EXPRESSION_RHYTHM_LIVELY;
+    return true;
+  }
+  return false;
 }
 }
 
@@ -111,7 +132,9 @@ bool WebSocketCommandHandlers::handleEyesCommand(
     const char* eyeColor = style["eyeColor"];
     const char* timeColor = style["timeColor"];
     const char* timeFont = time["font"];
+    const char* expressionRhythmText = behavior["expressionRhythm"];
     uint8_t timeFontId = 0;
+    uint8_t expressionRhythm = EyesConfig::EXPRESSION_RHYTHM_STANDARD;
     int timeFontSize = time["fontSize"].as<int>();
     if (!isHexColorText(eyeColor) ||
         !isHexColorText(timeColor)) {
@@ -120,6 +143,10 @@ bool WebSocketCommandHandlers::handleEyesCommand(
     }
     if (timeFont == nullptr || !clockFontIdFromString(timeFont, timeFontId)) {
       setErrorResponse(response, "invalid eyes time font");
+      return true;
+    }
+    if (!parseEyesExpressionRhythm(expressionRhythmText, expressionRhythm)) {
+      setErrorResponse(response, "invalid eyes expression rhythm");
       return true;
     }
     if (timeFontSize < 1 || timeFontSize > 3) {
@@ -140,6 +167,7 @@ bool WebSocketCommandHandlers::handleEyesCommand(
     nextConfig.behavior.lookIntervalMs = behavior["lookIntervalMs"].as<uint16_t>();
     nextConfig.behavior.idleMove = behavior["idleMove"].as<uint8_t>();
     nextConfig.behavior.sleepyAfterMs = behavior["sleepyAfterMs"].as<uint32_t>();
+    nextConfig.behavior.expressionRhythm = expressionRhythm;
 
     nextConfig.interaction.lookHoldMs = interaction["lookHoldMs"].as<uint16_t>();
     nextConfig.interaction.moodHoldMs = interaction["moodHoldMs"].as<uint16_t>();
@@ -168,8 +196,7 @@ bool WebSocketCommandHandlers::handleEyesCommand(
       setErrorResponse(response, "device busy");
       return true;
     }
-    responseSent = true;
-    return true;
+    return wsSendAcceptedResponse(client, response, responseSent);
   }
 
   if (cmd == "eyes_interact") {
@@ -199,8 +226,7 @@ bool WebSocketCommandHandlers::handleEyesCommand(
       setErrorResponse(response, "device busy");
       return true;
     }
-    responseSent = true;
-    return true;
+    return wsSendAcceptedResponse(client, response, responseSent);
   }
 
   return false;

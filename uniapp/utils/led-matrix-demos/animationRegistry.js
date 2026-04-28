@@ -1,5 +1,4 @@
 import { buildMazeDemoMaps } from "./mazeDemo.js";
-import { buildPingPongDemoMaps } from "./pingPongDemo.js";
 import { buildSnakeDemoMaps } from "./snakeDemo.js";
 import { buildSortingVisualizerDemoMaps } from "./sortingVisualizerDemo.js";
 import { buildTetrisGameDemoMaps } from "./tetrisGameDemo.js";
@@ -9,7 +8,6 @@ import { clamp, normalizeSpeed } from "./common.js";
 const ANIMATION_BUILDERS = {
   github_wave: buildWaveSceneDemoMaps,
   maze: buildMazeDemoMaps,
-  ping_pong: buildPingPongDemoMaps,
   snake: buildSnakeDemoMaps,
   sorting_visualizer: buildSortingVisualizerDemoMaps,
   tetris_game: buildTetrisGameDemoMaps,
@@ -30,9 +28,6 @@ function buildAnimationDemoMaps(demoId, speed, intensity, options) {
 
 function resolveAnimationFrameDelay(demoId, speed) {
   const safeSpeed = normalizeSpeed(speed);
-  if (demoId === "ping_pong") {
-    return clamp(92 - safeSpeed * 6, 30, 90);
-  }
   if (demoId === "maze") {
     return clamp(120 - safeSpeed * 8, 38, 120);
   }

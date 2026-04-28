@@ -372,33 +372,6 @@
       "size": "120x120@2x"
     },
     {
-      "type": "mode-badge",
-      "file": "static/figma-assets/mode-badges/badge-countdown@2x.png",
-      "source_svg": "static/figma-assets/mode-badges/badge-countdown@2x.svg",
-      "name": "倒计时",
-      "key": "countdown",
-      "format": "png",
-      "size": "120x120@2x"
-    },
-    {
-      "type": "mode-badge",
-      "file": "static/figma-assets/mode-badges/badge-stopwatch@2x.png",
-      "source_svg": "static/figma-assets/mode-badges/badge-stopwatch@2x.svg",
-      "name": "秒表",
-      "key": "stopwatch",
-      "format": "png",
-      "size": "120x120@2x"
-    },
-    {
-      "type": "mode-badge",
-      "file": "static/figma-assets/mode-badges/badge-notification@2x.png",
-      "source_svg": "static/figma-assets/mode-badges/badge-notification@2x.svg",
-      "name": "通知提醒",
-      "key": "notification",
-      "format": "png",
-      "size": "120x120@2x"
-    },
-    {
       "type": "achievement-badge",
       "file": "static/figma-assets/achievement-badges/achievement-first-create-common@2x.png",
       "source_svg": "static/figma-assets/achievement-badges/achievement-first-create-common@2x.svg",

@@ -1,5 +1,6 @@
 import {
   drawClockTextToPixels,
+  getClockFont,
   getClockTextWidth,
   getClockTextHeight,
   getCurrentTimeText,
@@ -119,16 +120,34 @@ export default {
       return Promise.resolve();
     },
 
-    requestPreviewRefresh() {
-      this.previewTick += 1;
+    ensureValidPreviewFont() {
+      if (getClockFont(this.config.font)) {
+        return true;
+      }
+
+      const defaultConfig = this.getDefaultConfigSnapshot();
+      if (!defaultConfig || !getClockFont(defaultConfig.font)) {
+        return false;
+      }
+
+      this.config.font = defaultConfig.font;
+      return true;
     },
 
     drawCanvas() {
-      this.requestPreviewRefresh();
+      if (!this.ensureValidPreviewFont()) {
+        this.previewPixels = new Map();
+        return;
+      }
+      this.previewPixels = this.buildAllPreviewPixels();
     },
 
     drawGIFFrame() {
-      this.requestPreviewRefresh();
+      if (!this.ensureValidPreviewFont()) {
+        this.previewPixels = new Map();
+        return;
+      }
+      this.previewPixels = this.buildAllPreviewPixels();
     },
 
     getClockExcludePixels() {
@@ -277,6 +296,17 @@ export default {
         );
       }
 
+      return pixels;
+    },
+
+    buildAllPreviewPixels() {
+      const pixels = this.buildImageLayerPixels();
+
+      if (this.showPreview === false) {
+        return pixels;
+      }
+
+      this.getPreviewPixels().forEach((color, key) => pixels.set(key, color));
       return pixels;
     },
 

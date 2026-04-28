@@ -9,6 +9,7 @@ public:
   static void initConfigPortal();
   static void initRuntime();
   static void handleLoop();
+  static bool isSettingsSessionActive();
   
   static AsyncWebServer server;
   

@@ -594,7 +594,7 @@ int getThemeDisplayHour(const struct tm* timeinfo) {
   }
 
   int hour = timeinfo->tm_hour;
-  if (ConfigManager::clockConfig.hourFormat == 12) {
+  if (ConfigManager::themeClockConfig.hourFormat == 12) {
     hour = hour % 12;
     if (hour == 0) {
       hour = 12;
@@ -604,7 +604,7 @@ int getThemeDisplayHour(const struct tm* timeinfo) {
 }
 
 bool themeUses12HourFormat() {
-  return ConfigManager::clockConfig.hourFormat == 12;
+  return ConfigManager::themeClockConfig.hourFormat == 12;
 }
 
 bool isThemeAM(const struct tm* timeinfo) {

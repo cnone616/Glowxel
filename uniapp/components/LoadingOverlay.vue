@@ -1,20 +1,25 @@
 <template>
   <view v-if="visible" class="glx-loading-overlay">
     <view class="glx-loading-card">
-      <view class="glx-loading-indicator">
-        <view class="glx-loading-dot glx-loading-dot--1"></view>
-        <view class="glx-loading-dot glx-loading-dot--2"></view>
-        <view class="glx-loading-dot glx-loading-dot--3"></view>
-      </view>
+      <GlxInlineLoader
+        class="glx-loading-indicator"
+        variant="chase"
+        size="lg"
+      />
       <text class="glx-loading-text">{{ message }}</text>
     </view>
   </view>
 </template>
 
 <script>
+import GlxInlineLoader from './GlxInlineLoader.vue'
 import { bindLoadingInstance, unbindLoadingInstance } from '../composables/useToast.js'
 
 export default {
+  components: {
+    GlxInlineLoader
+  },
+
   data() {
     return {
       visible: false,
@@ -53,64 +58,32 @@ export default {
   justify-content: center;
   padding: 32rpx;
   box-sizing: border-box;
-  background: rgba(255, 255, 255, 0.72);
+  background: rgba(255, 255, 255, 0.78);
 }
 
 .glx-loading-card {
   width: 100%;
-  max-width: 420rpx;
-  padding: 36rpx 32rpx;
+  max-width: 620rpx;
+  padding: 48rpx 40rpx 44rpx;
   border: 4rpx solid #000000;
   box-shadow: 10rpx 10rpx 0 #000000;
   background: #ffffff;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 22rpx;
+  gap: 24rpx;
   box-sizing: border-box;
 }
 
 .glx-loading-indicator {
-  display: flex;
-  align-items: center;
-  gap: 16rpx;
-}
-
-.glx-loading-dot {
-  width: 24rpx;
-  height: 24rpx;
-  border: 3rpx solid #000000;
-  background: #f2cf4a;
-  animation: glxLoadingBounce 0.9s ease-in-out infinite;
-}
-
-.glx-loading-dot--2 {
-  animation-delay: 0.12s;
-}
-
-.glx-loading-dot--3 {
-  animation-delay: 0.24s;
+  flex-shrink: 0;
 }
 
 .glx-loading-text {
-  font-size: 28rpx;
+  font-size: 30rpx;
   font-weight: 900;
   line-height: 1.4;
   color: #000000;
   text-align: center;
-}
-
-@keyframes glxLoadingBounce {
-  0%,
-  80%,
-  100% {
-    transform: translateY(0);
-    opacity: 0.45;
-  }
-
-  40% {
-    transform: translateY(-8rpx);
-    opacity: 1;
-  }
 }
 </style>

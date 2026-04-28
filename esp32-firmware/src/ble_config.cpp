@@ -80,7 +80,7 @@ class WiFiConfigCallbacks : public BLECharacteristicCallbacks {
 void BLEConfig::init() {
   Serial.println("初始化蓝牙配网服务...");
 
-  BLEDevice::init("RenLight-Setup");
+  BLEDevice::init("Glowxel PixelBoard-Setup");
   pServer = BLEDevice::createServer();
   pServer->setCallbacks(new BLEConfigServerCallbacks());
 
@@ -112,7 +112,7 @@ void BLEConfig::init() {
   pAdvertising->setMinPreferred(0x12);
   BLEDevice::startAdvertising();
 
-  Serial.println("蓝牙配网服务已启动，设备名: RenLight-Setup");
+  Serial.println("蓝牙配网服务已启动，设备名: Glowxel PixelBoard-Setup");
 }
 
 void BLEConfig::stop() {

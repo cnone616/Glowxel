@@ -197,9 +197,12 @@
         :class="{ disabled: !canPublish || isPublishing }"
         @click="handlePublish"
       >
-        <view v-if="isPublishing" class="loading-spinner">
-          <Icon name="loading" :size="32" />
-        </view>
+        <GlxInlineLoader
+          v-if="isPublishing"
+          class="loading-spinner"
+          variant="chase"
+          size="xs"
+        />
         <Icon v-else name="upload" :size="32" />
         <text class="publish-btn-text">{{
           isPublishing ? "发布中..." : "确认发布"
@@ -236,6 +239,7 @@ import Icon from "../../components/Icon.vue";
 import ConfirmDialogHost from "../../components/ConfirmDialogHost.vue";
 import Toast from "../../components/Toast.vue";
 import GlxSwitch from "../../components/GlxSwitch.vue";
+import GlxInlineLoader from "../../components/GlxInlineLoader.vue";
 
 import { PERLER_BOARD_SIZE } from "../../constants/perler.js";
 
@@ -246,6 +250,7 @@ export default {
     ConfirmDialogHost,
     Toast,
     GlxSwitch,
+    GlxInlineLoader,
   },
 
   data() {
@@ -1096,16 +1101,7 @@ export default {
 }
 
 .loading-spinner {
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+  flex-shrink: 0;
 }
 
 .publish-btn-text {

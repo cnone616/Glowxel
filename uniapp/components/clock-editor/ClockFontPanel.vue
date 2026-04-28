@@ -1,60 +1,77 @@
 <template>
   <view class="settings-card glx-panel-card">
     <view class="card-title-section glx-panel-head">
-      <Icon name="text" :size="32" />
-      <text class="card-title glx-panel-title">字体样式</text>
+      <view class="font-title-main">
+        <Icon name="text" :size="32" />
+        <text class="card-title glx-panel-title">字体样式</text>
+      </view>
     </view>
 
     <view class="setting-group">
       <view class="settings-block">
         <text class="setting-label">统一字体</text>
-        <scroll-view scroll-x class="font-scroll" show-scrollbar="false">
-          <view class="font-list">
+        <view class="font-list">
+          <view
+            v-for="font in fontOptions"
+            :key="font.id"
+            class="font-card glx-feature-card-option"
+            :class="{ active: selectedFont === font.id }"
+            @click="$emit('select-font', font.id)"
+          >
             <view
-              v-for="font in fontOptions"
-              :key="font.id"
-              class="font-card glx-feature-card-option"
-              :class="{ active: selectedFont === font.id }"
-              @click="$emit('select-font', font.id)"
+              class="font-preview-board"
+              :style="{ backgroundColor: font.previewBg }"
             >
-              <view
-                class="font-preview-board"
-                :style="{ backgroundColor: font.previewBg }"
-              >
-                <view class="font-preview-viewport">
+              <view class="font-preview-viewport">
+                <view
+                  class="font-preview-grid-wrap"
+                  :style="getFontPreviewWrapStyle(font.id)"
+                >
                   <view
-                    class="font-preview-grid-wrap"
-                    :style="getFontPreviewWrapStyle(font.id)"
+                    class="font-preview-grid"
+                    :style="getFontPreviewGridStyle(font.id)"
                   >
                     <view
-                      class="font-preview-grid"
-                      :style="getFontPreviewGridStyle(font.id)"
-                    >
-                      <view
-                        v-for="cell in getFontPreviewCells(font.id)"
-                        :key="cell.key"
-                        class="font-preview-pixel"
-                        :style="{
-                          backgroundColor: cell.active
-                            ? font.previewColor
-                            : 'transparent',
-                        }"
-                      ></view>
-                    </view>
+                      v-for="cell in getFontPreviewCells(font.id)"
+                      :key="cell.key"
+                      class="font-preview-pixel"
+                      :style="{
+                        backgroundColor: cell.active
+                          ? font.previewColor
+                          : 'transparent',
+                      }"
+                    ></view>
                   </view>
                 </view>
               </view>
-              <text
-                class="glx-feature-card-option__label glx-feature-card-option__label--single-line"
-                >{{ font.name }}</text
-              >
             </view>
+            <text
+              class="glx-feature-card-option__label glx-feature-card-option__label--single-line"
+              >{{ font.name }}</text
+            >
           </view>
-        </scroll-view>
+        </view>
       </view>
 
-      <view class="settings-block">
-        <view class="setting-header-row">
+      <view v-if="showSecondsControl" class="settings-block">
+        <text class="setting-label">秒钟</text>
+        <view v-if="showSecondsStyle === 'tabs'" class="seconds-tabs">
+          <view
+            class="seconds-tab glx-feature-option"
+            :class="{ active: showSeconds === false }"
+            @click="$emit('set-show-seconds', false)"
+          >
+            <text class="glx-feature-option__label">关闭</text>
+          </view>
+          <view
+            class="seconds-tab glx-feature-option"
+            :class="{ active: showSeconds === true }"
+            @click="$emit('set-show-seconds', true)"
+          >
+            <text class="glx-feature-option__label">显示</text>
+          </view>
+        </view>
+        <view v-else class="setting-header-row">
           <text class="setting-label">显示秒钟</text>
           <GlxSwitch
             class="glx-row-switch"
@@ -119,6 +136,14 @@ export default {
       type: Boolean,
       required: true,
     },
+    showSecondsStyle: {
+      type: String,
+      default: "switch",
+    },
+    showSecondsControl: {
+      type: Boolean,
+      default: false,
+    },
     hourFormat: {
       type: Number,
       default: 24,
@@ -128,7 +153,12 @@ export default {
       default: true,
     },
   },
-  emits: ["select-font", "toggle-seconds", "set-hour-format"],
+  emits: [
+    "select-font",
+    "toggle-seconds",
+    "set-hour-format",
+    "set-show-seconds",
+  ],
   methods: {
     getFontPreviewText() {
       return this.showSeconds ? "12:34:56" : "12:34";
@@ -214,6 +244,12 @@ export default {
   box-shadow: none;
 }
 
+.font-title-main {
+  display: flex;
+  align-items: center;
+  gap: 10rpx;
+}
+
 .setting-group {
   display: flex;
   flex-direction: column;
@@ -238,29 +274,34 @@ export default {
   justify-content: space-between;
 }
 
-.font-scroll {
-  width: 100%;
-  height: 197rpx;
-  padding: 2rpx 0 6rpx;
-  box-sizing: border-box;
-  white-space: nowrap;
+.seconds-tabs {
+  display: flex;
+  gap: 12rpx;
+  margin-top: 12rpx;
+}
+
+.seconds-tab {
+  flex: 1;
+  padding: 20rpx 16rpx;
+  text-align: center;
+  transition: var(--transition-base);
 }
 
 .font-list {
-  display: inline-flex;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 16rpx;
-  padding: 4rpx 14rpx 4rpx 2rpx;
+  padding: 4rpx 2rpx;
   box-sizing: border-box;
-  min-width: 100%;
 }
 
 .font-card {
   display: flex;
   flex-direction: column;
-  flex: 0 0 220rpx;
   gap: 12rpx;
   padding: 16rpx;
-  width: 220rpx;
+  width: 100%;
+  min-width: 0;
   box-sizing: border-box;
   transition: var(--transition-base);
 }

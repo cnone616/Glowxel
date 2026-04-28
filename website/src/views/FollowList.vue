@@ -1,100 +1,239 @@
 <template>
-  <div class="follow-list">
-    <div class="container">
-      <button class="back-btn" @click="$router.back()">← 返回</button>
-      <div class="tab-nav">
-        <button :class="{ active: tab === 'followers' }" @click="switchTab('followers')">粉丝 {{ followerTotal }}</button>
-        <button :class="{ active: tab === 'following' }" @click="switchTab('following')">关注 {{ followingTotal }}</button>
+  <div class="glx-page-shell">
+    <section class="glx-page-shell__hero">
+      <span class="glx-page-shell__eyebrow">Social</span>
+      <h1 class="glx-page-shell__title">{{ pageTitle }}</h1>
+      <p class="glx-page-shell__desc">
+        关系链页继续承接粉丝和关注列表，关注动作也一起恢复回来。
+      </p>
+      <div class="glx-inline-actions">
+        <button type="button" class="glx-button glx-button--ghost" @click="switchTab('followers')">看粉丝</button>
+        <button type="button" class="glx-button glx-button--ghost" @click="switchTab('following')">看关注</button>
       </div>
-      <div class="user-list">
-        <div class="user-item" v-for="u in list" :key="u.id" @click="$router.push(`/user/${u.id}`)">
-          <div class="avatar">{{ (u.name || '?')[0].toUpperCase() }}</div>
-          <div class="user-info">
-            <span class="name">{{ u.name }}</span>
-            <span class="bio">{{ u.bio || '暂无简介' }}</span>
-          </div>
-          <button v-if="String(u.id) !== String(currentUserId)" class="btn-follow" @click.stop="handleToggle(u)">
-            {{ u.is_following ? '已关注' : '关注' }}
+    </section>
+
+    <section class="glx-section-card glx-section-card--stack">
+      <div class="glx-tabs">
+        <button type="button" class="glx-tab" :class="{ 'is-active': tab === 'followers' }" @click="switchTab('followers')">
+          粉丝
+        </button>
+        <button type="button" class="glx-tab" :class="{ 'is-active': tab === 'following' }" @click="switchTab('following')">
+          关注
+        </button>
+      </div>
+    </section>
+
+    <div v-if="loading" class="glx-grid glx-grid--two">
+      <GlxSkeletonCard />
+      <GlxSkeletonCard />
+    </div>
+
+    <section v-else-if="list.length === 0" class="glx-empty-card">
+      <strong class="glx-section-title">当前列表为空</strong>
+      <p class="glx-page-shell__desc">等关系链建立后，这里会自动显示对应用户列表。</p>
+    </section>
+
+    <section v-else class="glx-stack">
+      <article v-for="user in list" :key="user.id" class="glx-list-card follow-row">
+        <div class="follow-row__avatar">{{ resolveAvatarText(user.name) }}</div>
+        <div class="glx-list-card__copy">
+          <strong class="glx-list-card__title">{{ resolveUserName(user) }}</strong>
+          <span class="glx-list-card__desc">{{ resolveUserBio(user) }}</span>
+        </div>
+        <div class="glx-inline-actions">
+          <router-link :to="`/user/${user.id}`" class="glx-button glx-button--ghost">查看主页</router-link>
+          <button
+            v-if="showToggleButton(user)"
+            type="button"
+            class="glx-button glx-button--ghost"
+            @click="handleToggle(user)"
+          >
+            {{ user.is_following ? "已关注" : "关注" }}
           </button>
         </div>
-        <div class="empty" v-if="list.length === 0 && !loading">暂无数据</div>
-      </div>
-    </div>
+      </article>
+    </section>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import { followAPI } from '@/api/index.js'
+import { computed, onMounted, ref, watch } from "vue";
+import { useRoute, useRouter } from "vue-router";
+import { followAPI } from "@/api/index.js";
+import { useFeedback } from "@/composables/useFeedback.js";
+import GlxSkeletonCard from "@/components/glx/GlxSkeletonCard.vue";
+import { useUserStore } from "@/stores/user.js";
 
-const route = useRoute()
-const router = useRouter()
-const getTabFromRoute = () => {
-  if (route.query.tab === 'followers' || route.query.tab === 'following') {
-    return route.query.tab
+const route = useRoute();
+const router = useRouter();
+const feedback = useFeedback();
+const userStore = useUserStore();
+
+const tab = ref("followers");
+const list = ref([]);
+const loading = ref(false);
+
+const pageTitle = computed(() => {
+  if (profileUserId.value.length > 0) {
+    return tab.value === "following" ? "TA 的关注" : "TA 的粉丝";
   }
-  return route.path.includes('/following') ? 'following' : 'followers'
+  return tab.value === "following" ? "我的关注" : "我的粉丝";
+});
+
+const profileUserId = computed(() => {
+  if (typeof route.params.id === "string" && route.params.id.length > 0) {
+    return route.params.id;
+  }
+  return "";
+});
+
+const targetUserId = computed(() => {
+  if (profileUserId.value.length > 0) {
+    return profileUserId.value;
+  }
+  if (userStore.userId != null) {
+    return String(userStore.userId);
+  }
+  return "";
+});
+
+function syncTabFromRoute() {
+  if (route.path.includes("/following")) {
+    tab.value = "following";
+    return;
+  }
+  tab.value = "followers";
 }
 
-const tab = ref(getTabFromRoute())
-const list = ref([])
-const loading = ref(false)
-const followerTotal = ref(0)
-const followingTotal = ref(0)
-
-const currentUserId = JSON.parse(localStorage.getItem('user_info') || '{}').id
-const userId = route.params.id || currentUserId
-
-async function load(t) {
-  loading.value = true
-  const res = t === 'followers'
-    ? await followAPI.getFollowers(userId, { page: 1, limit: 50 })
-    : await followAPI.getFollowing(userId, { page: 1, limit: 50 })
-  if (res.success) {
-    list.value = res.data?.list || []
-    if (t === 'followers') followerTotal.value = res.data?.total || list.value.length
-    else followingTotal.value = res.data?.total || list.value.length
+function resolveUserName(user) {
+  if (typeof user.name === "string" && user.name.length > 0) {
+    return user.name;
   }
-  loading.value = false
+  return "未命名用户";
 }
 
-async function switchTab(t) { tab.value = t; await load(t) }
-
-async function handleToggle(u) {
-  if (!currentUserId) {
-    router.push('/login')
-    return
+function resolveUserBio(user) {
+  if (typeof user.bio === "string" && user.bio.length > 0) {
+    return user.bio;
   }
-  if (String(u.id) === String(currentUserId)) return
-  const res = await followAPI.toggle(u.id)
-  if (res.success) u.is_following = res.data?.followed
+  return "暂无简介";
 }
 
-onMounted(() => load(tab.value))
+function resolveAvatarText(name) {
+  if (typeof name === "string" && name.length > 0) {
+    return name.slice(0, 1).toUpperCase();
+  }
+  return "?";
+}
 
-watch(() => route.fullPath, async () => {
-  tab.value = getTabFromRoute()
-  await load(tab.value)
-})
+async function load(currentTab) {
+  if (targetUserId.value.length === 0) {
+    list.value = [];
+    return;
+  }
+
+  loading.value = true;
+  try {
+    const response = currentTab === "followers"
+      ? await followAPI.getFollowers(targetUserId.value, { page: 1, limit: 50 })
+      : await followAPI.getFollowing(targetUserId.value, { page: 1, limit: 50 });
+
+    if (response.success && response.data != null && Array.isArray(response.data.list)) {
+      list.value = response.data.list;
+      return;
+    }
+
+    list.value = [];
+    feedback.error("列表加载失败", response.message || "关系链列表没有成功返回。");
+  } catch (error) {
+    list.value = [];
+    if (error instanceof Error) {
+      feedback.error("列表加载失败", error.message);
+    } else {
+      feedback.error("列表加载失败", "关系链列表读取失败。");
+    }
+  } finally {
+    loading.value = false;
+  }
+}
+
+async function switchTab(nextTab) {
+  if (tab.value === nextTab) {
+    return;
+  }
+
+  tab.value = nextTab;
+  if (profileUserId.value.length > 0) {
+    router.push(`/user/${profileUserId.value}/${nextTab}`);
+    return;
+  }
+  router.push(`/${nextTab}`);
+}
+
+function showToggleButton(user) {
+  if (userStore.userId == null) {
+    return true;
+  }
+  return String(user.id) !== String(userStore.userId);
+}
+
+async function handleToggle(user) {
+  if (!userStore.isLoggedIn) {
+    router.push({
+      name: "Login",
+      query: {
+        redirect: route.fullPath,
+      },
+    });
+    return;
+  }
+
+  const response = await followAPI.toggle(user.id);
+  if (!response.success) {
+    feedback.error("操作失败", "关注状态没有成功更新。");
+    return;
+  }
+
+  if (response.data != null && typeof response.data.followed === "boolean") {
+    user.is_following = response.data.followed;
+    return;
+  }
+
+  user.is_following = !user.is_following;
+}
+
+onMounted(async () => {
+  syncTabFromRoute();
+  await load(tab.value);
+});
+
+watch(
+  () => route.fullPath,
+  async () => {
+    syncTabFromRoute();
+    await load(tab.value);
+  },
+);
 </script>
 
 <style scoped>
-.container { max-width: 700px; margin: 0 auto; padding: 24px 20px 56px; }
-.back-btn { min-height: 42px; padding: 0 16px; border: 2px solid var(--nb-ink); background: var(--tone-paper-soft); box-shadow: var(--nb-shadow-soft); font-size: 14px; font-weight: 800; color: var(--nb-ink); cursor: pointer; display: inline-flex; align-items: center; margin-bottom: 18px; }
-.back-btn:hover { background: #f6f6f6; }
-.tab-nav { display: flex; gap: 10px; margin-bottom: 20px; }
-.tab-nav button { padding: 10px 18px; border: 2px solid var(--nb-ink); background: var(--tone-paper-soft); font-size: 14px; font-weight: 800; color: var(--text-secondary); cursor: pointer; box-shadow: var(--nb-shadow-soft); }
-.tab-nav button.active { color: var(--nb-ink); background: var(--nb-yellow); }
-.user-list { border: 3px solid var(--nb-ink); background: var(--tone-paper-soft); box-shadow: var(--nb-shadow-card); }
-.user-item { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-bottom: 2px solid var(--nb-ink); cursor: pointer; }
-.user-item:last-child { border-bottom: none; }
-.user-item:hover { background: #fafafa; }
-.avatar { width: 44px; height: 44px; border: 2px solid var(--nb-ink); border-radius: 0; background: var(--tone-blue-soft); display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: 800; color: var(--nb-ink); flex-shrink: 0; box-shadow: var(--nb-shadow-soft); }
-.user-info { flex: 1; }
-.name { display: block; font-size: 14px; font-weight: 700; color: var(--nb-ink); }
-.bio { display: block; font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
-.btn-follow { padding: 6px 16px; border-radius: 0; border: 2px solid var(--nb-ink); background: var(--tone-paper-soft); font-size: 13px; font-weight: 800; cursor: pointer; flex-shrink: 0; box-shadow: var(--nb-shadow-soft); }
-.btn-follow:hover { background: #f6f6f6; }
-.empty { text-align: center; padding: 60px 0; color: var(--text-secondary); font-size: 14px; }
+.follow-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.follow-row__avatar {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #111111;
+  background: var(--tone-blue-soft);
+  font-size: 18px;
+  font-weight: 900;
+  color: var(--nb-ink);
+  flex-shrink: 0;
+}
 </style>

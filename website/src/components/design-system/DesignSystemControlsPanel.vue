@@ -97,9 +97,9 @@
         <label class="ds-field__label" for="ds-select-field">选择框</label>
         <div class="ds-select">
           <select id="ds-select-field" v-model="selectedMode">
-            <option value="theme">主题时钟</option>
-            <option value="clock">动态时钟</option>
-            <option value="matrix">像素场景集</option>
+            <option value="canvas">画板模式</option>
+            <option value="pattern">拼豆工作台</option>
+            <option value="device">设备参数</option>
           </select>
           <DesignSystemGlyph name="arrow-down" />
         </div>
@@ -457,8 +457,8 @@ const buttonStates = [
   { label: "禁用", title: "暂不可用", icon: "warning", tone: "ds-btn--warning", disabled: true },
 ];
 
-const searchValue = ref("主题时钟");
-const selectedMode = ref("theme");
+const searchValue = ref("拼豆图纸");
+const selectedMode = ref("canvas");
 const syncEnabled = ref(true);
 const brightness = ref(68);
 const speed = ref(2);
@@ -534,26 +534,26 @@ const actionMenuItems = [
 ];
 
 const uploadExtraFile = {
-  name: "planet-scene.gif",
-  meta: "256KB / 动画素材",
+  name: "canvas-preview.gif",
+  meta: "256KB / 发送预览",
 };
 
 const uploadedFiles = ref([
   {
-    name: "clock-theme.glx",
-    meta: "12KB / 主题预设",
+    name: "pattern-plan.glx",
+    meta: "12KB / 图纸方案",
   },
   {
-    name: "scene-matrix.png",
+    name: "canvas-scene.png",
     meta: "48KB / 预览素材",
   },
 ]);
 
 const tableRows = [
-  { name: "主题时钟", statusLabel: "已发布", statusTone: "success", updatedAt: "04-18 21:40" },
-  { name: "环境光动画", statusLabel: "审核中", statusTone: "warning", updatedAt: "04-18 17:22" },
+  { name: "画板模式", statusLabel: "已发布", statusTone: "success", updatedAt: "04-18 21:40" },
+  { name: "拼豆工作台", statusLabel: "审核中", statusTone: "warning", updatedAt: "04-18 17:22" },
   { name: "像素挑战海报", statusLabel: "草稿", statusTone: "info", updatedAt: "04-17 09:18" },
-  { name: "行星屏保", statusLabel: "已发布", statusTone: "success", updatedAt: "04-16 13:08" },
+  { name: "设备连接引导", statusLabel: "已发布", statusTone: "success", updatedAt: "04-16 13:08" },
   { name: "设备参数模板", statusLabel: "已停用", statusTone: "danger", updatedAt: "04-15 10:45" },
   { name: "社区封面图", statusLabel: "草稿", statusTone: "info", updatedAt: "04-14 08:12" },
 ];
@@ -568,9 +568,9 @@ const searchKeywordLabel = computed(() => {
 });
 
 const selectedModeLabel = computed(() => {
-  if (selectedMode.value === "theme") return "主题时钟";
-  if (selectedMode.value === "clock") return "动态时钟";
-  return "像素场景集";
+  if (selectedMode.value === "canvas") return "画板模式";
+  if (selectedMode.value === "pattern") return "拼豆工作台";
+  return "设备参数";
 });
 
 const qualityLabel = computed(() => {

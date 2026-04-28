@@ -1,58 +1,68 @@
 <template>
-  <div class="settings">
-    <div class="container">
-      <button class="back-btn" @click="$router.back()">← 返回</button>
-      <h1 class="page-title">设置</h1>
-      <div class="settings-card">
-        <div class="section-title">账户</div>
-        <div class="setting-item" @click="$router.push('/settings/profile')">
-          <span>编辑资料</span>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+  <div class="glx-page-shell settings-page">
+    <section class="glx-page-shell__hero">
+      <span class="glx-page-shell__eyebrow">Settings</span>
+      <h1 class="glx-page-shell__title">设置</h1>
+      <p class="glx-page-shell__desc">
+        设置页需要保留，它继续承接资料编辑、个人中心回跳和退出登录。
+      </p>
+    </section>
+
+    <section class="glx-section-card glx-section-card--stack">
+      <router-link to="/settings/profile" class="glx-list-card settings-link">
+        <div class="glx-list-card__copy">
+          <strong class="glx-list-card__title">编辑资料</strong>
+          <span class="glx-list-card__desc">修改昵称和个人简介。</span>
         </div>
-        <div class="setting-item" @click="$router.push('/profile')">
-          <span>我的主页</span>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+      </router-link>
+      <router-link to="/profile" class="glx-list-card settings-link">
+        <div class="glx-list-card__copy">
+          <strong class="glx-list-card__title">我的主页</strong>
+          <span class="glx-list-card__desc">返回个人中心继续管理作品和收藏。</span>
         </div>
-        <div class="section-title" style="margin-top:24px">关于</div>
-        <div class="setting-item">
-          <span>版本</span>
-          <span class="value">1.0.0</span>
+      </router-link>
+      <router-link to="/cloud-sync" class="glx-list-card settings-link">
+        <div class="glx-list-card__copy">
+          <strong class="glx-list-card__title">云端同步</strong>
+          <span class="glx-list-card__desc">查看项目同步状态和最近同步时间。</span>
         </div>
-        <div class="setting-item">
-          <span>联系我们</span>
-          <span class="value">support@glowxel.com</span>
-        </div>
-        <div class="section-title" style="margin-top:24px">账户操作</div>
-        <div class="setting-item danger" @click="handleLogout">
-          <span>退出登录</span>
-        </div>
+      </router-link>
+    </section>
+
+    <section class="glx-section-card glx-section-card--stack">
+      <div class="glx-section-head">
+        <h2 class="glx-section-title">账户操作</h2>
+        <span class="glx-section-meta">当前会话</span>
       </div>
-    </div>
+      <div class="glx-inline-actions">
+        <button type="button" class="glx-button glx-button--danger" @click="handleLogout">
+          退出登录
+        </button>
+      </div>
+    </section>
   </div>
 </template>
 
 <script setup>
-import { useRouter } from 'vue-router'
+import { useRouter } from "vue-router";
+import { useUserStore } from "@/stores/user.js";
 
-const router = useRouter()
+const router = useRouter();
+const userStore = useUserStore();
 
 function handleLogout() {
-  localStorage.removeItem('auth_token')
-  localStorage.removeItem('user_info')
-  router.push('/login')
+  userStore.logout();
+  router.push("/login");
 }
 </script>
 
 <style scoped>
-.container { max-width: 600px; margin: 0 auto; padding: 24px 20px 56px; }
-.back-btn { min-height: 42px; padding: 0 16px; border: 2px solid var(--nb-ink); background: var(--tone-paper-soft); box-shadow: var(--nb-shadow-soft); font-size: 14px; font-weight: 800; color: var(--nb-ink); cursor: pointer; display: inline-flex; align-items: center; margin-bottom: 18px; }
-.back-btn:hover { background: #f6f6f6; }
-.page-title { font-size: 28px; font-weight: 800; color: var(--nb-ink); margin-bottom: 20px; }
-.settings-card { background: var(--tone-paper-soft); border: 3px solid var(--nb-ink); border-radius: 0; padding: 24px; box-shadow: var(--nb-shadow-card); }
-.section-title { font-size: 11px; font-weight: 800; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; }
-.setting-item { display: flex; justify-content: space-between; align-items: center; padding: 14px 0; border-bottom: 2px solid var(--nb-ink); cursor: pointer; font-size: 14px; color: var(--nb-ink); font-weight: 700; }
-.setting-item:last-child { border-bottom: none; }
-.setting-item:hover { background: #fafafa; }
-.setting-item.danger { color: var(--nb-coral); }
-.value { font-size: 13px; color: var(--text-secondary); }
+.settings-page {
+  max-width: 900px;
+}
+
+.settings-link {
+  text-decoration: none;
+  color: inherit;
+}
 </style>

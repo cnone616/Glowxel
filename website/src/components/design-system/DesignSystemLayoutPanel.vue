@@ -198,7 +198,7 @@
             <span class="ds-project-card__progress"><span></span></span>
           </div>
           <div class="ds-project-card__body">
-            <strong class="ds-project-card__title">像素行星屏保</strong>
+            <strong class="ds-project-card__title">像素拼豆图纸</strong>
             <div class="ds-project-card__meta">
               <span>64×64</span>
               <span>4/18</span>
@@ -218,7 +218,7 @@
             <strong class="ds-card__title ds-card__title--compact">霓虹像素街区</strong>
             <div class="ds-artwork-card__author">
               <span class="ds-avatar-shell ds-avatar-shell--sm">GX</span>
-              <span>Glowxel 用户</span>
+              <span>光格像素工坊用户</span>
             </div>
             <div class="ds-artwork-card__stats">
               <span>1.2k 喜欢</span>
@@ -280,7 +280,7 @@
           <span class="ds-avatar-shell">GX</span>
           <div class="ds-comment-card__body">
             <div class="ds-comment-card__head">
-              <strong>Glowxel 用户</strong>
+              <strong>光格像素工坊用户</strong>
               <span>刚刚</span>
             </div>
             <p class="ds-card__copy">头像允许保留圆形，但外围信息块、评论块和操作行继续按白底黑边直角体系收口。</p>
@@ -503,7 +503,7 @@ const previewPixels = [
 
 const themeCards = [
   { name: "经典", previewClass: "ds-theme-card__preview--classic", active: true, badge: "当前" },
-  { name: "行星", previewClass: "ds-theme-card__preview--planet", badge: "图片" },
+  { name: "图纸", previewClass: "ds-theme-card__preview--planet", badge: "图片" },
   { name: "霓虹", previewClass: "ds-theme-card__preview--neon" },
 ];
 

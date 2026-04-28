@@ -4,24 +4,26 @@
     <!-- #ifdef MP-WEIXIN -->
     <view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
     <!-- #endif -->
-    
+
     <!-- 顶部导航 -->
     <view class="header glx-topbar glx-page-shell__fixed">
       <view class="header-content">
         <Logo :size="88" :show-text="true" />
-        <view class="header-actions">
-        </view>
+        <view class="header-actions"> </view>
       </view>
     </view>
-    
+
     <!-- 主要内容 -->
-    <scroll-view scroll-y class="main-content glx-scroll-region glx-page-shell__content">
+    <scroll-view
+      scroll-y
+      class="main-content glx-scroll-region glx-page-shell__content"
+    >
       <!-- 横幅轮播 -->
       <view class="banner-section">
-        <swiper 
-          class="banner-swiper" 
-          indicator-dots 
-          autoplay 
+        <swiper
+          class="banner-swiper"
+          indicator-dots
+          autoplay
           interval="5000"
           indicator-color="rgba(255,255,255,0.3)"
           indicator-active-color="#FFFFFF"
@@ -36,29 +38,34 @@
                 </view>
               </view>
               <view class="banner-icon">
-                <Icon :name="banner.icon" :size="120" color="rgba(255,255,255,0.8)" />
+                <Icon
+                  :name="banner.icon"
+                  :size="120"
+                  color="rgba(255,255,255,0.8)"
+                />
               </view>
             </view>
           </swiper-item>
         </swiper>
       </view>
-      
 
-      
       <!-- 推荐作品 -->
       <view class="recommended-artworks">
         <view class="section-header glx-section-head">
           <text class="section-title glx-section-title">推荐作品</text>
-          <view class="more-btn glx-inline-cta" @click="goToRecommendedArtworks">
+          <view
+            class="more-btn glx-inline-cta"
+            @click="goToRecommendedArtworks"
+          >
             <text class="more-text">查看更多</text>
             <Icon name="arrow-right" :size="24" class="glx-inline-cta__icon" />
           </view>
         </view>
-        
+
         <scroll-view scroll-x class="artworks-scroll">
           <view class="artworks-list">
-            <ArtworkCard 
-              v-for="artwork in recommendedArtworks" 
+            <ArtworkCard
+              v-for="artwork in recommendedArtworks"
               :key="artwork.id"
               :artwork="artwork"
               @click="handleArtworkClick"
@@ -67,7 +74,7 @@
           </view>
         </scroll-view>
       </view>
-      
+
       <!-- 官方模板 -->
       <view class="official-templates">
         <view class="section-header glx-section-head">
@@ -77,21 +84,21 @@
             <Icon name="arrow-right" :size="24" class="glx-inline-cta__icon" />
           </view>
         </view>
-        
+
         <view class="templates-grid">
-          <TemplateCard 
-            v-for="template in officialTemplates" 
+          <TemplateCard
+            v-for="template in officialTemplates"
             :key="template.id"
             :template="template"
             @click="handleTemplateClick"
           />
         </view>
       </view>
-      
+
       <!-- 每周挑战 -->
       <view class="weekly-challenge">
         <text class="section-title glx-section-title">每周挑战</text>
-        <ChallengeCard 
+        <ChallengeCard
           v-if="weeklyChallenge"
           :challenge="weeklyChallenge"
           @click="handleChallengeClick"
@@ -105,17 +112,22 @@
 </template>
 
 <script>
-import { artworkAPI, challengeAPI, likeAPI, templateAPI } from '../../api/index.js'
-import { useToast } from '../../composables/useToast.js'
-import statusBarMixin from '../../mixins/statusBar.js'
-import Logo from '../../components/Logo.vue'
-import ArtworkCard from '../../components/ArtworkCard.vue'
-import TemplateCard from '../../components/TemplateCard.vue'
-import ChallengeCard from '../../components/ChallengeCard.vue'
-import Icon from '../../components/Icon.vue'
-import Toast from '../../components/Toast.vue'
+import {
+  artworkAPI,
+  challengeAPI,
+  likeAPI,
+  templateAPI,
+} from "../../api/index.js";
+import { useToast } from "../../composables/useToast.js";
+import statusBarMixin from "../../mixins/statusBar.js";
+import Logo from "../../components/Logo.vue";
+import ArtworkCard from "../../components/ArtworkCard.vue";
+import TemplateCard from "../../components/TemplateCard.vue";
+import ChallengeCard from "../../components/ChallengeCard.vue";
+import Icon from "../../components/Icon.vue";
+import Toast from "../../components/Toast.vue";
 
-const toast = useToast()
+const toast = useToast();
 
 export default {
   mixins: [statusBarMixin],
@@ -125,51 +137,50 @@ export default {
     TemplateCard,
     ChallengeCard,
     Icon,
-    Toast
+    Toast,
   },
-  
+
   data() {
     return {
-      searchTerm: '',
+      searchTerm: "",
       showSearch: false,
       recommendedArtworks: [],
       officialTemplates: [],
       weeklyChallenge: null,
       banners: [
         {
-          title: '创意无限',
-          subtitle: '用像素点亮想象',
-          buttonText: '开始创作',
-          icon: 'picture',
-          gradient: 'linear-gradient(135deg, #4F7FFF, #FF7A45)',
-          action: 'create'
+          title: "创意无限",
+          subtitle: "用像素点亮想象",
+          buttonText: "开始创作",
+          icon: "picture",
+          gradient: "linear-gradient(135deg, #4F7FFF, #FF7A45)",
+          action: "create",
         },
         {
-          title: '社区精选',
-          subtitle: '发现优秀作品',
-          buttonText: '立即探索',
-          icon: 'browse',
-          gradient: 'linear-gradient(135deg, #2ECC71, #4F7FFF)',
-          action: 'community'
+          title: "社区精选",
+          subtitle: "发现优秀作品",
+          buttonText: "立即探索",
+          icon: "browse",
+          gradient: "linear-gradient(135deg, #2ECC71, #4F7FFF)",
+          action: "community",
         },
         {
-          title: '每周挑战',
-          subtitle: '参与创作比赛',
-          buttonText: '查看挑战',
-          icon: 'work',
-          gradient: 'linear-gradient(135deg, #FF7A45, #E74C3C)',
-          action: 'challenge'
-        }
-      ]
-    }
+          title: "每周挑战",
+          subtitle: "参与创作比赛",
+          buttonText: "查看挑战",
+          icon: "work",
+          gradient: "linear-gradient(135deg, #FF7A45, #E74C3C)",
+          action: "challenge",
+        },
+      ],
+    };
   },
-  
-  computed: {
-  },
+
+  computed: {},
 
   onLoad() {
     // 加载推荐内容
-    this.loadRecommendedContent()
+    this.loadRecommendedContent();
   },
 
   onShow() {
@@ -179,166 +190,172 @@ export default {
   methods: {
     async loadRecommendedContent() {
       try {
-        const artRes = await artworkAPI.getPopularArtworks(1, 6)
+        const artRes = await artworkAPI.getPopularArtworks(1, 6);
         if (artRes.success && artRes.data) {
-          this.recommendedArtworks = artRes.data.list
+          this.recommendedArtworks = artRes.data.list;
         }
 
-        const tplRes = await templateAPI.getPopularTemplates(4)
+        const tplRes = await templateAPI.getPopularTemplates(4);
         if (tplRes.success && tplRes.data) {
-          this.officialTemplates = tplRes.data.list
+          this.officialTemplates = tplRes.data.list;
         }
 
-        const chRes = await challengeAPI.getActiveChallenges()
+        const chRes = await challengeAPI.getActiveChallenges();
         if (chRes.success && chRes.data) {
-          const challenges = chRes.data.list
+          const challenges = chRes.data.list;
           if (Array.isArray(challenges) && challenges.length > 0) {
-            this.weeklyChallenge = challenges[0]
+            this.weeklyChallenge = challenges[0];
           }
         }
       } catch (error) {
-        console.error('加载推荐内容失败:', error)
+        console.error("加载推荐内容失败:", error);
       }
     },
-    
+
     cleanupInvalidThumbnails() {
       // 清理所有非 Base64 的缩略图（临时文件路径）
-      if (!this.projectStore || !this.projectStore.projects) return
-      
-      let cleaned = false
-      this.projectStore.projects.forEach(project => {
-        if (project.thumbnail && !project.thumbnail.startsWith('data:image')) {
+      if (!this.projectStore || !this.projectStore.projects) return;
+
+      let cleaned = false;
+      this.projectStore.projects.forEach((project) => {
+        if (project.thumbnail && !project.thumbnail.startsWith("data:image")) {
           // 这是临时文件路径，清除它
-          project.thumbnail = ''
-          cleaned = true
+          project.thumbnail = "";
+          cleaned = true;
         }
-      })
-      
+      });
+
       if (cleaned) {
-        console.log('已清理无效的缩略图路径')
-        this.projectStore.saveProjects()
+        console.log("已清理无效的缩略图路径");
+        this.projectStore.saveProjects();
       }
     },
-    
+
     toggleSearch() {
-      this.showSearch = !this.showSearch
+      this.showSearch = !this.showSearch;
       if (!this.showSearch) {
-        this.searchTerm = ''
+        this.searchTerm = "";
       }
     },
-    
+
     handleSearchBlur() {
       if (!this.searchTerm) {
-        this.showSearch = false
+        this.showSearch = false;
       }
     },
-    
+
     clearSearch() {
-      this.searchTerm = ''
+      this.searchTerm = "";
     },
-    
+
     handleBannerClick(banner) {
       switch (banner.action) {
-        case 'create':
-          this.goToCreate()
-          break
-        case 'community':
-          this.goToCommunity()
-          break
-        case 'challenge':
-          this.goToChallenges()
-          break
+        case "create":
+          this.goToCreate();
+          break;
+        case "community":
+          this.goToCommunity();
+          break;
+        case "challenge":
+          this.goToChallenges();
+          break;
       }
     },
-    
+
     goToCreate() {
       uni.navigateTo({
-        url: '/pages/create/create'
-      })
+        url: "/pages/create/create",
+      });
     },
-    
+
     goToTemplates() {
       uni.navigateTo({
-        url: '/pages/gallery/gallery?type=templates&title=' + encodeURIComponent('官方模板')
-      })
+        url:
+          "/pages/gallery/gallery?type=templates&title=" +
+          encodeURIComponent("官方模板"),
+      });
     },
-    
+
     goToImport() {
       uni.navigateTo({
-        url: '/pages/create/create?mode=image'
-      })
+        url: "/pages/create/create?mode=image",
+      });
     },
-    
+
     goToCommunity() {
       uni.switchTab({
-        url: '/pages/community/community'
-      })
+        url: "/pages/community/community",
+      });
     },
-    
+
     goToRecommendedArtworks() {
       uni.navigateTo({
-        url: '/pages/gallery/gallery?type=artworks&title=' + encodeURIComponent('推荐作品')
-      })
+        url:
+          "/pages/gallery/gallery?type=artworks&title=" +
+          encodeURIComponent("推荐作品"),
+      });
     },
-    
+
     goToChallenges() {
       uni.navigateTo({
-        url: '/pages/gallery/gallery?type=challenges&title=' + encodeURIComponent('热门挑战')
-      })
+        url:
+          "/pages/gallery/gallery?type=challenges&title=" +
+          encodeURIComponent("热门挑战"),
+      });
     },
-    
+
     handleArtworkClick(artwork) {
       // 跳转到作品详情页
       uni.navigateTo({
-        url: `/pages/artwork-detail/artwork-detail?id=${artwork.id}`
-      })
+        url: `/pages/artwork-detail/artwork-detail?id=${artwork.id}`,
+      });
     },
-    
+
     async handleArtworkLike(data) {
       try {
         if (data.liked) {
-          await likeAPI.likeArtwork(data.artwork.id)
-          data.artwork.likes += 1
+          await likeAPI.likeArtwork(data.artwork.id);
+          data.artwork.likes += 1;
         } else {
-          await likeAPI.unlikeArtwork(data.artwork.id)
-          data.artwork.likes -= 1
+          await likeAPI.unlikeArtwork(data.artwork.id);
+          data.artwork.likes -= 1;
         }
       } catch (error) {
-        toast.showError('操作失败')
+        toast.showError("操作失败");
       }
     },
-    
+
     handleTemplateClick(template) {
       // 使用模板创建画布
       uni.navigateTo({
-        url: `/pages/create/create?templateId=${template.id}`
-      })
+        url: `/pages/create/create?templateId=${template.id}`,
+      });
     },
-    
+
     handleChallengeClick(challenge) {
       // 跳转到挑战详情页
       uni.navigateTo({
-        url: `/pages/challenge-detail/challenge-detail?id=${challenge.id}`
-      })
+        url: `/pages/challenge-detail/challenge-detail?id=${challenge.id}`,
+      });
     },
-    
+
     async handleChallengeJoin(challenge) {
       try {
-        const res = await challengeAPI.joinChallenge(challenge.id)
+        const res = await challengeAPI.joinChallenge(challenge.id);
         if (!(res.success && res.data)) {
-          throw new Error('join failed')
+          throw new Error("join failed");
         }
-        challenge.joined = res.data.joined
+        challenge.joined = res.data.joined;
         if (res.data.changed) {
-          challenge.participants += 1
+          challenge.participants += 1;
         }
-        toast.showSuccess('已参与挑战')
+        toast.showSuccess("已参与挑战");
       } catch (error) {
-        toast.showError('参与失败')
+        toast.showError("参与失败");
       }
-    }
-  }
-}
+    },
+  },
+};
 </script>
 
 <style scoped>
@@ -432,7 +449,7 @@ export default {
 
 /* 横幅轮播 */
 .banner-section {
-  margin: 32rpx;
+  margin: 24rpx;
   margin-bottom: 48rpx;
 }
 
@@ -460,7 +477,7 @@ export default {
 .banner-title {
   font-size: 48rpx;
   font-weight: 700;
-  color: #FFFFFF;
+  color: #ffffff;
   line-height: 1.2;
   margin-bottom: 12rpx;
 }
@@ -489,7 +506,7 @@ export default {
 .banner-btn-text {
   font-size: 28rpx;
   font-weight: 600;
-  color: #FFFFFF;
+  color: #ffffff;
 }
 
 .banner-icon {
@@ -503,7 +520,7 @@ export default {
 
 /* 通用区块样式 */
 .section-title {
-  font-size: 36rpx;
+  font-size: 30rpx;
   font-weight: 700;
   color: var(--nb-ink);
   margin-bottom: 24rpx;
@@ -595,7 +612,7 @@ export default {
 }
 
 .recommended-artworks .section-header {
-  margin: 0 32rpx 24rpx;
+  margin: 0 24rpx 24rpx;
 }
 
 .artworks-scroll {
@@ -615,7 +632,7 @@ export default {
 
 /* 官方模板 */
 .official-templates {
-  margin: 0 32rpx 48rpx;
+  margin: 0 24rpx 24rpx;
 }
 
 .templates-grid {
@@ -626,6 +643,6 @@ export default {
 
 /* 每周挑战 */
 .weekly-challenge {
-  margin: 0 32rpx 48rpx;
+  margin: 0 24rpx 48rpx;
 }
 </style>

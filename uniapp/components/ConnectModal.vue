@@ -25,8 +25,15 @@
 
         <!-- 连接状态 -->
         <view v-if="connecting" class="status-box connecting">
-          <view class="loading-spinner"></view>
-          <text class="status-text">连接中...</text>
+          <GlxInlineLoader
+            class="status-loader"
+            variant="chase"
+            size="sm"
+          />
+          <view class="status-copy">
+            <text class="status-text">正在连接设备</text>
+            <text class="status-tip">请稍候，连接成功后会自动关闭弹窗</text>
+          </view>
         </view>
 
         <view v-if="error" class="status-box error">
@@ -53,10 +60,11 @@
 
 <script>
 import Icon from "./Icon.vue";
-
+import GlxInlineLoader from "./GlxInlineLoader.vue";
 export default {
   components: {
     Icon,
+    GlxInlineLoader,
   },
 
   props: {
@@ -70,7 +78,7 @@ export default {
     },
     description: {
       type: String,
-      default: "请输入 RenLight 设备的 IP 地址",
+      default: "请输入 Glowxel PixelBoard 的 IP 地址",
     },
     placeholder: {
       type: String,
@@ -119,14 +127,14 @@ export default {
       this.connecting = true;
       this.error = "";
 
-      // 设置10秒超时
+      // 首连现在会经过运行态预检 + 最多两次握手尝试，UI 超时需要覆盖整条链路
       this.timeoutTimer = setTimeout(() => {
         if (this.connecting) {
           this.connecting = false;
           this.error = "连接超时，请重试";
           this.$emit("timeout");
         }
-      }, 10000);
+      }, 40000);
 
       this.$emit("confirm", this.inputValue);
     },
@@ -293,35 +301,44 @@ export default {
 }
 
 .status-box.connecting {
+  align-items: flex-start;
   background-color: #e7f0ff;
+}
+
+.status-loader {
+  flex-shrink: 0;
+  margin-top: 2rpx;
 }
 
 .status-box.error {
   background-color: #f8dede;
 }
 
-.loading-spinner {
-  width: 32rpx;
-  height: 32rpx;
-  border: 3rpx solid rgba(0, 0, 0, 0.16);
-  border-top-color: var(--nb-ink);
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
+.status-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 6rpx;
+  min-width: 0;
 }
 
 .status-text {
   font-size: 24rpx;
   font-weight: 800;
+  line-height: 1.4;
+}
+
+.status-tip {
+  font-size: 22rpx;
+  line-height: 1.5;
+  color: #4a4a4a;
 }
 
 .status-box.connecting .status-text {
   color: var(--nb-ink);
+}
+
+.status-box.connecting .status-tip {
+  color: #4a4a4a;
 }
 
 .status-box.error .status-text {

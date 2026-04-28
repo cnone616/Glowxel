@@ -5,6 +5,7 @@
 #include "display_manager.h"
 #include "mode_tags.h"
 #include "runtime_command_bus.h"
+#include "websocket_async_command_response.h"
 #include "runtime_mode_coordinator.h"
 #include "websocket_effect_common.h"
 
@@ -97,8 +98,7 @@ bool handleVisualEffectCommand(
       wsSetErrorResponse(response, "device busy");
       return true;
     }
-    responseSent = true;
-    return true;
+    return wsSendAcceptedResponse(client, response, responseSent);
   }
 
   if (cmd == "set_rhythm_effect") {
@@ -176,8 +176,7 @@ bool handleVisualEffectCommand(
       wsSetErrorResponse(response, "device busy");
       return true;
     }
-    responseSent = true;
-    return true;
+    return wsSendAcceptedResponse(client, response, responseSent);
   }
 
   if (cmd == "set_ambient_effect") {
@@ -262,8 +261,7 @@ bool handleVisualEffectCommand(
       wsSetErrorResponse(response, "device busy");
       return true;
     }
-    responseSent = true;
-    return true;
+    return wsSendAcceptedResponse(client, response, responseSent);
   }
 
   return false;

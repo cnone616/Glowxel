@@ -1,4 +1,7 @@
-import { ARTKAL_COLORS_FULL } from "../../../data/artkal-colors-full.js";
+import {
+  ARTKAL_COLORS_FULL,
+  getColorByCode,
+} from "../../../data/artkal-colors-full.js";
 import { PERLER_BOARD_SIZE } from "../../../constants/perler.js";
 
 export default {
@@ -163,11 +166,216 @@ export default {
       this.imageFile = null;
       this.previewUrl = null;
       this.previewPixels = null;
+      this.previewImageUrl = "";
       this.usedColors = [];
+      this.activeReplaceColorCode = "";
       this.recommendedSize = null;
       this.contentRatio = null;
       this.isCropped = false;
       this.cropParams = null;
+    },
+
+    getSelectedArtkalColors() {
+      const colors = [];
+
+      this.selectedColors.forEach((code) => {
+        const color = getColorByCode(code);
+        if (color) {
+          colors.push(color);
+        }
+      });
+
+      return colors;
+    },
+
+    openColorReplacePanel(code) {
+      if (!code) {
+        return;
+      }
+
+      const usedColor = this.usedColors.find((color) => color.code === code);
+      if (!usedColor) {
+        return;
+      }
+
+      this.activeReplaceColorCode = code;
+    },
+
+    closeColorReplacePanel() {
+      this.activeReplaceColorCode = "";
+    },
+
+    replaceColorByNearest(targetCode) {
+      if (!targetCode) {
+        return;
+      }
+
+      const replacementColor = this.findNearestSelectedColor(targetCode);
+      if (!replacementColor) {
+        this.toast.showError("当前套装没有可替换的其他颜色");
+        return;
+      }
+
+      this.applyPreviewColorReplacement(targetCode, replacementColor.code);
+    },
+
+    replaceColorByCode(targetCode, replacementCode) {
+      if (!targetCode) {
+        return;
+      }
+
+      if (!replacementCode) {
+        return;
+      }
+
+      if (targetCode === replacementCode) {
+        return;
+      }
+
+      this.applyPreviewColorReplacement(targetCode, replacementCode);
+    },
+
+    applyPreviewColorReplacement(targetCode, replacementCode) {
+      if (!this.previewPixels) {
+        this.toast.showError("当前还没有可处理的预览");
+        return;
+      }
+
+      if (this.previewPixels.size === 0) {
+        this.toast.showError("当前还没有可处理的预览");
+        return;
+      }
+
+      const targetColor = getColorByCode(targetCode);
+      const replacementColor = getColorByCode(replacementCode);
+
+      if (!targetColor) {
+        this.toast.showError("替换颜色不存在");
+        return;
+      }
+
+      if (!replacementColor) {
+        this.toast.showError("替换颜色不存在");
+        return;
+      }
+
+      const selectedArtkalColors = this.getSelectedArtkalColors();
+      const replacementInPreset = selectedArtkalColors.find(
+        (color) => color.code === replacementCode,
+      );
+      if (!replacementInPreset) {
+        this.toast.showError("替换颜色不在当前套装内");
+        return;
+      }
+
+      const updatedPixels = new Map();
+      let replacedCount = 0;
+
+      this.previewPixels.forEach((color, key) => {
+        if (color === targetColor.hex) {
+          updatedPixels.set(key, replacementColor.hex);
+          replacedCount++;
+          return;
+        }
+
+        updatedPixels.set(key, color);
+      });
+
+      if (replacedCount === 0) {
+        this.toast.showError("当前颜色未出现在预览中");
+        return;
+      }
+
+      this.previewPixels = updatedPixels;
+      this.rebuildUsedColorsFromPreviewPixels();
+      this.drawPreview(updatedPixels);
+      this.closeColorReplacePanel();
+      this.toast.showSuccess(
+        `已将 ${targetCode} 替换为 ${replacementCode}，共处理 ${replacedCount} 个像素`,
+      );
+    },
+
+    rebuildUsedColorsFromPreviewPixels() {
+      if (!this.previewPixels) {
+        this.usedColors = [];
+        this.activeReplaceColorCode = "";
+        return;
+      }
+
+      if (this.previewPixels.size === 0) {
+        this.usedColors = [];
+        this.activeReplaceColorCode = "";
+        return;
+      }
+
+      const selectedArtkalColors = this.getSelectedArtkalColors();
+      const colorUsage = new Map();
+
+      this.previewPixels.forEach((hex) => {
+        const currentCount = colorUsage.get(hex);
+        if (typeof currentCount === "number") {
+          colorUsage.set(hex, currentCount + 1);
+          return;
+        }
+
+        colorUsage.set(hex, 1);
+      });
+
+      const usedColors = [];
+
+      colorUsage.forEach((count, hex) => {
+        const colorInfo = selectedArtkalColors.find((color) => color.hex === hex);
+        if (!colorInfo) {
+          return;
+        }
+
+        usedColors.push({
+          hex,
+          code: colorInfo.code,
+          name: colorInfo.name,
+          count,
+        });
+      });
+
+      this.usedColors = usedColors.sort((firstColor, secondColor) => {
+        return secondColor.count - firstColor.count;
+      });
+
+      if (!this.activeReplaceColorCode) {
+        return;
+      }
+
+      const activeColorStillUsed = this.usedColors.find(
+        (color) => color.code === this.activeReplaceColorCode,
+      );
+      if (!activeColorStillUsed) {
+        this.activeReplaceColorCode = "";
+      }
+    },
+
+    findNearestSelectedColor(targetCode) {
+      const targetColor = getColorByCode(targetCode);
+      if (!targetColor) {
+        return null;
+      }
+
+      const selectedArtkalColors = this.getSelectedArtkalColors();
+      let nearestColor = null;
+      let minDistance = Infinity;
+
+      selectedArtkalColors.forEach((color) => {
+        if (color.code === targetCode) {
+          return;
+        }
+
+        const distance = this.getColorDistance(targetColor.hex, color.hex);
+        if (distance < minDistance) {
+          minDistance = distance;
+          nearestColor = color;
+        }
+      });
+
+      return nearestColor;
     },
 
     async generatePreview() {
@@ -581,11 +789,10 @@ export default {
       }
     },
 
-    processImageData(data, artkalPalette, selectedArtkalColors) {
+    processImageData(data, artkalPalette) {
       const offsetX = Math.floor((this.paddedWidth - this.customWidth) / 2);
       const offsetY = Math.floor((this.paddedHeight - this.customHeight) / 2);
       const artkalPixels = new Map();
-      const colorUsage = new Map();
 
       for (let y = 0; y < this.customHeight; y++) {
         for (let x = 0; x < this.customWidth; x++) {
@@ -614,23 +821,12 @@ export default {
           }
 
           artkalPixels.set(`${x + offsetX},${y + offsetY}`, closestColor);
-          colorUsage.set(closestColor, (colorUsage.get(closestColor) || 0) + 1);
         }
       }
 
       this.previewPixels = artkalPixels;
-      this.usedColors = Array.from(colorUsage.entries())
-        .map(([hex, count]) => {
-          const colorInfo = selectedArtkalColors.find((color) => color.hex === hex);
-          return {
-            hex,
-            code: colorInfo?.code || "",
-            name: colorInfo?.name || "",
-            count,
-          };
-        })
-        .sort((a, b) => b.count - a.count);
-
+      this.activeReplaceColorCode = "";
+      this.rebuildUsedColorsFromPreviewPixels();
       this.drawPreview(artkalPixels);
       this.isProcessing = false;
       this.stepAnimationClass = "step-exit";
@@ -719,6 +915,10 @@ export default {
               );
             });
 
+            // #ifdef H5
+            this.previewImageUrl = canvas.toDataURL("image/png");
+            // #endif
+
             // #ifdef MP-WEIXIN
             setTimeout(() => {
               uni.canvasToTempFilePath(
@@ -737,6 +937,17 @@ export default {
             // #endif
           });
       }, 500);
+    },
+
+    getColorDistance(firstHex, secondHex) {
+      const firstRgb = this.hexToRgb(firstHex);
+      const secondRgb = this.hexToRgb(secondHex);
+
+      return Math.sqrt(
+        Math.pow(firstRgb[0] - secondRgb[0], 2) +
+          Math.pow(firstRgb[1] - secondRgb[1], 2) +
+          Math.pow(firstRgb[2] - secondRgb[2], 2),
+      );
     },
 
     hexToRgb(hex) {
