@@ -36,6 +36,8 @@ public:
   static bool isStationConnecting();
   static bool isPortalRestartScheduled();
   static bool isTimeSynced();
+  static void startRuntimeSettingsWindow(unsigned long holdMs);
+  static bool isRuntimeSettingsWindowActive();
   static WifiScanPhase getScanPhase();
   static String getDeviceIP();
   static String getConnectedSSID();
@@ -52,6 +54,7 @@ private:
   static size_t scanned_network_capacity;
   static bool config_mode;
   static bool sta_connecting;
+  static bool sta_reconnect_pending;
   static String saved_ssid;
   static String saved_password;
   static String config_portal_ssid;
@@ -59,8 +62,11 @@ private:
   static unsigned long portal_restart_at;
   static unsigned long sta_connect_started_at;
   static unsigned long sta_connect_deadline_at;
+  static unsigned long sta_reconnect_due_at;
+  static unsigned long runtime_settings_window_until;
   static bool ntp_sync_logged;
   static bool time_synced_once;
+  static bool runtime_access_ap_started;
   static WifiScanPhase scan_phase;
   static unsigned long scan_started_at;
   static volatile bool scan_result_ready;
@@ -72,6 +78,7 @@ private:
   static void resetScanState();
   static void clearScannedNetworkCache();
   static void setScanPhase(WifiScanPhase nextPhase, const char* reason);
+  static void ensureRuntimeSettingsAccessPoint();
   static void finalizeNetworkScan(int networkCount);
   static void handleWiFiEvent(arduino_event_t* event);
 };

@@ -12,11 +12,11 @@ const char* toTag(DeviceMode mode) {
   if (mode == MODE_ANIMATION) {
     return ModeTags::ANIMATION;
   }
-  if (mode == MODE_THEME) {
-    return ModeTags::THEME;
-  }
   if (mode == MODE_TRANSFERRING) {
     return ModeTags::TRANSFERRING;
+  }
+  if (mode == MODE_THEME) {
+    return ModeTags::THEME;
   }
   return nullptr;
 }

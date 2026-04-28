@@ -15,7 +15,7 @@
     <view class="canvas-section">
       <view class="preview-canvas-container" :style="previewCanvasBoxStyle">
         <PixelCanvas
-          v-if="previewCanvasReady"
+          v-if="previewCanvasReady && !shouldShowSendingSnapshot"
           :width="64"
           :height="64"
           :pixels="currentPreviewPixels"
@@ -29,6 +29,18 @@
           :touch-enabled="false"
           canvas-id="tetrisClockPreviewCanvas"
         />
+        <PixelPreviewBoard
+          v-else-if="previewCanvasReady && shouldShowSendingSnapshot"
+          :width="64"
+          :height="64"
+          :pixels="sendingPreviewPixels"
+          :refresh-token="sendingPreviewTick"
+          :zoom="previewZoom"
+          :offset-x="previewOffset.x"
+          :offset-y="previewOffset.y"
+          :grid-visible="true"
+          :is-dark-mode="true"
+        />
       </view>
       <view class="preview-caption glx-preview-panel">
         <view class="preview-caption-info glx-preview-panel__info">
@@ -37,6 +49,7 @@
         <view class="preview-actions">
           <view
             class="action-btn-sm primary glx-primary-action"
+            :class="{ disabled: isSending }"
             @click="saveAndApply"
           >
             <Icon name="link" :size="36" color="var(--nb-ink)" />
@@ -80,10 +93,52 @@
             </view>
           </view>
         </view>
+
+        <view class="card glx-panel-card glx-editor-card tetris-section-card">
+          <view class="card-title-section glx-panel-head">
+            <text class="card-title glx-panel-title">小时制式</text>
+          </view>
+          <view class="option-row option-row-double">
+            <view
+              class="option-btn glx-feature-option"
+              :class="{ active: config.hourFormat === 24 }"
+              @click="config.hourFormat = 24"
+            >
+              <text>24 小时</text>
+            </view>
+            <view
+              class="option-btn glx-feature-option"
+              :class="{ active: config.hourFormat === 12 }"
+              @click="config.hourFormat = 12"
+            >
+              <text>12 小时</text>
+            </view>
+          </view>
+        </view>
       </view>
     </scroll-view>
 
-    <Toast ref="toastRef" />
+    <view
+      v-if="isSending"
+      class="glx-device-sending-overlay"
+      @touchmove.stop.prevent
+    >
+      <view class="glx-device-sending-card">
+        <GlxInlineLoader
+          class="glx-device-sending-spinner"
+          variant="chase"
+          size="lg"
+        />
+        <text class="glx-device-sending-title">{{ sendOverlayTitle }}</text>
+        <text class="glx-device-sending-tip">{{ sendOverlayTip }}</text>
+      </view>
+    </view>
+
+    <Toast
+      ref="toastRef"
+      @show="handleToastShow"
+      @hide="handleToastHide"
+    />
   </view>
 </template>
 
@@ -91,9 +146,12 @@
 import { useDeviceStore } from "../../store/device.js";
 import { useToast } from "../../composables/useToast.js";
 import statusBarMixin from "../../mixins/statusBar.js";
+import deviceSendUxMixin from "../../mixins/deviceSendUxMixin.js";
 import Icon from "../../components/Icon.vue";
 import Toast from "../../components/Toast.vue";
+import GlxInlineLoader from "../../components/GlxInlineLoader.vue";
 import PixelCanvas from "../../components/PixelCanvas.vue";
+import PixelPreviewBoard from "../../components/PixelPreviewBoard.vue";
 import { buildTetrisPreviewFrames } from "../../utils/tetrisClockPreview.js";
 
 const TETRIS_SPEED_OPTIONS = {
@@ -101,14 +159,12 @@ const TETRIS_SPEED_OPTIONS = {
   normal: 150,
   fast: 80,
 };
+const TETRIS_CLOCK_STORAGE_KEY = "tetris_clock_config";
 
 function createDefaultConfig() {
   return {
-    clearMode: true,
-    cellSize: 2,
     speed: "normal",
-    showClock: true,
-    pieces: [0, 1, 2, 3, 4, 5, 6],
+    hourFormat: 24,
   };
 }
 
@@ -119,29 +175,24 @@ function normalizeSavedConfig(saved) {
   }
 
   const normalized = createDefaultConfig();
-  if (typeof saved.clearMode === "boolean") {
-    normalized.clearMode = saved.clearMode;
-  }
-  if (saved.cellSize === 1 || saved.cellSize === 2 || saved.cellSize === 3) {
-    normalized.cellSize = saved.cellSize;
-  }
   if (saved.speed === "slow" || saved.speed === "normal" || saved.speed === "fast") {
     normalized.speed = saved.speed;
   }
-  if (Array.isArray(saved.pieces)) {
-    const pieces = saved.pieces
-      .map((item) => Number(item))
-      .filter((item) => Number.isInteger(item) && item >= 0 && item < 7);
-    if (pieces.length > 0) {
-      normalized.pieces = Array.from(new Set(pieces)).sort((left, right) => left - right);
-    }
+  if (saved.hourFormat === 12 || saved.hourFormat === 24) {
+    normalized.hourFormat = saved.hourFormat;
   }
   return normalized;
 }
 
 export default {
-  mixins: [statusBarMixin],
-  components: { Icon, Toast, PixelCanvas },
+  mixins: [statusBarMixin, deviceSendUxMixin],
+  components: {
+    Icon,
+    Toast,
+    GlxInlineLoader,
+    PixelCanvas,
+    PixelPreviewBoard,
+  },
   data() {
     return {
       deviceStore: null,
@@ -152,7 +203,10 @@ export default {
       previewOffset: { x: 0, y: 0 },
       previewContainerSize: { width: 320, height: 320 },
       previewFrames: [],
+      sendingPreviewPixels: new Map(),
+      sendingPreviewTick: 0,
       previewFrameIndex: 0,
+      previewClockKey: "",
       currentPreviewMap: new Map(),
       previewTimer: null,
       previewRefreshTimer: null,
@@ -181,7 +235,7 @@ export default {
     this.deviceStore = useDeviceStore();
     this.deviceStore.init();
     this.toast = useToast();
-    const saved = uni.getStorageSync("tetris_clock_config");
+    const saved = uni.getStorageSync(TETRIS_CLOCK_STORAGE_KEY);
     this.config = normalizeSavedConfig(saved);
   },
   onReady() {
@@ -197,12 +251,30 @@ export default {
     this.cleanupPreviewTimers();
   },
   methods: {
+    captureSendingPreview() {
+      this.sendingPreviewPixels = new Map(this.currentPreviewPixels);
+      this.sendingPreviewTick += 1;
+    },
+    clearSendingPreview() {
+      this.sendingPreviewPixels = new Map();
+      this.sendingPreviewTick += 1;
+    },
+    beginSendUi() {
+      this.captureSendingPreview();
+      deviceSendUxMixin.methods.beginSendUi.call(this);
+    },
+    endSendUi() {
+      deviceSendUxMixin.methods.endSendUi.call(this);
+    },
     handleBack() {
       uni.navigateBack();
     },
     initPreviewCanvas() {
       const systemInfo = uni.getSystemInfoSync();
-      const statusBarHeight = systemInfo.statusBarHeight || 0;
+      const statusBarHeight =
+        typeof systemInfo.statusBarHeight === "number"
+          ? systemInfo.statusBarHeight
+          : 0;
 
       this.$nextTick(() => {
         setTimeout(() => {
@@ -252,6 +324,7 @@ export default {
         this.previewRefreshTimer = null;
       }
       this.previewRefreshTimer = setTimeout(() => {
+        this.previewClockKey = this.getPreviewClockKey();
         this.previewFrames = buildTetrisPreviewFrames(this.config);
         this.previewFrameIndex = 0;
         if (this.previewFrames.length > 0) {
@@ -268,20 +341,39 @@ export default {
         return;
       }
       const playNext = () => {
-        const delay = TETRIS_SPEED_OPTIONS[this.config.speed];
+        const isAtLastFrame =
+          this.previewFrameIndex >= this.previewFrames.length - 1;
+        const delay = isAtLastFrame
+          ? 250
+          : TETRIS_SPEED_OPTIONS[this.config.speed];
         this.previewTimer = setTimeout(() => {
           if (this.previewFrames.length === 0) {
             return;
           }
-          this.previewFrameIndex += 1;
-          if (this.previewFrameIndex >= this.previewFrames.length) {
-            this.previewFrameIndex = 0;
+          const nextClockKey = this.getPreviewClockKey();
+          if (nextClockKey !== this.previewClockKey) {
+            this.schedulePreviewRefresh();
+            return;
+          }
+          if (this.previewFrameIndex < this.previewFrames.length - 1) {
+            this.previewFrameIndex += 1;
           }
           this.currentPreviewMap = this.previewFrames[this.previewFrameIndex];
           playNext();
         }, delay);
       };
       playNext();
+    },
+    getPreviewClockKey() {
+      const now = new Date();
+      let hours = now.getHours();
+      if (this.config.hourFormat === 12) {
+        hours %= 12;
+        if (hours === 0) {
+          hours = 12;
+        }
+      }
+      return `${String(hours).padStart(2, "0")}${String(now.getMinutes()).padStart(2, "0")}`;
     },
     stopPreviewPlayback() {
       if (this.previewTimer) {
@@ -297,25 +389,32 @@ export default {
       }
       this.previewFrames = [];
       this.previewFrameIndex = 0;
+      this.previewClockKey = "";
     },
     async saveAndApply() {
-      uni.setStorageSync("tetris_clock_config", this.config);
+      if (!this.guardBeforeSend(this.deviceStore.connected)) {
+        return;
+      }
+
+      uni.setStorageSync(TETRIS_CLOCK_STORAGE_KEY, this.config);
+      const previousMode = this.deviceStore.deviceMode;
+      this.beginSendUi();
       try {
         const ws = this.deviceStore.getWebSocket();
         await ws.startTetrisClock({
-          clearMode: this.config.clearMode,
-          cellSize: this.config.cellSize,
+          cellSize: 2,
           speed: TETRIS_SPEED_OPTIONS[this.config.speed],
-          pieces: this.config.pieces,
+          hourFormat: this.config.hourFormat,
         });
-        await this.deviceStore.syncAndRequireBusinessMode(
-          "tetris_clock",
-          "设备未进入俄罗斯方块时钟",
-        );
-        this.toast.showSuccess("已应用");
+        this.showSendSuccess("已应用");
       } catch (err) {
+        await this.deviceStore.rollbackBusinessMode(previousMode, {
+          expectedMode: "tetris_clock",
+        });
         console.error("发送失败:", err);
-        this.toast.showError("发送失败");
+        this.showSendFailure(err);
+      } finally {
+        this.endSendUi();
       }
     },
   },

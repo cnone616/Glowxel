@@ -392,6 +392,13 @@ bool clockFontIdFromString(const char* fontName, uint8_t& outFontId) {
   return false;
 }
 
+const char* clockFontNameFromId(uint8_t fontId) {
+  if (fontId >= sizeof(CLOCK_FONT_NAMES) / sizeof(CLOCK_FONT_NAMES[0])) {
+    return "";
+  }
+  return CLOCK_FONT_NAMES[fontId];
+}
+
 int getClockFontWidth(uint8_t fontId) {
   return getClockFontDefinition(fontId).width;
 }

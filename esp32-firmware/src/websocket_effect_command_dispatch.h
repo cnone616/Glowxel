@@ -18,13 +18,6 @@ namespace WebSocketEffectCommandDispatch {
     StaticJsonDocument<768>& response,
     bool& responseSent
   );
-
-  bool handleGameEffectCommand(
-    AsyncWebSocketClient* client,
-    JsonDocument& doc,
-    StaticJsonDocument<768>& response,
-    bool& responseSent
-  );
 }
 
 #endif

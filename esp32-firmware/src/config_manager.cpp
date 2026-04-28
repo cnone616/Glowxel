@@ -1,5 +1,6 @@
 #include "config_manager.h"
 #include "animation_manager.h"
+#include "board_native_effect.h"
 #include "display_manager.h"
 #include "device_mode_tag_codec.h"
 #include "mode_tags.h"
@@ -9,14 +10,54 @@
 Preferences ConfigManager::preferences;
 
 namespace {
-GameScreensaverConfig makeDefaultGameScreensaverConfig() {
-  GameScreensaverConfig config = {};
-  config.game = GAME_SCREENSAVER_MAZE;
-  config.speed = 6;
-  config.snakeWidth = 1;
-  config.mazeSizeMode = GAME_SCREENSAVER_MAZE_WIDE;
-  config.cellSize = 2;
+MazeModeConfig makeDefaultMazeModeConfig() {
+  MazeModeConfig config = {};
+  config.speed = 3;
+  config.mazeSizeMode = MAZE_SIZE_WIDE;
   config.showClock = true;
+  memcpy(config.panelBgColor, "#05070f", sizeof(config.panelBgColor));
+  memcpy(config.borderColor, "#182c4c", sizeof(config.borderColor));
+  memcpy(config.timeColor, "#ffd400", sizeof(config.timeColor));
+  memcpy(config.dateColor, "#ff6464", sizeof(config.dateColor));
+  memcpy(config.generationPathColor, "#4f4f55", sizeof(config.generationPathColor));
+  memcpy(config.searchVisitedColor, "#ff4444", sizeof(config.searchVisitedColor));
+  memcpy(config.searchFrontierColor, "#70ff9c", sizeof(config.searchFrontierColor));
+  memcpy(config.solvedPathStartColor, "#1a60ff", sizeof(config.solvedPathStartColor));
+  memcpy(config.solvedPathEndColor, "#42bcff", sizeof(config.solvedPathEndColor));
+  return config;
+}
+
+SnakeModeConfig makeDefaultSnakeModeConfig() {
+  SnakeModeConfig config = {};
+  config.speed = 6;
+  config.snakeWidth = 2;
+  config.snakeColorR = 86;
+  config.snakeColorG = 214;
+  config.snakeColorB = 120;
+  config.foodColorR = 255;
+  config.foodColorG = 168;
+  config.foodColorB = 84;
+  config.font = CLOCK_FONT_MINIMAL_3X5;
+  config.showSeconds = false;
+  memcpy(config.snakeSkin, "gradient", sizeof("gradient"));
+  return config;
+}
+
+TetrisModeConfig makeDefaultTetrisModeConfig(bool showClock) {
+  TetrisModeConfig config = {};
+  config.clearMode = true;
+  config.cellSize = 2;
+  config.speed = 150;
+  config.showClock = showClock;
+  config.pieces = 0x7F;
+  return config;
+}
+
+TetrisClockModeConfig makeDefaultTetrisClockModeConfig() {
+  TetrisClockModeConfig config = {};
+  config.cellSize = 2;
+  config.speed = 150;
+  config.hourFormat = 24;
   return config;
 }
 
@@ -122,6 +163,7 @@ EyesConfig makeDefaultEyesConfig() {
   defaultEyesConfig.behavior.lookIntervalMs = 4200;
   defaultEyesConfig.behavior.idleMove = 2;
   defaultEyesConfig.behavior.sleepyAfterMs = 45000;
+  defaultEyesConfig.behavior.expressionRhythm = EyesConfig::EXPRESSION_RHYTHM_STANDARD;
   defaultEyesConfig.interaction.lookHoldMs = 1200;
   defaultEyesConfig.interaction.moodHoldMs = 1800;
   defaultEyesConfig.time.show = true;
@@ -150,6 +192,22 @@ bool isValidHexColorString(const char* value) {
     }
   }
   return true;
+}
+
+bool isValidMazeModeConfig(const MazeModeConfig& config) {
+  return config.speed >= 1 &&
+         config.speed <= 10 &&
+         (config.mazeSizeMode == MAZE_SIZE_WIDE ||
+          config.mazeSizeMode == MAZE_SIZE_DENSE) &&
+         isValidHexColorString(config.panelBgColor) &&
+         isValidHexColorString(config.borderColor) &&
+         isValidHexColorString(config.timeColor) &&
+         isValidHexColorString(config.dateColor) &&
+         isValidHexColorString(config.generationPathColor) &&
+         isValidHexColorString(config.searchVisitedColor) &&
+         isValidHexColorString(config.searchFrontierColor) &&
+         isValidHexColorString(config.solvedPathStartColor) &&
+         isValidHexColorString(config.solvedPathEndColor);
 }
 
 bool sanitizeEyesConfig(EyesConfig& config) {
@@ -197,6 +255,10 @@ bool sanitizeEyesConfig(EyesConfig& config) {
     config.behavior.sleepyAfterMs = defaults.behavior.sleepyAfterMs;
     changed = true;
   }
+  if (config.behavior.expressionRhythm > EyesConfig::EXPRESSION_RHYTHM_LIVELY) {
+    config.behavior.expressionRhythm = defaults.behavior.expressionRhythm;
+    changed = true;
+  }
 
   if (config.interaction.lookHoldMs < 200 || config.interaction.lookHoldMs > 10000) {
     config.interaction.lookHoldMs = defaults.interaction.lookHoldMs;
@@ -239,7 +301,9 @@ bool isStaticallyRecoverableBusinessModeTag(const String& businessModeTag) {
          businessModeTag == ModeTags::EYES ||
          businessModeTag == ModeTags::AMBIENT_EFFECT ||
          businessModeTag == ModeTags::LED_MATRIX_SHOWCASE ||
-         businessModeTag == ModeTags::GAME_SCREENSAVER;
+         businessModeTag == ModeTags::MAZE ||
+         businessModeTag == ModeTags::SNAKE ||
+         businessModeTag == ModeTags::PLANET_SCREENSAVER;
 }
 
 bool canPersistCurrentBusinessModeTag(const String& businessModeTag) {
@@ -306,15 +370,30 @@ ClockConfig ConfigManager::animClockConfig = {
   .week = {false, 26, 47, 100, 100, 100},
   .image = {false, 0, 0, 64, 64}
 };
-EyesConfig ConfigManager::eyesConfig = {
-  .layout = {24, 14, 16, 10, 22, 4},
-  .behavior = {true, 3200, 4200, 2, 45000},
-  .interaction = {1200, 1800},
-  .time = {true, false, CLOCK_FONT_MINIMAL_3X5, 1},
-  .style = {"#9bdcff", "#d8f3ff"}
+ClockConfig ConfigManager::tetrisOverlayClockConfig = {
+  .font = CLOCK_FONT_CLASSIC_5X7,
+  .showSeconds = false,
+  .hourFormat = 24,
+  .time = {true, 1, 18, 2, 255, 255, 255},
+  .date = {false, 1, 0, 0, 120, 120, 120},
+  .week = {false, 0, 0, 100, 100, 100},
+  .image = {false, 0, 0, 64, 64}
 };
+EyesConfig ConfigManager::eyesConfig = makeDefaultEyesConfig();
 ThemeConfig ConfigManager::themeConfig = {};
-GameScreensaverConfig ConfigManager::gameScreensaverConfig = makeDefaultGameScreensaverConfig();
+ClockConfig ConfigManager::themeClockConfig = {
+  .font = CLOCK_FONT_CLASSIC_5X7,
+  .showSeconds = false,
+  .hourFormat = 24,
+  .time = {true, 1, 17, 5, 255, 255, 255},
+  .date = {false, 1, 22, 10, 120, 120, 120},
+  .week = {false, 26, 47, 100, 100, 100},
+  .image = {false, 0, 0, 64, 64}
+};
+TetrisModeConfig ConfigManager::tetrisConfig = makeDefaultTetrisModeConfig(false);
+TetrisClockModeConfig ConfigManager::tetrisClockConfig = makeDefaultTetrisClockModeConfig();
+MazeModeConfig ConfigManager::mazeConfig = makeDefaultMazeModeConfig();
+SnakeModeConfig ConfigManager::snakeConfig = makeDefaultSnakeModeConfig();
 DeviceParamsConfig ConfigManager::deviceParamsConfig = makeDefaultDeviceParamsConfig();
 PixelData* ConfigManager::staticImagePixels = nullptr;
 int ConfigManager::staticImagePixelCount = 0;
@@ -342,12 +421,17 @@ void ConfigManager::init() {
     loadDeviceParamsConfig();
     loadClockConfig();
     loadAnimClockConfig();
+    loadTetrisOverlayClockConfig();
     loadStaticImagePixels();
     loadAnimImagePixels();
     loadEyesConfig();
     loadAmbientEffectConfig();
     loadThemeConfig();
-    loadGameScreensaverConfig();
+    loadThemeClockConfig();
+    loadTetrisConfig();
+    loadTetrisClockConfig();
+    loadMazeConfig();
+    loadSnakeConfig();
     loadPacmanRoute();
     loadCanvasPixels();
   }
@@ -407,16 +491,10 @@ void ConfigManager::loadClockConfig() {
   if (savedBusinessMode.length() == 0) {
     savedBusinessMode = resolveBusinessModeTagFromMode(savedMode);
   }
+  savedBusinessMode = sanitizeRecoverableBusinessModeTag(savedBusinessMode, "");
 
   String savedLastBusinessMode = preferences.getString("lastBizMode", "");
   savedLastBusinessMode = sanitizeLastBusinessTargetTag(savedLastBusinessMode, savedBusinessMode);
-
-  if (savedMode == MODE_TRANSFERRING || savedBusinessMode == ModeTags::TRANSFERRING) {
-    savedBusinessMode = sanitizeRecoverableBusinessModeTag(savedLastBusinessMode, "");
-    Serial.println("检测到传输临时模式，已恢复到最近可恢复业务模式");
-  } else {
-    savedBusinessMode = sanitizeRecoverableBusinessModeTag(savedBusinessMode, savedLastBusinessMode);
-  }
 
   savedMode = resolveTopLevelModeFromBusinessModeTag(savedBusinessMode);
 
@@ -450,8 +528,7 @@ void ConfigManager::saveClockConfig() {
   storedBusinessMode = sanitizeRecoverableBusinessModeTag(storedBusinessMode, "");
 
   String bizModeToSave = storedBusinessMode;
-  if (DisplayManager::currentMode != MODE_TRANSFERRING &&
-      canPersistCurrentBusinessModeTag(DisplayManager::currentBusinessModeTag)) {
+  if (canPersistCurrentBusinessModeTag(DisplayManager::currentBusinessModeTag)) {
     bizModeToSave = DisplayManager::currentBusinessModeTag;
   }
 
@@ -487,6 +564,29 @@ void ConfigManager::saveAnimClockConfig() {
   preferences.putBytes("config", &animClockConfig, sizeof(ClockConfig));
   preferences.end();
   Serial.println("anim clock config saved");
+}
+
+void ConfigManager::loadTetrisOverlayClockConfig() {
+  preferences.begin("tetris_ovr", true);
+  size_t configSize = preferences.getBytesLength("config");
+  if (configSize == sizeof(ClockConfig)) {
+    preferences.getBytes("config", &tetrisOverlayClockConfig, sizeof(ClockConfig));
+    if (migrateLegacyDefaultClockLayout(tetrisOverlayClockConfig)) {
+      Serial.println("已迁移俄罗斯方块屏保时钟默认布局");
+      saveTetrisOverlayClockConfig();
+    }
+    Serial.println("tetris overlay clock config loaded");
+  } else {
+    Serial.println("tetris overlay clock config: using default");
+  }
+  preferences.end();
+}
+
+void ConfigManager::saveTetrisOverlayClockConfig() {
+  preferences.begin("tetris_ovr", false);
+  preferences.putBytes("config", &tetrisOverlayClockConfig, sizeof(ClockConfig));
+  preferences.end();
+  Serial.println("tetris overlay clock config saved");
 }
 
 void ConfigManager::loadStaticImagePixels() {
@@ -525,9 +625,15 @@ void ConfigManager::loadStaticImagePixels() {
 }
 
 void ConfigManager::saveStaticImagePixels() {
-  if (staticImagePixels == nullptr || staticImagePixelCount <= 0) return;
-
   preferences.begin("clock", false);
+
+  if (staticImagePixels == nullptr || staticImagePixelCount <= 0) {
+    preferences.remove("pixels");
+    preferences.putInt("pixelCount", 0);
+    preferences.end();
+    Serial.println("静态时钟像素数据已清空");
+    return;
+  }
 
   size_t dataSize = staticImagePixelCount * sizeof(PixelData);
   const size_t maxDataSize = 64 * 64 * sizeof(PixelData);
@@ -579,9 +685,15 @@ void ConfigManager::loadAnimImagePixels() {
 }
 
 void ConfigManager::saveAnimImagePixels() {
-  if (animImagePixels == nullptr || animImagePixelCount <= 0) return;
-
   preferences.begin("anim", false);
+
+  if (animImagePixels == nullptr || animImagePixelCount <= 0) {
+    preferences.remove("pixels");
+    preferences.putInt("pixelCount", 0);
+    preferences.end();
+    Serial.println("动态时钟像素数据已清空");
+    return;
+  }
 
   size_t dataSize = animImagePixelCount * sizeof(PixelData);
   const size_t maxDataSize = 64 * 64 * sizeof(PixelData);
@@ -627,8 +739,16 @@ void ConfigManager::loadAmbientEffectConfig() {
   preferences.begin("ambient", true);
 
   size_t configSize = preferences.getBytesLength("config");
+  bool removedPresetMigrated = false;
   if (configSize == sizeof(AmbientEffectConfig)) {
     preferences.getBytes("config", &DisplayManager::ambientEffectConfig, sizeof(AmbientEffectConfig));
+    if (DisplayManager::ambientEffectConfig.preset == 13 ||
+        DisplayManager::ambientEffectConfig.preset == 14 ||
+        DisplayManager::ambientEffectConfig.preset == 24) {
+      DisplayManager::ambientEffectConfig = {AMBIENT_PRESET_AURORA, 6, 72, 72, 100, 200, 255, true};
+      removedPresetMigrated = true;
+      Serial.println("ambient effect config migrated from removed preset");
+    }
     Serial.println("ambient effect config loaded");
   } else {
     DisplayManager::ambientEffectConfig = {AMBIENT_PRESET_AURORA, 6, 72, 72, 100, 200, 255, true};
@@ -636,6 +756,10 @@ void ConfigManager::loadAmbientEffectConfig() {
   }
 
   preferences.end();
+
+  if (removedPresetMigrated) {
+    saveAmbientEffectConfig();
+  }
 }
 
 void ConfigManager::saveAmbientEffectConfig() {
@@ -666,24 +790,148 @@ void ConfigManager::saveThemeConfig() {
   Serial.printf("theme config saved: %s\n", themeConfig.themeId);
 }
 
-void ConfigManager::loadGameScreensaverConfig() {
-  preferences.begin("game_ss", true);
+void ConfigManager::loadThemeClockConfig() {
+  preferences.begin("theme_clk", true);
   size_t configSize = preferences.getBytesLength("config");
-  if (configSize == sizeof(GameScreensaverConfig)) {
-    preferences.getBytes("config", &gameScreensaverConfig, sizeof(GameScreensaverConfig));
-    Serial.println("game screensaver config loaded");
+  if (configSize == sizeof(ClockConfig)) {
+    preferences.getBytes("config", &themeClockConfig, sizeof(ClockConfig));
+    if (migrateLegacyDefaultClockLayout(themeClockConfig)) {
+      Serial.println("已迁移主题模式默认布局");
+      saveThemeClockConfig();
+    }
+    Serial.println("theme clock config loaded");
   } else {
-    gameScreensaverConfig = makeDefaultGameScreensaverConfig();
-    Serial.println("game screensaver config: using default");
+    Serial.println("theme clock config: using default");
   }
   preferences.end();
 }
 
-void ConfigManager::saveGameScreensaverConfig() {
-  preferences.begin("game_ss", false);
-  preferences.putBytes("config", &gameScreensaverConfig, sizeof(GameScreensaverConfig));
+void ConfigManager::saveThemeClockConfig() {
+  preferences.begin("theme_clk", false);
+  preferences.putBytes("config", &themeClockConfig, sizeof(ClockConfig));
   preferences.end();
-  Serial.println("game screensaver config saved");
+  Serial.println("theme clock config saved");
+}
+
+void ConfigManager::loadTetrisConfig() {
+  preferences.begin("tetris", true);
+  size_t configSize = preferences.getBytesLength("config");
+  if (configSize == sizeof(TetrisModeConfig)) {
+    preferences.getBytes("config", &tetrisConfig, sizeof(TetrisModeConfig));
+    Serial.println("tetris config loaded");
+  } else {
+    tetrisConfig = makeDefaultTetrisModeConfig(false);
+    Serial.println("tetris config: using default");
+  }
+  preferences.end();
+}
+
+void ConfigManager::saveTetrisConfig() {
+  preferences.begin("tetris", false);
+  preferences.putBytes("config", &tetrisConfig, sizeof(TetrisModeConfig));
+  preferences.end();
+  Serial.println("tetris config saved");
+}
+
+void ConfigManager::loadTetrisClockConfig() {
+  preferences.begin("tetris_clk", true);
+  size_t configSize = preferences.getBytesLength("config");
+  if (configSize == sizeof(TetrisClockModeConfig)) {
+    preferences.getBytes("config", &tetrisClockConfig, sizeof(TetrisClockModeConfig));
+    Serial.println("tetris clock config loaded");
+  } else {
+    tetrisClockConfig = makeDefaultTetrisClockModeConfig();
+    Serial.println("tetris clock config: using default");
+  }
+  preferences.end();
+}
+
+void ConfigManager::saveTetrisClockConfig() {
+  preferences.begin("tetris_clk", false);
+  preferences.putBytes("config", &tetrisClockConfig, sizeof(TetrisClockModeConfig));
+  preferences.end();
+  Serial.println("tetris clock config saved");
+}
+
+void ConfigManager::loadMazeConfig() {
+  preferences.begin("maze", true);
+  size_t configSize = preferences.getBytesLength("config");
+  if (configSize == sizeof(MazeModeConfig)) {
+    preferences.getBytes("config", &mazeConfig, sizeof(MazeModeConfig));
+    mazeConfig.panelBgColor[sizeof(mazeConfig.panelBgColor) - 1] = '\0';
+    mazeConfig.borderColor[sizeof(mazeConfig.borderColor) - 1] = '\0';
+    mazeConfig.timeColor[sizeof(mazeConfig.timeColor) - 1] = '\0';
+    mazeConfig.dateColor[sizeof(mazeConfig.dateColor) - 1] = '\0';
+    mazeConfig.generationPathColor[sizeof(mazeConfig.generationPathColor) - 1] = '\0';
+    mazeConfig.searchVisitedColor[sizeof(mazeConfig.searchVisitedColor) - 1] = '\0';
+    mazeConfig.searchFrontierColor[sizeof(mazeConfig.searchFrontierColor) - 1] = '\0';
+    mazeConfig.solvedPathStartColor[sizeof(mazeConfig.solvedPathStartColor) - 1] = '\0';
+    mazeConfig.solvedPathEndColor[sizeof(mazeConfig.solvedPathEndColor) - 1] = '\0';
+    if (isValidMazeModeConfig(mazeConfig)) {
+      Serial.println("maze config loaded");
+    } else {
+      mazeConfig = makeDefaultMazeModeConfig();
+      Serial.println("maze config invalid: using default");
+    }
+  } else {
+    mazeConfig = makeDefaultMazeModeConfig();
+    Serial.println("maze config: using default");
+  }
+  preferences.end();
+}
+
+void ConfigManager::saveMazeConfig() {
+  preferences.begin("maze", false);
+  preferences.putBytes("config", &mazeConfig, sizeof(MazeModeConfig));
+  preferences.end();
+  Serial.println("maze config saved");
+}
+
+void ConfigManager::loadSnakeConfig() {
+  preferences.begin("snake", true);
+  size_t configSize = preferences.getBytesLength("config");
+  if (configSize == sizeof(SnakeModeConfig)) {
+    preferences.getBytes("config", &snakeConfig, sizeof(SnakeModeConfig));
+    snakeConfig.snakeSkin[sizeof(snakeConfig.snakeSkin) - 1] = '\0';
+    Serial.println("snake config loaded");
+  } else {
+    snakeConfig = makeDefaultSnakeModeConfig();
+    Serial.println("snake config: using default");
+  }
+  preferences.end();
+}
+
+void ConfigManager::saveSnakeConfig() {
+  preferences.begin("snake", false);
+  preferences.putBytes("config", &snakeConfig, sizeof(SnakeModeConfig));
+  preferences.end();
+  Serial.println("snake config saved");
+}
+
+void ConfigManager::loadPlanetScreensaverConfig() {
+  preferences.begin("planet_ss", true);
+  size_t configSize = preferences.getBytesLength("config");
+  if (configSize == sizeof(PlanetScreensaverNativeConfig)) {
+    PlanetScreensaverNativeConfig config = {};
+    preferences.getBytes("config", &config, sizeof(PlanetScreensaverNativeConfig));
+    config.preset[sizeof(config.preset) - 1] = '\0';
+    config.size[sizeof(config.size) - 1] = '\0';
+    config.direction[sizeof(config.direction) - 1] = '\0';
+    BoardNativeEffect::setPlanetScreensaverConfig(config);
+    Serial.println("planet screensaver config loaded");
+  } else {
+    Serial.println("planet screensaver config: keep current");
+  }
+  preferences.end();
+}
+
+void ConfigManager::savePlanetScreensaverConfig() {
+  const PlanetScreensaverNativeConfig& config =
+    BoardNativeEffect::getPlanetScreensaverConfig();
+  preferences.begin("planet_ss", false);
+  preferences.putBytes("config", &config, sizeof(PlanetScreensaverNativeConfig));
+  preferences.end();
+  Serial.println("planet screensaver config saved");
 }
 
 void ConfigManager::loadPacmanRoute() {
@@ -826,6 +1074,34 @@ void ConfigManager::resetToDefault() {
   preferences.clear();
   preferences.end();
 
+  preferences.begin("tetris", false);
+  preferences.clear();
+  preferences.end();
+
+  preferences.begin("tetris_clk", false);
+  preferences.clear();
+  preferences.end();
+
+  preferences.begin("game_ss", false);
+  preferences.clear();
+  preferences.end();
+
+  preferences.begin("maze", false);
+  preferences.clear();
+  preferences.end();
+
+  preferences.begin("snake", false);
+  preferences.clear();
+  preferences.end();
+
+  preferences.begin("tetris_ovr", false);
+  preferences.clear();
+  preferences.end();
+
+  preferences.begin("planet_ss", false);
+  preferences.clear();
+  preferences.end();
+
   preferences.begin("device", false);
   preferences.clear();
   preferences.end();
@@ -867,9 +1143,32 @@ void ConfigManager::resetToDefault() {
     .image = {false, 0, 0, 64, 64}
   };
 
+  tetrisOverlayClockConfig = {
+    .font = CLOCK_FONT_CLASSIC_5X7,
+    .showSeconds = false,
+    .hourFormat = 24,
+    .time = {true, 1, 18, 2, 255, 255, 255},
+    .date = {false, 1, 0, 0, 120, 120, 120},
+    .week = {false, 0, 0, 100, 100, 100},
+    .image = {false, 0, 0, 64, 64}
+  };
+
   eyesConfig = makeDefaultEyesConfig();
   DisplayManager::ambientEffectConfig = {AMBIENT_PRESET_AURORA, 6, 72, 72, 100, 200, 255, true};
   themeConfig.themeId[0] = '\0';
+  themeClockConfig = {
+    .font = CLOCK_FONT_CLASSIC_5X7,
+    .showSeconds = false,
+    .hourFormat = 24,
+    .time = {true, 1, 17, 5, 255, 255, 255},
+    .date = {false, 1, 22, 10, 120, 120, 120},
+    .week = {false, 26, 47, 100, 100, 100},
+    .image = {false, 0, 0, 64, 64}
+  };
+  tetrisConfig = makeDefaultTetrisModeConfig(false);
+  tetrisClockConfig = makeDefaultTetrisClockModeConfig();
+  mazeConfig = makeDefaultMazeModeConfig();
+  snakeConfig = makeDefaultSnakeModeConfig();
   deviceParamsConfig = makeDefaultDeviceParamsConfig();
   DisplayManager::currentBrightness = deviceParamsConfig.displayBright;
 

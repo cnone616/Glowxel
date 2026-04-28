@@ -15,7 +15,7 @@
     <view class="canvas-section">
       <view class="preview-canvas-container" :style="previewCanvasBoxStyle">
         <PixelCanvas
-          v-if="previewCanvasReady"
+          v-if="previewCanvasReady && !shouldShowSendingSnapshot"
           :width="64"
           :height="64"
           :pixels="currentPreviewPixels"
@@ -29,6 +29,18 @@
           :touch-enabled="false"
           canvas-id="tetrisScreensaverPreviewCanvas"
         />
+        <PixelPreviewBoard
+          v-else-if="previewCanvasReady && shouldShowSendingSnapshot"
+          :width="64"
+          :height="64"
+          :pixels="sendingPreviewPixels"
+          :refresh-token="sendingPreviewTick"
+          :zoom="previewZoom"
+          :offset-x="previewOffset.x"
+          :offset-y="previewOffset.y"
+          :grid-visible="true"
+          :is-dark-mode="true"
+        />
       </view>
       <view class="preview-caption glx-preview-panel">
         <view class="preview-caption-info glx-preview-panel__info">
@@ -37,6 +49,7 @@
         <view class="preview-actions">
           <view
             class="action-btn-sm primary glx-primary-action"
+            :class="{ disabled: isSending }"
             @click="saveAndApply"
           >
             <Icon name="link" :size="36" color="var(--nb-ink)" />
@@ -52,108 +65,179 @@
       :style="{ height: contentHeight }"
     >
       <view class="content-wrapper glx-scroll-stack">
-        <view class="card glx-panel-card glx-editor-card tetris-section-card">
-          <view class="card-title-section glx-panel-head">
-            <text class="card-title glx-panel-title">模式</text>
-          </view>
-          <view class="option-row option-row-double">
-            <view
-              class="option-btn glx-feature-option"
-              :class="{ active: config.clearMode }"
-              @click="config.clearMode = true"
-            >
-              <text>消除模式</text>
+        <view v-show="currentTab === 1">
+          <view class="card glx-panel-card glx-editor-card tetris-section-card">
+            <view class="card-title-section glx-panel-head">
+              <text class="card-title glx-panel-title">模式</text>
             </view>
-            <view
-              class="option-btn glx-feature-option"
-              :class="{ active: !config.clearMode }"
-              @click="config.clearMode = false"
-            >
-              <text>满屏模式</text>
+            <view class="option-row option-row-double">
+              <view
+                class="option-btn glx-feature-option"
+                :class="{ active: config.clearMode }"
+                @click="config.clearMode = true"
+              >
+                <text>消除模式</text>
+              </view>
+              <view
+                class="option-btn glx-feature-option"
+                :class="{ active: !config.clearMode }"
+                @click="config.clearMode = false"
+              >
+                <text>满屏模式</text>
+              </view>
             </view>
           </view>
+
+          <view class="card glx-panel-card glx-editor-card tetris-section-card">
+            <view class="card-title-section glx-panel-head">
+              <text class="card-title glx-panel-title">方块大小</text>
+            </view>
+            <view class="option-row option-row-triple">
+              <view
+                class="option-btn glx-feature-option"
+                :class="{ active: config.cellSize === 1 }"
+                @click="config.cellSize = 1"
+              >
+                <text>小 (1px)</text>
+              </view>
+              <view
+                class="option-btn glx-feature-option"
+                :class="{ active: config.cellSize === 2 }"
+                @click="config.cellSize = 2"
+              >
+                <text>中 (2px)</text>
+              </view>
+              <view
+                class="option-btn glx-feature-option"
+                :class="{ active: config.cellSize === 3 }"
+                @click="config.cellSize = 3"
+              >
+                <text>大 (3px)</text>
+              </view>
+            </view>
+          </view>
+
+          <view class="card glx-panel-card glx-editor-card tetris-section-card">
+            <view class="card-title-section glx-panel-head">
+              <text class="card-title glx-panel-title">下落速度</text>
+            </view>
+            <view class="option-row option-row-triple">
+              <view
+                class="option-btn glx-feature-option"
+                :class="{ active: config.speed === 'slow' }"
+                @click="config.speed = 'slow'"
+              >
+                <text>慢</text>
+              </view>
+              <view
+                class="option-btn glx-feature-option"
+                :class="{ active: config.speed === 'normal' }"
+                @click="config.speed = 'normal'"
+              >
+                <text>中</text>
+              </view>
+              <view
+                class="option-btn glx-feature-option"
+                :class="{ active: config.speed === 'fast' }"
+                @click="config.speed = 'fast'"
+              >
+                <text>快</text>
+              </view>
+            </view>
+          </view>
+
+          <view class="card glx-panel-card glx-editor-card tetris-section-card">
+            <view class="card-title-section glx-panel-head">
+              <text class="card-title glx-panel-title">时间显示</text>
+            </view>
+            <view class="option-row option-row-double">
+              <view
+                class="option-btn glx-feature-option"
+                :class="{ active: config.showClock }"
+                @click="config.showClock = true"
+              >
+                <text>显示时间</text>
+              </view>
+              <view
+                class="option-btn glx-feature-option"
+                :class="{ active: !config.showClock }"
+                @click="config.showClock = false"
+              >
+                <text>隐藏时间</text>
+              </view>
+            </view>
+          </view>
+
         </view>
 
-        <view class="card glx-panel-card glx-editor-card tetris-section-card">
-          <view class="card-title-section glx-panel-head">
-            <text class="card-title glx-panel-title">方块大小</text>
-          </view>
-          <view class="option-row option-row-triple">
-            <view
-              class="option-btn glx-feature-option"
-              :class="{ active: config.cellSize === 1 }"
-              @click="config.cellSize = 1"
-            >
-              <text>小 (1px)</text>
-            </view>
-            <view
-              class="option-btn glx-feature-option"
-              :class="{ active: config.cellSize === 2 }"
-              @click="config.cellSize = 2"
-            >
-              <text>中 (2px)</text>
-            </view>
-            <view
-              class="option-btn glx-feature-option"
-              :class="{ active: config.cellSize === 3 }"
-              @click="config.cellSize = 3"
-            >
-              <text>大 (3px)</text>
-            </view>
-          </view>
-        </view>
+        <ClockTextSettingsCard
+          v-show="currentTab === 2"
+          icon-name="time"
+          title="时间显示"
+          :section="effectiveTimeSection"
+          :preset-colors="presetColors"
+          :show-font-size="true"
+          :show-seconds-control="true"
+          :show-seconds="clockConfig.showSeconds"
+          :min-font-size="1"
+          :max-font-size="3"
+          :show-toggle="false"
+          @toggle-seconds="toggleShowSeconds"
+          @adjust="handleTimeAdjust"
+          @update-color="handleTimeColor"
+          @set-align="handleTimeAlign"
+        />
 
-        <view class="card glx-panel-card glx-editor-card tetris-section-card">
-          <view class="card-title-section glx-panel-head">
-            <text class="card-title glx-panel-title">下落速度</text>
-          </view>
-          <view class="option-row option-row-triple">
-            <view
-              class="option-btn glx-feature-option"
-              :class="{ active: config.speed === 'slow' }"
-              @click="config.speed = 'slow'"
-            >
-              <text>慢</text>
-            </view>
-            <view
-              class="option-btn glx-feature-option"
-              :class="{ active: config.speed === 'normal' }"
-              @click="config.speed = 'normal'"
-            >
-              <text>中</text>
-            </view>
-            <view
-              class="option-btn glx-feature-option"
-              :class="{ active: config.speed === 'fast' }"
-              @click="config.speed = 'fast'"
-            >
-              <text>快</text>
-            </view>
-          </view>
-        </view>
-
-        <view class="card glx-panel-card glx-editor-card tetris-section-card">
-          <view class="card-title-section glx-panel-head">
-            <text class="card-title glx-panel-title">方块类型</text>
-          </view>
-          <view class="piece-grid">
-            <view
-              v-for="(piece, idx) in pieceTypes"
-              :key="idx"
-              class="glx-feature-option glx-feature-option--tile"
-              :class="{ active: config.pieces.includes(idx) }"
-              @click="togglePiece(idx)"
-            >
-              <view class="piece-preview" :style="{ backgroundColor: piece.color }"></view>
-              <text class="piece-name">{{ piece.name }}</text>
-            </view>
-          </view>
-        </view>
-
+        <ClockFontPanel
+          v-show="currentTab === 3"
+          :font-options="fontOptions"
+          :selected-font="clockConfig.font"
+          :show-seconds="clockConfig.showSeconds"
+          :hour-format="clockConfig.hourFormat"
+          @select-font="selectFont"
+          @set-hour-format="setHourFormat"
+        />
       </view>
     </scroll-view>
 
-    <Toast ref="toastRef" />
+    <view class="bottom-tabs">
+      <view
+        v-for="tab in tabDefinitions"
+        :key="tab.index"
+        class="bottom-tab-item"
+        :class="{ active: currentTab === tab.index }"
+        @click="currentTab = tab.index"
+      >
+        <Icon
+          :name="tab.icon"
+          :size="36"
+          :color="currentTab === tab.index ? '#000000' : '#666666'"
+        />
+        <text class="bottom-tab-text">{{ tab.label }}</text>
+      </view>
+    </view>
+
+    <view
+      v-if="isSending"
+      class="glx-device-sending-overlay"
+      @touchmove.stop.prevent
+    >
+      <view class="glx-device-sending-card">
+        <GlxInlineLoader
+          class="glx-device-sending-spinner"
+          variant="chase"
+          size="lg"
+        />
+        <text class="glx-device-sending-title">{{ sendOverlayTitle }}</text>
+        <text class="glx-device-sending-tip">{{ sendOverlayTip }}</text>
+      </view>
+    </view>
+
+    <Toast
+      ref="toastRef"
+      @show="handleToastShow"
+      @hide="handleToastHide"
+    />
   </view>
 </template>
 
@@ -161,28 +245,83 @@
 import { useDeviceStore } from "../../store/device.js";
 import { useToast } from "../../composables/useToast.js";
 import statusBarMixin from "../../mixins/statusBar.js";
+import deviceSendUxMixin from "../../mixins/deviceSendUxMixin.js";
 import Icon from "../../components/Icon.vue";
 import Toast from "../../components/Toast.vue";
+import GlxInlineLoader from "../../components/GlxInlineLoader.vue";
 import PixelCanvas from "../../components/PixelCanvas.vue";
+import PixelPreviewBoard from "../../components/PixelPreviewBoard.vue";
+import ClockFontPanel from "../../components/clock-editor/ClockFontPanel.vue";
+import ClockTextSettingsCard from "../../components/clock-editor/ClockTextSettingsCard.vue";
 import {
   createTetrisScreensaverPreviewState,
   renderTetrisScreensaverPreviewState,
   stepTetrisScreensaverPreviewState,
 } from "../../utils/tetrisScreensaverPreview.js";
+import {
+  getClockFontOptions,
+  getClockTextWidth,
+  getCurrentTimeText,
+} from "../../utils/clockCanvas.js";
 
 const TETRIS_SPEED_OPTIONS = {
   slow: 300,
   normal: 150,
   fast: 80,
 };
+const TETRIS_ALL_PIECES = Object.freeze([0, 1, 2, 3, 4, 5, 6]);
+const TETRIS_CONFIG_STORAGE_KEY = "tetris_config";
+const TETRIS_OVERLAY_CLOCK_CONFIG_STORAGE_KEY = "tetris_overlay_clock_config";
+
+function cloneAllTetrisPieces() {
+  return TETRIS_ALL_PIECES.slice();
+}
 
 function createDefaultConfig() {
   return {
     clearMode: true,
     cellSize: 2,
     speed: "normal",
-    showClock: false,
-    pieces: [0, 1, 2, 3, 4, 5, 6],
+    showClock: true,
+    pieces: cloneAllTetrisPieces(),
+  };
+}
+
+function createDefaultClockConfig() {
+  return {
+    font: "classic_5x7",
+    showSeconds: false,
+    hourFormat: 24,
+    time: {
+      show: true,
+      fontSize: 1,
+      x: 32,
+      y: 2,
+      color: "#ffffff",
+      align: "center",
+    },
+    date: {
+      show: false,
+      fontSize: 1,
+      x: 0,
+      y: 0,
+      color: "#787878",
+      align: "left",
+    },
+    week: {
+      show: false,
+      x: 0,
+      y: 0,
+      color: "#646464",
+      align: "left",
+    },
+    image: {
+      show: false,
+      x: 0,
+      y: 0,
+      width: 64,
+      height: 64,
+    },
   };
 }
 
@@ -202,20 +341,23 @@ function normalizeSavedConfig(saved) {
   if (saved.speed === "slow" || saved.speed === "normal" || saved.speed === "fast") {
     normalized.speed = saved.speed;
   }
-  if (Array.isArray(saved.pieces)) {
-    const pieces = saved.pieces
-      .map((item) => Number(item))
-      .filter((item) => Number.isInteger(item) && item >= 0 && item < 7);
-    if (pieces.length > 0) {
-      normalized.pieces = Array.from(new Set(pieces)).sort((left, right) => left - right);
-    }
+  if (typeof saved.showClock === "boolean") {
+    normalized.showClock = saved.showClock;
   }
   return normalized;
 }
 
 export default {
-  mixins: [statusBarMixin],
-  components: { Icon, Toast, PixelCanvas },
+  mixins: [statusBarMixin, deviceSendUxMixin],
+  components: {
+    Icon,
+    Toast,
+    GlxInlineLoader,
+    PixelCanvas,
+    PixelPreviewBoard,
+    ClockFontPanel,
+    ClockTextSettingsCard,
+  },
   data() {
     return {
       deviceStore: null,
@@ -227,23 +369,39 @@ export default {
       previewContainerSize: { width: 320, height: 320 },
       previewState: null,
       currentPreviewMap: new Map(),
+      sendingPreviewPixels: new Map(),
+      sendingPreviewTick: 0,
       previewTimer: null,
       previewRefreshTimer: null,
       config: createDefaultConfig(),
-      pieceTypes: [
-        { name: "I", color: "#00F0F0" },
-        { name: "O", color: "#F0F000" },
-        { name: "T", color: "#A000F0" },
-        { name: "S", color: "#00F000" },
-        { name: "Z", color: "#F00000" },
-        { name: "J", color: "#0000F0" },
-        { name: "L", color: "#F0A000" },
+      clockConfig: createDefaultClockConfig(),
+      fontOptions: getClockFontOptions(),
+      currentTab: 1,
+      tabDefinitions: [
+        { index: 1, label: "屏保", icon: "picture" },
+        { index: 2, label: "时间", icon: "time" },
+        { index: 3, label: "字体", icon: "text" },
+      ],
+      presetColors: [
+        { name: "青色", hex: "#64c8ff" },
+        { name: "绿色", hex: "#00ff9d" },
+        { name: "黄色", hex: "#ffdc00" },
+        { name: "橙色", hex: "#ffa500" },
+        { name: "红色", hex: "#ff6464" },
+        { name: "紫色", hex: "#c864ff" },
+        { name: "白色", hex: "#ffffff" },
       ],
     };
   },
   computed: {
     currentPreviewPixels() {
       return this.currentPreviewMap;
+    },
+    effectiveTimeSection() {
+      return {
+        ...this.clockConfig.time,
+        show: this.config.showClock,
+      };
     },
     previewCanvasBoxStyle() {
       return {
@@ -258,13 +416,25 @@ export default {
       },
       deep: true,
     },
+    clockConfig: {
+      handler() {
+        this.schedulePreviewRefresh();
+      },
+      deep: true,
+    },
   },
   onLoad() {
     this.deviceStore = useDeviceStore();
     this.deviceStore.init();
     this.toast = useToast();
-    const saved = uni.getStorageSync("tetris_config");
+    const saved = uni.getStorageSync(TETRIS_CONFIG_STORAGE_KEY);
     this.config = normalizeSavedConfig(saved);
+    const savedClockConfig = uni.getStorageSync(
+      TETRIS_OVERLAY_CLOCK_CONFIG_STORAGE_KEY,
+    );
+    if (savedClockConfig && typeof savedClockConfig === "object") {
+      this.clockConfig = savedClockConfig;
+    }
   },
   onReady() {
     if (this.$refs.toastRef) {
@@ -279,6 +449,21 @@ export default {
     this.cleanupPreviewTimers();
   },
   methods: {
+    captureSendingPreview() {
+      this.sendingPreviewPixels = new Map(this.currentPreviewPixels);
+      this.sendingPreviewTick += 1;
+    },
+    clearSendingPreview() {
+      this.sendingPreviewPixels = new Map();
+      this.sendingPreviewTick += 1;
+    },
+    beginSendUi() {
+      this.captureSendingPreview();
+      deviceSendUxMixin.methods.beginSendUi.call(this);
+    },
+    endSendUi() {
+      deviceSendUxMixin.methods.endSendUi.call(this);
+    },
     handleBack() {
       uni.navigateBack();
     },
@@ -334,7 +519,14 @@ export default {
         this.previewRefreshTimer = null;
       }
       this.previewRefreshTimer = setTimeout(() => {
-        this.previewState = createTetrisScreensaverPreviewState(this.config);
+        const previewConfig = {
+          ...this.config,
+          pieces: cloneAllTetrisPieces(),
+        };
+        this.previewState = createTetrisScreensaverPreviewState(
+          previewConfig,
+          this.buildEffectiveClockConfig(),
+        );
         this.currentPreviewMap = renderTetrisScreensaverPreviewState(this.previewState);
         this.startPreviewPlayback();
       }, 80);
@@ -373,37 +565,157 @@ export default {
       }
       this.previewState = null;
     },
-    togglePiece(idx) {
-      const pieceIndex = this.config.pieces.indexOf(idx);
-      if (pieceIndex >= 0) {
-        if (this.config.pieces.length <= 1) {
-          this.toast.showError("至少保留一种方块");
-          return;
-        }
-        this.config.pieces.splice(pieceIndex, 1);
-      } else {
-        this.config.pieces.push(idx);
-        this.config.pieces.sort();
+    buildEffectiveClockConfig() {
+      return {
+        ...this.clockConfig,
+        time: {
+          ...this.clockConfig.time,
+          show: this.config.showClock,
+        },
+      };
+    },
+    getTimeText(clockConfig = this.clockConfig) {
+      return getCurrentTimeText(
+        clockConfig.showSeconds,
+        clockConfig.hourFormat,
+      );
+    },
+    selectFont(fontId) {
+      this.clockConfig.font = fontId;
+    },
+    toggleShowSeconds() {
+      this.clockConfig.showSeconds = !this.clockConfig.showSeconds;
+    },
+    setHourFormat(hourFormat) {
+      this.clockConfig.hourFormat = hourFormat;
+    },
+    handleTimeAdjust(key, delta, min, max) {
+      const currentValue = this.clockConfig.time[key];
+      const nextValue = Math.max(min, Math.min(max, currentValue + delta));
+      if (nextValue !== currentValue) {
+        this.clockConfig.time[key] = nextValue;
       }
     },
+    handleTimeColor(color) {
+      this.clockConfig.time.color = color;
+    },
+    handleTimeAlign(align) {
+      this.clockConfig.time.align = align;
+      if (align === "left") {
+        this.clockConfig.time.x = 0;
+      } else if (align === "center") {
+        this.clockConfig.time.x = 32;
+      } else if (align === "right") {
+        this.clockConfig.time.x = 63;
+      }
+    },
+    hexToRgb(hex) {
+      const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+      return {
+        r: parseInt(result[1], 16),
+        g: parseInt(result[2], 16),
+        b: parseInt(result[3], 16),
+      };
+    },
+    buildTetrisClockPayload(clockConfig = this.buildEffectiveClockConfig()) {
+      const timeText = this.getTimeText(clockConfig);
+      let timeX = clockConfig.time.x;
+
+      if (clockConfig.time.align === "center") {
+        timeX =
+          timeX -
+          Math.floor(
+            getClockTextWidth(
+              timeText,
+              clockConfig.font,
+              clockConfig.time.fontSize,
+            ) / 2,
+          );
+      } else if (clockConfig.time.align === "right") {
+        timeX =
+          timeX -
+          getClockTextWidth(
+            timeText,
+            clockConfig.font,
+            clockConfig.time.fontSize,
+          );
+      }
+
+      return {
+        font: clockConfig.font,
+        showSeconds: clockConfig.showSeconds,
+        hourFormat: clockConfig.hourFormat,
+        time: {
+          show: clockConfig.time.show,
+          fontSize: clockConfig.time.fontSize,
+          x: timeX,
+          y: clockConfig.time.y,
+          color: this.hexToRgb(clockConfig.time.color),
+        },
+        date: {
+          show: clockConfig.date.show,
+          fontSize: clockConfig.date.fontSize,
+          x: clockConfig.date.x,
+          y: clockConfig.date.y,
+          color: this.hexToRgb(clockConfig.date.color),
+        },
+        week: {
+          show: clockConfig.week.show,
+          x: clockConfig.week.x,
+          y: clockConfig.week.y,
+          color: this.hexToRgb(clockConfig.week.color),
+        },
+        image: {
+          show: clockConfig.image.show,
+          x: clockConfig.image.x,
+          y: clockConfig.image.y,
+          width: clockConfig.image.width,
+          height: clockConfig.image.height,
+        },
+      };
+    },
     async saveAndApply() {
-      uni.setStorageSync("tetris_config", this.config);
+      if (!this.guardBeforeSend(this.deviceStore.connected)) {
+        return;
+      }
+
+      const nextConfig = {
+        clearMode: this.config.clearMode,
+        cellSize: this.config.cellSize,
+        speed: this.config.speed,
+        showClock: this.config.showClock,
+        pieces: cloneAllTetrisPieces(),
+      };
+      const nextClockConfig = this.buildEffectiveClockConfig();
+      this.config = nextConfig;
+      this.clockConfig = nextClockConfig;
+      uni.setStorageSync(TETRIS_CONFIG_STORAGE_KEY, nextConfig);
+      uni.setStorageSync(
+        TETRIS_OVERLAY_CLOCK_CONFIG_STORAGE_KEY,
+        nextClockConfig,
+      );
+
+      const previousMode = this.deviceStore.deviceMode;
+      this.beginSendUi();
       try {
         const ws = this.deviceStore.getWebSocket();
         await ws.startTetris({
-          clearMode: this.config.clearMode,
-          cellSize: this.config.cellSize,
-          speed: TETRIS_SPEED_OPTIONS[this.config.speed],
-          pieces: this.config.pieces,
+          config: this.buildTetrisClockPayload(nextClockConfig),
+          clearMode: nextConfig.clearMode,
+          cellSize: nextConfig.cellSize,
+          speed: TETRIS_SPEED_OPTIONS[nextConfig.speed],
+          showClock: nextConfig.showClock,
+          pieces: nextConfig.pieces,
         });
-        await this.deviceStore.syncAndRequireBusinessMode(
-          "tetris",
-          "设备未进入俄罗斯方块屏保",
-        );
-        this.toast.showSuccess("已应用");
+        this.showSendSuccess("已应用");
       } catch (err) {
+        await this.deviceStore.rollbackBusinessMode(previousMode, {
+          expectedMode: "tetris",
+        });
         console.error("发送失败:", err);
-        this.toast.showError("发送失败");
+        this.showSendFailure(err);
+      } finally {
+        this.endSendUi();
       }
     },
   },
@@ -438,6 +750,10 @@ export default {
   padding: 16rpx 20rpx 0;
 }
 
+.content-wrapper {
+  padding: 0 0 56rpx;
+}
+
 .tetris-section-card {
   background: transparent !important;
   border: 0 !important;
@@ -464,26 +780,44 @@ export default {
   font-weight: 900 !important;
 }
 
-.piece-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10rpx;
+.bottom-tabs {
+  display: flex;
+  flex-shrink: 0;
+  padding: 2rpx 10rpx 0;
+  padding-bottom: var(--layout-bottom-offset);
+  background-color: var(--bg-elevated);
+  border-top: 2rpx solid var(--nb-ink);
+  gap: 2rpx;
 }
 
-.piece-preview {
-  width: 44rpx;
-  height: 44rpx;
-  border: 2rpx solid var(--nb-ink);
-  box-sizing: border-box;
+.bottom-tab-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2rpx;
+  min-height: 68rpx;
+  padding: 2rpx 0;
+  background-color: transparent;
 }
 
-.piece-name {
+.bottom-tab-item:active {
+  background-color: transparent;
+}
+
+.bottom-tab-item.active {
+  background-color: transparent;
+}
+
+.bottom-tab-item.active .bottom-tab-text {
+  color: #000000;
+  font-weight: 900;
   font-size: 22rpx;
-  line-height: 1;
 }
 
-.glx-feature-option.active .piece-name {
-  color: var(--nb-ink);
-  font-weight: 700;
+.bottom-tab-text {
+  font-size: 20rpx;
+  color: var(--text-secondary);
 }
 </style>

@@ -16,13 +16,26 @@
     <view class="canvas-section">
       <view class="preview-canvas-container" :style="previewCanvasBoxStyle">
         <PixelPreviewBoard
+          v-if="previewCanvasReady && !shouldShowSendingSnapshot"
           :width="64"
           :height="64"
-          :pixels="allPixelsForPreview"
+          :pixels="previewPixels"
           :refresh-token="previewTick"
-          :zoom="zoom"
-          :offset-x="pan.x"
-          :offset-y="pan.y"
+          :zoom="previewZoom"
+          :offset-x="previewOffset.x"
+          :offset-y="previewOffset.y"
+          :grid-visible="true"
+          :is-dark-mode="true"
+        />
+        <PixelPreviewBoard
+          v-else-if="previewCanvasReady && shouldShowSendingSnapshot"
+          :width="64"
+          :height="64"
+          :pixels="sendingPreviewPixels"
+          :refresh-token="sendingPreviewTick"
+          :zoom="previewZoom"
+          :offset-x="previewOffset.x"
+          :offset-y="previewOffset.y"
           :grid-visible="true"
           :is-dark-mode="true"
         />
@@ -59,9 +72,12 @@
           :section="config.time"
           :preset-colors="presetColors"
           :show-font-size="true"
+          :show-seconds-control="true"
+          :show-seconds="config.showSeconds"
           :min-font-size="1"
           :max-font-size="3"
           @toggle="toggleTimeShow"
+          @toggle-seconds="toggleShowSeconds"
           @adjust="handleTimeAdjust"
           @update-color="handleTimeColor"
           @set-align="handleTimeAlign"
@@ -75,7 +91,6 @@
           :show-seconds="config.showSeconds"
           :hour-format="config.hourFormat"
           @select-font="selectFont"
-          @toggle-seconds="toggleShowSeconds"
           @set-hour-format="setHourFormat"
         />
 
@@ -122,16 +137,23 @@
           </view>
 
           <view class="image-upload">
-            <view
-              v-if="!config.image.data"
-              class="upload-placeholder"
-              @click="chooseImage"
-            >
-              <Icon name="add" :size="64" />
-              <text class="upload-text">点击上传图片/GIF</text>
-              <text class="upload-hint"
-                >支持静态图片和 GIF 动画，建议 64x64 以内</text
-              >
+            <view v-if="!config.image.data" class="image-upload-empty">
+              <view class="upload-placeholder" @click="chooseImage">
+                <Icon name="add" :size="64" />
+                <text class="upload-text">点击上传图片/GIF</text>
+                <text class="upload-hint"
+                  >支持静态图片和 GIF 动画，建议 64x64 以内</text
+                >
+              </view>
+              <view class="image-actions">
+                <view
+                  class="image-action-btn secondary"
+                  @click.stop="restoreLastUsedGif"
+                >
+                  <Icon name="refresh" :size="28" color="currentColor" />
+                  <text>上次使用</text>
+                </view>
+              </view>
             </view>
             <view v-else class="image-preview">
               <image
@@ -313,7 +335,11 @@
       @touchmove.stop.prevent
     >
       <view class="glx-device-sending-card">
-        <view class="glx-device-sending-spinner"></view>
+        <GlxInlineLoader
+          class="glx-device-sending-spinner"
+          variant="chase"
+          size="lg"
+        />
         <text class="glx-device-sending-title">{{ sendOverlayTitle }}</text>
         <text class="glx-device-sending-tip">{{ sendOverlayTip }}</text>
       </view>
@@ -350,6 +376,7 @@ import deviceSyncMixin from "./mixins/deviceSyncMixin.js";
 import deviceSendUxMixin from "../../mixins/deviceSendUxMixin.js";
 import Icon from "../../components/Icon.vue";
 import Toast from "../../components/Toast.vue";
+import GlxInlineLoader from "../../components/GlxInlineLoader.vue";
 import PixelPreviewBoard from "../../components/PixelPreviewBoard.vue";
 import ClockFontPanel from "../../components/clock-editor/ClockFontPanel.vue";
 import ClockTextSettingsCard from "../../components/clock-editor/ClockTextSettingsCard.vue";
@@ -366,6 +393,7 @@ export default {
   components: {
     Icon,
     Toast,
+    GlxInlineLoader,
     PixelPreviewBoard,
     ClockFontPanel,
     ClockTextSettingsCard,
@@ -389,13 +417,17 @@ export default {
 
       imagePixels: null,
       showPreview: true,
+      previewPixels: new Map(),
+      sendingPreviewPixels: new Map(),
 
       // PixelCanvas 视图控制
-      zoom: 4,
-      pan: { x: 0, y: 0 },
-      containerSize: { width: 320, height: 320 },
-      canvasReady: false,
+      previewZoom: 4,
+      previewOffset: { x: 16, y: 16 },
+      previewContainerSize: { width: 320, height: 320 },
+      previewCanvasReady: false,
       previewTick: 0,
+      sendingPreviewTick: 0,
+      previewRefreshTimer: null,
       previewClockTimer: null,
 
       // loading 动画定时器（实例变量，方便清理）
@@ -465,13 +497,6 @@ export default {
   },
 
   watch: {
-    canvasReady(newVal) {
-      if (newVal) {
-        this.$nextTick(() => {
-          this.drawCanvas();
-        });
-      }
-    },
     gifPlaySpeed(newVal, oldVal) {
       if (newVal === oldVal || !this.gifIsPlaying) {
         return;
@@ -480,6 +505,9 @@ export default {
       this.startGifAnimation();
     },
     gifRenderedFrameMaps(newVal) {
+      if (!this.previewCanvasReady) {
+        return;
+      }
       if (
         !newVal ||
         newVal.length <= 1 ||
@@ -490,7 +518,7 @@ export default {
       }
 
       this.$nextTick(() => {
-        this.startGifAnimation();
+        this.schedulePreviewRefresh();
       });
     },
     "config.image.show"(newVal) {
@@ -498,16 +526,22 @@ export default {
         return;
       }
 
+      if (!this.previewCanvasReady) {
+        if (!newVal) {
+          this.stopGifAnimation();
+        }
+        return;
+      }
+
       if (newVal) {
         this.$nextTick(() => {
-          this.resumeAnimationGifPreview();
-          this.drawCanvas();
+          this.schedulePreviewRefresh();
         });
         return;
       }
 
       this.stopGifAnimation();
-      this.drawCanvas();
+      this.schedulePreviewRefresh();
     },
   },
 
@@ -523,22 +557,12 @@ export default {
     },
     previewCanvasBoxStyle() {
       const size =
-        this.containerSize && this.containerSize.height
-          ? this.containerSize.height
+        this.previewContainerSize && this.previewContainerSize.height
+          ? this.previewContainerSize.height
           : 320;
       return {
         height: `${size}px`,
       };
-    },
-    allPixelsForPreview() {
-      const tick = this.previewTick;
-      const pixels = this.buildImageLayerPixels();
-
-      if (this.showPreview) {
-        this.getPreviewPixels().forEach((color, key) => pixels.set(key, color));
-      }
-
-      return pixels;
     },
   },
 
@@ -577,23 +601,73 @@ export default {
   },
 
   onShow() {
-    this.startPreviewClockTimer();
-    if (
-      this.gifRenderedFrameMaps &&
-      this.gifRenderedFrameMaps.length > 1 &&
-      !this.gifIsPlaying
-    ) {
-      this.startGifAnimation();
+    if (this.previewCanvasReady) {
+      this.schedulePreviewRefresh();
+      this.startPreviewClockTimer();
+      if (
+        this.gifRenderedFrameMaps &&
+        this.gifRenderedFrameMaps.length > 1 &&
+        !this.gifIsPlaying
+      ) {
+        this.startGifAnimation();
+      }
     }
   },
 
   methods: {
+    captureSendingPreview() {
+      let frozenPixels = this.previewPixels;
+
+      if (!(frozenPixels instanceof Map) || frozenPixels.size === 0) {
+        const rebuiltPixels = this.buildPreviewPixels();
+        if (rebuiltPixels instanceof Map) {
+          frozenPixels = rebuiltPixels;
+        }
+      }
+
+      this.sendingPreviewPixels = new Map(frozenPixels);
+      this.sendingPreviewTick += 1;
+    },
+    clearSendingPreview() {
+      this.sendingPreviewPixels = new Map();
+      this.sendingPreviewTick += 1;
+    },
+    beginSendUi() {
+      this.captureSendingPreview();
+      deviceSendUxMixin.methods.beginSendUi.call(this);
+    },
+    endSendUi() {
+      deviceSendUxMixin.methods.endSendUi.call(this);
+    },
+    buildPreviewPixels() {
+      if (!this.ensureValidPreviewFont()) {
+        return null;
+      }
+      return this.buildAllPreviewPixels();
+    },
+    drawCanvas() {
+      const pixels = this.buildPreviewPixels();
+      if (!pixels) {
+        console.warn("[clock-preview] animation invalid preview pixels");
+        return;
+      }
+      this.previewPixels = pixels;
+      this.previewTick += 1;
+    },
+    drawGIFFrame() {
+      const pixels = this.buildPreviewPixels();
+      if (!pixels) {
+        return;
+      }
+      this.previewPixels = pixels;
+      this.previewTick += 1;
+    },
     startPreviewClockTimer() {
       if (this.previewClockTimer) {
         return;
       }
       const refreshPreview = () => {
-        this.drawCanvas();
+        this.schedulePreviewRefresh();
       };
       refreshPreview();
       this.previewClockTimer = setInterval(refreshPreview, 1000);
@@ -627,30 +701,46 @@ export default {
             .select(".preview-canvas-container")
             .boundingClientRect((data) => {
               if (data && data.width > 0) {
-                this.containerSize = { width: data.width, height: data.width };
+                this.previewContainerSize = {
+                  width: data.width,
+                  height: data.width,
+                };
                 const fitZoom = Math.max(
                   2,
                   Math.floor((data.width * 0.96) / 64),
                 );
-                this.zoom = fitZoom;
-                this.pan = {
+                this.previewZoom = fitZoom;
+                this.previewOffset = {
                   x: (data.width - 64 * fitZoom) / 2,
                   y: (data.width - 64 * fitZoom) / 2,
                 };
               } else {
-                this.zoom = 4;
-                this.pan = { x: 16, y: 16 };
+                this.previewZoom = 4;
+                this.previewOffset = { x: 16, y: 16 };
               }
-              this.canvasReady = true;
+              this.previewCanvasReady = true;
               this.isReady = true;
+              this.schedulePreviewRefresh();
               this.startPreviewClockTimer();
-              this.$nextTick(() => {
-                this.drawCanvas();
-              });
             })
             .exec();
         }, 80);
       });
+    },
+    schedulePreviewRefresh() {
+      if (!this.previewCanvasReady) {
+        return;
+      }
+      if (this.previewRefreshTimer) {
+        clearTimeout(this.previewRefreshTimer);
+        this.previewRefreshTimer = null;
+      }
+      this.previewRefreshTimer = setTimeout(() => {
+        this.drawCanvas();
+        if (this.config.image.show && !this.gifIsPlaying) {
+          this.resumeAnimationGifPreview();
+        }
+      }, 80);
     },
     ensureValidCurrentTab() {
       const validTabs = this.tabDefinitions.map((tab) => tab.index);
@@ -666,6 +756,10 @@ export default {
       if (this._resizeDebounceTimer) {
         clearTimeout(this._resizeDebounceTimer);
         this._resizeDebounceTimer = null;
+      }
+      if (this.previewRefreshTimer) {
+        clearTimeout(this.previewRefreshTimer);
+        this.previewRefreshTimer = null;
       }
     },
 
@@ -1275,6 +1369,12 @@ export default {
   margin-bottom: 24rpx;
 }
 
+.image-upload-empty {
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
+}
+
 .upload-placeholder {
   display: flex;
   flex-direction: column;
@@ -1362,6 +1462,11 @@ export default {
   color: #ffffff;
 }
 
+.image-action-btn.secondary {
+  background-color: #ffffff;
+  color: #000000;
+}
+
 .image-action-btn.danger:active {
   background-color: #d92d20;
 }
@@ -1394,18 +1499,11 @@ export default {
 }
 
 .sending-spinner {
-  width: 60rpx;
-  height: 60rpx;
-  border: 6rpx solid rgba(0, 0, 0, 0.16);
-  border-top-color: var(--nb-ink);
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  line-height: 1;
 }
 
 .sending-title {

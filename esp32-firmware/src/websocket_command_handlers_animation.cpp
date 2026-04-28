@@ -1,20 +1,12 @@
 #include "websocket_command_handlers.h"
 #include "animation_manager.h"
-#include "display_manager.h"
-#include "mode_tags.h"
-#include "runtime_command_bus.h"
-#include "runtime_mode_coordinator.h"
 #include "websocket_handler.h"
+#include "websocket_async_command_response.h"
 
 namespace {
 void setErrorResponse(StaticJsonDocument<768>& response, const char* message) {
   response["status"] = "error";
   response["message"] = message;
-}
-
-void abortTransferWithError(StaticJsonDocument<768>& response, const char* message, const char* restoreReason) {
-  setErrorResponse(response, message);
-  RuntimeCommandBus::enqueueAbortTransientTransferAndRestore(restoreReason);
 }
 }
 
@@ -27,16 +19,34 @@ bool WebSocketCommandHandlers::handleAnimationCommand(
   String cmd = doc["cmd"].as<String>();
 
   if (cmd == "set_gif_animation") {
+    if (!doc.containsKey("animationData")) {
+      if (client == nullptr) {
+        setErrorResponse(response, "client unavailable");
+        return true;
+      }
+
+      WebSocketHandler::prepareBinaryAnimationUpload(client->id());
+      return wsSendAcceptedResponse(client, response, responseSent);
+    }
+
     JsonVariant animData = doc["animationData"];
 
     if (animData.isNull()) {
       AnimationManager::freeGIFAnimation();
-      response["status"] = "success";
-      response["message"] = "animation cleared";
+      if (!AnimationManager::saveAnimation()) {
+        setErrorResponse(response, "animation persistence failed");
+      } else {
+        response["status"] = "success";
+        response["message"] = "animation cleared";
+      }
     } else if (AnimationManager::loadGIFAnimation(animData)) {
-      response["status"] = "success";
-      response["message"] = "compact animation loaded";
-      response["frameCount"] = AnimationManager::currentGIF->frameCount;
+      if (!AnimationManager::saveAnimation()) {
+        setErrorResponse(response, "animation persistence failed");
+      } else {
+        response["status"] = "success";
+        response["message"] = "compact animation loaded";
+        response["frameCount"] = AnimationManager::currentGIF->frameCount;
+      }
     } else {
       setErrorResponse(response, "animation load failed");
     }
@@ -44,32 +54,24 @@ bool WebSocketCommandHandlers::handleAnimationCommand(
   }
 
   if (cmd == "animation_begin") {
-    if (!doc.containsKey("frameCount")) {
-      abortTransferWithError(response, "missing frameCount", "动画初始化字段缺失，恢复稳定态");
+    if (client == nullptr) {
+      setErrorResponse(response, "client unavailable");
+      return true;
+    }
+    if (!doc.containsKey("frameCount") || !doc["frameCount"].is<int>()) {
+      setErrorResponse(response, "invalid frameCount");
       return true;
     }
 
     int frameCount = doc["frameCount"].as<int>();
+    WebSocketHandler::prepareStreamingAnimationUpload(client->id());
     if (AnimationManager::beginAnimation(frameCount)) {
       response["status"] = "success";
       response["message"] = "ready to receive frames";
       response["frameCount"] = frameCount;
     } else {
-      abortTransferWithError(response, "animation init failed", "动画初始化失败，恢复稳定态");
-    }
-    return true;
-  }
-
-  if (cmd == "animation_frame") {
-    int index = doc["index"] | -1;
-    JsonVariant frameData = doc["frame"];
-    if (AnimationManager::addFrame(index, frameData)) {
-      response["status"] = "success";
-      response["message"] = "frame received";
-      response["index"] = index;
-    } else {
-      setErrorResponse(response, "frame load failed");
-      response["index"] = index;
+      setErrorResponse(response, "animation init failed");
+      WebSocketHandler::restoreAfterAnimationUploadFailure();
     }
     return true;
   }
@@ -78,8 +80,12 @@ bool WebSocketCommandHandlers::handleAnimationCommand(
     if (!doc.containsKey("index") ||
         !doc.containsKey("type") ||
         !doc.containsKey("delay") ||
-        !doc.containsKey("totalPixels")) {
-      abortTransferWithError(response, "missing frame fields", "帧初始化字段缺失，恢复稳定态");
+        !doc.containsKey("totalPixels") ||
+        !doc["index"].is<int>() ||
+        !doc["type"].is<int>() ||
+        !doc["delay"].is<int>() ||
+        !doc["totalPixels"].is<int>()) {
+      setErrorResponse(response, "invalid frame fields");
       return true;
     }
 
@@ -92,59 +98,60 @@ bool WebSocketCommandHandlers::handleAnimationCommand(
       response["message"] = "frame initialized";
       response["index"] = index;
     } else {
-      abortTransferWithError(response, "frame init failed", "帧初始化失败，恢复稳定态");
+      setErrorResponse(response, "frame init failed");
       response["index"] = index;
+      WebSocketHandler::restoreAfterAnimationUploadFailure();
     }
     return true;
   }
 
   if (cmd == "frame_status") {
-    if (!doc.containsKey("index")) {
-      abortTransferWithError(response, "missing frame status index", "帧状态查询字段缺失，恢复稳定态");
+    if (!doc.containsKey("index") || !doc["index"].is<int>()) {
+      setErrorResponse(response, "invalid frame index");
       return true;
     }
 
     int index = doc["index"].as<int>();
-    int count = 0;
-    if (AnimationManager::frameStatus(index, count)) {
-      response["status"] = "success";
-      response["message"] = "frame status";
+    if (AnimationManager::currentGIF == nullptr ||
+        index < 0 ||
+        index >= AnimationManager::currentGIF->frameCount) {
+      setErrorResponse(response, "frame not found");
       response["index"] = index;
-      response["count"] = count;
-      Serial.printf("帧 %d 状态提交成功: %d 像素\n", index, count);
-    } else {
-      abortTransferWithError(response, "frame status mismatch", "帧像素数量不完整，恢复稳定态");
-      response["index"] = index;
-    }
-    return true;
-  }
-
-  if (cmd == "frame_chunk") {
-    if (!doc.containsKey("index") || !doc.containsKey("pixels")) {
-      abortTransferWithError(response, "missing chunk fields", "帧 chunk 字段缺失，恢复稳定态");
+      WebSocketHandler::restoreAfterAnimationUploadFailure();
       return true;
     }
 
-    int index = doc["index"].as<int>();
-    JsonArray pixels = doc["pixels"].as<JsonArray>();
-    if (AnimationManager::addFrameChunk(index, pixels)) {
-      response["status"] = "success";
-      response["message"] = "chunk received";
+    AnimationFrame& frame = AnimationManager::currentGIF->frames[index];
+    if (frame.pixelCount != frame.capacity) {
+      setErrorResponse(response, "frame incomplete");
       response["index"] = index;
-    } else {
-      abortTransferWithError(response, "chunk failed", "帧 chunk 追加失败，恢复稳定态");
-      response["index"] = index;
+      response["count"] = frame.pixelCount;
+      WebSocketHandler::restoreAfterAnimationUploadFailure();
+      return true;
     }
+
+    response["status"] = "success";
+    response["message"] = "frame status";
+    response["index"] = index;
+    response["count"] = frame.pixelCount;
     return true;
   }
 
   if (cmd == "animation_end") {
-    AnimationManager::receivingFrameIndex = -1;
     if (AnimationManager::endAnimation()) {
-      response["status"] = "success";
-      response["message"] = "animation upload ready";
+      if (!AnimationManager::saveAnimation()) {
+        setErrorResponse(response, "animation persistence failed");
+        WebSocketHandler::restoreAfterAnimationUploadFailure();
+      } else {
+        WebSocketHandler::clearStreamingAnimationUpload(client != nullptr ? client->id() : 0);
+        response["status"] = "success";
+        response["message"] = "animation loaded and playing";
+        response["frameCount"] =
+          AnimationManager::currentGIF != nullptr ? AnimationManager::currentGIF->frameCount : 0;
+      }
     } else {
-      abortTransferWithError(response, "animation finalize failed", "动画上传收尾失败，恢复稳定态");
+      setErrorResponse(response, "animation finalize failed");
+      WebSocketHandler::restoreAfterAnimationUploadFailure();
     }
     return true;
   }

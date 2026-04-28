@@ -1,6 +1,5 @@
 import { normalizeIntensity, normalizeSpeed } from "../led-matrix-demos/common.js";
 import { resolveDemoById } from "./demoCatalog.js";
-import { resolveTetrisDropSpeed } from "./tetrisScene.js";
 
 function normalizeDensity(value) {
   const parsed = Number(value);
@@ -41,32 +40,6 @@ function buildLedMatrixSendPlan(options) {
   const intensity = normalizeIntensity(safeOptions.intensity);
   const density = normalizeDensity(safeOptions.density);
 
-  if (
-    demo.id === "maze" ||
-    demo.id === "snake" ||
-    demo.id === "ping_pong"
-  ) {
-    const command = {
-      cmd: "set_game_screensaver",
-      game: demo.id,
-      speed,
-    };
-
-    if (demo.id === "snake") {
-      command.snakeWidth = safeOptions.snakeWidth;
-    }
-
-    if (demo.id === "maze") {
-      command.mazeSizeMode = safeOptions.mazeSizeMode;
-    }
-
-    return {
-      type: "command",
-      deviceMode: "game_screensaver",
-      command,
-    };
-  }
-
   if (demo.type === "ambient") {
     if (demo.id === "rain") {
       return {
@@ -92,22 +65,6 @@ function buildLedMatrixSendPlan(options) {
         speed,
         intensity,
         loop: true,
-      },
-    };
-  }
-
-  if (demo.type === "tetris") {
-    return {
-      type: "command",
-      deviceMode: "tetris",
-      command: {
-        cmd: "set_mode",
-        mode: "tetris",
-        clearMode: true,
-        cellSize: 2,
-        speed: resolveTetrisDropSpeed(speed),
-        showClock: true,
-        pieces: [0, 1, 2, 3, 4, 5, 6],
       },
     };
   }

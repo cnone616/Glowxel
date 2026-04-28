@@ -9,9 +9,11 @@
 namespace {
 const long kGmtOffsetSec = 8 * 3600;
 const int kDaylightOffsetSec = 0;
-const unsigned long kStaConnectTimeoutMs = 12000;
-const unsigned long kNtpRetryIntervalMs = 15000;
-const unsigned long kNtpFastRetryIntervalsMs[] = {1500, 3000, 5000};
+const unsigned long kStaConnectTimeoutMs = 20000;
+const unsigned long kStaReconnectDelayMs = 1500;
+const unsigned long kRuntimeSettingsWindowDefaultHoldMs = 120000;
+const unsigned long kNtpFirstRetryIntervalMs = 20000;
+const unsigned long kNtpRetryIntervalMs = 20000;
 const unsigned long kWifiScanTimeoutMs = 18000;
 const uint32_t kWifiScanMinMsPerChannel = 80;
 const uint32_t kWifiScanMaxMsPerChannel = 280;
@@ -50,19 +52,53 @@ unsigned long currentNtpRetryIntervalMs() {
     return 0;
   }
 
-  size_t fastRetryIndex = static_cast<size_t>(s_ntpRequestAttemptCount - 1);
-  if (fastRetryIndex < (sizeof(kNtpFastRetryIntervalsMs) / sizeof(kNtpFastRetryIntervalsMs[0]))) {
-    return kNtpFastRetryIntervalsMs[fastRetryIndex];
+  if (s_ntpRequestAttemptCount == 1) {
+    return kNtpFirstRetryIntervalMs;
   }
 
   return kNtpRetryIntervalMs;
+}
+
+void disableStationPowerSave(const char* stage) {
+  bool sleep_ok = WiFi.setSleep(false);
+  esp_err_t set_ps_err = esp_wifi_set_ps(WIFI_PS_NONE);
+  wifi_ps_type_t current_ps = WIFI_PS_MIN_MODEM;
+  esp_err_t get_ps_err = esp_wifi_get_ps(&current_ps);
+  Serial.printf(
+    "[WiFi] %s 关闭省电: WiFi.setSleep(false)=%d, esp_wifi_set_ps=%d, esp_wifi_get_ps=%d, current_ps=%d\n",
+    stage == nullptr ? "unknown" : stage,
+    sleep_ok ? 1 : 0,
+    (int)set_ps_err,
+    (int)get_ps_err,
+    (int)current_ps
+  );
+}
+
+void applyStationRadioTuning(const char* stage, bool logLinkMetrics) {
+  bool tx_power_ok = WiFi.setTxPower(WIFI_POWER_19_5dBm);
+  if (!logLinkMetrics) {
+    Serial.printf(
+      "[WiFi] %s 射频配置: WiFi.setTxPower(WIFI_POWER_19_5dBm)=%d\n",
+      stage == nullptr ? "unknown" : stage,
+      tx_power_ok ? 1 : 0
+    );
+    return;
+  }
+
+  Serial.printf(
+    "[WiFi] %s 射频配置: WiFi.setTxPower(WIFI_POWER_19_5dBm)=%d, RSSI=%d dBm, channel=%d\n",
+    stage == nullptr ? "unknown" : stage,
+    tx_power_ok ? 1 : 0,
+    WiFi.RSSI(),
+    WiFi.channel()
+  );
 }
 
 String buildConfigPortalSSID() {
   uint64_t chipId = ESP.getEfuseMac();
   char suffix[7];
   snprintf(suffix, sizeof(suffix), "%06llX", static_cast<unsigned long long>(chipId & 0xFFFFFFULL));
-  return "Glowxel-" + String(suffix);
+  return "Glowxel PixelBoard-" + String(suffix);
 }
 
 void copyScanItem(WiFiScanResultItem& item, const String& ssid, int32_t rssi, bool secure) {
@@ -227,6 +263,7 @@ size_t WiFiManager::scanned_network_count = 0;
 size_t WiFiManager::scanned_network_capacity = 0;
 bool WiFiManager::config_mode = false;
 bool WiFiManager::sta_connecting = false;
+bool WiFiManager::sta_reconnect_pending = false;
 String WiFiManager::saved_ssid = "";
 String WiFiManager::saved_password = "";
 String WiFiManager::config_portal_ssid = "";
@@ -234,8 +271,11 @@ unsigned long WiFiManager::last_ntp_retry_at = 0;
 unsigned long WiFiManager::portal_restart_at = 0;
 unsigned long WiFiManager::sta_connect_started_at = 0;
 unsigned long WiFiManager::sta_connect_deadline_at = 0;
+unsigned long WiFiManager::sta_reconnect_due_at = 0;
+unsigned long WiFiManager::runtime_settings_window_until = 0;
 bool WiFiManager::ntp_sync_logged = false;
 bool WiFiManager::time_synced_once = false;
+bool WiFiManager::runtime_access_ap_started = false;
 WifiScanPhase WiFiManager::scan_phase = WifiScanPhase::IDLE;
 unsigned long WiFiManager::scan_started_at = 0;
 volatile bool WiFiManager::scan_result_ready = false;
@@ -288,12 +328,16 @@ void WiFiManager::setScanPhase(WifiScanPhase nextPhase, const char* reason) {
 void WiFiManager::beginStationConnect() {
   config_mode = false;
   sta_connecting = true;
+  sta_reconnect_pending = false;
   portal_restart_at = 0;
   sta_connect_started_at = millis();
   sta_connect_deadline_at = sta_connect_started_at + kStaConnectTimeoutMs;
+  sta_reconnect_due_at = 0;
   last_ntp_retry_at = 0;
   ntp_sync_logged = false;
   time_synced_once = false;
+  runtime_settings_window_until = 0;
+  runtime_access_ap_started = false;
   config_portal_ssid = "";
   resetNtpRetrySchedule();
 
@@ -306,6 +350,11 @@ void WiFiManager::beginStationConnect() {
                 mode_ok ? 1 : 0,
                 (int)WiFi.getMode(),
                 ESP.getFreeHeap());
+  bool disconnect_ok = WiFi.disconnect();
+  Serial.printf("[WiFi] WiFi.disconnect()=%d\n", disconnect_ok ? 1 : 0);
+  delay(50);
+  disableStationPowerSave("beginStationConnect()");
+  applyStationRadioTuning("beginStationConnect()", false);
   wl_status_t begin_status = WiFi.begin(saved_ssid.c_str(), saved_password.c_str());
   Serial.printf("[WiFi] WiFi.begin 已调用，返回=%d\n", (int)begin_status);
 }
@@ -316,10 +365,12 @@ void WiFiManager::finalizeStationConnected() {
   }
 
   sta_connecting = false;
+  sta_reconnect_pending = false;
   config_mode = false;
   portal_restart_at = 0;
   sta_connect_started_at = 0;
   sta_connect_deadline_at = 0;
+  sta_reconnect_due_at = 0;
 
   requestTimeSync();
   resetNtpRetrySchedule();
@@ -329,9 +380,12 @@ void WiFiManager::finalizeStationConnected() {
   time_synced_once = false;
 
   String ip = WiFi.localIP().toString();
+  disableStationPowerSave("finalizeStationConnected()");
+  applyStationRadioTuning("finalizeStationConnected()", true);
   Serial.println("WiFi已连接");
   Serial.print("IP地址: ");
   Serial.println(ip);
+  Serial.println("[WiFi] STA 已连接，已再次确认关闭省电以稳定 HTTP/WebSocket 入站访问");
   Serial.println("已发起网络时间同步，后台更新中");
   showWiFiConnectedScreen(ip);
 }
@@ -347,8 +401,10 @@ void WiFiManager::setupWiFi() {
                 saved_password.length() > 0 ? 1 : 0);
 
   sta_connecting = false;
+  sta_reconnect_pending = false;
   sta_connect_started_at = 0;
   sta_connect_deadline_at = 0;
+  sta_reconnect_due_at = 0;
   portal_restart_at = 0;
   last_ntp_retry_at = 0;
   ntp_sync_logged = false;
@@ -369,12 +425,16 @@ void WiFiManager::setupWiFi() {
 void WiFiManager::startConfigPortal() {
   config_mode = true;
   sta_connecting = false;
+  sta_reconnect_pending = false;
   portal_restart_at = 0;
   last_ntp_retry_at = 0;
   ntp_sync_logged = false;
   time_synced_once = false;
   sta_connect_started_at = 0;
   sta_connect_deadline_at = 0;
+  sta_reconnect_due_at = 0;
+  runtime_settings_window_until = 0;
+  runtime_access_ap_started = false;
   config_portal_ssid = buildConfigPortalSSID();
   resetNtpRetrySchedule();
 
@@ -420,6 +480,33 @@ void WiFiManager::stopConfigPortal() {
   stopWifiScanDriverIfNeeded("关闭配网页前");
   WiFi.scanDelete();
   WiFi.softAPdisconnect(true);
+  runtime_access_ap_started = false;
+}
+
+void WiFiManager::ensureRuntimeSettingsAccessPoint() {
+  if (config_mode || runtime_access_ap_started) {
+    return;
+  }
+
+  if (config_portal_ssid.length() == 0) {
+    config_portal_ssid = buildConfigPortalSSID();
+  }
+
+  WiFi.softAPConfig(kConfigPortalIp, kConfigPortalGateway, kConfigPortalSubnet);
+  bool started = WiFi.softAP(config_portal_ssid.c_str());
+  if (!started) {
+    Serial.println("[WiFi] 运行态设置热点启动失败");
+    return;
+  }
+
+  runtime_access_ap_started = true;
+  Serial.printf(
+    "[WiFi] 运行态设置热点已启动: ssid=%s ip=%s mode=%d heap=%u bytes\n",
+    config_portal_ssid.c_str(),
+    kConfigPortalIp.toString().c_str(),
+    (int)WiFi.getMode(),
+    ESP.getFreeHeap()
+  );
 }
 
 void WiFiManager::scanNearbyNetworks() {
@@ -537,6 +624,11 @@ void WiFiManager::handleWiFiEvent(arduino_event_t* event) {
   if (event->event_id == ARDUINO_EVENT_WIFI_AP_STACONNECTED) {
     Serial.printf("[WiFi Event] AP client connected, aid=%d\n",
                   (int)event->event_info.wifi_ap_staconnected.aid);
+    if (!config_mode) {
+      startRuntimeSettingsWindow(kRuntimeSettingsWindowDefaultHoldMs);
+      Serial.printf("[WiFi] 运行态检测到热点客户端接入，设置窗口续期=%lu ms\n",
+                    kRuntimeSettingsWindowDefaultHoldMs);
+    }
     return;
   }
 
@@ -556,6 +648,16 @@ void WiFiManager::handleWiFiEvent(arduino_event_t* event) {
       (int)DisplayManager::currentMode,
       DisplayManager::currentBusinessModeTag.c_str()
     );
+    if (!config_mode && saved_ssid.length() > 0) {
+      if (sta_connecting) {
+        Serial.println("[WiFi] 当前仍处于 STA 连接窗口内，保持本轮连接超时控制，不立即重置重连状态机");
+        return;
+      }
+      sta_connecting = false;
+      sta_reconnect_pending = true;
+      sta_reconnect_due_at = millis() + kStaReconnectDelayMs;
+      Serial.printf("[WiFi] 已计划自动重连，delay=%lu ms\n", kStaReconnectDelayMs);
+    }
     return;
   }
 
@@ -644,6 +746,18 @@ bool WiFiManager::isStationConnecting() {
 
 bool WiFiManager::isPortalRestartScheduled() {
   return portal_restart_at != 0;
+}
+
+void WiFiManager::startRuntimeSettingsWindow(unsigned long holdMs) {
+  if (holdMs == 0) {
+    return;
+  }
+  runtime_settings_window_until = millis() + holdMs;
+}
+
+bool WiFiManager::isRuntimeSettingsWindowActive() {
+  return runtime_settings_window_until != 0 &&
+         static_cast<long>(runtime_settings_window_until - millis()) > 0;
 }
 
 WifiScanPhase WiFiManager::getScanPhase() {
@@ -801,11 +915,30 @@ void WiFiManager::tick() {
     return;
   }
 
+  if (sta_reconnect_pending) {
+    if (WiFi.status() == WL_CONNECTED) {
+      finalizeStationConnected();
+      return;
+    }
+
+    if (sta_reconnect_due_at != 0 && millis() >= sta_reconnect_due_at) {
+      Serial.println("[WiFi] 执行 STA 自动重连");
+      beginStationConnect();
+    }
+    return;
+  }
+
   if (WiFi.status() != WL_CONNECTED) {
     last_ntp_retry_at = 0;
     ntp_sync_logged = false;
     time_synced_once = false;
     resetNtpRetrySchedule();
+    if (saved_ssid.length() > 0) {
+      sta_reconnect_pending = true;
+      sta_reconnect_due_at = millis() + kStaReconnectDelayMs;
+      Serial.printf("[WiFi] 检测到 STA 离线，补发自动重连计划，delay=%lu ms\n",
+                    kStaReconnectDelayMs);
+    }
     return;
   }
 
@@ -827,7 +960,8 @@ void WiFiManager::tick() {
   last_ntp_retry_at = now;
   noteNtpSyncRequest();
   ntp_sync_logged = false;
-  Serial.printf("NTP 未同步，后台重试... request#%u, interval=%lu ms\n",
+  // configTime() 会停止并重新初始化 SNTP，频繁调用会打断正在进行的同步流程。
+  Serial.printf("NTP 未同步，重新初始化同步客户端... request#%u, interval=%lu ms\n",
                 (unsigned int)s_ntpRequestAttemptCount,
                 retryIntervalMs);
   requestTimeSync();

@@ -4,6 +4,7 @@
       <Icon :name="iconName" :size="32" />
       <text class="card-title glx-panel-title">{{ title }}</text>
       <GlxSwitch
+        v-if="showToggle"
         class="glx-row-switch"
         :checked="section.show"
         @change="$emit('toggle')"
@@ -28,6 +29,15 @@
             <text class="control-icon">+</text>
           </view>
         </view>
+      </view>
+
+      <view v-if="showSecondsControl" class="setting-item-row">
+        <text class="setting-label">显示秒钟</text>
+        <GlxSwitch
+          class="glx-row-switch"
+          :checked="showSeconds"
+          @change="$emit('toggle-seconds')"
+        />
       </view>
 
       <view class="setting-item-row">
@@ -152,8 +162,20 @@ export default {
       type: String,
       default: "Y 位置",
     },
+    showToggle: {
+      type: Boolean,
+      default: true,
+    },
+    showSecondsControl: {
+      type: Boolean,
+      default: false,
+    },
+    showSeconds: {
+      type: Boolean,
+      default: false,
+    },
   },
-  emits: ["toggle", "adjust", "update-color", "set-align"],
+  emits: ["toggle", "adjust", "update-color", "set-align", "toggle-seconds"],
 };
 </script>
 

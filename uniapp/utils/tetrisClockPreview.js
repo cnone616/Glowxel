@@ -91,9 +91,6 @@ const ORIGINAL_TETRIS_COLOR_SEQUENCE = [
 ];
 
 const ORIGINAL_DIGIT_X_SHIFTS = [1, 8, 18, 25];
-const ORIGINAL_PREVIEW_SCALE = 2;
-const ORIGINAL_PREVIEW_OFFSET_X = 0;
-const ORIGINAL_PREVIEW_OFFSET_Y = 12;
 const ORIGINAL_FALL_START_Y = -5;
 const ORIGINAL_COLON_X = 15;
 const ORIGINAL_COLON_VERTICAL_GAP_RATIO = 0.2;
@@ -318,6 +315,36 @@ function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
 }
 
+function createEmptyBounds() {
+  return {
+    minX: Infinity,
+    maxX: -Infinity,
+    minY: Infinity,
+    maxY: -Infinity,
+  };
+}
+
+function mergeBounds(target, bounds) {
+  target.minX = Math.min(target.minX, bounds.minX);
+  target.maxX = Math.max(target.maxX, bounds.maxX);
+  target.minY = Math.min(target.minY, bounds.minY);
+  target.maxY = Math.max(target.maxY, bounds.maxY);
+}
+
+function resolveOriginalCellSize(value, maxSize = 2) {
+  const numericValue = Number(value);
+  if (numericValue === 1) {
+    return 1;
+  }
+  if (numericValue === 2) {
+    return 2;
+  }
+  if (maxSize === 3 && numericValue === 3) {
+    return 3;
+  }
+  return 2;
+}
+
 function normalizeShape(cells) {
   let minX = Infinity;
   let minY = Infinity;
@@ -467,10 +494,17 @@ function getDropSpeed(config) {
   return 150;
 }
 
-function getClockSnapshot() {
+function getClockSnapshot(hourFormat = 24) {
   const now = new Date();
+  let hours = now.getHours();
+  if (hourFormat === 12) {
+    hours %= 12;
+    if (hours === 0) {
+      hours = 12;
+    }
+  }
   return {
-    hours: now.getHours(),
+    hours,
     minutes: now.getMinutes(),
   };
 }
@@ -1050,10 +1084,10 @@ function buildFrameMap(state, pulseBright) {
 }
 
 function createSimulationState(config) {
-  const cellSize = clamp(Number(config.cellSize) || 2, 1, 3);
+  const cellSize = resolveOriginalCellSize(config.cellSize, 3);
   const cols = Math.floor(PANEL_SIZE / cellSize);
   const rows = Math.floor(PANEL_SIZE / cellSize);
-  const clock = getClockSnapshot();
+  const clock = getClockSnapshot(config.hourFormat);
   const pieces = choosePieceTypes(config.pieces);
   let piecesMask = 0;
   for (let index = 0; index < pieces.length; index += 1) {
@@ -1086,9 +1120,35 @@ function createSimulationState(config) {
   return state;
 }
 
-function getOriginalClockDigits() {
-  const clock = getClockSnapshot();
+function getOriginalClockDigits(hourFormat = 24) {
+  const clock = getClockSnapshot(hourFormat);
   return `${String(clock.hours).padStart(2, "0")}${String(clock.minutes).padStart(2, "0")}`;
+}
+
+function getOriginalSequenceBounds(digits, colonFalls) {
+  const bounds = createEmptyBounds();
+  mergeBounds(bounds, getOriginalDigitGroupBounds(digits));
+  for (let index = 0; index < colonFalls.length; index += 1) {
+    const item = colonFalls[index];
+    mergeBounds(
+      bounds,
+      getOriginalPlacedBlockBounds(item.block, item.x, item.y - 1, item.rot),
+    );
+  }
+  return bounds;
+}
+
+function resolveOriginalPreviewLayout(config, digits, colonFalls) {
+  const scale = resolveOriginalCellSize(config.cellSize, 2);
+  const bounds = getOriginalSequenceBounds(digits, colonFalls);
+  const width = (bounds.maxX - bounds.minX + 1) * scale;
+  const height = (bounds.maxY - bounds.minY + 1) * scale;
+
+  return {
+    scale,
+    offsetX: Math.floor((PANEL_SIZE - width) / 2) - bounds.minX * scale,
+    offsetY: Math.floor((PANEL_SIZE - height) / 2) - bounds.minY * scale,
+  };
 }
 
 function createOriginalDigitStates(digits) {
@@ -1181,14 +1241,14 @@ function resolveOriginalFallingRotation(targetRotation, fallIndex, stopY) {
   return rotations;
 }
 
-function drawOriginalBlockShape(pixels, block, colorName, xPos, yPos, rotation, scale, offsetX, offsetY) {
+function drawOriginalBlockShape(pixels, block, colorName, xPos, yPos, rotation, layout) {
   const color = ORIGINAL_TETRIS_COLORS[colorName] || ORIGINAL_TETRIS_COLORS.myWHITE;
   const fillColor = rgbToText(color);
   const cells = getOriginalShapeCells(block, rotation);
   for (let index = 0; index < cells.length; index += 1) {
-    const px = offsetX + (xPos + cells[index][0]) * scale;
-    const py = offsetY + (yPos + cells[index][1]) * scale;
-    fillRect(pixels, px, py, scale, scale, fillColor);
+    const px = layout.offsetX + (xPos + cells[index][0]) * layout.scale;
+    const py = layout.offsetY + (yPos + cells[index][1]) * layout.scale;
+    fillRect(pixels, px, py, layout.scale, layout.scale, fillColor);
   }
 }
 
@@ -1196,11 +1256,8 @@ function getOriginalCurrentFallY(fallIndex) {
   return ORIGINAL_FALL_START_Y + fallIndex - 1;
 }
 
-function buildOriginalTetrisFrame(states, colonFalls, colonStates) {
+function buildOriginalTetrisFrame(states, colonFalls, colonStates, layout) {
   const pixels = new Map();
-  const scale = ORIGINAL_PREVIEW_SCALE;
-  const offsetX = ORIGINAL_PREVIEW_OFFSET_X;
-  const offsetY = ORIGINAL_PREVIEW_OFFSET_Y;
 
   for (let stateIndex = 0; stateIndex < states.length; stateIndex += 1) {
     const state = states[stateIndex];
@@ -1214,9 +1271,7 @@ function buildOriginalTetrisFrame(states, colonFalls, colonStates) {
         item.x + state.xShift,
         item.y - 1,
         item.rot,
-        scale,
-        offsetX,
-        offsetY,
+        layout,
       );
     }
 
@@ -1234,9 +1289,7 @@ function buildOriginalTetrisFrame(states, colonFalls, colonStates) {
         current.x + state.xShift,
         getOriginalCurrentFallY(state.fallIndex),
         rotation,
-        scale,
-        offsetX,
-        offsetY,
+        layout,
       );
     }
   }
@@ -1255,9 +1308,7 @@ function buildOriginalTetrisFrame(states, colonFalls, colonStates) {
         item.x,
         item.y - 1,
         item.rot,
-        scale,
-        offsetX,
-        offsetY,
+        layout,
       );
       continue;
     }
@@ -1268,9 +1319,7 @@ function buildOriginalTetrisFrame(states, colonFalls, colonStates) {
       item.x,
       getOriginalCurrentFallY(state.fallIndex),
       item.rot,
-      scale,
-      offsetX,
-      offsetY,
+      layout,
     );
   }
 
@@ -1328,27 +1377,28 @@ function stepOriginalColonStates(colonFalls, colonStates) {
 }
 
 function buildOriginalTetrisPreviewFrames(config) {
-  const digits = getOriginalClockDigits();
-  const states = createOriginalDigitStates(digits);
+  const digits = getOriginalClockDigits(config.hourFormat);
   const colonFalls = buildOriginalColonFalls(digits);
+  const layout = resolveOriginalPreviewLayout(config, digits, colonFalls);
+  const states = createOriginalDigitStates(digits);
   const colonStates = createOriginalColonStates(colonFalls);
   const frames = [];
   const speed = getDropSpeed(config);
   const holdFrames = speed <= 90 ? 40 : speed <= 170 ? 56 : 68;
 
-  frames.push(buildOriginalTetrisFrame(states, colonFalls, colonStates));
+  frames.push(buildOriginalTetrisFrame(states, colonFalls, colonStates, layout));
 
   for (let frameIndex = 0; frameIndex < 320; frameIndex += 1) {
     const digitsDone = stepOriginalDigitStates(states);
     const colonDone = stepOriginalColonStates(colonFalls, colonStates);
-    frames.push(buildOriginalTetrisFrame(states, colonFalls, colonStates));
+    frames.push(buildOriginalTetrisFrame(states, colonFalls, colonStates, layout));
     if (digitsDone && colonDone) {
       break;
     }
   }
 
   for (let holdIndex = 0; holdIndex < holdFrames; holdIndex += 1) {
-    frames.push(buildOriginalTetrisFrame(states, colonFalls, colonStates));
+    frames.push(buildOriginalTetrisFrame(states, colonFalls, colonStates, layout));
   }
 
   return frames;

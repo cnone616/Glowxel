@@ -43,6 +43,12 @@ enum TimeOfDay : uint8_t {
   TIME_NIGHT
 };
 
+enum SpecialWindowId : uint8_t {
+  SPECIAL_WINDOW_NONE = 0,
+  SPECIAL_WINDOW_MIDNIGHT,
+  SPECIAL_WINDOW_WAKE
+};
+
 struct EyeShapePreset {
   float offsetX;
   float offsetY;
@@ -136,6 +142,7 @@ struct EyesRuntimeState {
   unsigned long lastLookAt;
   unsigned long nextLookAfterMs;
   unsigned long lastExpressionAt;
+  unsigned long nextExpressionAfterMs;
   unsigned long actionExpireAt;
   unsigned long lastInteractionAt;
   EyeExpressionId expression;
@@ -147,6 +154,21 @@ struct EyesRuntimeState {
 struct WeightedExpression {
   EyeExpressionId expression;
   float weight;
+};
+
+struct ExpressionPool {
+  const EyeExpressionId* expressions;
+  uint8_t count;
+};
+
+struct ScheduleContext {
+  TimeOfDay timeOfDay;
+  SpecialWindowId specialWindow;
+};
+
+struct ExpressionDedupeProfile {
+  float currentMultiplier;
+  float historyPenalties[4];
 };
 
 static const EyeShapePreset kEyePresets[EYE_EXPRESSION_COUNT] = {
@@ -179,6 +201,88 @@ static const unsigned long kEyesFrameIntervalMs = 42;
 static const uint8_t kHeartEyeR = 255;
 static const uint8_t kHeartEyeG = 111;
 static const uint8_t kHeartEyeB = 179;
+static const float kAllowedPoolBaseWeight = 10.0f;
+static const int kExpressionJitterMinPercent = 90;
+static const int kExpressionJitterMaxPercent = 110;
+static const EyeExpressionId kDeepNightPool[] = {
+  EYE_EXPRESSION_SLEEPY,
+  EYE_EXPRESSION_SQUINT,
+  EYE_EXPRESSION_NORMAL,
+  EYE_EXPRESSION_WORRIED,
+  EYE_EXPRESSION_UNIMPRESSED
+};
+static const EyeExpressionId kEarlyMorningPool[] = {
+  EYE_EXPRESSION_SLEEPY,
+  EYE_EXPRESSION_CONFUSED,
+  EYE_EXPRESSION_NORMAL,
+  EYE_EXPRESSION_HAPPY,
+  EYE_EXPRESSION_DETERMINED
+};
+static const EyeExpressionId kMorningPool[] = {
+  EYE_EXPRESSION_NORMAL,
+  EYE_EXPRESSION_FOCUSED,
+  EYE_EXPRESSION_HAPPY,
+  EYE_EXPRESSION_DETERMINED,
+  EYE_EXPRESSION_GLEE
+};
+static const EyeExpressionId kNoonPool[] = {
+  EYE_EXPRESSION_FOCUSED,
+  EYE_EXPRESSION_NORMAL,
+  EYE_EXPRESSION_SLEEPY,
+  EYE_EXPRESSION_UNIMPRESSED,
+  EYE_EXPRESSION_FRUSTRATED
+};
+static const EyeExpressionId kAfternoonPool[] = {
+  EYE_EXPRESSION_FOCUSED,
+  EYE_EXPRESSION_DETERMINED,
+  EYE_EXPRESSION_HAPPY,
+  EYE_EXPRESSION_SKEPTIC,
+  EYE_EXPRESSION_SUSPICIOUS
+};
+static const EyeExpressionId kEveningPool[] = {
+  EYE_EXPRESSION_HAPPY,
+  EYE_EXPRESSION_GLEE,
+  EYE_EXPRESSION_AWE,
+  EYE_EXPRESSION_EXCITED,
+  EYE_EXPRESSION_NORMAL
+};
+static const EyeExpressionId kNightPool[] = {
+  EYE_EXPRESSION_SLEEPY,
+  EYE_EXPRESSION_NORMAL,
+  EYE_EXPRESSION_UNIMPRESSED,
+  EYE_EXPRESSION_WORRIED,
+  EYE_EXPRESSION_SAD
+};
+static const EyeExpressionId kMidnightWindowPool[] = {
+  EYE_EXPRESSION_SLEEPY,
+  EYE_EXPRESSION_NORMAL,
+  EYE_EXPRESSION_SQUINT,
+  EYE_EXPRESSION_UNIMPRESSED,
+  EYE_EXPRESSION_WORRIED
+};
+static const EyeExpressionId kWakeWindowPool[] = {
+  EYE_EXPRESSION_SLEEPY,
+  EYE_EXPRESSION_CONFUSED,
+  EYE_EXPRESSION_NORMAL,
+  EYE_EXPRESSION_HAPPY
+};
+static const EyeExpressionId kSleepyBiasPool[] = {
+  EYE_EXPRESSION_SLEEPY,
+  EYE_EXPRESSION_SQUINT,
+  EYE_EXPRESSION_UNIMPRESSED,
+  EYE_EXPRESSION_NORMAL,
+  EYE_EXPRESSION_WORRIED
+};
+static const unsigned long kExpressionIntervalTable[3][7] = {
+  {12000UL, 10000UL, 7000UL, 8000UL, 7000UL, 8000UL, 10000UL},
+  {9000UL, 7500UL, 5000UL, 6000UL, 5000UL, 6000UL, 7500UL},
+  {7000UL, 6000UL, 3800UL, 4500UL, 3800UL, 4800UL, 6000UL}
+};
+static const ExpressionDedupeProfile kExpressionDedupeProfiles[3] = {
+  {0.68f, {0.72f, 0.78f, 0.84f, 0.90f}},
+  {0.52f, {0.58f, 0.66f, 0.74f, 0.82f}},
+  {0.36f, {0.42f, 0.52f, 0.62f, 0.72f}}
+};
 
 EyesRuntimeState s_state = {};
 unsigned long s_lastEyesRenderAt = 0;
@@ -221,6 +325,79 @@ static float randomFloat(float minValue, float maxValue) {
 static unsigned long jitteredInterval(unsigned long baseMs, int minPercent, int maxPercent) {
   long percent = random(minPercent, maxPercent + 1);
   return (unsigned long)((float)baseMs * ((float)percent / 100.0f));
+}
+
+static uint8_t expressionRhythmIndex(const EyesConfig& config) {
+  if (config.behavior.expressionRhythm > EyesConfig::EXPRESSION_RHYTHM_LIVELY) {
+    return EyesConfig::EXPRESSION_RHYTHM_STANDARD;
+  }
+  return config.behavior.expressionRhythm;
+}
+
+static ExpressionPool makeExpressionPool(const EyeExpressionId* expressions, uint8_t count) {
+  ExpressionPool pool;
+  pool.expressions = expressions;
+  pool.count = count;
+  return pool;
+}
+
+static ExpressionPool getTimeExpressionPool(TimeOfDay timeOfDay) {
+  switch (timeOfDay) {
+    case TIME_DEEP_NIGHT:
+      return makeExpressionPool(kDeepNightPool, sizeof(kDeepNightPool) / sizeof(kDeepNightPool[0]));
+    case TIME_EARLY_MORNING:
+      return makeExpressionPool(kEarlyMorningPool, sizeof(kEarlyMorningPool) / sizeof(kEarlyMorningPool[0]));
+    case TIME_MORNING:
+      return makeExpressionPool(kMorningPool, sizeof(kMorningPool) / sizeof(kMorningPool[0]));
+    case TIME_NOON:
+      return makeExpressionPool(kNoonPool, sizeof(kNoonPool) / sizeof(kNoonPool[0]));
+    case TIME_AFTERNOON:
+      return makeExpressionPool(kAfternoonPool, sizeof(kAfternoonPool) / sizeof(kAfternoonPool[0]));
+    case TIME_EVENING:
+      return makeExpressionPool(kEveningPool, sizeof(kEveningPool) / sizeof(kEveningPool[0]));
+    case TIME_NIGHT:
+    default:
+      return makeExpressionPool(kNightPool, sizeof(kNightPool) / sizeof(kNightPool[0]));
+  }
+}
+
+static ExpressionPool getSpecialExpressionPool(SpecialWindowId specialWindow) {
+  switch (specialWindow) {
+    case SPECIAL_WINDOW_MIDNIGHT:
+      return makeExpressionPool(kMidnightWindowPool, sizeof(kMidnightWindowPool) / sizeof(kMidnightWindowPool[0]));
+    case SPECIAL_WINDOW_WAKE:
+      return makeExpressionPool(kWakeWindowPool, sizeof(kWakeWindowPool) / sizeof(kWakeWindowPool[0]));
+    case SPECIAL_WINDOW_NONE:
+    default:
+      return makeExpressionPool(nullptr, 0);
+  }
+}
+
+static bool expressionPoolContains(const ExpressionPool& pool, EyeExpressionId expression) {
+  for (uint8_t i = 0; i < pool.count; i++) {
+    if (pool.expressions[i] == expression) {
+      return true;
+    }
+  }
+  return false;
+}
+
+static void fillPoolWeights(const ExpressionPool& pool, float weights[EYE_EXPRESSION_COUNT]) {
+  for (int i = 0; i < EYE_EXPRESSION_COUNT; i++) {
+    weights[i] = 0.0f;
+  }
+
+  for (uint8_t i = 0; i < pool.count; i++) {
+    weights[(int)pool.expressions[i]] = kAllowedPoolBaseWeight;
+  }
+}
+
+static unsigned long minExpressionInterval(const EyesConfig& config, TimeOfDay timeOfDay) {
+  return kExpressionIntervalTable[expressionRhythmIndex(config)][(int)timeOfDay];
+}
+
+static const ExpressionDedupeProfile& expressionDedupeProfile(const EyesConfig& config) {
+  return kExpressionDedupeProfiles[expressionRhythmIndex(config)];
 }
 
 static bool parseHexColor(const char* hex, uint8_t& r, uint8_t& g, uint8_t& b) {
@@ -541,20 +718,40 @@ static EyeRenderTransform buildLookTransform(const EyesConfig& config, bool isLe
   return transform;
 }
 
-static TimeOfDay getCurrentTimeOfDay() {
+static ScheduleContext getCurrentScheduleContext() {
   struct tm timeinfo;
   int hour = 10;
+  int minute = 0;
   if (getLocalTime(&timeinfo, 0)) {
     hour = timeinfo.tm_hour;
+    minute = timeinfo.tm_min;
   }
 
-  if (hour >= 23 || hour < 6) return TIME_DEEP_NIGHT;
-  if (hour < 9) return TIME_EARLY_MORNING;
-  if (hour < 12) return TIME_MORNING;
-  if (hour < 14) return TIME_NOON;
-  if (hour < 18) return TIME_AFTERNOON;
-  if (hour < 21) return TIME_EVENING;
-  return TIME_NIGHT;
+  ScheduleContext context;
+  if (hour >= 23 || hour < 6) {
+    context.timeOfDay = TIME_DEEP_NIGHT;
+  } else if (hour < 9) {
+    context.timeOfDay = TIME_EARLY_MORNING;
+  } else if (hour < 12) {
+    context.timeOfDay = TIME_MORNING;
+  } else if (hour < 14) {
+    context.timeOfDay = TIME_NOON;
+  } else if (hour < 18) {
+    context.timeOfDay = TIME_AFTERNOON;
+  } else if (hour < 21) {
+    context.timeOfDay = TIME_EVENING;
+  } else {
+    context.timeOfDay = TIME_NIGHT;
+  }
+
+  context.specialWindow = SPECIAL_WINDOW_NONE;
+  if (hour == 0 && minute < 10) {
+    context.specialWindow = SPECIAL_WINDOW_MIDNIGHT;
+  } else if (hour == 6 && minute < 30) {
+    context.specialWindow = SPECIAL_WINDOW_WAKE;
+  }
+
+  return context;
 }
 
 static bool parseExpressionAction(const char* action, EyeExpressionId& expression) {
@@ -653,113 +850,6 @@ static bool parseExpressionAction(const char* action, EyeExpressionId& expressio
   }
 
   return false;
-}
-
-static unsigned long minExpressionInterval(TimeOfDay timeOfDay) {
-  switch (timeOfDay) {
-    case TIME_DEEP_NIGHT:
-      return 5800;
-    case TIME_EARLY_MORNING:
-      return 4200;
-    case TIME_NOON:
-      return 3600;
-    case TIME_EVENING:
-      return 3200;
-    case TIME_NIGHT:
-      return 4000;
-    case TIME_MORNING:
-    case TIME_AFTERNOON:
-    default:
-      return 2800;
-  }
-}
-
-static void fillTimeWeights(TimeOfDay timeOfDay, float weights[EYE_EXPRESSION_COUNT]) {
-  for (int i = 0; i < EYE_EXPRESSION_COUNT; i++) {
-    weights[i] = 0.45f;
-  }
-
-  weights[EYE_EXPRESSION_SLEEPY] = 0.18f;
-  weights[EYE_EXPRESSION_SCARED] = 0.20f;
-  weights[EYE_EXPRESSION_FURIOUS] = 0.20f;
-  weights[EYE_EXPRESSION_ANGRY] = 0.24f;
-  weights[EYE_EXPRESSION_HEART] = 0.0f;
-
-  switch (timeOfDay) {
-    case TIME_DEEP_NIGHT:
-      weights[EYE_EXPRESSION_SLEEPY] += 18.0f;
-      weights[EYE_EXPRESSION_SQUINT] += 11.0f;
-      weights[EYE_EXPRESSION_NORMAL] += 8.0f;
-      weights[EYE_EXPRESSION_WORRIED] += 7.0f;
-      weights[EYE_EXPRESSION_SAD] += 6.0f;
-      weights[EYE_EXPRESSION_UNIMPRESSED] += 4.0f;
-      break;
-    case TIME_EARLY_MORNING:
-      weights[EYE_EXPRESSION_SLEEPY] += 12.0f;
-      weights[EYE_EXPRESSION_NORMAL] += 8.0f;
-      weights[EYE_EXPRESSION_FOCUSED] += 5.0f;
-      weights[EYE_EXPRESSION_WORRIED] += 5.0f;
-      weights[EYE_EXPRESSION_SQUINT] += 5.0f;
-      weights[EYE_EXPRESSION_UNIMPRESSED] += 4.0f;
-      weights[EYE_EXPRESSION_HAPPY] += 3.0f;
-      weights[EYE_EXPRESSION_DETERMINED] += 2.0f;
-      break;
-    case TIME_MORNING:
-      weights[EYE_EXPRESSION_NORMAL] += 7.0f;
-      weights[EYE_EXPRESSION_FOCUSED] += 9.0f;
-      weights[EYE_EXPRESSION_HAPPY] += 8.0f;
-      weights[EYE_EXPRESSION_DETERMINED] += 8.0f;
-      weights[EYE_EXPRESSION_EXCITED] += 5.0f;
-      weights[EYE_EXPRESSION_GLEE] += 4.0f;
-      weights[EYE_EXPRESSION_SURPRISED] += 3.0f;
-      weights[EYE_EXPRESSION_AWE] += 2.0f;
-      weights[EYE_EXPRESSION_SUSPICIOUS] += 2.0f;
-      break;
-    case TIME_NOON:
-      weights[EYE_EXPRESSION_FOCUSED] += 7.0f;
-      weights[EYE_EXPRESSION_NORMAL] += 6.0f;
-      weights[EYE_EXPRESSION_HAPPY] += 5.0f;
-      weights[EYE_EXPRESSION_DETERMINED] += 4.0f;
-      weights[EYE_EXPRESSION_SLEEPY] += 4.0f;
-      weights[EYE_EXPRESSION_UNIMPRESSED] += 4.0f;
-      weights[EYE_EXPRESSION_SQUINT] += 4.0f;
-      weights[EYE_EXPRESSION_FRUSTRATED] += 3.0f;
-      weights[EYE_EXPRESSION_ANNOYED] += 2.0f;
-      break;
-    case TIME_AFTERNOON:
-      weights[EYE_EXPRESSION_FOCUSED] += 8.0f;
-      weights[EYE_EXPRESSION_DETERMINED] += 7.0f;
-      weights[EYE_EXPRESSION_HAPPY] += 6.0f;
-      weights[EYE_EXPRESSION_NORMAL] += 5.0f;
-      weights[EYE_EXPRESSION_EXCITED] += 5.0f;
-      weights[EYE_EXPRESSION_SKEPTIC] += 4.0f;
-      weights[EYE_EXPRESSION_SUSPICIOUS] += 4.0f;
-      weights[EYE_EXPRESSION_SURPRISED] += 3.0f;
-      weights[EYE_EXPRESSION_ANNOYED] += 3.0f;
-      weights[EYE_EXPRESSION_GLEE] += 3.0f;
-      break;
-    case TIME_EVENING:
-      weights[EYE_EXPRESSION_HAPPY] += 8.0f;
-      weights[EYE_EXPRESSION_GLEE] += 7.0f;
-      weights[EYE_EXPRESSION_EXCITED] += 7.0f;
-      weights[EYE_EXPRESSION_SURPRISED] += 5.0f;
-      weights[EYE_EXPRESSION_AWE] += 5.0f;
-      weights[EYE_EXPRESSION_NORMAL] += 4.0f;
-      weights[EYE_EXPRESSION_DETERMINED] += 3.0f;
-      weights[EYE_EXPRESSION_SUSPICIOUS] += 3.0f;
-      weights[EYE_EXPRESSION_FOCUSED] += 2.0f;
-      break;
-    case TIME_NIGHT:
-      weights[EYE_EXPRESSION_SLEEPY] += 8.0f;
-      weights[EYE_EXPRESSION_NORMAL] += 6.0f;
-      weights[EYE_EXPRESSION_SQUINT] += 5.0f;
-      weights[EYE_EXPRESSION_UNIMPRESSED] += 5.0f;
-      weights[EYE_EXPRESSION_WORRIED] += 4.0f;
-      weights[EYE_EXPRESSION_SAD] += 4.0f;
-      weights[EYE_EXPRESSION_HAPPY] += 2.0f;
-      weights[EYE_EXPRESSION_AWE] += 2.0f;
-      break;
-  }
 }
 
 static void applyTransitionWeights(EyeExpressionId currentExpression, float weights[EYE_EXPRESSION_COUNT]) {
@@ -863,9 +953,24 @@ static void applyTransitionWeights(EyeExpressionId currentExpression, float weig
 
   for (int i = 0; i < transitionCount; i++) {
     int index = (int)transitions[i].expression;
+    if (weights[index] <= 0.0f) {
+      continue;
+    }
     float timeWeight = weights[index];
     weights[index] = timeWeight * 0.6f + transitions[i].weight * 0.4f;
   }
+}
+
+static ExpressionPool selectExpressionPool(const EyesConfig& config, const ScheduleContext& context, unsigned long now) {
+  if (context.specialWindow != SPECIAL_WINDOW_NONE) {
+    return getSpecialExpressionPool(context.specialWindow);
+  }
+
+  if (now - s_state.lastInteractionAt >= config.behavior.sleepyAfterMs) {
+    return makeExpressionPool(kSleepyBiasPool, sizeof(kSleepyBiasPool) / sizeof(kSleepyBiasPool[0]));
+  }
+
+  return getTimeExpressionPool(context.timeOfDay);
 }
 
 static void pushHistory(EyeExpressionId expression) {
@@ -904,21 +1009,34 @@ static EyeExpressionId weightedRandomChoice(const float weights[EYE_EXPRESSION_C
   return fallbackExpression;
 }
 
-static EyeExpressionId chooseNextExpression() {
-  TimeOfDay timeOfDay = getCurrentTimeOfDay();
-  float weights[EYE_EXPRESSION_COUNT];
-  fillTimeWeights(timeOfDay, weights);
-  applyTransitionWeights(s_state.expression, weights);
-
-  weights[(int)s_state.expression] *= 0.12f;
-
-  int recentStart = s_state.historyCount > 4 ? (s_state.historyCount - 4) : 0;
-  for (int i = recentStart; i < s_state.historyCount; i++) {
-    float penalty = 0.05f + (float)(i - recentStart) * 0.03f;
-    weights[(int)s_state.history[i]] *= penalty;
+static EyeExpressionId chooseNextExpression(const EyesConfig& config, const ScheduleContext& context, unsigned long now) {
+  ExpressionPool pool = selectExpressionPool(config, context, now);
+  if (pool.count == 0) {
+    return s_state.expression;
   }
 
-  return weightedRandomChoice(weights, s_state.expression);
+  float weights[EYE_EXPRESSION_COUNT];
+  fillPoolWeights(pool, weights);
+  applyTransitionWeights(s_state.expression, weights);
+
+  const ExpressionDedupeProfile& dedupe = expressionDedupeProfile(config);
+  if (weights[(int)s_state.expression] > 0.0f) {
+    weights[(int)s_state.expression] *= dedupe.currentMultiplier;
+  }
+
+  int penaltyIndex = 0;
+  for (int i = (int)s_state.historyCount - 2; i >= 0 && penaltyIndex < 4; i--) {
+    int historyExpressionIndex = (int)s_state.history[i];
+    if (weights[historyExpressionIndex] > 0.0f) {
+      weights[historyExpressionIndex] *= dedupe.historyPenalties[penaltyIndex];
+    }
+    penaltyIndex++;
+  }
+
+  EyeExpressionId fallbackExpression = expressionPoolContains(pool, s_state.expression)
+    ? s_state.expression
+    : pool.expressions[0];
+  return weightedRandomChoice(weights, fallbackExpression);
 }
 
 static void scheduleNextBlink(const EyesConfig& config) {
@@ -927,6 +1045,14 @@ static void scheduleNextBlink(const EyesConfig& config) {
 
 static void scheduleNextLook(const EyesConfig& config) {
   s_state.nextLookAfterMs = jitteredInterval(config.behavior.lookIntervalMs, 45, 100);
+}
+
+static void scheduleNextExpression(const EyesConfig& config, TimeOfDay timeOfDay) {
+  s_state.nextExpressionAfterMs = jitteredInterval(
+    minExpressionInterval(config, timeOfDay),
+    kExpressionJitterMinPercent,
+    kExpressionJitterMaxPercent
+  );
 }
 
 static void startBlink(unsigned long now) {
@@ -1001,6 +1127,7 @@ static void resetState() {
   s_state.lastLookAt = now;
   s_state.nextLookAfterMs = 0;
   s_state.lastExpressionAt = now;
+  s_state.nextExpressionAfterMs = 0;
   s_state.actionExpireAt = 0;
   s_state.lastInteractionAt = now;
   s_state.expression = EYE_EXPRESSION_NORMAL;
@@ -1527,11 +1654,15 @@ static void chooseIdleLook() {
 
 static void updateRuntime(const EyesConfig& config) {
   unsigned long now = millis();
+  ScheduleContext scheduleContext = getCurrentScheduleContext();
   if (s_state.nextBlinkAfterMs == 0) {
     scheduleNextBlink(config);
   }
   if (s_state.nextLookAfterMs == 0) {
     scheduleNextLook(config);
+  }
+  if (config.behavior.autoSwitch && s_state.nextExpressionAfterMs == 0) {
+    scheduleNextExpression(config, scheduleContext.timeOfDay);
   }
 
   updateBlink(config, now);
@@ -1547,18 +1678,17 @@ static void updateRuntime(const EyesConfig& config) {
   }
 
   if (config.behavior.autoSwitch && s_state.actionExpireAt == 0 && !s_state.transitionActive) {
-    if (now - s_state.lastInteractionAt >= config.behavior.sleepyAfterMs) {
-      if (s_state.expression != EYE_EXPRESSION_SLEEPY) {
-        startExpressionTransition(EYE_EXPRESSION_SLEEPY, now);
-      }
-    } else if (now - s_state.lastExpressionAt >= minExpressionInterval(getCurrentTimeOfDay())) {
-      EyeExpressionId nextExpression = chooseNextExpression();
+    if (now - s_state.lastExpressionAt >= s_state.nextExpressionAfterMs) {
+      EyeExpressionId nextExpression = chooseNextExpression(config, scheduleContext, now);
       if (nextExpression != s_state.expression) {
         startExpressionTransition(nextExpression, now);
       } else {
         s_state.lastExpressionAt = now;
       }
+      scheduleNextExpression(config, scheduleContext.timeOfDay);
     }
+  } else if (!config.behavior.autoSwitch) {
+    s_state.nextExpressionAfterMs = 0;
   }
 
   if (now - s_state.lastLookAt >= s_state.nextLookAfterMs) {

@@ -527,7 +527,7 @@ export default {
       this.selectedAchievement = achievement;
     },
     shareAchievements() {
-      const shareText = `我在 Glowxel 已解锁 ${this.unlockedCount} 项成就，当前完成度 ${this.completionRate}%`;
+      const shareText = `我在光格像素工坊已解锁 ${this.unlockedCount} 项成就，当前完成度 ${this.completionRate}%`;
       uni.setClipboardData({
         data: shareText,
         success: () => {
@@ -541,7 +541,7 @@ export default {
 
     shareSelectedAchievement() {
       if (!this.selectedAchievement) return;
-      const shareText = `我在 Glowxel 的${this.getRarityText(this.selectedAchievement.rarity)}成就「${this.selectedAchievement.title}」进度为 ${this.selectedAchievement.current}/${this.selectedAchievement.target}`;
+      const shareText = `我在光格像素工坊的${this.getRarityText(this.selectedAchievement.rarity)}成就「${this.selectedAchievement.title}」进度为 ${this.selectedAchievement.current}/${this.selectedAchievement.target}`;
       uni.setClipboardData({
         data: shareText,
         success: () => {

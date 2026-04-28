@@ -4,7 +4,6 @@ import { clamp, normalizeIntensity, normalizeSpeed } from "../led-matrix-demos/c
 import { mapsToFrames } from "../led-matrix-demos/frameCodec.js";
 import { buildMazePreviewSequence } from "../led-matrix-demos/mazeDemo.js";
 import { resolveDemoById } from "./demoCatalog.js";
-import { buildTetrisDemoMaps } from "./tetrisScene.js";
 
 function normalizeDensity(value) {
   const parsed = Number(value);
@@ -91,19 +90,6 @@ function buildPreviewSequence(options) {
     };
   }
 
-  if (demo.type === "tetris") {
-    const maps = buildTetrisDemoMaps({
-      speed,
-      cellSize: 2,
-      showClock: true,
-    });
-    const delay = clamp(192 - speed * 11, 70, 220);
-    return {
-      maps,
-      delays: maps.map(() => delay),
-    };
-  }
-
   if (demo.id === "maze") {
     const sequence = buildMazePreviewSequence(speed, intensity, safeOptions);
     return {
@@ -115,6 +101,8 @@ function buildPreviewSequence(options) {
   const maps = buildAnimationDemoMaps(demo.id, speed, intensity, {
     ...safeOptions,
     snakeWidth: safeOptions.snakeWidth,
+    snakeColor: safeOptions.snakeColor,
+    foodColor: safeOptions.foodColor,
     previewMode: true,
   });
   const delay = resolveAnimationFrameDelay(demo.id, speed);
@@ -155,16 +143,6 @@ function buildLedMatrixDemoFrames(options) {
       bouncingLogoScale: safeOptions.bouncingLogoScale,
     });
     const delay = clamp(172 - speed * 9, 60, 180);
-    return mapsToFrames(maps, delay);
-  }
-
-  if (demo.type === "tetris") {
-    const maps = buildTetrisDemoMaps({
-      speed,
-      cellSize: 2,
-      showClock: true,
-    });
-    const delay = clamp(192 - speed * 11, 70, 220);
     return mapsToFrames(maps, delay);
   }
 

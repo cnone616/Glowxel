@@ -1,36 +1,68 @@
 <template>
-  <div id="app" :class="{ 'app-admin': isAdmin }">
-    <NavBar v-if="!isAdmin" />
-    <main class="main-content">
+  <div id="app">
+    <PublicShell v-if="shellName === 'public'">
+      <main class="main-content">
+        <router-view v-slot="{ Component }">
+          <transition name="fade" mode="out-in">
+            <component :is="Component" />
+          </transition>
+        </router-view>
+      </main>
+    </PublicShell>
+
+    <AppShell v-else-if="shellName === 'app'">
+      <main class="main-content">
+        <router-view v-slot="{ Component }">
+          <transition name="fade" mode="out-in">
+            <component :is="Component" />
+          </transition>
+        </router-view>
+      </main>
+    </AppShell>
+
+    <main v-else class="main-content">
       <router-view v-slot="{ Component }">
         <transition name="fade" mode="out-in">
           <component :is="Component" />
         </transition>
       </router-view>
     </main>
-    <Footer v-if="!isAdmin" />
+
+    <GlxBlockingLayer />
+    <GlxToastViewport />
   </div>
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import NavBar from './components/NavBar.vue'
-import Footer from './components/Footer.vue'
+import PublicShell from '@/components/layout/PublicShell.vue'
+import AppShell from '@/components/layout/AppShell.vue'
+import GlxBlockingLayer from '@/components/glx/GlxBlockingLayer.vue'
+import GlxToastViewport from '@/components/glx/GlxToastViewport.vue'
+import { useUserStore } from '@/stores/user.js'
 
 const route = useRoute()
-const isAdmin = computed(() => route.path.startsWith('/admin'))
+const userStore = useUserStore()
+
+const shellName = computed(() => {
+  if (typeof route.meta.shell === 'string') {
+    return route.meta.shell
+  }
+  return 'public'
+})
+
+onMounted(async () => {
+  await userStore.init()
+})
 </script>
 
 <style>
 #app {
   min-height: 100vh;
-  display: flex;
-  flex-direction: column;
 }
 
 .main-content {
-  flex: 1;
   position: relative;
   z-index: 1;
 }
@@ -43,9 +75,5 @@ const isAdmin = computed(() => route.path.startsWith('/admin'))
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;
-}
-
-#app:not(.app-admin) .main-content {
-  padding-bottom: 24px;
 }
 </style>

@@ -198,7 +198,7 @@
             </button>
           </div>
           <div class="ds-connect-modal__body">
-            <p class="ds-card__copy">请输入 Glowxel 设备的 IP 地址。</p>
+            <p class="ds-card__copy">请输入 Glowxel PixelBoard 的 IP 地址。</p>
             <div class="ds-connect-modal__input">
               <input value="192.168.31.84" class="ds-input ds-input--bare" readonly />
             </div>
@@ -384,7 +384,7 @@ const guardrails = [
   },
   {
     label: "品牌语言",
-    title: "只用 Glowxel 彩色九宫格",
+    title: "只用品牌九宫格 loader",
     copy: "黑色 spinner、默认系统 loading 和无语义小圆圈都不再进入正式页面。",
   },
 ];

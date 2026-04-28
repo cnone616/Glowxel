@@ -22,6 +22,7 @@ public:
 
   void setTargetBuffer(uint16_t* buffer, int width, int height);
   void drawPixel(int16_t x, int16_t y, uint16_t color) override;
+  void fillRect(int16_t x, int16_t y, int16_t w, int16_t h, uint16_t color) override;
   void fillScreen(uint16_t color) override;
   void drawPixelRGB888(int16_t x, int16_t y, uint8_t r, uint8_t g, uint8_t b);
   void clearScreen();
@@ -34,11 +35,11 @@ private:
 
 // 设备模式（枚举值不能改，NVS 里存的是数字）
 enum DeviceMode {
-  MODE_CLOCK,        // 0: 静态时钟背景模式（默认）
-  MODE_ANIMATION,    // 1: 动态壁纸模式
-  MODE_CANVAS,       // 2: 画板模式
-  MODE_TRANSFERRING, // 3: 传输模式（临时状态，不保存到 NVS）
-  MODE_THEME         // 4: 主题模式
+  MODE_CLOCK = 0,     // 0: 静态时钟背景模式（默认）
+  MODE_ANIMATION = 1, // 1: 动态壁纸模式
+  MODE_CANVAS = 2,    // 2: 画板模式
+  MODE_TRANSFERRING = 3,  // 3: 临时传输模式（不持久化）
+  MODE_THEME = 4      // 4: 主题模式；值 3 保留空洞，避免影响已存 NVS 数字
 };
 
 enum NativeEffectType : uint8_t {
@@ -93,14 +94,15 @@ enum AmbientEffectPreset : uint8_t {
   AMBIENT_PRESET_BOUNCING_LOGO = 10,
   AMBIENT_PRESET_SORTING_VISUALIZER = 11,
   AMBIENT_PRESET_CLOCK_SCENE = 12,
-  AMBIENT_PRESET_COUNTDOWN_SCENE = 13,
-  AMBIENT_PRESET_WEATHER_SCENE = 14,
   AMBIENT_PRESET_GAME_OF_LIFE = 15,
   AMBIENT_PRESET_JULIA_SET = 16,
   AMBIENT_PRESET_REACTION_DIFFUSION = 17,
   AMBIENT_PRESET_COSMIC_KALE = 18,
   AMBIENT_PRESET_VOID_FIRE = 19,
-  AMBIENT_PRESET_DEEP_SPACE_NEBULA = 20
+  AMBIENT_PRESET_DEEP_SPACE_NEBULA = 20,
+  AMBIENT_PRESET_WATER_SURFACE = 21,
+  AMBIENT_PRESET_WATER_CURRENT = 22,
+  AMBIENT_PRESET_WATER_CAUSTICS = 23
 };
 
 struct BreathEffectConfig {
@@ -199,10 +201,17 @@ public:
   static void clearLiveFrame(uint16_t color = 0);
   static void writeLiveFramePixel565(int x, int y, uint16_t color);
   static void writeLiveFramePixelRGB888(int x, int y, uint8_t r, uint8_t g, uint8_t b);
-  static bool beginRedirectedFrame(uint16_t* targetBuffer, uint16_t clearColor = 0);
+  static bool beginRedirectedFrame(
+    uint16_t* targetBuffer,
+    uint16_t clearColor = 0,
+    bool clearBuffer = true
+  );
   static void endRedirectedFrame(bool present = true);
   static MatrixPanel_I2S_DMA* beginOffscreenFrame(uint16_t* targetBuffer, uint16_t clearColor = 0);
   static void presentOffscreenFrame(const uint16_t* targetBuffer);
+  static unsigned long getLastPresentDurationUs();
+  static uint16_t getLastPresentChangedPixels();
+  static uint32_t getLastPresentFrameHash();
 
   static CaptureMatrixPanel* dma_display;
   static DeviceMode currentMode;

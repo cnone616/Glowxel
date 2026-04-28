@@ -1,5 +1,7 @@
 # Glowxel 环境配置约定
 
+说明：本文中的 `Glowxel` 指仓库 / 工程代号。对外命名统一为：官网 / 网站端 / 小程序 `光格像素工坊`，设备 `Glowxel PixelBoard`，公司 `仁光数字科技有限公司`（英文名 `RenLight`）。
+
 ## 目标
 
 统一 `server`、`website`、`admin`、`uniapp` 的接口地址配置入口，避免页面内散落硬编码。

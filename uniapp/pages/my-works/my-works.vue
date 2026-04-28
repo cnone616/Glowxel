@@ -402,8 +402,8 @@ export default {
       const workName = this.selectedWork.name || this.selectedWork.title;
       const shareText =
         this.selectedWork.type === "published"
-          ? `我在 Glowxel 发布了作品《${workName}》`
-          : `我正在 Glowxel 创作《${workName}》`;
+          ? `我在光格像素工坊发布了作品《${workName}》`
+          : `我正在光格像素工坊创作《${workName}》`;
 
       uni.setClipboardData({
         data: shareText,

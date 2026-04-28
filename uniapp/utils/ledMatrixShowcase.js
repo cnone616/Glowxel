@@ -1,6 +1,5 @@
 export {
   getLedMatrixDemoItems,
-  getGameScreensaverDemoItems,
   resolveDemoById,
 } from "./led-matrix-showcase/demoCatalog.js";
 

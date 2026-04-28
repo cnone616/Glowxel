@@ -7,7 +7,8 @@
 #include "board_native_effect.h"
 #include "config_manager.h"
 #include "display_manager.h"
-#include "game_screensaver_types.h"
+
+class AsyncWebSocketClient;
 
 namespace RuntimeCommandBus {
 enum class RuntimeCommandSource : uint8_t {
@@ -23,34 +24,31 @@ enum class RuntimeCommandType : uint8_t {
   BREATH_EFFECT = 3,
   RHYTHM_EFFECT = 4,
   AMBIENT_EFFECT = 5,
-  GAME_SCREENSAVER = 6,
   TEXT_DISPLAY = 7,
-  WEATHER_BOARD = 8,
-  COUNTDOWN_BOARD = 9,
-  STOPWATCH_BOARD = 10,
-  NOTIFICATION_BOARD = 11,
-  PLANET_SCREENSAVER = 12,
-  EYES_CONFIG = 13,
-  EYES_ACTION = 14,
-  CLEAR = 15,
-  BRIGHTNESS = 16,
-  START_LOADING = 17,
-  STOP_LOADING = 18,
-  SHOW_LOADING = 19,
-  LOAD_CANVAS = 20,
-  CLEAR_CANVAS = 21,
-  HIGHLIGHT_COLOR = 22,
-  HIGHLIGHT_ROW = 23,
-  TEXT = 24,
-  PIXEL = 25,
-  IMAGE = 26,
-  IMAGE_SPARSE = 27,
-  IMAGE_CHUNK = 28,
-  APPLY_DEVICE_PARAMS = 29,
-  RESTORE_CURRENT_MODE_FRAME = 30,
-  RESTORE_AFTER_TRANSIENT_DISCONNECT = 31,
-  ABORT_TRANSIENT_TRANSFER_AND_RESTORE = 32,
-  HTTP_UPLOAD_IMAGE = 33
+  PLANET_SCREENSAVER = 8,
+  EYES_CONFIG = 9,
+  EYES_ACTION = 10,
+  CLEAR = 11,
+  BRIGHTNESS = 12,
+  START_LOADING = 13,
+  STOP_LOADING = 14,
+  SHOW_LOADING = 15,
+  LOAD_CANVAS = 16,
+  CLEAR_CANVAS = 17,
+  HIGHLIGHT_COLOR = 18,
+  HIGHLIGHT_ROW = 19,
+  TEXT = 20,
+  PIXEL = 21,
+  IMAGE = 22,
+  IMAGE_SPARSE = 23,
+  IMAGE_CHUNK = 24,
+  APPLY_DEVICE_PARAMS = 25,
+  RESTORE_CURRENT_MODE_FRAME = 26,
+  RESTORE_AFTER_TRANSIENT_DISCONNECT = 27,
+  ABORT_TRANSIENT_TRANSFER_AND_RESTORE = 28,
+  HTTP_UPLOAD_IMAGE = 29,
+  WEBSOCKET_TRANSACTION_COMMIT = 30,
+  WEBSOCKET_TRANSACTION_ABORT = 31
 };
 
 struct RuntimeCommand {
@@ -80,13 +78,10 @@ struct RuntimeCommand {
   BreathEffectConfig breathEffectConfig = {};
   RhythmEffectConfig rhythmEffectConfig = {};
   AmbientEffectConfig ambientEffectConfig = {};
-  GameScreensaverConfig gameScreensaverConfig = {};
   TextDisplayNativeConfig textDisplayConfig = {};
-  WeatherBoardNativeConfig weatherConfig = {};
-  CountdownBoardNativeConfig countdownConfig = {};
-  StopwatchBoardNativeConfig stopwatchConfig = {};
-  NotificationBoardNativeConfig notificationConfig = {};
   PlanetScreensaverNativeConfig planetConfig = {};
+  MazeModeConfig mazeConfig = {};
+  SnakeModeConfig snakeConfig = {};
 };
 
 RuntimeCommand* createCommand(RuntimeCommandSource source, uint32_t clientId);
@@ -95,6 +90,32 @@ bool enqueue(RuntimeCommand* command);
 bool enqueueRestoreCurrentModeFrame();
 bool enqueueRestoreAfterTransientDisconnect(bool persistState);
 bool enqueueAbortTransientTransferAndRestore(const char* reason);
+void queueOrSendClientResponse(uint32_t clientId, StaticJsonDocument<768>& response);
+bool beginWebSocketTransaction(
+  AsyncWebSocketClient* client,
+  JsonDocument& doc,
+  StaticJsonDocument<768>& response,
+  bool& responseSent
+);
+bool commitWebSocketTransaction(
+  AsyncWebSocketClient* client,
+  JsonDocument& doc,
+  StaticJsonDocument<768>& response
+);
+bool abortWebSocketTransaction(
+  AsyncWebSocketClient* client,
+  JsonDocument& doc,
+  StaticJsonDocument<768>& response
+);
+bool appendWebSocketTransactionBinary(
+  AsyncWebSocketClient* client,
+  const uint8_t* data,
+  size_t len,
+  StaticJsonDocument<768>& response,
+  bool& responseReady
+);
+bool hasActiveWebSocketTransaction(uint32_t clientId);
+void handleWebSocketTransactionDisconnect(uint32_t clientId);
 
 void tick();
 const char* commandTypeLabel(RuntimeCommandType type);

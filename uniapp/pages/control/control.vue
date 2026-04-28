@@ -21,7 +21,7 @@
               <view class="device-logo-core"></view>
             </view>
             <view class="device-summary-text">
-              <text class="device-name">Glowxel Pro</text>
+              <text class="device-name">Glowxel PixelBoard</text>
               <view class="device-status-row">
                 <view
                   class="device-status-dot"
@@ -61,6 +61,15 @@
               >
             </view>
           </view>
+        </view>
+
+        <view
+          v-else
+          class="device-disconnect-entry glx-secondary-action"
+          @click="handleDisconnect"
+        >
+          <Icon name="close" :size="32" color="var(--nb-ink)" />
+          <text class="device-disconnect-label">断开连接</text>
         </view>
       </view>
 
@@ -128,7 +137,7 @@
     <ConnectModal
       :visible="showConnectModal"
       title="连接设备"
-      description="请输入 RenLight 设备的 IP 地址"
+      description="请输入 Glowxel PixelBoard 的 IP 地址"
       :placeholder="deviceIp || '192.168.31.84'"
       :defaultValue="deviceIp"
       ref="connectModal"
@@ -154,7 +163,7 @@
 <script>
 import { useDeviceStore } from "../../store/device.js";
 import { useToast } from "../../composables/useToast.js";
-import { uploadAnimationFrames } from "../../utils/animationUploader.js";
+import { applyCompactAnimation } from "../../utils/animationUploader.js";
 import statusBarMixin from "../../mixins/statusBar.js";
 import Icon from "../../components/Icon.vue";
 import Toast from "../../components/Toast.vue";
@@ -222,7 +231,7 @@ export default {
         {
           key: "eyes",
           name: "桌面宠物",
-          icon: "browse",
+          icon: "smile",
           variant: "pink",
           type: "mode",
           bucket: "stable",
@@ -238,7 +247,7 @@ export default {
         {
           key: "animation",
           name: "动态时钟",
-          icon: "play",
+          icon: "dynamic-filling",
           variant: "teal",
           type: "mode",
           bucket: "stable",
@@ -270,23 +279,39 @@ export default {
         {
           key: "tetris_clock",
           name: "俄罗斯方块时钟",
-          icon: "modular",
+          icon: "clock-filling",
           variant: "gold",
           type: "mode",
           bucket: "secondary",
         },
         {
-          key: "game_screensaver",
-          name: "游戏屏保",
-          icon: "pad",
+          key: "maze",
+          name: "迷宫漫游",
+          icon: "map",
           variant: "indigo",
+          type: "mode",
+          bucket: "secondary",
+        },
+        {
+          key: "snake",
+          name: "贪吃蛇",
+          icon: "move",
+          variant: "indigo",
+          type: "mode",
+          bucket: "secondary",
+        },
+        {
+          key: "water_world",
+          name: "水世界",
+          icon: "layers",
+          variant: "azure",
           type: "mode",
           bucket: "secondary",
         },
         {
           key: "planet_screensaver",
           name: "星球屏保",
-          icon: "map",
+          icon: "navigation",
           variant: "indigo",
           type: "mode",
           bucket: "secondary",
@@ -304,15 +329,12 @@ export default {
     },
 
     async handleConnect() {
-      if (this.isDeviceConnected) {
-        // 已连接，断开
-        await this.deviceStore.disconnect();
-        this.toast.showInfo("设备已断开");
-        return;
-      }
-
-      // 显示连接弹窗
       this.showConnectModal = true;
+    },
+
+    async handleDisconnect() {
+      await this.deviceStore.disconnect();
+      this.toast.showInfo("设备已断开");
     },
 
     async handleConnectConfirm(ip) {
@@ -322,7 +344,7 @@ export default {
         const result = await this.deviceStore.connect(ip);
         if (result.success) {
           this.$refs.connectModal.onSuccess();
-          this.toast.showSuccess("已连接到 RenLight 设备");
+          this.toast.showSuccess("已连接到 Glowxel PixelBoard");
         } else {
           let errorMessage = "连接失败，请检查 IP 地址";
           if (result.error && result.error.errMsg) {
@@ -368,8 +390,12 @@ export default {
         this.openTetrisSettings();
       } else if (mode === "tetris_clock") {
         this.openTetrisClockSettings();
-      } else if (mode === "game_screensaver") {
-        this.openGameScreensaver();
+      } else if (mode === "maze") {
+        this.openMazeMode();
+      } else if (mode === "snake") {
+        this.openSnakeMode();
+      } else if (mode === "water_world") {
+        this.openWaterWorld();
       } else if (mode === "gif_player") {
         this.openGifPlayer();
       } else if (mode === "canvas") {
@@ -419,9 +445,21 @@ export default {
       });
     },
 
-    openGameScreensaver() {
+    openMazeMode() {
       uni.navigateTo({
-        url: "/pages/game-screensaver/game-screensaver",
+        url: "/pages/maze-mode/maze-mode",
+      });
+    },
+
+    openSnakeMode() {
+      uni.navigateTo({
+        url: "/pages/snake-mode/snake-mode",
+      });
+    },
+
+    openWaterWorld() {
+      uni.navigateTo({
+        url: "/pages/water-world/water-world",
       });
     },
 
@@ -482,35 +520,14 @@ export default {
           jsonData.d !== undefined &&
           Array.isArray(jsonData.d)
         ) {
-          console.log("检测到动画数据，逐帧发送到 ESP32");
+          console.log("检测到动画数据，走紧凑动画命令发送到 ESP32");
 
           try {
             const frameCount = jsonData.f;
             const frames = jsonData.d;
-            const uploadFrames = frames
-              .slice(0, frameCount)
-              .map((frame, index) => {
-                if (!Array.isArray(frame) || frame.length < 4) {
-                  throw new Error(`第 ${index + 1} 帧数据格式错误`);
-                }
+            const animationData = frames.slice(0, frameCount);
 
-                return {
-                  type: frame[0],
-                  delay: frame[1],
-                  totalPixels: frame[2],
-                  pixels:
-                    frame[3] instanceof Uint8Array
-                      ? frame[3]
-                      : new Uint8Array(frame[3]),
-                };
-              });
-
-            await uploadAnimationFrames(ws, uploadFrames, "animation");
-            await this.deviceStore.syncAndRequireBusinessMode(
-              "animation",
-              "设备未进入动画模式",
-            );
-
+            await applyCompactAnimation(ws, animationData, "animation");
             this.toast.showSuccess(`动画已发送！${frameCount} 帧`);
           } catch (err) {
             console.error("发送动画数据失败:", err);
@@ -603,20 +620,12 @@ export default {
               })
             : [];
 
-          // 闹钟背景图必须用闹钟模式接收，先切换模式
-          await ws.setMode("clock");
-
-          // 发送配置
-          await ws.setClockConfig("clock", configData);
-
-          // 如果有像素数据，使用二进制方式发送（闹钟背景图）
-          if (imagePixels.length > 0) {
-            await this.sendImagePixelsBinary(imagePixels);
-          }
-
-          await this.deviceStore.syncAndRequireBusinessMode(
+          await ws.applyClockMode(
             "clock",
-            "设备未进入静态时钟模式",
+            configData,
+            imagePixels.length > 0
+              ? ws.buildPixelBinaryFromObjects(imagePixels)
+              : null,
           );
 
           if (imagePixels.length > 0) {
@@ -642,108 +651,6 @@ export default {
         this.showJsonImportModal = false;
         this.toast.showError("导入失败：" + e.message);
       }
-    },
-
-    async sendImagePixelsBinary(pixels) {
-      // 使用二进制方式发送像素数据
-      // 格式：每个像素5字节 (x, y, r, g, b)
-      const ws = this.deviceStore.getWebSocket();
-
-      console.log(`开始发送像素数据，共 ${pixels.length} 个像素`);
-      console.log(`前3个像素:`, pixels.slice(0, 3));
-
-      // 每批 64 个像素，间隔 200ms
-      const batchSize = 64;
-      let sentCount = 0;
-
-      for (let i = 0; i < pixels.length; i += batchSize) {
-        const batch = pixels.slice(i, Math.min(i + batchSize, pixels.length));
-        const binaryData = [];
-
-        for (const pixel of batch) {
-          binaryData.push(pixel.x, pixel.y, pixel.r, pixel.g, pixel.b);
-        }
-
-        const buffer = new Uint8Array(binaryData);
-
-        // 打印第一批的前15个字节（3个像素）
-        if (i === 0) {
-          console.log(`第一批前15字节:`, Array.from(buffer.slice(0, 15)));
-        }
-
-        await new Promise((resolve, reject) => {
-          ws.socket.send({
-            data: buffer.buffer,
-            success: () => {
-              sentCount += batch.length;
-              if (sentCount % 100 === 0 || sentCount === pixels.length) {
-                console.log(
-                  `已发送 ${sentCount}/${pixels.length} 个像素 (${Math.round((sentCount / pixels.length) * 100)}%)`,
-                );
-              }
-              resolve();
-            },
-            fail: (err) => {
-              console.error("发送失败:", err);
-              reject(err);
-            },
-          });
-        });
-
-        // 每批之间等待 200ms
-        await new Promise((resolve) => setTimeout(resolve, 200));
-      }
-
-      console.log(`✓ 像素数据发送完成，共 ${sentCount} 个像素`);
-      console.log(`最后3个像素:`, pixels.slice(-3));
-
-      // 等待 ESP32 确认消息（发送完成后等待1秒，ESP32需要500ms保存）
-      const receivedCount = await this.waitForPixelConfirmation(1000);
-
-      if (receivedCount === null) {
-        console.warn("⚠ 未收到 ESP32 确认消息，无法验证数量");
-        return;
-      }
-
-      console.log(`ESP32 确认接收: ${receivedCount} 个像素`);
-
-      if (receivedCount === sentCount) {
-        console.log(`✓✓✓ 数量匹配！发送 ${sentCount}，接收 ${receivedCount}`);
-      } else {
-        console.error(
-          `✗✗✗ 数量不匹配！发送 ${sentCount}，接收 ${receivedCount}，丢失 ${sentCount - receivedCount} 个像素`,
-        );
-        throw new Error(
-          `数据传输不完整：发送 ${sentCount} 个，接收 ${receivedCount} 个`,
-        );
-      }
-    },
-
-    async waitForPixelConfirmation(timeout) {
-      // 等待 ESP32 发送确认消息
-      return new Promise((resolve) => {
-        const ws = this.deviceStore.getWebSocket();
-        let timeoutId = null;
-
-        const messageHandler = (data) => {
-          if (
-            data.status === "ok" &&
-            data.message === "pixels_received" &&
-            data.count !== undefined
-          ) {
-            clearTimeout(timeoutId);
-            ws.offMessage(messageHandler);
-            resolve(data.count);
-          }
-        };
-
-        ws.onMessage(messageHandler);
-
-        timeoutId = setTimeout(() => {
-          ws.offMessage(messageHandler);
-          resolve(null);
-        }, timeout);
-      });
     },
 
     handleJsonImportError(message) {
@@ -960,6 +867,24 @@ export default {
   display: flex;
   align-items: center;
   gap: 20rpx;
+}
+
+.device-disconnect-entry {
+  margin-top: 16rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12rpx;
+  min-height: 84rpx;
+  border: 2rpx solid var(--nb-ink);
+  background: var(--nb-surface);
+  box-shadow: var(--nb-shadow-soft);
+}
+
+.device-disconnect-label {
+  font-size: 26rpx;
+  font-weight: 600;
+  color: var(--nb-ink);
 }
 
 .connect-entry-icon,

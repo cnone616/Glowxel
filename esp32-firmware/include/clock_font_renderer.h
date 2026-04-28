@@ -25,6 +25,7 @@ enum ClockFontId : uint8_t {
 };
 
 bool clockFontIdFromString(const char* fontName, uint8_t& outFontId);
+const char* clockFontNameFromId(uint8_t fontId);
 int getClockFontWidth(uint8_t fontId);
 int getClockFontHeight(uint8_t fontId);
 int getClockTextWidth(const char* text, uint8_t fontId, int scale);

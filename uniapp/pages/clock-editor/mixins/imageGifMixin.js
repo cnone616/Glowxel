@@ -266,6 +266,7 @@ export default {
         delay: frame.delay || 100,
         width: targetW,
         height: targetH,
+        pixelMap: this._rgbaFrameToPixelMapData(frame.rgba, targetW, targetH),
       }));
 
       if (this.gifRenderedFrameMaps.length > 0) {
@@ -278,8 +279,7 @@ export default {
       console.log("GIF 帧已生成:", this.gifRenderedFrameMaps.length, "帧");
     },
 
-    _rgbaFrameToPixelMap(frame) {
-      const { rgba, width, height } = frame;
+    _rgbaFrameToPixelMapData(rgba, width, height) {
       const pixelMap = new Map();
       for (let y = 0; y < height; y++) {
         for (let x = 0; x < width; x++) {
@@ -299,6 +299,14 @@ export default {
       return pixelMap;
     },
 
+    _rgbaFrameToPixelMap(frame) {
+      if (frame && frame.pixelMap instanceof Map) {
+        return frame.pixelMap;
+      }
+      const { rgba, width, height } = frame;
+      return this._rgbaFrameToPixelMapData(rgba, width, height);
+    },
+
     _saveGifToLocal(arrayBuffer) {
       try {
         const filePath = `${uni.env.USER_DATA_PATH}/clock_gif.bin`;
@@ -309,36 +317,68 @@ export default {
       }
     },
 
-    _restoreGifFromLocal() {
-      try {
-        const filePath = `${uni.env.USER_DATA_PATH}/clock_gif.bin`;
-        const fs = uni.getFileSystemManager();
-        fs.access({
-          path: filePath,
-          success: () => {
-            fs.readFile({
-              filePath,
-              success: (res) => {
-                try {
-                  this._parseAndInitGif(res.data);
-                  const base64 = uni.arrayBufferToBase64(res.data);
-                  this.config.image.data = "data:image/gif;base64," + base64;
-                  this.config.image.show = true;
-                  this.resumeAnimationGifPreview();
-                  this.drawCanvas();
-                  console.log("GIF 动画已从本地恢复");
-                } catch (e) {
-                  console.error("恢复 GIF 解析失败:", e);
-                }
-              },
-              fail: (err) => console.error("读取本地 GIF 失败:", err),
-            });
-          },
-          fail: () => console.log("没有保存的 GIF 文件"),
-        });
-      } catch (e) {
-        console.error("恢复 GIF 失败:", e);
-      }
+    restoreLastUsedGif() {
+      return this._restoreGifFromLocal(true);
+    },
+
+    _restoreGifFromLocal(notify) {
+      const shouldNotify = notify === true;
+
+      return new Promise((resolve) => {
+        try {
+          const filePath = `${uni.env.USER_DATA_PATH}/clock_gif.bin`;
+          const fs = uni.getFileSystemManager();
+          fs.access({
+            path: filePath,
+            success: () => {
+              fs.readFile({
+                filePath,
+                success: (res) => {
+                  try {
+                    this._parseAndInitGif(res.data);
+                    const base64 = uni.arrayBufferToBase64(res.data);
+                    this.config.image.data = "data:image/gif;base64," + base64;
+                    this.config.image.show = true;
+                    this.resumeAnimationGifPreview();
+                    this.drawCanvas();
+                    console.log("GIF 动画已从本地恢复");
+                    if (shouldNotify && this.toast) {
+                      this.toast.showSuccess("已恢复上次使用");
+                    }
+                    resolve(true);
+                  } catch (e) {
+                    console.error("恢复 GIF 解析失败:", e);
+                    if (shouldNotify && this.toast) {
+                      this.toast.showError("恢复 GIF 失败");
+                    }
+                    resolve(false);
+                  }
+                },
+                fail: (err) => {
+                  console.error("读取本地 GIF 失败:", err);
+                  if (shouldNotify && this.toast) {
+                    this.toast.showError("读取上次 GIF 失败");
+                  }
+                  resolve(false);
+                },
+              });
+            },
+            fail: () => {
+              console.log("没有保存的 GIF 文件");
+              if (shouldNotify && this.toast) {
+                this.toast.showInfo("没有可恢复的上次 GIF");
+              }
+              resolve(false);
+            },
+          });
+        } catch (e) {
+          console.error("恢复 GIF 失败:", e);
+          if (shouldNotify && this.toast) {
+            this.toast.showError("恢复 GIF 失败");
+          }
+          resolve(false);
+        }
+      });
     },
 
     _deleteLocalGif() {
@@ -458,6 +498,7 @@ export default {
           delay: frame.delay || 100,
           width: targetW,
           height: targetH,
+          pixelMap: this._rgbaFrameToPixelMapData(frame.rgba, targetW, targetH),
         }));
         this.gifFrameIndex = 0;
         this.imagePixels = this._rgbaFrameToPixelMap(
@@ -467,20 +508,6 @@ export default {
 
       if (!this.gifRenderedFrameMaps || this.gifRenderedFrameMaps.length <= 1) {
         return;
-      }
-
-      if (this._gifParser) {
-        const targetW = this.config.image.width || 64;
-        const targetH = this.config.image.height || 64;
-        this.gifAnimationData = this._gifParser.generateESP32Data(
-          targetW,
-          targetH,
-          20,
-          null,
-          this.config.image.x || 0,
-          this.config.image.y || 0,
-          this.gifRenderedFrameMaps,
-        );
       }
 
       this.gifIsPlaying = true;

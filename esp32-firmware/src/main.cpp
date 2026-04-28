@@ -12,9 +12,11 @@
 #include "ota_manager.h"
 #include "runtime_command_bus.h"
 #include "runtime_mode_coordinator.h"
+#include "maze_effect.h"
+#include "tetris_clock_effect.h"
 #include "tetris_effect.h"
 #include "eyes_effect.h"
-#include "game_screensaver_effect.h"
+#include "snake_effect.h"
 #include "theme_renderer.h"
 
 namespace {
@@ -33,6 +35,9 @@ BootPhase gBootPhase = BootPhase::BOOT_MINIMAL;
 bool gPortalServerInitialized = false;
 bool gRuntimeInitialized = false;
 bool gTimeSyncRestorePending = false;
+bool gRuntimeInteractiveSettingsMode = false;
+bool gDeferredRuntimeModulesInitialized = false;
+bool gRuntimeDisplayOutputPaused = false;
 
 const char* bootPhaseLabel(BootPhase phase) {
   switch (phase) {
@@ -98,6 +103,59 @@ bool renderStartupRestoredFrame() {
   return RuntimeModeCoordinator::restoreCurrentModeFrame();
 }
 
+void clearScreenBeforeStartupRestoreIfNeeded() {
+  if (!RuntimeModeCoordinator::shouldClearScreenBeforeBusinessModeEntry(
+        DisplayManager::currentBusinessModeTag)) {
+    return;
+  }
+
+  DisplayManager::clearScreen();
+}
+
+void initDeferredRuntimeModulesIfNeeded() {
+  if (gDeferredRuntimeModulesInitialized) {
+    return;
+  }
+
+  Serial.println("[BOOT] 开始补齐运行态延后模块初始化");
+  AnimationManager::init();
+  EyesEffect::init();
+  MazeEffect::init();
+  SnakeEffect::init();
+  BoardNativeEffect::init();
+  ConfigManager::loadPlanetScreensaverConfig();
+  OTAManager::init();
+  OTAManager::checkUpdate();
+  gDeferredRuntimeModulesInitialized = true;
+  Serial.println("[BOOT] 运行态延后模块初始化完成");
+}
+
+bool isRuntimeSettingsSessionActive() {
+  return WiFiManager::isRuntimeSettingsWindowActive() ||
+         WebServer::isSettingsSessionActive();
+}
+
+void pauseRuntimeDisplayOutputIfNeeded() {
+  if (gRuntimeDisplayOutputPaused || DisplayManager::dma_display == nullptr) {
+    return;
+  }
+
+  DisplayManager::dma_display->stopDMAoutput();
+  gRuntimeDisplayOutputPaused = true;
+  Serial.println("[BOOT] 已暂停 HUB75 DMA 输出，优先保障联网设置访问");
+}
+
+void resumeRuntimeDisplayOutputIfNeeded() {
+  if (!gRuntimeDisplayOutputPaused) {
+    return;
+  }
+
+  DisplayManager::applyDeviceParams(false);
+  DisplayManager::refreshScheduledBrightness();
+  gRuntimeDisplayOutputPaused = false;
+  Serial.println("[BOOT] 已恢复 HUB75 DMA 输出");
+}
+
 void restoreRuntimeFrame() {
   gTimeSyncRestorePending = !WiFiManager::isTimeSynced();
   if (gTimeSyncRestorePending) {
@@ -110,6 +168,7 @@ void restoreRuntimeFrame() {
                 DisplayManager::currentMode,
                 DisplayManager::currentBusinessModeTag.c_str());
 
+  clearScreenBeforeStartupRestoreIfNeeded();
   if (renderStartupRestoredFrame()) {
     Serial.println("[BOOT] 业务态画面已恢复");
     return;
@@ -131,6 +190,7 @@ void finishClockRestoreIfReady() {
   gTimeSyncRestorePending = false;
   Serial.println("[BOOT] 时间同步完成，恢复业务态画面");
 
+  clearScreenBeforeStartupRestoreIfNeeded();
   if (renderStartupRestoredFrame()) {
     Serial.println("[BOOT] 时间同步后的业务态画面已恢复");
     return;
@@ -156,7 +216,6 @@ void printRuntimeReadyBanner() {
   Serial.println("系统就绪！");
   Serial.print("STA模式访问地址: http://");
   Serial.println(WiFiManager::getDeviceIP());
-  Serial.println("WebSocket 路径: ws://" + WiFiManager::getDeviceIP() + "/ws");
   Serial.println("=================================\n");
 }
 
@@ -185,18 +244,11 @@ void startRuntimeIfNeeded() {
   setBootPhase(BootPhase::RUNTIME_STARTING, "STA 已连接，开始启动运行态");
 
   ConfigManager::init();
-  WebSocketHandler::init();
   WebServer::initRuntime();
 
-  AnimationManager::init();
-  EyesEffect::init();
-  GameScreensaverEffect::init();
-  BoardNativeEffect::init();
-
-  OTAManager::init();
-  OTAManager::checkUpdate();
-
   gRuntimeInitialized = true;
+  gDeferredRuntimeModulesInitialized = false;
+  initDeferredRuntimeModulesIfNeeded();
   restoreRuntimeFrame();
 
   setBootPhase(BootPhase::RUNTIME_ACTIVE, "运行态初始化完成");
@@ -242,6 +294,7 @@ void setup() {
 
 void loop() {
   WiFiManager::tick();
+  WebServer::handleLoop();
   WebSocketHandler::tick();
   RuntimeCommandBus::tick();
 
@@ -271,6 +324,24 @@ void loop() {
     }
   }
 
+  if (isRuntimeSettingsSessionActive()) {
+    if (!gRuntimeInteractiveSettingsMode) {
+      gRuntimeInteractiveSettingsMode = true;
+      Serial.println("[BOOT] 检测到设置页访问，切换到轻量设置会话");
+      pauseRuntimeDisplayOutputIfNeeded();
+    }
+    delay(5);
+    return;
+  }
+
+  if (gRuntimeInteractiveSettingsMode) {
+    gRuntimeInteractiveSettingsMode = false;
+    Serial.println("[BOOT] 轻量设置会话结束，恢复业务态画面");
+    resumeRuntimeDisplayOutputIfNeeded();
+    initDeferredRuntimeModulesIfNeeded();
+    restoreRuntimeFrame();
+  }
+
   DisplayManager::lockRuntimeAccess();
   DisplayManager::refreshScheduledBrightness();
   finishClockRestoreIfReady();
@@ -278,49 +349,11 @@ void loop() {
   if (gTimeSyncRestorePending) {
     DisplayManager::updateLoadingAnimation();
     DisplayManager::unlockRuntimeAccess();
-    WebSocketHandler::ws.cleanupClients();
+    if (WebSocketHandler::ws.count() > 0) {
+      WebSocketHandler::ws.cleanupClients();
+    }
     yield();
     return;
-  }
-
-  // 检查是否有待保存的二进制像素数据
-  if (WebSocketHandler::binaryDataPending && millis() - WebSocketHandler::lastBinaryReceiveTime > 500) {
-    WebSocketHandler::binaryDataPending = false;
-
-    // 根据当前模式选择对应的像素数据
-    PixelData*& imagePixels = (DisplayManager::currentMode == MODE_ANIMATION)
-      ? ConfigManager::animImagePixels
-      : ConfigManager::staticImagePixels;
-    int& imagePixelCount = (DisplayManager::currentMode == MODE_ANIMATION)
-      ? ConfigManager::animImagePixelCount
-      : ConfigManager::staticImagePixelCount;
-
-    if (imagePixels != nullptr && imagePixelCount > 0) {
-      Serial.printf("=== 开始保存像素数据到 Preferences: %d 个像素 ===\n", imagePixelCount);
-
-      if (DisplayManager::currentMode == MODE_ANIMATION) {
-        ConfigManager::saveAnimImagePixels();
-      } else {
-        ConfigManager::saveStaticImagePixels();
-      }
-
-      // 只向当前上传连接返回确认，避免广播扰动其他客户端状态机
-      WebSocketHandler::sendBinaryReceiveConfirmation(imagePixelCount);
-
-      // 保存完成后恢复显示刷新
-      DisplayManager::receivingPixels = false;
-      WebSocketHandler::clearBinaryImageTransferBackup();
-
-      // 保存完成后刷新显示
-      if (DisplayManager::currentMode == MODE_CLOCK) {
-        DisplayManager::displayClock(true);
-      } else if (DisplayManager::currentMode == MODE_THEME) {
-        DisplayManager::displayTheme(true);
-      } else if (DisplayManager::currentMode == MODE_ANIMATION &&
-                 AnimationManager::currentGIF == nullptr) {
-        DisplayManager::displayClock(true);
-      }
-    }
   }
 
   // 连接保持策略：不因短时心跳抖动主动断开，只记录长时间空闲状态
@@ -342,8 +375,6 @@ void loop() {
   if (DisplayManager::currentMode == MODE_CANVAS || DisplayManager::currentMode == MODE_CLOCK) {
     if (DisplayManager::currentMode == MODE_CANVAS) {
       // 纯画板模式：不画时钟，不干预显示
-    } else if (DisplayManager::clientConnected) {
-      // 有客户端连接时，不自动刷新时钟
     } else {
       // 静态时钟模式，无客户端：每分钟更新一次时钟
       static unsigned long lastClockUpdate = 0;
@@ -371,19 +402,23 @@ void loop() {
     }
   } else if (DisplayManager::currentMode == MODE_ANIMATION) {
     // 动画模式
-    if (DisplayManager::currentBusinessModeTag == ModeTags::GAME_SCREENSAVER &&
-               GameScreensaverEffect::isActive()) {
-      GameScreensaverEffect::update();
-      GameScreensaverEffect::render();
+    if (DisplayManager::currentBusinessModeTag == ModeTags::MAZE &&
+               MazeEffect::isActive()) {
+      MazeEffect::update();
+      MazeEffect::render();
+    } else if (DisplayManager::currentBusinessModeTag == ModeTags::SNAKE &&
+               SnakeEffect::isActive()) {
+      SnakeEffect::update();
+      SnakeEffect::render();
     } else if ((DisplayManager::currentBusinessModeTag == ModeTags::TEXT_DISPLAY ||
-                DisplayManager::currentBusinessModeTag == ModeTags::WEATHER ||
-                DisplayManager::currentBusinessModeTag == ModeTags::COUNTDOWN ||
-                DisplayManager::currentBusinessModeTag == ModeTags::STOPWATCH ||
-                DisplayManager::currentBusinessModeTag == ModeTags::NOTIFICATION ||
                 DisplayManager::currentBusinessModeTag == ModeTags::PLANET_SCREENSAVER) &&
                BoardNativeEffect::isActive()) {
       BoardNativeEffect::update();
       BoardNativeEffect::render();
+    } else if (DisplayManager::currentBusinessModeTag == ModeTags::TETRIS_CLOCK &&
+               TetrisClockEffect::isActive) {
+      TetrisClockEffect::update();
+      TetrisClockEffect::render(DisplayManager::dma_display);
     } else if (TetrisEffect::isActive) {
       // 俄罗斯方块屏保
       TetrisEffect::update();
@@ -401,7 +436,9 @@ void loop() {
   DisplayManager::unlockRuntimeAccess();
 
   // 清理WebSocket，防止内存泄漏
-  WebSocketHandler::ws.cleanupClients();
+  if (WebSocketHandler::ws.count() > 0) {
+    WebSocketHandler::ws.cleanupClients();
+  }
 
   yield();
 }

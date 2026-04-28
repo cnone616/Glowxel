@@ -33,9 +33,7 @@
           新建
         </router-link>
         <template v-if="isLoggedIn">
-          <router-link to="/profile" class="btn-login" @click="closeMobileMenu"
-            >我的</router-link
-          >
+          <router-link to="/profile" class="btn-login" @click="closeMobileMenu">我的</router-link>
           <button class="btn-login btn-logout" @click="handleLogout">
             退出
           </button>
@@ -45,8 +43,9 @@
           to="/login"
           class="btn-login"
           @click="closeMobileMenu"
-          >登录</router-link
         >
+          登录
+        </router-link>
       </div>
 
       <button
@@ -89,6 +88,7 @@
 import { computed, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import BrandLogo from "@/components/BrandLogo.vue";
+import { clearStoredSession } from "@/utils/session.js";
 
 const router = useRouter();
 const route = useRoute();
@@ -111,12 +111,18 @@ const activeNavKey = computed(() => {
     path.startsWith("/workspace") ||
     path.startsWith("/create") ||
     path.startsWith("/pattern-workbench") ||
-    path.startsWith("/clock-editor") ||
     path.startsWith("/editor")
   ) {
     return "workspace";
   }
-  if (path.startsWith("/device-control")) return "device";
+  if (
+    path.startsWith("/device-control") ||
+    path.startsWith("/device-params") ||
+    path.startsWith("/ble-config") ||
+    path.startsWith("/canvas-editor")
+  ) {
+    return "device";
+  }
   if (path.startsWith("/design-system")) return "design-system";
   if (path.startsWith("/templates")) return "templates";
   if (path.startsWith("/challenges") || path.startsWith("/challenge/")) {
@@ -140,8 +146,7 @@ const closeMobileMenu = () => {
   mobileMenuOpen.value = false;
 };
 const handleLogout = () => {
-  localStorage.removeItem("auth_token");
-  localStorage.removeItem("user_info");
+  clearStoredSession();
   closeMobileMenu();
   router.push("/login");
 };

@@ -6,7 +6,7 @@
           <div class="ds-page-head__brand">
             <BrandLogo variant="page" />
             <div class="ds-page-head__copy">
-              <span class="ds-page-head__eyebrow">Glowxel 组件规范站</span>
+              <span class="ds-page-head__eyebrow">光格像素工坊组件规范站</span>
               <h1 class="ds-page-head__title">官网内正式组件页</h1>
               <p class="ds-page-head__desc">只保留正式组件覆盖、状态和规则，不再堆多余解释块。</p>
             </div>

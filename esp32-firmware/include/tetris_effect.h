@@ -29,6 +29,7 @@ private:
   static int targetX;
   static uint8_t curColor;
   static unsigned long lastDropTime;
+  static unsigned long lastClockRefreshTime;
   static bool needsRender;
 
   static const uint16_t pieces[7][4];
@@ -36,6 +37,15 @@ private:
 
   static void spawnPiece();
   static bool canMove(int type, int rot, int x, int y);
+  static int scorePlacement(int type, int rot, int x, int y);
+  static bool findBestPlacement(
+    const int enabledTypes[7],
+    int enabledCount,
+    int& bestType,
+    int& bestRot,
+    int& bestX
+  );
+  static bool findReachableSpawnX(int type, int rot, int targetX, int spawnY, int& spawnX);
   static void lockPiece();
   static int clearLines();
   static void resetBoard();

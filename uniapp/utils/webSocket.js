@@ -3,6 +3,36 @@
  * 用于与 ESP32 LED 矩阵板进行 WebSocket 通讯
  */
 
+const COMMAND_TIMEOUT_MS = 15000;
+const COMMAND_FINAL_TIMEOUT_MS = 45000;
+const CONNECT_TIMEOUT_MS = 30000;
+const HTTP_RUNTIME_PRECHECK_TIMEOUT_MS = 4000;
+const AUTO_RECONNECT_DELAY_MS = 1500;
+const AUTO_RECONNECT_MAX_ATTEMPTS = 3;
+const ACCEPTED_MESSAGE = "accepted";
+const TRANSACTION_ACCEPTED_STATUS = "accepted";
+const TRANSACTION_FINAL_OK_STATUS = "final_ok";
+const TRANSACTION_FINAL_ERROR_STATUS = "final_error";
+const TRANSACTION_ACCEPTED_TIMEOUT_MS = 8000;
+const TRANSACTION_FINAL_TIMEOUT_MS = 90000;
+const STATIC_PIXEL_BINARY_CHUNK_SIZE = 320;
+const STATIC_PIXEL_BINARY_CHUNK_DELAY_MS = 200;
+const COMPACT_ANIMATION_BINARY_CHUNK_SIZE = 1000;
+const COMPACT_ANIMATION_BINARY_CHUNK_DELAY_MS = 80;
+const WS_DEBUG_VERBOSE = false;
+const WS_DEBUG_KEY_LABELS = new Set([
+  "connect start",
+  "connect timeout fired",
+  "closeSocketTask",
+  "task onOpen",
+  "task onClose",
+  "task onError",
+  "connectSocket fail callback",
+  "schedule reconnect",
+  "skip reconnect: limit reached",
+  "reconnect attempt failed",
+]);
+
 function normalizeHexColor(value) {
   if (typeof value !== "string") {
     throw new Error("颜色值无效");
@@ -50,6 +80,141 @@ function isErrorResponse(message) {
   return !!(message && (message.error || message.status === "error"));
 }
 
+function isRuntimeStatusPayload(message) {
+  return !!(
+    message &&
+    message.status === "ok" &&
+    typeof message.ip === "string" &&
+    typeof message.width === "number" &&
+    typeof message.height === "number" &&
+    typeof message.brightness === "number" &&
+    typeof message.mode === "string" &&
+    typeof message.businessMode === "string" &&
+    typeof message.effectMode === "string"
+  );
+}
+
+function isAcceptedResponse(message) {
+  return !!(
+    message &&
+    message.status === "ok" &&
+    message.message === ACCEPTED_MESSAGE
+  );
+}
+
+function isTransactionAcceptedResponse(message) {
+  return !!(
+    message &&
+    message.status === TRANSACTION_ACCEPTED_STATUS
+  );
+}
+
+function isTransactionFinalErrorResponse(message) {
+  return !!(
+    message &&
+    message.status === TRANSACTION_FINAL_ERROR_STATUS
+  );
+}
+
+function isTransactionFinalResponse(message) {
+  return !!(
+    message &&
+    (
+      message.status === TRANSACTION_FINAL_OK_STATUS ||
+      message.status === TRANSACTION_FINAL_ERROR_STATUS
+    )
+  );
+}
+
+function buildTransactionError(message, fallbackReason) {
+  const error = new Error(fallbackReason);
+
+  if (message && typeof message === "object") {
+    if (typeof message.reason === "string" && message.reason.length > 0) {
+      error.message = message.reason;
+    }
+    error.transactionResponse = message;
+    if (isTransactionFinalResponse(message)) {
+      error.transactionFinalReceived = true;
+    }
+  }
+
+  return error;
+}
+
+function normalizeBinaryPayload(data) {
+  if (data instanceof ArrayBuffer) {
+    return data;
+  }
+
+  if (ArrayBuffer.isView(data)) {
+    return data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength);
+  }
+
+  throw new Error("二进制数据无效");
+}
+
+function buildPixelBinaryBufferFromObjects(pixels) {
+  if (!Array.isArray(pixels)) {
+    throw new Error("像素数据格式无效");
+  }
+
+  const buffer = new Uint8Array(pixels.length * 5);
+  for (let index = 0; index < pixels.length; index += 1) {
+    const pixel = pixels[index];
+    if (!pixel || typeof pixel !== "object") {
+      throw new Error(`第 ${index + 1} 个像素格式无效`);
+    }
+
+    const values = [pixel.x, pixel.y, pixel.r, pixel.g, pixel.b];
+    for (let channelIndex = 0; channelIndex < values.length; channelIndex += 1) {
+      const value = Number(values[channelIndex]);
+      if (!Number.isInteger(value) || value < 0 || value > 255) {
+        throw new Error(`第 ${index + 1} 个像素数据无效`);
+      }
+      buffer[index * 5 + channelIndex] = value;
+    }
+  }
+
+  return buffer.buffer;
+}
+
+function buildPixelBinaryBufferFromPackedPixels(pixelData, width = 64, height = 64) {
+  if (!Array.isArray(pixelData) || pixelData.length % 5 !== 0) {
+    throw new Error("像素数据格式无效");
+  }
+
+  const offsetX = Math.floor((64 - width) / 2);
+  const offsetY = Math.floor((64 - height) / 2);
+  const buffer = new Uint8Array(pixelData.length);
+
+  for (let index = 0; index < pixelData.length; index += 5) {
+    const x = Number(pixelData[index]);
+    const y = Number(pixelData[index + 1]);
+    const r = Number(pixelData[index + 2]);
+    const g = Number(pixelData[index + 3]);
+    const b = Number(pixelData[index + 4]);
+
+    if (
+      !Number.isInteger(x) ||
+      !Number.isInteger(y) ||
+      !Number.isInteger(r) ||
+      !Number.isInteger(g) ||
+      !Number.isInteger(b)
+    ) {
+      throw new Error("像素数据格式无效");
+    }
+
+    buffer[index] = x + offsetX;
+    buffer[index + 1] = y + offsetY;
+    buffer[index + 2] = r;
+    buffer[index + 3] = g;
+    buffer[index + 4] = b;
+  }
+
+  return buffer.buffer;
+}
+
 function buildMessageMatcher(expectedMessages) {
   const targets = Array.isArray(expectedMessages)
     ? expectedMessages
@@ -69,6 +234,138 @@ function buildMessageMatcher(expectedMessages) {
   };
 }
 
+function normalizeCompactAnimationPixelBytes(pixels, totalPixels, frameIndex) {
+  if (pixels instanceof Uint8Array) {
+    if (pixels.length !== totalPixels * 5) {
+      throw new Error(`第 ${frameIndex + 1} 帧像素长度不匹配`);
+    }
+    return pixels;
+  }
+
+  if (ArrayBuffer.isView(pixels)) {
+    const bytes = new Uint8Array(
+      pixels.buffer,
+      pixels.byteOffset,
+      pixels.byteLength,
+    );
+    if (bytes.length !== totalPixels * 5) {
+      throw new Error(`第 ${frameIndex + 1} 帧像素长度不匹配`);
+    }
+    return bytes;
+  }
+
+  if (!Array.isArray(pixels) || pixels.length !== totalPixels) {
+    throw new Error(`第 ${frameIndex + 1} 帧像素数量不匹配`);
+  }
+
+  const bytes = new Uint8Array(totalPixels * 5);
+  for (let pixelIndex = 0; pixelIndex < totalPixels; pixelIndex += 1) {
+    const pixel = pixels[pixelIndex];
+    if (!Array.isArray(pixel) || pixel.length < 5) {
+      throw new Error(`第 ${frameIndex + 1} 帧第 ${pixelIndex + 1} 个像素格式错误`);
+    }
+
+    const offset = pixelIndex * 5;
+    for (let channelIndex = 0; channelIndex < 5; channelIndex += 1) {
+      const value = Number(pixel[channelIndex]);
+      if (!Number.isInteger(value) || value < 0 || value > 255) {
+        throw new Error(
+          `第 ${frameIndex + 1} 帧第 ${pixelIndex + 1} 个像素数据无效`,
+        );
+      }
+      bytes[offset + channelIndex] = value;
+    }
+  }
+
+  return bytes;
+}
+
+function buildCompactAnimationBinaryBuffer(animationData) {
+  if (!Array.isArray(animationData) || animationData.length === 0) {
+    throw new Error("动画帧不能为空");
+  }
+
+  const normalizedFrames = animationData.map((frame, frameIndex) => {
+    if (!Array.isArray(frame) || frame.length < 4) {
+      throw new Error(`第 ${frameIndex + 1} 帧数据格式错误`);
+    }
+
+    const type = Number(frame[0]);
+    const delay = Number(frame[1]);
+    const totalPixels = Number(frame[2]);
+    const pixels = frame[3];
+
+    if (!Number.isInteger(type) || (type !== 0 && type !== 1)) {
+      throw new Error(`第 ${frameIndex + 1} 帧类型无效`);
+    }
+    if (!Number.isFinite(delay) || delay < 0 || delay > 65535) {
+      throw new Error(`第 ${frameIndex + 1} 帧延迟无效`);
+    }
+    if (!Number.isInteger(totalPixels) || totalPixels < 0 || totalPixels > 65535) {
+      throw new Error(`第 ${frameIndex + 1} 帧像素数量无效`);
+    }
+
+    return {
+      type,
+      delay: Math.round(delay),
+      totalPixels,
+      pixels: normalizeCompactAnimationPixelBytes(
+        pixels,
+        totalPixels,
+        frameIndex,
+      ),
+    };
+  });
+
+  let totalBytes = 2;
+  normalizedFrames.forEach((frame) => {
+    totalBytes += 5 + frame.totalPixels * 5;
+  });
+
+  const buffer = new ArrayBuffer(totalBytes);
+  const bytes = new Uint8Array(buffer);
+  const view = new DataView(buffer);
+  let offset = 0;
+  view.setUint16(offset, normalizedFrames.length, true);
+  offset += 2;
+
+  normalizedFrames.forEach((frame) => {
+    bytes[offset++] = frame.type;
+    view.setUint16(offset, frame.delay, true);
+    offset += 2;
+    view.setUint16(offset, frame.totalPixels, true);
+    offset += 2;
+    bytes.set(frame.pixels, offset);
+    offset += frame.pixels.length;
+  });
+
+  return buffer;
+}
+
+function isCompactAnimationBinaryPayload(mode, byteLength) {
+  if (mode === "gif_player") {
+    return true;
+  }
+  if (mode !== "animation") {
+    return false;
+  }
+  return byteLength > 0 && byteLength % 5 === 2;
+}
+
+function resolveTransactionBinaryChunkProfile(mode, byteLength) {
+  if (isCompactAnimationBinaryPayload(mode, byteLength)) {
+    return {
+      chunkSize: COMPACT_ANIMATION_BINARY_CHUNK_SIZE,
+      delayMs: COMPACT_ANIMATION_BINARY_CHUNK_DELAY_MS,
+    };
+  }
+
+  return {
+    chunkSize: STATIC_PIXEL_BINARY_CHUNK_SIZE,
+    delayMs: STATIC_PIXEL_BINARY_CHUNK_DELAY_MS,
+  };
+}
+
 function getSetModeSuccessMessage(mode) {
   if (mode === "clock") {
     return "switched to static clock mode";
@@ -85,6 +382,9 @@ function getSetModeSuccessMessage(mode) {
   if (mode === "theme") {
     return "switched to theme mode";
   }
+  if (mode === "transferring") {
+    return "entered transferring mode";
+  }
   if (mode === "text_display") {
     return "switched to text display mode";
   }
@@ -100,26 +400,17 @@ function getSetModeSuccessMessage(mode) {
   if (mode === "led_matrix_showcase") {
     return "switched to led matrix showcase mode";
   }
-  if (mode === "transferring") {
-    return "entered transferring mode";
-  }
   if (mode === "tetris") {
     return "tetris started";
   }
   if (mode === "tetris_clock") {
     return "tetris clock started";
   }
-  if (mode === "weather") {
-    return "switched to weather mode";
+  if (mode === "maze") {
+    return "maze mode started";
   }
-  if (mode === "countdown") {
-    return "switched to countdown mode";
-  }
-  if (mode === "stopwatch") {
-    return "switched to stopwatch mode";
-  }
-  if (mode === "notification") {
-    return "switched to notification mode";
+  if (mode === "snake") {
+    return "snake mode started";
   }
   if (mode === "planet_screensaver") {
     return "switched to planet screensaver mode";
@@ -150,6 +441,75 @@ class WebSocket {
     this._closeMetaBySocketId = new Map();
     this._messageWaiters = new Set();
     this._jsonCommandQueue = Promise.resolve();
+    this._transactionIdSeed = 0;
+    this._debugGlobalSocketHooksBound = false;
+    this._reconnectTimer = null;
+    this._reconnectAttemptCount = 0;
+  }
+
+  _debugTimestamp() {
+    return new Date().toISOString();
+  }
+
+  _debugLog(socketId, label, detail = null) {
+    if (!WS_DEBUG_VERBOSE && !WS_DEBUG_KEY_LABELS.has(label)) {
+      return;
+    }
+    const prefix = `[WS DEBUG] ${this._debugTimestamp()} socket=${socketId} state=${this.connectionState} connected=${this.connected}`;
+    if (detail === null || typeof detail === "undefined") {
+      console.log(prefix, label);
+      return;
+    }
+    console.log(prefix, label, detail);
+  }
+
+  _summarizeSocketEventPayload(payload) {
+    if (!payload || typeof payload !== "object") {
+      return payload;
+    }
+
+    const summary = {};
+    Object.keys(payload).forEach((key) => {
+      const value = payload[key];
+      if (typeof value === "string") {
+        summary[key] =
+          value.length > 160 ? `${value.slice(0, 160)}...` : value;
+        if (key === "data") {
+          summary.dataLength = value.length;
+        }
+        return;
+      }
+      summary[key] = value;
+    });
+    return summary;
+  }
+
+  _ensureGlobalSocketDebugHooks() {
+    if (!WS_DEBUG_VERBOSE || this._debugGlobalSocketHooksBound) {
+      return;
+    }
+
+    this._debugGlobalSocketHooksBound = true;
+
+    const bindGlobalHook = (hookName, label) => {
+      if (!uni || typeof uni[hookName] !== "function") {
+        this._debugLog(this._currentSocketId, `global ${label} unavailable`);
+        return;
+      }
+
+      uni[hookName]((payload) => {
+        this._debugLog(
+          this._currentSocketId,
+          `global ${label}`,
+          this._summarizeSocketEventPayload(payload),
+        );
+      });
+    };
+
+    bindGlobalHook("onSocketOpen", "onSocketOpen");
+    bindGlobalHook("onSocketError", "onSocketError");
+    bindGlobalHook("onSocketClose", "onSocketClose");
+    bindGlobalHook("onSocketMessage", "onSocketMessage");
   }
 
   normalizeHostInput(host) {
@@ -176,6 +536,107 @@ class WebSocket {
     }
   }
 
+  probeRuntimeStatus(
+    host,
+    port = 80,
+    timeout = HTTP_RUNTIME_PRECHECK_TIMEOUT_MS,
+  ) {
+    const normalizedHost = this.normalizeHostInput(host);
+    if (!normalizedHost) {
+      return Promise.reject(new Error("设备 IP 地址无效"));
+    }
+
+    const url = `http://${normalizedHost}:${port}/status?ts=${Date.now()}`;
+    return new Promise((resolve, reject) => {
+      uni.request({
+        url,
+        method: "GET",
+        timeout,
+        success: (res) => {
+          if (
+            typeof res.statusCode !== "number" ||
+            res.statusCode < 200 ||
+            res.statusCode >= 300
+          ) {
+            reject(
+              new Error(`设备运行态 HTTP 不可用（${res.statusCode || "unknown"}）`),
+            );
+            return;
+          }
+
+          let data = res.data;
+          if (typeof data === "string") {
+            try {
+              data = JSON.parse(data);
+            } catch (err) {
+              reject(new Error("设备运行态状态响应不是有效 JSON"));
+              return;
+            }
+          }
+
+          if (!isRuntimeStatusPayload(data)) {
+            reject(new Error("设备运行态状态响应无效"));
+            return;
+          }
+
+          resolve(data);
+        },
+        fail: (err) => {
+          const errMsg =
+            err && typeof err.errMsg === "string" ? err.errMsg : "";
+          if (errMsg.includes("timeout")) {
+            reject(new Error("设备运行态 HTTP 预检超时"));
+            return;
+          }
+          reject(new Error("设备运行态不可达，请确认设备已联网并进入运行态"));
+        },
+      });
+    });
+  }
+
+  _clearReconnectTimer() {
+    if (this._reconnectTimer) {
+      clearTimeout(this._reconnectTimer);
+      this._reconnectTimer = null;
+    }
+  }
+
+  _scheduleReconnect(reason = null) {
+    if (!this.host || !this.port) {
+      return;
+    }
+    if (this.connected || this.connectionState === "connecting" || this._connectPromise) {
+      return;
+    }
+    if (this._reconnectAttemptCount >= AUTO_RECONNECT_MAX_ATTEMPTS) {
+      this._debugLog(this._currentSocketId, "skip reconnect: limit reached", {
+        attempts: this._reconnectAttemptCount,
+        reason,
+      });
+      return;
+    }
+
+    this._clearReconnectTimer();
+    const socketId = this._currentSocketId;
+    this._reconnectAttemptCount += 1;
+    this._debugLog(socketId, "schedule reconnect", reason);
+    this._reconnectTimer = setTimeout(() => {
+      this._reconnectTimer = null;
+      if (!this.host || !this.port) {
+        return;
+      }
+      if (this.connected || this.connectionState === "connecting" || this._connectPromise) {
+        return;
+      }
+
+      this.connect(this.host, this.port, { autoReconnect: true }).catch((err) => {
+        this._debugLog(this._currentSocketId, "reconnect attempt failed", {
+          message: err && err.message ? err.message : err,
+        });
+      });
+    }, AUTO_RECONNECT_DELAY_MS);
+  }
+
   _registerCloseMeta(socketId, meta) {
     this._closeMetaBySocketId.set(socketId, meta);
   }
@@ -193,12 +654,20 @@ class WebSocket {
       return;
     }
 
+    this._debugLog(socketId, "closeSocketTask", meta || {});
     this._registerCloseMeta(socketId, meta);
     socketTask.close({
       success: () => {
         if (meta && meta.logClose) {
           console.log(meta.logClose);
         }
+      },
+      fail: (err) => {
+        this._debugLog(
+          socketId,
+          "closeSocketTask fail",
+          this._summarizeSocketEventPayload(err),
+        );
       },
     });
   }
@@ -238,6 +707,11 @@ class WebSocket {
 
     this._jsonCommandQueue = queuedTask.catch(() => {});
     return queuedTask;
+  }
+
+  _createTransactionId() {
+    this._transactionIdSeed += 1;
+    return `tx-${Date.now()}-${this._transactionIdSeed}`;
   }
 
   _createMessageWaiter(matcher, timeout) {
@@ -316,12 +790,161 @@ class WebSocket {
     };
   }
 
+  _createTransactionWaiter(txId, matcher, timeout) {
+    return this._createMessageWaiter(
+      (message) =>
+        !!(
+          message &&
+          message.txId === txId &&
+          matcher(message)
+        ),
+      timeout,
+    );
+  }
+
+  async _sendBinaryChunks(mode, payload) {
+    const bytes = new Uint8Array(payload);
+    const profile = resolveTransactionBinaryChunkProfile(mode, bytes.byteLength);
+    for (
+      let offset = 0;
+      offset < bytes.byteLength;
+      offset += profile.chunkSize
+    ) {
+      const end = Math.min(offset + profile.chunkSize, bytes.byteLength);
+      await this.sendBinary(bytes.slice(offset, end));
+      if (end < bytes.byteLength) {
+        await new Promise((resolve) => setTimeout(resolve, profile.delayMs));
+      }
+    }
+  }
+
+  async _sendTransactionAbort(txId) {
+    if (!this.connected || !this.socket) {
+      return;
+    }
+
+    try {
+      await this.send({
+        cmd: "tx_abort",
+        txId,
+      });
+    } catch (err) {
+      console.warn("事务中止指令发送失败:", err);
+    }
+  }
+
+  async runModeTransaction(options = {}) {
+    if (!options || typeof options !== "object") {
+      throw new Error("事务参数无效");
+    }
+
+    const { mode } = options;
+    if (typeof mode !== "string" || mode.length === 0) {
+      throw new Error("事务模式无效");
+    }
+
+    const hasParams = Object.prototype.hasOwnProperty.call(options, "params");
+    let params = {};
+    if (hasParams) {
+      if (
+        !options.params ||
+        typeof options.params !== "object" ||
+        Array.isArray(options.params)
+      ) {
+        throw new Error("事务参数对象无效");
+      }
+      params = options.params;
+    }
+    const binaryPayload =
+      typeof options.binary === "undefined" || options.binary === null
+        ? null
+        : normalizeBinaryPayload(options.binary);
+    const txId = this._createTransactionId();
+    const acceptedTimeout =
+      Number.isInteger(options.acceptedTimeout) && options.acceptedTimeout > 0
+        ? options.acceptedTimeout
+        : TRANSACTION_ACCEPTED_TIMEOUT_MS;
+    const finalTimeout =
+      Number.isInteger(options.finalTimeout) && options.finalTimeout > 0
+        ? options.finalTimeout
+        : TRANSACTION_FINAL_TIMEOUT_MS;
+
+    return this._enqueueJsonCommand(async () => {
+      let accepted = false;
+      const acceptedWaiter = this._createTransactionWaiter(
+        txId,
+        (message) =>
+          isTransactionAcceptedResponse(message) ||
+          isTransactionFinalErrorResponse(message),
+        acceptedTimeout,
+      );
+      const finalWaiter = this._createTransactionWaiter(
+        txId,
+        (message) => isTransactionFinalResponse(message),
+        finalTimeout,
+      );
+
+      try {
+        await this.send({
+          cmd: "tx_begin",
+          txId,
+          mode,
+          params,
+          hasBinary: binaryPayload !== null,
+          binarySize: binaryPayload ? binaryPayload.byteLength : 0,
+        });
+
+        const acceptedResponse = await acceptedWaiter.promise;
+        if (!isTransactionAcceptedResponse(acceptedResponse)) {
+          throw buildTransactionError(acceptedResponse, "事务未被设备接受");
+        }
+
+        accepted = true;
+        if (binaryPayload) {
+          await this._sendBinaryChunks(mode, binaryPayload);
+        }
+
+        await this.send({
+          cmd: "tx_commit",
+          txId,
+        });
+
+        const finalResponse = await finalWaiter.promise;
+        if (!finalResponse || typeof finalResponse !== "object") {
+          throw new Error("设备事务响应无效");
+        }
+
+        if (finalResponse.status === TRANSACTION_FINAL_ERROR_STATUS) {
+          throw buildTransactionError(finalResponse, "设备事务执行失败");
+        }
+
+        return finalResponse;
+      } catch (err) {
+        acceptedWaiter.reject(err);
+        finalWaiter.reject(err);
+        if (accepted && !err.transactionFinalReceived) {
+          await this._sendTransactionAbort(txId);
+        }
+        throw err;
+      }
+    });
+  }
+
   /**
    * 连接到 ESP32
    * @param {string} host - IP 地址
    * @param {number} port - 端口号，默认 80
    */
-  connect(host, port = 80) {
+  connect(host, port = 80, options = {}) {
+    this._ensureGlobalSocketDebugHooks();
+    this._clearReconnectTimer();
+    if (!options.autoReconnect) {
+      this._reconnectAttemptCount = 0;
+    }
+    const connectTimeoutMs =
+      Number.isInteger(options.connectTimeoutMs) && options.connectTimeoutMs > 0
+        ? options.connectTimeoutMs
+        : CONNECT_TIMEOUT_MS;
     const normalizedHost = this.normalizeHostInput(host);
     if (!normalizedHost) {
       const err = new Error("设备 IP 地址无效");
@@ -350,6 +973,7 @@ class WebSocket {
     const previousSocket = this.socket;
     const previousSocketId = this._currentSocketId;
     if (previousSocket) {
+      this._debugLog(previousSocketId, "closing previous socket before connect");
       console.log("关闭旧连接");
       this._closeSocketTask(previousSocket, previousSocketId, {
         suppressReconnect: true,
@@ -368,6 +992,8 @@ class WebSocket {
     this._connectPromise = new Promise((resolve, reject) => {
       let settled = false;
       let connectTimeoutTimer = null;
+      let closingAfterConnectTimeout = false;
+      let hasOpened = false;
 
       const finishResolve = () => {
         if (settled) {
@@ -394,17 +1020,67 @@ class WebSocket {
       };
 
       const url = `ws://${normalizedHost}/ws`;
+      this._debugLog(socketId, "connect start", {
+        url,
+        host: normalizedHost,
+        port,
+        connectKey,
+        previousSocketId,
+        hasPreviousSocket: !!previousSocket,
+      });
       console.log("准备连接 WebSocket:", url);
+
+      if (WS_DEBUG_VERBOSE) {
+        try {
+          if (typeof uni.getSystemInfoSync === "function") {
+            const systemInfo = uni.getSystemInfoSync();
+            this._debugLog(socketId, "system info", {
+              platform: systemInfo.platform,
+              hostSDKVersion: systemInfo.hostSDKVersion,
+              SDKVersion: systemInfo.SDKVersion,
+              brand: systemInfo.brand,
+              model: systemInfo.model,
+            });
+          }
+        } catch (err) {
+          this._debugLog(socketId, "getSystemInfoSync failed", err);
+        }
+
+        if (typeof uni.getNetworkType === "function") {
+          uni.getNetworkType({
+            success: (res) => {
+              this._debugLog(
+                socketId,
+                "network type",
+                this._summarizeSocketEventPayload(res),
+              );
+            },
+            fail: (err) => {
+              this._debugLog(
+                socketId,
+                "getNetworkType fail",
+                this._summarizeSocketEventPayload(err),
+              );
+            },
+          });
+        }
+      }
 
       const socketTask = uni.connectSocket({
         url,
         success: () => {
+          this._debugLog(socketId, "connectSocket success callback");
           console.log("WebSocket 创建成功");
         },
         fail: (err) => {
           if (socketId !== this._currentSocketId) {
             return;
           }
+          this._debugLog(
+            socketId,
+            "connectSocket fail callback",
+            this._summarizeSocketEventPayload(err),
+          );
           console.error("WebSocket 创建失败:", err);
           this._setDisconnectedState("idle");
           this._emitError(err);
@@ -413,28 +1089,37 @@ class WebSocket {
       });
 
       this.socket = socketTask;
+      this._debugLog(socketId, "socketTask assigned");
 
       connectTimeoutTimer = setTimeout(() => {
         if (socketId !== this._currentSocketId) {
           return;
         }
+        this._debugLog(socketId, "connect timeout fired", {
+          currentSocketId: this._currentSocketId,
+          hasSocket: this.socket === socketTask,
+        });
         const err = new Error("WebSocket 连接超时");
         console.error(err.message);
         this._setDisconnectedState("idle");
         this._emitError(err);
-        this._closeSocketTask(socketTask, socketId, {
-          suppressReconnect: true,
-        });
+        closingAfterConnectTimeout = true;
         finishReject(err);
-      }, 12000);
+        this._closeSocketTask(socketTask, socketId, {
+          timeout: true,
+        });
+      }, connectTimeoutMs);
 
       socketTask.onOpen(() => {
         if (socketId !== this._currentSocketId) {
           return;
         }
+        this._debugLog(socketId, "task onOpen");
         console.log("WebSocket 连接成功");
+        hasOpened = true;
         this.connected = true;
         this.connectionState = "open";
+        this._reconnectAttemptCount = 0;
         if (this.onConnectCallback) {
           this.onConnectCallback();
         }
@@ -445,10 +1130,16 @@ class WebSocket {
         if (socketId !== this._currentSocketId) {
           return;
         }
+        this._debugLog(
+          socketId,
+          "task onMessage",
+          this._summarizeSocketEventPayload(res),
+        );
         console.log("收到消息:", res.data);
         try {
           const data = JSON.parse(res.data);
-          this.onMessageCallbacks.forEach((callback) => {
+          const callbacks = this.onMessageCallbacks.slice();
+          callbacks.forEach((callback) => {
             if (callback) {
               callback(data);
             }
@@ -459,10 +1150,15 @@ class WebSocket {
       });
 
       socketTask.onClose((event) => {
-        this._consumeCloseMeta(socketId);
+        const closeMeta = this._consumeCloseMeta(socketId);
         if (socketId !== this._currentSocketId) {
           return;
         }
+        this._debugLog(
+          socketId,
+          "task onClose",
+          this._summarizeSocketEventPayload(event),
+        );
 
         const closeCode =
           event && typeof event.code !== "undefined" ? event.code : "unknown";
@@ -485,7 +1181,18 @@ class WebSocket {
         }
 
         if (!settled) {
-          finishReject(new Error("WebSocket 连接已关闭"));
+          finishReject(
+            new Error(closingAfterConnectTimeout ? "WebSocket 连接超时" : "WebSocket 连接已关闭"),
+          );
+          return;
+        }
+
+        if (hasOpened && (!closeMeta || !closeMeta.suppressReconnect)) {
+          this._scheduleReconnect({
+            stage: "connected",
+            code: closeCode,
+            reason: closeReason,
+          });
         }
       });
 
@@ -493,8 +1200,26 @@ class WebSocket {
         if (socketId !== this._currentSocketId) {
           return;
         }
+        this._debugLog(
+          socketId,
+          "task onError",
+          this._summarizeSocketEventPayload(err),
+        );
+        if (closingAfterConnectTimeout) {
+          this._debugLog(socketId, "ignore task onError after connect timeout");
+          return;
+        }
         console.error("WebSocket 错误:", err);
-        this._emitError(err);
+        const socketError =
+          err instanceof Error
+            ? err
+            : new Error(
+                err && typeof err.errMsg === "string"
+                  ? err.errMsg
+                  : "WebSocket 错误",
+              );
+        this._rejectMessageWaitersForSocket(socketId, socketError);
+        this._emitError(socketError);
       });
     });
 
@@ -530,10 +1255,41 @@ class WebSocket {
     });
   }
 
+  sendBinary(data) {
+    if (!this.connected || !this.socket) {
+      const err = new Error("未连接到设备");
+      console.error(err.message);
+      return Promise.reject(err);
+    }
+
+    let payload = null;
+    if (data instanceof ArrayBuffer) {
+      payload = data;
+    } else if (ArrayBuffer.isView(data)) {
+      payload = data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength);
+    }
+
+    if (!payload) {
+      return Promise.reject(new Error("二进制数据无效"));
+    }
+
+    return new Promise((resolve, reject) => {
+      this.socket.send({
+        data: payload,
+        success: resolve,
+        fail: (err) => {
+          console.error("二进制发送失败:", err);
+          reject(err);
+        },
+      });
+    });
+  }
+
   /**
    * 断开连接
    */
   disconnect() {
+    this._clearReconnectTimer();
     if (!this.socket) {
       this._setDisconnectedState("idle");
       return;
@@ -577,12 +1333,22 @@ class WebSocket {
     return this.send({ cmd: "ping" });
   }
 
-  waitForMessage(matcher, timeout = 8000) {
+  waitForMessage(matcher, timeout = COMMAND_TIMEOUT_MS) {
     return this._createMessageWaiter(matcher, timeout).promise;
   }
 
-  sendAndWait(data, timeout = 8000, matcher = null) {
-    const finalMatcher =
+  sendAndWait(data, timeout = COMMAND_TIMEOUT_MS, matcher = null, options = {}) {
+    const requiresAccepted = options.requiresAccepted === true;
+    const waitForFinal = options.waitForFinal !== false;
+    const acceptedTimeout =
+      Number.isInteger(options.acceptedTimeout) && options.acceptedTimeout > 0
+        ? options.acceptedTimeout
+        : timeout;
+    const finalTimeout =
+      Number.isInteger(options.finalTimeout) && options.finalTimeout > 0
+        ? options.finalTimeout
+        : timeout;
+    const baseFinalMatcher =
       typeof matcher === "function"
         ? matcher
         : (message) => {
@@ -595,23 +1361,51 @@ class WebSocket {
               message.status === "error"
             );
           };
+    const finalMatcher = (message) => {
+      if (requiresAccepted && isAcceptedResponse(message)) {
+        return false;
+      }
+      return baseFinalMatcher(message);
+    };
 
     return this._enqueueJsonCommand(async () => {
-      const waiter = this._createMessageWaiter(finalMatcher, timeout);
+      const acceptedWaiter = requiresAccepted
+        ? this._createMessageWaiter(
+            (message) => isAcceptedResponse(message) || isErrorResponse(message),
+            acceptedTimeout,
+          )
+        : null;
+      const finalWaiter = waitForFinal
+        ? this._createMessageWaiter(finalMatcher, finalTimeout)
+        : null;
       try {
         await this.send(data);
-        return await waiter.promise;
+        if (acceptedWaiter) {
+          await acceptedWaiter.promise;
+        }
+        if (finalWaiter) {
+          return await finalWaiter.promise;
+        }
+        return {
+          status: "ok",
+          message: ACCEPTED_MESSAGE,
+        };
       } catch (err) {
-        waiter.reject(err);
+        if (acceptedWaiter) {
+          acceptedWaiter.reject(err);
+        }
+        if (finalWaiter) {
+          finalWaiter.reject(err);
+        }
         throw err;
       }
     });
   }
 
-  async getStatus() {
+  async getStatus(timeout = COMMAND_TIMEOUT_MS) {
     return this.sendAndWait(
       { cmd: "status" },
-      5000,
+      timeout,
       (response) => {
         if (!response || typeof response !== "object") {
           return false;
@@ -653,7 +1447,7 @@ class WebSocket {
     );
   }
 
-  waitForCommand(data, expectedMessages, timeout = 8000) {
+  waitForCommand(data, expectedMessages, timeout = COMMAND_TIMEOUT_MS) {
     return this.sendAndWait(
       data,
       timeout,
@@ -661,12 +1455,41 @@ class WebSocket {
     );
   }
 
-  async setMode(mode) {
+  waitForAcceptedCommand(data, timeout = COMMAND_TIMEOUT_MS) {
+    return this.sendAndWait(data, timeout, null, {
+      requiresAccepted: true,
+      waitForFinal: false,
+    });
+  }
+
+  // 新增异步模式/效果命令时，优先走 accepted + 最终结果两阶段。
+  waitForCommandWithAccepted(
+    data,
+    expectedMessages,
+    timeout = COMMAND_TIMEOUT_MS,
+    finalTimeout = COMMAND_FINAL_TIMEOUT_MS,
+  ) {
+    return this.sendAndWait(data, timeout, buildMessageMatcher(expectedMessages), {
+      requiresAccepted: true,
+      waitForFinal: true,
+      finalTimeout,
+    });
+  }
+
+  async setMode(mode, options = {}) {
     const expectedMessage = getSetModeSuccessMessage(mode);
     if (!expectedMessage) {
       throw new Error(`未支持的模式切换确认：${mode}`);
     }
-    return this.waitForCommand({ cmd: "set_mode", mode }, expectedMessage, 8000);
+    if (options.waitForFinal === false) {
+      return this.waitForAcceptedCommand({ cmd: "set_mode", mode }, 8000);
+    }
+    return this.waitForCommandWithAccepted(
+      { cmd: "set_mode", mode },
+      expectedMessage,
+      8000,
+      COMMAND_FINAL_TIMEOUT_MS,
+    );
   }
 
   async setClockConfig(clockMode, config) {
@@ -677,185 +1500,209 @@ class WebSocket {
     );
   }
 
-  async setThemeConfig(themeId) {
-    return this.waitForCommand(
-      { cmd: "set_theme_config", themeId },
-      "theme config updated",
-      8000,
-    );
+  async applyClockMode(mode, config, binary = null, options = {}) {
+    if (mode !== "clock" && mode !== "animation") {
+      throw new Error(`未支持的时钟事务模式：${mode}`);
+    }
+
+    return this.runModeTransaction({
+      mode,
+      params: { config },
+      binary,
+      acceptedTimeout: options.acceptedTimeout,
+      finalTimeout: options.finalTimeout,
+    });
+  }
+
+  async applyThemeMode(config, themeId, options = {}) {
+    return this.runModeTransaction({
+      mode: "theme",
+      params: {
+        config,
+        themeId,
+      },
+      acceptedTimeout: options.acceptedTimeout,
+      finalTimeout: options.finalTimeout,
+    });
+  }
+
+  async ensureCanvasMode(options = {}) {
+    return this.runModeTransaction({
+      mode: "canvas",
+      params: {},
+      acceptedTimeout: options.acceptedTimeout,
+      finalTimeout: options.finalTimeout,
+    });
+  }
+
+  async setThemeConfig(themeId, options = {}) {
+    return this.runModeTransaction({
+      mode: "theme",
+      params: {
+        themeId,
+      },
+      acceptedTimeout: options.acceptedTimeout,
+      finalTimeout: options.finalTimeout,
+    });
   }
 
   async setEyesConfig(config) {
-    return this.waitForCommand(
-      { cmd: "set_eyes_config", config },
-      "eyes config updated",
-      8000,
-    );
+    return this.runModeTransaction({
+      mode: "eyes",
+      params: { config },
+    });
   }
 
-  async setAmbientEffect(config) {
-    if (config.preset === "rain_scene") {
-      return this.waitForCommand(
-        {
-          cmd: "set_ambient_effect",
-          preset: config.preset,
-          speed: config.speed,
-          density: config.density,
-          color: hexToRgb(config.color),
-          loop: config.loop,
-        },
-        "ambient effect applied",
-        8000,
-      );
-    }
+  async setAmbientEffect(config, options = {}) {
+    const params =
+      config.preset === "rain_scene"
+        ? {
+            preset: config.preset,
+            speed: config.speed,
+            density: config.density,
+            color: hexToRgb(config.color),
+            loop: config.loop,
+          }
+        : {
+            preset: config.preset,
+            speed: config.speed,
+            intensity: config.intensity,
+            loop: config.loop,
+          };
 
-    return this.waitForCommand(
-      {
-        cmd: "set_ambient_effect",
-        preset: config.preset,
+    return this.runModeTransaction({
+      mode: "led_matrix_showcase",
+      params,
+      acceptedTimeout: options.acceptedTimeout,
+      finalTimeout: options.finalTimeout,
+    });
+  }
+
+  async startMaze(config, options = {}) {
+    return this.runModeTransaction({
+      mode: "maze",
+      params: {
         speed: config.speed,
-        intensity: config.intensity,
-        loop: config.loop,
+        mazeSizeMode: config.mazeSizeMode,
+        showClock: config.showClock,
+        panelBgColor: normalizeHexColor(config.panelBgColor),
+        borderColor: normalizeHexColor(config.borderColor),
+        timeColor: normalizeHexColor(config.timeColor),
+        dateColor: normalizeHexColor(config.dateColor),
+        generationPathColor: normalizeHexColor(config.generationPathColor),
+        searchVisitedColor: normalizeHexColor(config.searchVisitedColor),
+        searchFrontierColor: normalizeHexColor(config.searchFrontierColor),
+        solvedPathStartColor: normalizeHexColor(config.solvedPathStartColor),
+        solvedPathEndColor: normalizeHexColor(config.solvedPathEndColor),
       },
-      "ambient effect applied",
-      8000,
-    );
+      acceptedTimeout: options.acceptedTimeout,
+      finalTimeout: options.finalTimeout,
+    });
   }
 
-  async setGameScreensaver(config) {
-    if (config.game === "maze") {
-      return this.waitForCommand(
-        {
-          cmd: "set_game_screensaver",
-          game: config.game,
-          speed: config.speed,
-          mazeSizeMode: config.mazeSizeMode,
-        },
-        "game screensaver applied",
-        8000,
-      );
-    }
-
-    if (config.game === "snake") {
-      return this.waitForCommand(
-        {
-          cmd: "set_game_screensaver",
-          game: config.game,
-          speed: config.speed,
-          snakeWidth: config.snakeWidth,
-        },
-        "game screensaver applied",
-        8000,
-      );
-    }
-
-    if (config.game === "ping_pong") {
-      return this.waitForCommand(
-        {
-          cmd: "set_game_screensaver",
-          game: config.game,
-          speed: config.speed,
-        },
-        "game screensaver applied",
-        8000,
-      );
-    }
-
-    if (config.game === "tetris_game") {
-      return this.waitForCommand(
-        {
-          cmd: "set_game_screensaver",
-          game: config.game,
-          speed: config.speed,
-          cellSize: config.cellSize,
-          showClock: config.showClock,
-        },
-        "game screensaver applied",
-        8000,
-      );
-    }
-
-    throw new Error(`未支持的游戏屏保：${config.game}`);
-  }
-
-  async setCountdownBoard(config) {
-    return this.waitForCommand(
-      {
-        cmd: "set_countdown_board",
-        hours: config.hours,
-        minutes: config.minutes,
-        seconds: config.seconds,
-        progress: config.progress,
-      },
-      "countdown board applied",
-      8000,
-    );
-  }
-
-  async startTetris(config) {
-    return this.waitForCommand(
-      {
-        cmd: "set_mode",
-        mode: "tetris",
-        clearMode: config.clearMode,
-        cellSize: config.cellSize,
+  async startSnake(config, options = {}) {
+    return this.runModeTransaction({
+      mode: "snake",
+      params: {
         speed: config.speed,
-        showClock: false,
-        pieces: config.pieces,
+        snakeWidth: config.snakeWidth,
+        snakeColor: hexToRgb(config.snakeColor),
+        foodColor: hexToRgb(config.foodColor),
+        font: config.font,
+        showSeconds: config.showSeconds,
+        snakeSkin: config.snakeSkin,
       },
-      "tetris started",
-      8000,
-    );
+      acceptedTimeout: options.acceptedTimeout,
+      finalTimeout: options.finalTimeout,
+    });
   }
 
-  async startTetrisClock(config) {
-    return this.waitForCommand(
-      {
-        cmd: "set_mode",
-        mode: "tetris_clock",
-        clearMode: config.clearMode,
-        cellSize: config.cellSize,
+  async startTetris(config, options = {}) {
+    const params = {
+      clearMode: config.clearMode,
+      cellSize: config.cellSize,
+      speed: config.speed,
+      showClock: config.showClock,
+      pieces: config.pieces,
+    };
+    if (
+      Object.prototype.hasOwnProperty.call(config, "config") &&
+      config.config &&
+      typeof config.config === "object" &&
+      !Array.isArray(config.config)
+    ) {
+      params.config = config.config;
+    }
+
+    return this.runModeTransaction({
+      mode: "tetris",
+      params,
+      acceptedTimeout: options.acceptedTimeout,
+      finalTimeout: options.finalTimeout,
+    });
+  }
+
+  async startTetrisClock(config, options = {}) {
+    return this.runModeTransaction({
+      mode: "tetris_clock",
+      params: {
+        cellSize: 2,
         speed: config.speed,
-        showClock: true,
-        pieces: config.pieces,
+        hourFormat: config.hourFormat,
       },
-      "tetris clock started",
-      8000,
-    );
+      acceptedTimeout: options.acceptedTimeout,
+      finalTimeout: options.finalTimeout,
+    });
   }
 
-  async setPlanetScreensaver(config) {
-    return this.waitForCommand(
-      {
-        cmd: "set_planet_screensaver",
+  async setPlanetScreensaver(config, options = {}) {
+    return this.runModeTransaction({
+      mode: "planet_screensaver",
+      params: {
         preset: config.preset,
         size: config.size,
         direction: config.direction,
         speed: config.speed,
         seed: config.seed,
         colorSeed: config.colorSeed,
+        planetX: config.planetX,
+        planetY: config.planetY,
+        font: config.font,
+        showSeconds: config.showSeconds,
+        time: config.time,
       },
-      "planet screensaver applied",
-      8000,
-    );
+      acceptedTimeout: options.acceptedTimeout,
+      finalTimeout: options.finalTimeout,
+    });
   }
 
   async setGifAnimation(animationData) {
-    return this.waitForCommand(
-      {
-        cmd: "set_gif_animation",
-        animationData,
-      },
-      animationData == null ? "animation cleared" : "compact animation loaded",
-      10000,
-    );
+    if (animationData == null) {
+      return this.waitForCommand(
+        {
+          cmd: "set_gif_animation",
+          animationData,
+        },
+        "animation cleared",
+        10000,
+      );
+    }
+
+    const binaryPayload = buildCompactAnimationBinaryBuffer(animationData);
+    return this.runModeTransaction({
+      mode: "gif_player",
+      params: {},
+      binary: binaryPayload,
+      finalTimeout: TRANSACTION_FINAL_TIMEOUT_MS,
+    });
   }
 
   async eyesInteract(action) {
-    return this.waitForCommand(
+    return this.waitForCommandWithAccepted(
       { cmd: "eyes_interact", action },
       "eyes action applied",
       8000,
+      COMMAND_FINAL_TIMEOUT_MS,
     );
   }
 
@@ -877,28 +1724,31 @@ class WebSocket {
 
   async highlightRow(row) {
     const expectedMessage = row >= 0 ? "row highlighted" : "highlight cleared";
-    return this.waitForCommand(
+    return this.waitForCommandWithAccepted(
       { cmd: "highlight_row", row },
       expectedMessage,
+      8000,
       8000,
     );
   }
 
   async highlightColor(color) {
     if (color === null) {
-      return this.waitForCommand(
+      return this.waitForCommandWithAccepted(
         { cmd: "highlight_color", color: null },
         "highlight cleared",
+        8000,
         8000,
       );
     }
 
-    return this.waitForCommand(
+    return this.waitForCommandWithAccepted(
       {
         cmd: "highlight_color",
         color: normalizeRgbColor(color),
       },
       "color highlighted",
+      8000,
       8000,
     );
   }
@@ -935,29 +1785,11 @@ class WebSocket {
     return this.send({ cmd: "clear" });
   }
 
-  async saveCanvas() {
-    return this.waitForCommand({ cmd: "save_canvas" }, "canvas saved", 8000);
-  }
-
-  async clearCanvas() {
-    return this.waitForCommand({ cmd: "clear_canvas" }, "canvas cleared", 8000);
-  }
-
   async setBrightness(value) {
     return this.send({ cmd: "brightness", value });
   }
 
-  async showText(text, x = 0, y = 0) {
-    return this.send({ cmd: "text", text, x, y });
-  }
-
-  async setPixel(x, y, r, g, b) {
-    return this.send({ cmd: "pixel", x, y, r, g, b });
-  }
-
   async showImage(pixels, width, height) {
-    await this.send({ cmd: "clear" });
-
     const sparseData = [];
     let idx = 0;
 
@@ -970,103 +1802,39 @@ class WebSocket {
       }
     }
 
-    if (sparseData.length === 0) {
-      return;
-    }
-
-    const batchSize = 64;
-    const pixelsPerBatch = batchSize * 5;
-
-    console.log(
-      `发送完整画布数据: ${width}x${height}, 总像素: ${sparseData.length / 5}`,
-    );
-
-    for (let i = 0; i < sparseData.length; i += pixelsPerBatch) {
-      const batch = sparseData.slice(i, Math.min(i + pixelsPerBatch, sparseData.length));
-      const buffer = new Uint8Array(batch);
-
-      await new Promise((resolve, reject) => {
-        this.socket.send({
-          data: buffer.buffer,
-          success: resolve,
-          fail: reject,
-        });
-      });
-
-      await new Promise((resolve) => setTimeout(resolve, 200));
-    }
+    return this.runModeTransaction({
+      mode: "canvas",
+      params: {},
+      binary:
+        sparseData.length > 0
+          ? buildPixelBinaryBufferFromPackedPixels(sparseData, width, height)
+          : new ArrayBuffer(0),
+      finalTimeout: TRANSACTION_FINAL_TIMEOUT_MS,
+    });
   }
 
   async showSparseImage(sparsePixels, width = 64, height = 64) {
-    if (sparsePixels.length === 0) {
-      return;
-    }
-
-    const offsetX = Math.floor((64 - width) / 2);
-    const offsetY = Math.floor((64 - height) / 2);
-
-    await this.send({ cmd: "clear" });
-
-    const offsetData = [];
-    for (let i = 0; i < sparsePixels.length; i += 5) {
-      offsetData.push(
-        sparsePixels[i] + offsetX,
-        sparsePixels[i + 1] + offsetY,
-        sparsePixels[i + 2],
-        sparsePixels[i + 3],
-        sparsePixels[i + 4],
-      );
-    }
-
-    const batchSize = 64;
-    const pixelsPerBatch = batchSize * 5;
-
-    console.log(`发送稀疏像素数据: ${offsetData.length / 5} 个像素`);
-
-    for (let i = 0; i < offsetData.length; i += pixelsPerBatch) {
-      const batch = offsetData.slice(i, Math.min(i + pixelsPerBatch, offsetData.length));
-      const buffer = new Uint8Array(batch);
-
-      await new Promise((resolve, reject) => {
-        this.socket.send({
-          data: buffer.buffer,
-          success: resolve,
-          fail: reject,
-        });
-      });
-
-      await new Promise((resolve) => setTimeout(resolve, 200));
-    }
+    return this.runModeTransaction({
+      mode: "canvas",
+      params: {},
+      binary:
+        sparsePixels.length > 0
+          ? buildPixelBinaryBufferFromPackedPixels(sparsePixels, width, height)
+          : new ArrayBuffer(0),
+      finalTimeout: TRANSACTION_FINAL_TIMEOUT_MS,
+    });
   }
 
-  async sendPartialUpdate(pixelData, width = 64, height = 64) {
-    if (pixelData.length === 0) {
-      return;
-    }
+  buildPixelBinaryFromObjects(pixels) {
+    return buildPixelBinaryBufferFromObjects(pixels);
+  }
 
-    const offsetX = Math.floor((64 - width) / 2);
-    const offsetY = Math.floor((64 - height) / 2);
+  buildPixelBinaryFromPackedPixels(pixelData, width = 64, height = 64) {
+    return buildPixelBinaryBufferFromPackedPixels(pixelData, width, height);
+  }
 
-    const offsetData = [];
-    for (let i = 0; i < pixelData.length; i += 5) {
-      offsetData.push(
-        pixelData[i] + offsetX,
-        pixelData[i + 1] + offsetY,
-        pixelData[i + 2],
-        pixelData[i + 3],
-        pixelData[i + 4],
-      );
-    }
-
-    const buffer = new Uint8Array(offsetData);
-
-    await new Promise((resolve, reject) => {
-      this.socket.send({
-        data: buffer.buffer,
-        success: resolve,
-        fail: reject,
-      });
-    });
+  buildCompactAnimationBinaryBuffer(animationData) {
+    return buildCompactAnimationBinaryBuffer(animationData);
   }
 }
 

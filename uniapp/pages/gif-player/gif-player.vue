@@ -15,7 +15,7 @@
     <view class="canvas-section">
       <view class="preview-canvas-container" :style="previewCanvasBoxStyle">
         <PixelCanvas
-          v-if="previewCanvasReady && !shouldHidePreview"
+          v-if="previewCanvasReady && !shouldShowSendingSnapshot"
           :width="64"
           :height="64"
           :pixels="currentPreviewPixels"
@@ -28,6 +28,18 @@
           :is-dark-mode="true"
           :touch-enabled="false"
           canvas-id="gifPlayerPreviewCanvas"
+        />
+        <PixelPreviewBoard
+          v-else-if="previewCanvasReady && shouldShowSendingSnapshot"
+          :width="64"
+          :height="64"
+          :pixels="sendingPreviewPixels"
+          :refresh-token="sendingPreviewTick"
+          :zoom="previewZoom"
+          :offset-x="previewOffset.x"
+          :offset-y="previewOffset.y"
+          :grid-visible="true"
+          :is-dark-mode="true"
         />
       </view>
       <view class="preview-caption glx-preview-panel">
@@ -104,7 +116,11 @@
       @touchmove.stop.prevent
     >
       <view class="glx-device-sending-card">
-        <view class="glx-device-sending-spinner"></view>
+        <GlxInlineLoader
+          class="glx-device-sending-spinner"
+          variant="chase"
+          size="lg"
+        />
         <text class="glx-device-sending-title">{{ sendOverlayTitle }}</text>
         <text class="glx-device-sending-tip">{{ sendOverlayTip }}</text>
       </view>
@@ -123,7 +139,9 @@ import statusBarMixin from "../../mixins/statusBar.js";
 import deviceSendUxMixin from "../../mixins/deviceSendUxMixin.js";
 import Icon from "../../components/Icon.vue";
 import Toast from "../../components/Toast.vue";
+import GlxInlineLoader from "../../components/GlxInlineLoader.vue";
 import PixelCanvas from "../../components/PixelCanvas.vue";
+import PixelPreviewBoard from "../../components/PixelPreviewBoard.vue";
 import GlxStepper from "../../components/GlxStepper.vue";
 import { useDeviceStore } from "../../store/device.js";
 import { useToast } from "../../composables/useToast.js";
@@ -133,6 +151,7 @@ import {
   getGifPlayerSceneItems,
   resolveSceneById,
 } from "../../utils/gif-player/localPlayer.js";
+import { applyCompactAnimation } from "../../utils/animationUploader.js";
 
 const GIF_PLAYER_CONFIG_KEY = "gif_player_config";
 
@@ -141,20 +160,23 @@ export default {
   components: {
     Icon,
     Toast,
+    GlxInlineLoader,
     PixelCanvas,
+    PixelPreviewBoard,
     GlxStepper,
   },
   data() {
     return {
       deviceStore: null,
       toast: null,
-      sendPreviewKind: "native",
       contentHeight: "calc(100vh - 88rpx - 520rpx)",
       previewCanvasReady: false,
       previewZoom: 4,
       previewOffset: { x: 0, y: 0 },
       previewContainerSize: { width: 320, height: 320 },
       previewFrameMaps: [],
+      sendingPreviewPixels: new Map(),
+      sendingPreviewTick: 0,
       previewFrameDelays: [],
       previewFrameIndex: 0,
       previewTimer: null,
@@ -216,11 +238,23 @@ export default {
     this.cleanupPreviewTimers();
   },
   methods: {
+    captureSendingPreview() {
+      this.sendingPreviewPixels = new Map(this.currentPreviewPixels);
+      this.sendingPreviewTick += 1;
+    },
+    clearSendingPreview() {
+      this.sendingPreviewPixels = new Map();
+      this.sendingPreviewTick += 1;
+    },
+    beginSendUi() {
+      this.captureSendingPreview();
+      deviceSendUxMixin.methods.beginSendUi.call(this);
+    },
+    endSendUi() {
+      deviceSendUxMixin.methods.endSendUi.call(this);
+    },
     handleBack() {
       uni.navigateBack();
-    },
-    handleDeviceSendPreviewRestored() {
-      this.schedulePreviewRefresh();
     },
     initPreviewCanvas() {
       const systemInfo = uni.getSystemInfoSync();
@@ -368,6 +402,7 @@ export default {
         return;
       }
 
+      const previousMode = this.deviceStore.deviceMode;
       this.beginSendUi();
       try {
         const ws = this.deviceStore.getWebSocket();
@@ -376,15 +411,13 @@ export default {
           speed: this.speed,
           intensity: this.intensity,
         });
-        await ws.setGifAnimation(payload.animationData);
-        await ws.setMode("gif_player");
-        await this.deviceStore.syncAndRequireBusinessMode(
-          "gif_player",
-          "设备未成功加载 GIF 动画",
-        );
+        await applyCompactAnimation(ws, payload.animationData, "gif_player");
         this.saveConfig();
         this.showSendSuccess();
       } catch (error) {
+        await this.deviceStore.rollbackBusinessMode(previousMode, {
+          expectedMode: "gif_player",
+        });
         console.error("发送 GIF 素材失败:", error);
         this.showSendFailure(error);
       } finally {

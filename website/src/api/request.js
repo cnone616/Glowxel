@@ -1,7 +1,23 @@
 import { API_BASE_URL } from '../config/api'
+import { clearStoredSession, getStoredAuthToken } from '@/utils/session.js'
 
 function getToken() {
-  return localStorage.getItem('auth_token') || ''
+  return getStoredAuthToken()
+}
+
+function buildRequestUrl(url, queryStr) {
+  const base = typeof API_BASE_URL === 'string' ? API_BASE_URL : ''
+  let requestPath = url
+
+  if (base.length > 0) {
+    if (base === '/api' && url.startsWith('/api/')) {
+      requestPath = url
+    } else {
+      requestPath = `${base}${url}`
+    }
+  }
+
+  return `${requestPath}${queryStr}`
 }
 
 export async function request(url, options = {}) {
@@ -23,7 +39,7 @@ export async function request(url, options = {}) {
     : ''
 
   try {
-    const res = await fetch(`${API_BASE_URL}${url}${queryStr}`, config)
+    const res = await fetch(buildRequestUrl(url, queryStr), config)
     const json = await res.json()
     const bizCode = typeof json?.code === 'number' ? json.code : 0
 
@@ -31,13 +47,11 @@ export async function request(url, options = {}) {
       return { success: true, data: json.data || json, message: json.message || 'ok' }
     }
     if (res.status === 401) {
-      localStorage.removeItem('auth_token')
-      localStorage.removeItem('user_info')
+      clearStoredSession()
       return { success: false, data: null, message: '登录已过期' }
     }
     if (bizCode === 401) {
-      localStorage.removeItem('auth_token')
-      localStorage.removeItem('user_info')
+      clearStoredSession()
     }
     return {
       success: false,

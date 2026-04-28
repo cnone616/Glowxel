@@ -5,6 +5,7 @@
 #include "mode_tags.h"
 #include "runtime_command_bus.h"
 #include "runtime_mode_coordinator.h"
+#include "websocket_async_command_response.h"
 
 namespace {
 void setErrorResponse(StaticJsonDocument<768>& response, const char* message) {
@@ -31,7 +32,10 @@ bool WebSocketCommandHandlers::handleClockCommand(
   JsonObject config = doc["config"];
   const char* clockMode = doc["clockMode"];
 
-  if (strcmp(clockMode, ModeTags::CLOCK) != 0 && strcmp(clockMode, ModeTags::ANIMATION) != 0) {
+  if (strcmp(clockMode, ModeTags::CLOCK) != 0 &&
+      strcmp(clockMode, ModeTags::ANIMATION) != 0 &&
+      strcmp(clockMode, ModeTags::THEME) != 0 &&
+      strcmp(clockMode, ModeTags::TETRIS) != 0) {
     setErrorResponse(response, "invalid clockMode");
     return true;
   }
@@ -47,9 +51,14 @@ bool WebSocketCommandHandlers::handleClockCommand(
     return true;
   }
 
-  ClockConfig& target = (strcmp(clockMode, ModeTags::ANIMATION) == 0)
-    ? ConfigManager::animClockConfig
-    : ConfigManager::clockConfig;
+  ClockConfig* target = &ConfigManager::clockConfig;
+  if (strcmp(clockMode, ModeTags::ANIMATION) == 0) {
+    target = &ConfigManager::animClockConfig;
+  } else if (strcmp(clockMode, ModeTags::THEME) == 0) {
+    target = &ConfigManager::themeClockConfig;
+  } else if (strcmp(clockMode, ModeTags::TETRIS) == 0) {
+    target = &ConfigManager::tetrisOverlayClockConfig;
+  }
 
   const char* fontName = config["font"];
   uint8_t fontId = 0;
@@ -109,41 +118,45 @@ bool WebSocketCommandHandlers::handleClockCommand(
     return true;
   }
 
-  target.font = fontId;
-  target.showSeconds = config["showSeconds"];
-  target.hourFormat = hourFormat;
+  target->font = fontId;
+  target->showSeconds = config["showSeconds"];
+  target->hourFormat = hourFormat;
 
-  target.time.show = time["show"];
-  target.time.fontSize = time["fontSize"];
-  target.time.x = time["x"];
-  target.time.y = time["y"];
-  target.time.r = timeColor["r"];
-  target.time.g = timeColor["g"];
-  target.time.b = timeColor["b"];
+  target->time.show = time["show"];
+  target->time.fontSize = time["fontSize"];
+  target->time.x = time["x"];
+  target->time.y = time["y"];
+  target->time.r = timeColor["r"];
+  target->time.g = timeColor["g"];
+  target->time.b = timeColor["b"];
 
-  target.date.show = date["show"];
-  target.date.fontSize = date["fontSize"];
-  target.date.x = date["x"];
-  target.date.y = date["y"];
-  target.date.r = dateColor["r"];
-  target.date.g = dateColor["g"];
-  target.date.b = dateColor["b"];
+  target->date.show = date["show"];
+  target->date.fontSize = date["fontSize"];
+  target->date.x = date["x"];
+  target->date.y = date["y"];
+  target->date.r = dateColor["r"];
+  target->date.g = dateColor["g"];
+  target->date.b = dateColor["b"];
 
-  target.week.show = week["show"];
-  target.week.x = week["x"];
-  target.week.y = week["y"];
-  target.week.r = weekColor["r"];
-  target.week.g = weekColor["g"];
-  target.week.b = weekColor["b"];
+  target->week.show = week["show"];
+  target->week.x = week["x"];
+  target->week.y = week["y"];
+  target->week.r = weekColor["r"];
+  target->week.g = weekColor["g"];
+  target->week.b = weekColor["b"];
 
-  target.image.show = image["show"];
-  target.image.x = image["x"];
-  target.image.y = image["y"];
-  target.image.width = image["width"];
-  target.image.height = image["height"];
+  target->image.show = image["show"];
+  target->image.x = image["x"];
+  target->image.y = image["y"];
+  target->image.width = image["width"];
+  target->image.height = image["height"];
 
   if (strcmp(clockMode, ModeTags::ANIMATION) == 0) {
     ConfigManager::saveAnimClockConfig();
+  } else if (strcmp(clockMode, ModeTags::THEME) == 0) {
+    ConfigManager::saveThemeClockConfig();
+  } else if (strcmp(clockMode, ModeTags::TETRIS) == 0) {
+    ConfigManager::saveTetrisOverlayClockConfig();
   } else {
     ConfigManager::saveClockConfig();
   }
@@ -195,6 +208,5 @@ bool WebSocketCommandHandlers::handleThemeCommand(
     setErrorResponse(response, "device busy");
     return true;
   }
-  responseSent = true;
-  return true;
+  return wsSendAcceptedResponse(client, response, responseSent);
 }

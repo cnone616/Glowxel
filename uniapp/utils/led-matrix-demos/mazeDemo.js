@@ -1,6 +1,24 @@
+import {
+  drawClockTextToPixels,
+  drawTinyTextToPixels,
+  getClockTextHeight,
+  getClockTextWidth,
+  getCurrentDateText,
+  getCurrentTimeText,
+  getTinyTextWidth,
+} from "../clockCanvas.js";
 import { fillRect, normalizeSpeed } from "./common.js";
+import { createMazeModeConfig } from "../mazeModeConfig.js";
 
 const DISPLAY_SIZE = 64;
+const MAZE_INFO_PANEL_METRICS = {
+  panelPaddingX: 3,
+  panelPaddingTop: 2,
+  panelPaddingBottom: 2,
+  sectionGapY: 1,
+  reservedMarginX: 0,
+  reservedMarginY: 0,
+};
 
 const MAZE_LAYOUTS = {
   wide: {
@@ -37,6 +55,178 @@ function resolveMazeLayout(options) {
   };
 }
 
+function rectanglesIntersect(left, right) {
+  return (
+    left.x < right.x + right.width &&
+    left.x + left.width > right.x &&
+    left.y < right.y + right.height &&
+    left.y + left.height > right.y
+  );
+}
+
+function drawRectOutline(map, x, y, width, height, r, g, b) {
+  fillRect(map, x, y, width, 1, r, g, b);
+  fillRect(map, x, y + height - 1, width, 1, r, g, b);
+  fillRect(map, x, y, 1, height, r, g, b);
+  fillRect(map, x + width - 1, y, 1, height, r, g, b);
+}
+
+function normalizeHexColorText(value) {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const body = value.trim().replace(/^#/, "");
+  if (!/^[0-9a-fA-F]{6}$/.test(body)) {
+    return null;
+  }
+  return `#${body.toLowerCase()}`;
+}
+
+function hexToRgb(hex) {
+  const normalized = normalizeHexColorText(hex);
+  if (normalized === null) {
+    throw new Error("迷宫颜色配置无效");
+  }
+  return {
+    r: parseInt(normalized.slice(1, 3), 16),
+    g: parseInt(normalized.slice(3, 5), 16),
+    b: parseInt(normalized.slice(5, 7), 16),
+  };
+}
+
+function interpolateColor(startColor, endColor, ratio) {
+  return {
+    r: Math.round(startColor.r + (endColor.r - startColor.r) * ratio),
+    g: Math.round(startColor.g + (endColor.g - startColor.g) * ratio),
+    b: Math.round(startColor.b + (endColor.b - startColor.b) * ratio),
+  };
+}
+
+function resolveMazeRuntimeConfig(speed, options) {
+  if (!options || typeof options !== "object") {
+    return null;
+  }
+  return createMazeModeConfig({
+    speed,
+    mazeSizeMode: options.mazeSizeMode,
+    showClock: options.showClock,
+    panelBgColor: options.panelBgColor,
+    borderColor: options.borderColor,
+    timeColor: options.timeColor,
+    dateColor: options.dateColor,
+    generationPathColor: options.generationPathColor,
+    searchVisitedColor: options.searchVisitedColor,
+    searchFrontierColor: options.searchFrontierColor,
+    solvedPathStartColor: options.solvedPathStartColor,
+    solvedPathEndColor: options.solvedPathEndColor,
+  });
+}
+
+function buildMazeInfoPanel(showClock) {
+  if (!showClock) {
+    return null;
+  }
+
+  const timeText = getCurrentTimeText(false, 24);
+  const dateText = getCurrentDateText();
+  const timeScale = 2;
+  const dateScale = 1;
+  const timeWidth = getClockTextWidth(timeText, "minimal_3x5", timeScale);
+  const timeHeight = getClockTextHeight("minimal_3x5", timeScale);
+  const dateWidth = getTinyTextWidth(dateText, dateScale);
+  const dateHeight = getClockTextHeight("minimal_3x5", dateScale);
+  const contentWidth = Math.max(timeWidth, dateWidth);
+  const panelWidth = contentWidth + MAZE_INFO_PANEL_METRICS.panelPaddingX * 2;
+  const panelHeight =
+    MAZE_INFO_PANEL_METRICS.panelPaddingTop +
+    timeHeight +
+    MAZE_INFO_PANEL_METRICS.sectionGapY +
+    dateHeight +
+    MAZE_INFO_PANEL_METRICS.panelPaddingBottom;
+  const panelX = Math.floor((DISPLAY_SIZE - panelWidth) / 2);
+  const panelY = Math.floor((DISPLAY_SIZE - panelHeight) / 2);
+  const reservedX = Math.max(0, panelX - MAZE_INFO_PANEL_METRICS.reservedMarginX);
+  const reservedY = Math.max(0, panelY - MAZE_INFO_PANEL_METRICS.reservedMarginY);
+  const reservedRect = {
+    x: reservedX,
+    y: reservedY,
+    width: Math.min(
+      DISPLAY_SIZE - reservedX,
+      panelWidth + MAZE_INFO_PANEL_METRICS.reservedMarginX * 2,
+    ),
+    height: Math.min(
+      DISPLAY_SIZE - reservedY,
+      panelHeight + MAZE_INFO_PANEL_METRICS.reservedMarginY * 2,
+    ),
+  };
+
+  return {
+    panelX,
+    panelY,
+    panelWidth,
+    panelHeight,
+    reservedRect,
+    timeText,
+    dateText,
+    timeScale,
+    dateScale,
+    timeBaselineY: panelY + MAZE_INFO_PANEL_METRICS.panelPaddingTop,
+    dateBaselineY:
+      panelY +
+      MAZE_INFO_PANEL_METRICS.panelPaddingTop +
+      timeHeight +
+      MAZE_INFO_PANEL_METRICS.sectionGapY,
+  };
+}
+
+function drawMazeInfoPanel(map, panel, colors) {
+  if (!panel) {
+    return;
+  }
+
+  const panelBgColor = hexToRgb(colors.panelBgColor);
+  const borderColor = hexToRgb(colors.borderColor);
+  fillRect(
+    map,
+    panel.panelX,
+    panel.panelY,
+    panel.panelWidth,
+    panel.panelHeight,
+    panelBgColor.r,
+    panelBgColor.g,
+    panelBgColor.b,
+  );
+  drawRectOutline(
+    map,
+    panel.panelX,
+    panel.panelY,
+    panel.panelWidth,
+    panel.panelHeight,
+    borderColor.r,
+    borderColor.g,
+    borderColor.b,
+  );
+  drawClockTextToPixels(
+    panel.timeText,
+    Math.floor(DISPLAY_SIZE / 2),
+    panel.timeBaselineY,
+    colors.timeColor,
+    map,
+    "minimal_3x5",
+    panel.timeScale,
+    "center",
+  );
+  drawTinyTextToPixels(
+    panel.dateText,
+    Math.floor(DISPLAY_SIZE / 2),
+    panel.dateBaselineY,
+    colors.dateColor,
+    map,
+    panel.dateScale,
+    "center",
+  );
+}
+
 function cellIndex(layout, x, y) {
   return y * layout.cellCount + x;
 }
@@ -59,6 +249,53 @@ function getCellOrigin(layout, x, y) {
     x: layout.borderSize + x * layout.stride,
     y: layout.borderSize + y * layout.stride,
   };
+}
+
+function getCellReservedRect(layout, x, y) {
+  const origin = getCellOrigin(layout, x, y);
+  return {
+    x: origin.x - layout.wallSize,
+    y: origin.y - layout.wallSize,
+    width: layout.cellSize + layout.wallSize * 2,
+    height: layout.cellSize + layout.wallSize * 2,
+  };
+}
+
+function buildReservedMask(layout, panel) {
+  const mask = new Array(layout.cellCount * layout.cellCount).fill(false);
+  if (!panel) {
+    return mask;
+  }
+
+  for (let y = 0; y < layout.cellCount; y += 1) {
+    for (let x = 0; x < layout.cellCount; x += 1) {
+      mask[cellIndex(layout, x, y)] = rectanglesIntersect(
+        getCellReservedRect(layout, x, y),
+        panel.reservedRect,
+      );
+    }
+  }
+
+  return mask;
+}
+
+function findAvailableAnchor(layout, reservedMask, preferEnd = false) {
+  const yStart = preferEnd ? layout.cellCount - 1 : 0;
+  const yEnd = preferEnd ? -1 : layout.cellCount;
+  const yStep = preferEnd ? -1 : 1;
+  const xStart = preferEnd ? layout.cellCount - 1 : 0;
+  const xEnd = preferEnd ? -1 : layout.cellCount;
+  const xStep = preferEnd ? -1 : 1;
+
+  for (let y = yStart; y !== yEnd; y += yStep) {
+    for (let x = xStart; x !== xEnd; x += xStep) {
+      if (!reservedMask[cellIndex(layout, x, y)]) {
+        return { x, y };
+      }
+    }
+  }
+
+  return null;
 }
 
 function drawCell(layout, map, x, y, r, g, b) {
@@ -235,11 +472,33 @@ function drawVisitedMaze(layout, map, cells, visited, showFullMaze, floorR, floo
 }
 
 function buildMazeSequence(speed, intensity, options) {
-  const layout = resolveMazeLayout(options);
-  const isPreviewMode = !!(options && options.previewMode);
+  const mazeConfig = resolveMazeRuntimeConfig(speed, options);
+  if (!mazeConfig) {
+    return {
+      maps: [],
+      phaseTags: [],
+    };
+  }
+  const layout = resolveMazeLayout(mazeConfig);
+  const isPreviewMode = options.previewMode === true;
+  const generationPathColor = hexToRgb(mazeConfig.generationPathColor);
+  const searchVisitedColor = hexToRgb(mazeConfig.searchVisitedColor);
+  const searchFrontierColor = hexToRgb(mazeConfig.searchFrontierColor);
+  const solvedPathStartColor = hexToRgb(mazeConfig.solvedPathStartColor);
+  const solvedPathEndColor = hexToRgb(mazeConfig.solvedPathEndColor);
+  const mazeInfoPanel = buildMazeInfoPanel(mazeConfig.showClock);
+  const reservedMask = buildReservedMask(layout, mazeInfoPanel);
+  const startNode = findAvailableAnchor(layout, reservedMask, false);
+  const endNode = findAvailableAnchor(layout, reservedMask, true);
+  if (!startNode || !endNode) {
+    return {
+      maps: [],
+      phaseTags: [],
+    };
+  }
   const maps = [];
   const phaseTags = [];
-  const safeSpeed = normalizeSpeed(speed);
+  const safeSpeed = normalizeSpeed(mazeConfig.speed);
   const safeIntensity = 0.72;
 
   const cells = createMazeCells(layout);
@@ -252,14 +511,14 @@ function buildMazeSequence(speed, intensity, options) {
   const openMask = new Array(layout.cellCount * layout.cellCount).fill(false);
   const closedMask = new Array(layout.cellCount * layout.cellCount).fill(false);
 
-  const generationStack = [{ x: 0, y: 0 }];
+  const generationStack = [{ x: startNode.x, y: startNode.y }];
   const openSet = [];
   const closedSet = [];
   let path = [];
   let travelerRoute = [];
   const previewPacing = resolveMazePreviewPacing(layout, safeSpeed);
 
-  visited[cellIndex(layout, 0, 0)] = true;
+  visited[cellIndex(layout, startNode.x, startNode.y)] = true;
 
   const generationStepsPerFrame = isPreviewMode
     ? previewPacing.generationStepsPerFrame
@@ -290,7 +549,7 @@ function buildMazeSequence(speed, intensity, options) {
       ? 3600
       : 5200;
 
-  let generationHead = { x: 0, y: 0 };
+  let generationHead = { x: startNode.x, y: startNode.y };
   let phase = "generation";
   let generationHold = 0;
   let solveHold = 0;
@@ -326,6 +585,9 @@ function buildMazeSequence(speed, intensity, options) {
       const nextX = current.x + dir.dx;
       const nextY = current.y + dir.dy;
       if (!inBounds(layout, nextX, nextY)) {
+        continue;
+      }
+      if (reservedMask[cellIndex(layout, nextX, nextY)]) {
         continue;
       }
       if (visited[cellIndex(layout, nextX, nextY)]) {
@@ -366,6 +628,9 @@ function buildMazeSequence(speed, intensity, options) {
       if (!inBounds(layout, nextX, nextY)) {
         continue;
       }
+      if (reservedMask[cellIndex(layout, nextX, nextY)]) {
+        continue;
+      }
       result.push({ x: nextX, y: nextY });
     }
     return result;
@@ -373,11 +638,11 @@ function buildMazeSequence(speed, intensity, options) {
 
   function solveStep() {
     if (openSet.length === 0 && path.length === 0) {
-      openSet.push({ x: 0, y: 0 });
-      openMask[cellIndex(layout, 0, 0)] = true;
-      const startIndex = cellIndex(layout, 0, 0);
+      openSet.push({ x: startNode.x, y: startNode.y });
+      openMask[cellIndex(layout, startNode.x, startNode.y)] = true;
+      const startIndex = cellIndex(layout, startNode.x, startNode.y);
       nodeG[startIndex] = 0;
-      nodeH[startIndex] = heuristic(0, 0, layout.cellCount - 1, layout.cellCount - 1);
+      nodeH[startIndex] = heuristic(startNode.x, startNode.y, endNode.x, endNode.y);
       nodeF[startIndex] = nodeH[startIndex];
       return false;
     }
@@ -402,7 +667,7 @@ function buildMazeSequence(speed, intensity, options) {
     closedSet.push(current);
     closedMask[cellIndex(layout, current.x, current.y)] = true;
 
-    if (current.x === layout.cellCount - 1 && current.y === layout.cellCount - 1) {
+    if (current.x === endNode.x && current.y === endNode.y) {
       path = reconstructPath(
         layout,
         parentX,
@@ -426,7 +691,7 @@ function buildMazeSequence(speed, intensity, options) {
         parentX[nextIndex] = current.x;
         parentY[nextIndex] = current.y;
         nodeG[nextIndex] = tentativeG;
-        nodeH[nextIndex] = heuristic(next.x, next.y, layout.cellCount - 1, layout.cellCount - 1);
+        nodeH[nextIndex] = heuristic(next.x, next.y, endNode.x, endNode.y);
         nodeF[nextIndex] = nodeG[nextIndex] + nodeH[nextIndex];
         if (!openMask[nextIndex]) {
           openSet.push(next);
@@ -498,8 +763,6 @@ function buildMazeSequence(speed, intensity, options) {
 
     const map = new Map();
     const wallShade = 12;
-    const floorShade = 60 + Math.round(26 * safeIntensity);
-    const floorBlue = floorShade + 6;
     const showFullMaze = phase !== "generation" && phase !== "generation_hold";
 
     fillRect(map, 0, 0, DISPLAY_SIZE, DISPLAY_SIZE, wallShade, wallShade, wallShade + 2);
@@ -509,9 +772,9 @@ function buildMazeSequence(speed, intensity, options) {
       cells,
       visited,
       showFullMaze,
-      floorShade,
-      floorShade,
-      floorBlue,
+      generationPathColor.r,
+      generationPathColor.g,
+      generationPathColor.b,
     );
 
     if (phase === "generation" || phase === "generation_hold") {
@@ -521,10 +784,15 @@ function buildMazeSequence(speed, intensity, options) {
     if (phase === "solve" || phase === "solve_hold") {
       for (let index = 0; index < closedSet.length; index += 1) {
         const node = closedSet[index];
-        const colorR = 255;
-        const colorG = 68;
-        const colorB = 68;
-        drawCell(layout, map, node.x, node.y, colorR, colorG, colorB);
+        drawCell(
+          layout,
+          map,
+          node.x,
+          node.y,
+          searchVisitedColor.r,
+          searchVisitedColor.g,
+          searchVisitedColor.b,
+        );
         const parentIndex = cellIndex(layout, node.x, node.y);
         if (parentX[parentIndex] !== -1 && parentY[parentIndex] !== -1) {
           drawConnection(
@@ -532,15 +800,23 @@ function buildMazeSequence(speed, intensity, options) {
             map,
             { x: parentX[parentIndex], y: parentY[parentIndex] },
             node,
-            colorR,
-            colorG,
-            colorB,
+            searchVisitedColor.r,
+            searchVisitedColor.g,
+            searchVisitedColor.b,
           );
         }
       }
       for (let index = 0; index < openSet.length; index += 1) {
         const node = openSet[index];
-        drawCell(layout, map, node.x, node.y, 112, 255, 156);
+        drawCell(
+          layout,
+          map,
+          node.x,
+          node.y,
+          searchFrontierColor.r,
+          searchFrontierColor.g,
+          searchFrontierColor.b,
+        );
       }
     }
 
@@ -549,19 +825,29 @@ function buildMazeSequence(speed, intensity, options) {
       for (let index = 0; index < visibleCount; index += 1) {
         const node = path[index];
         const ratio = index / Math.max(1, path.length - 1);
-        const blueR = Math.round(26 + ratio * 40);
-        const blueG = Math.round(96 + ratio * 92);
-        const blueB = 255;
-        drawCell(layout, map, node.x, node.y, blueR, blueG, blueB);
+        const pathColor = interpolateColor(
+          solvedPathStartColor,
+          solvedPathEndColor,
+          ratio,
+        );
+        drawCell(
+          layout,
+          map,
+          node.x,
+          node.y,
+          pathColor.r,
+          pathColor.g,
+          pathColor.b,
+        );
         if (index > 0) {
           drawConnection(
             layout,
             map,
             path[index - 1],
             node,
-            blueR,
-            blueG,
-            blueB,
+            pathColor.r,
+            pathColor.g,
+            pathColor.b,
           );
         }
       }
@@ -583,16 +869,17 @@ function buildMazeSequence(speed, intensity, options) {
       }
     }
 
-    drawCell(layout, map, 0, 0, 40, 255, 120);
+    drawCell(layout, map, startNode.x, startNode.y, 40, 255, 120);
     drawCell(
       layout,
       map,
-      layout.cellCount - 1,
-      layout.cellCount - 1,
+      endNode.x,
+      endNode.y,
       90,
       188,
       255,
     );
+    drawMazeInfoPanel(map, mazeInfoPanel, mazeConfig);
     maps.push(map);
     phaseTags.push(phase);
   }
@@ -609,7 +896,7 @@ export function buildMazeDemoMaps(speed, intensity, options) {
 
 export function buildMazePreviewSequence(speed, intensity, options) {
   return buildMazeSequence(speed, intensity, {
-    ...(options || {}),
+    ...options,
     previewMode: true,
   });
 }

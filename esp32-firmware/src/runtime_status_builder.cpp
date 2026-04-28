@@ -3,12 +3,15 @@
 #include "ambient_preset_codec.h"
 #include "animation_manager.h"
 #include "board_native_effect.h"
+#include "clock_font_renderer.h"
 #include "config_manager.h"
 #include "device_mode_tag_codec.h"
 #include "display_manager.h"
-#include "game_screensaver_effect.h"
+#include "maze_effect.h"
 #include "mode_tags.h"
 #include "ota_manager.h"
+#include "snake_effect.h"
+#include "tetris_clock_effect.h"
 #include "tetris_effect.h"
 #include "wifi_manager.h"
 
@@ -61,34 +64,39 @@ void fillAmbientEffectStatus(JsonDocument& doc) {
   effectColor["b"] = DisplayManager::ambientEffectConfig.colorB;
 }
 
-void fillGameScreensaverStatus(JsonDocument& doc) {
-  const GameScreensaverConfig& config = GameScreensaverEffect::getConfig();
-  doc["effectMode"] = ModeTags::GAME_SCREENSAVER;
+void fillMazeStatus(JsonDocument& doc) {
+  const MazeModeConfig& config = MazeEffect::getConfig();
+  doc["effectMode"] = ModeTags::MAZE;
   doc["speed"] = config.speed;
+  doc["mazeSizeMode"] = config.mazeSizeMode == MAZE_SIZE_DENSE ? "dense" : "wide";
+  doc["showClock"] = config.showClock;
+  doc["panelBgColor"] = config.panelBgColor;
+  doc["borderColor"] = config.borderColor;
+  doc["timeColor"] = config.timeColor;
+  doc["dateColor"] = config.dateColor;
+  doc["generationPathColor"] = config.generationPathColor;
+  doc["searchVisitedColor"] = config.searchVisitedColor;
+  doc["searchFrontierColor"] = config.searchFrontierColor;
+  doc["solvedPathStartColor"] = config.solvedPathStartColor;
+  doc["solvedPathEndColor"] = config.solvedPathEndColor;
+}
 
-  if (config.game == GAME_SCREENSAVER_MAZE) {
-    doc["game"] = "maze";
-    doc["mazeSizeMode"] =
-      config.mazeSizeMode == GAME_SCREENSAVER_MAZE_DENSE ? "dense" : "wide";
-    return;
-  }
-
-  if (config.game == GAME_SCREENSAVER_SNAKE) {
-    doc["game"] = "snake";
-    doc["snakeWidth"] = config.snakeWidth;
-    return;
-  }
-
-  if (config.game == GAME_SCREENSAVER_PING_PONG) {
-    doc["game"] = "ping_pong";
-    return;
-  }
-
-  if (config.game == GAME_SCREENSAVER_TETRIS_GAME) {
-    doc["game"] = "tetris_game";
-    doc["cellSize"] = config.cellSize;
-    doc["showClock"] = config.showClock;
-  }
+void fillSnakeStatus(JsonDocument& doc) {
+  const SnakeModeConfig& config = SnakeEffect::getConfig();
+  doc["effectMode"] = ModeTags::SNAKE;
+  doc["speed"] = config.speed;
+  doc["snakeWidth"] = config.snakeWidth;
+  doc["font"] = clockFontNameFromId(config.font);
+  doc["showSeconds"] = config.showSeconds;
+  doc["snakeSkin"] = config.snakeSkin;
+  JsonObject snakeColor = doc.createNestedObject("snakeColor");
+  snakeColor["r"] = config.snakeColorR;
+  snakeColor["g"] = config.snakeColorG;
+  snakeColor["b"] = config.snakeColorB;
+  JsonObject foodColor = doc.createNestedObject("foodColor");
+  foodColor["r"] = config.foodColorR;
+  foodColor["g"] = config.foodColorG;
+  foodColor["b"] = config.foodColorB;
 }
 
 void fillBoardNativeStatus(JsonDocument& doc) {
@@ -113,57 +121,6 @@ void fillBoardNativeStatus(JsonDocument& doc) {
     return;
   }
 
-  if (DisplayManager::currentBusinessModeTag == ModeTags::WEATHER) {
-    const WeatherBoardNativeConfig& config = BoardNativeEffect::getWeatherConfig();
-    doc["effectMode"] = ModeTags::WEATHER;
-    doc["weatherType"] = config.weatherType;
-    doc["city"] = config.city;
-    doc["temperature"] = config.temperature;
-    doc["humidity"] = config.humidity;
-    doc["unit"] = config.unit;
-    return;
-  }
-
-  if (DisplayManager::currentBusinessModeTag == ModeTags::COUNTDOWN) {
-    const CountdownBoardNativeConfig& config = BoardNativeEffect::getCountdownConfig();
-    doc["effectMode"] = ModeTags::COUNTDOWN;
-    doc["hours"] = config.hours;
-    doc["minutes"] = config.minutes;
-    doc["seconds"] = config.seconds;
-    doc["progress"] = config.progress;
-    doc["remainingSeconds"] = BoardNativeEffect::getCountdownRemainingSeconds();
-    return;
-  }
-
-  if (DisplayManager::currentBusinessModeTag == ModeTags::STOPWATCH) {
-    const StopwatchBoardNativeConfig& config = BoardNativeEffect::getStopwatchConfig();
-    doc["effectMode"] = ModeTags::STOPWATCH;
-    doc["previewSeconds"] = config.previewSeconds;
-    doc["lapCount"] = config.lapCount;
-    doc["showMilliseconds"] = config.showMilliseconds;
-    doc["elapsedMs"] = BoardNativeEffect::getStopwatchElapsedMs();
-    return;
-  }
-
-  if (DisplayManager::currentBusinessModeTag == ModeTags::NOTIFICATION) {
-    const NotificationBoardNativeConfig& config = BoardNativeEffect::getNotificationConfig();
-    doc["effectMode"] = ModeTags::NOTIFICATION;
-    doc["repeatMode"] = config.repeatMode;
-    doc["text"] = config.text;
-    doc["icon"] = config.icon;
-    doc["contentType"] = config.contentType;
-    doc["textTemplate"] = config.textTemplate;
-    doc["staticTemplate"] = config.staticTemplate;
-    doc["animationTemplate"] = config.animationTemplate;
-    doc["hour"] = config.hour;
-    doc["minute"] = config.minute;
-    JsonObject accentColor = doc.createNestedObject("accentColor");
-    accentColor["r"] = config.accentR;
-    accentColor["g"] = config.accentG;
-    accentColor["b"] = config.accentB;
-    return;
-  }
-
   if (DisplayManager::currentBusinessModeTag == ModeTags::PLANET_SCREENSAVER) {
     const PlanetScreensaverNativeConfig& config =
       BoardNativeEffect::getPlanetScreensaverConfig();
@@ -174,6 +131,19 @@ void fillBoardNativeStatus(JsonDocument& doc) {
     doc["speed"] = config.speed;
     doc["seed"] = config.seed;
     doc["colorSeed"] = config.colorSeed;
+    doc["planetX"] = config.planetX;
+    doc["planetY"] = config.planetY;
+    doc["font"] = clockFontNameFromId(config.font);
+    doc["showSeconds"] = config.showSeconds;
+    JsonObject time = doc["time"].to<JsonObject>();
+    time["show"] = config.time.show;
+    time["fontSize"] = config.time.fontSize;
+    time["x"] = config.time.x;
+    time["y"] = config.time.y;
+    JsonObject color = time["color"].to<JsonObject>();
+    color["r"] = config.time.r;
+    color["g"] = config.time.g;
+    color["b"] = config.time.b;
   }
 }
 
@@ -199,9 +169,15 @@ void fillEffectStatus(JsonDocument& doc) {
     return;
   }
 
-  if (DisplayManager::currentBusinessModeTag == ModeTags::GAME_SCREENSAVER &&
-      GameScreensaverEffect::isActive()) {
-    fillGameScreensaverStatus(doc);
+  if (DisplayManager::currentBusinessModeTag == ModeTags::MAZE &&
+      MazeEffect::isActive()) {
+    fillMazeStatus(doc);
+    return;
+  }
+
+  if (DisplayManager::currentBusinessModeTag == ModeTags::SNAKE &&
+      SnakeEffect::isActive()) {
+    fillSnakeStatus(doc);
     return;
   }
 
@@ -212,10 +188,18 @@ void fillEffectStatus(JsonDocument& doc) {
     return;
   }
 
-  if ((DisplayManager::currentBusinessModeTag == ModeTags::TETRIS ||
-       DisplayManager::currentBusinessModeTag == ModeTags::TETRIS_CLOCK) &&
+  if (DisplayManager::currentBusinessModeTag == ModeTags::TETRIS &&
       TetrisEffect::isActive) {
     doc["effectMode"] = ModeTags::TETRIS;
+    return;
+  }
+
+  if (DisplayManager::currentBusinessModeTag == ModeTags::TETRIS_CLOCK &&
+      TetrisClockEffect::isActive) {
+    doc["effectMode"] = ModeTags::TETRIS_CLOCK;
+    doc["cellSize"] = ConfigManager::tetrisClockConfig.cellSize;
+    doc["speed"] = ConfigManager::tetrisClockConfig.speed;
+    doc["hourFormat"] = ConfigManager::tetrisClockConfig.hourFormat;
     return;
   }
 

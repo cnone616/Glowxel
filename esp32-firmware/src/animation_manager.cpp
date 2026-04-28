@@ -1,28 +1,14 @@
 #include "animation_manager.h"
 #include "display_manager.h"
+#include "mode_tags.h"
 #include <LittleFS.h>
 
 namespace {
 constexpr const char* kAnimationFilePath = "/anim.bin";
-constexpr const char* kAnimationUploadFilePath = "/anim.upload.bin";
-constexpr const char* kAnimationBackupFilePath = "/anim.prev.bin";
+constexpr const char* kAnimationUploadTempPath = "/anim_upload.bin";
 constexpr uint16_t kMaxAnimationFrames = 20;
 constexpr uint16_t kMaxFullFramePixels = 4096;
 constexpr uint16_t kMaxDiffFramePixels = 1024;
-
-struct AnimationUploadSession {
-  bool active;
-  bool readyToActivate;
-  int expectedFrameCount;
-  int committedFrameCount;
-  int inFlightFrameIndex;
-  int lastCommittedFrameIndex;
-  int lastCommittedPixelCount;
-  AnimationFrame inFlightFrame;
-  File file;
-};
-
-AnimationUploadSession s_uploadSession = {};
 bool s_littleFSMounted = false;
 
 static bool s_loopBlendActive = false;
@@ -37,25 +23,10 @@ uint16_t maxPixelsForFrameType(const String& type) {
   return type == "full" ? kMaxFullFramePixels : kMaxDiffFramePixels;
 }
 
-uint16_t maxPixelsForFrameTypeInt(int type) {
-  return type == 1 ? kMaxFullFramePixels : kMaxDiffFramePixels;
-}
-
 void resetLoopBridgeState() {
   s_loopBlendActive = false;
   s_loopBlendStep = 0;
   s_loopBlendDelay = 0;
-}
-
-void resetAnimationFrame(AnimationFrame& frame) {
-  if (frame.pixels != nullptr) {
-    free(frame.pixels);
-    frame.pixels = nullptr;
-  }
-  frame.type = "full";
-  frame.delay = 100;
-  frame.pixelCount = 0;
-  frame.capacity = 0;
 }
 
 void freeGIFAnimationInstance(GIFAnimation* gif) {
@@ -87,33 +58,32 @@ bool ensureLittleFSMounted() {
   return true;
 }
 
-void closeUploadFileIfOpen() {
-  if (s_uploadSession.file) {
-    s_uploadSession.file.flush();
-    s_uploadSession.file.close();
-  }
-}
-
-void clearUploadSessionState(bool removeTempFiles) {
-  closeUploadFileIfOpen();
-  resetAnimationFrame(s_uploadSession.inFlightFrame);
-  s_uploadSession.active = false;
-  s_uploadSession.readyToActivate = false;
-  s_uploadSession.expectedFrameCount = 0;
-  s_uploadSession.committedFrameCount = 0;
-  s_uploadSession.inFlightFrameIndex = -1;
-  s_uploadSession.lastCommittedFrameIndex = -1;
-  s_uploadSession.lastCommittedPixelCount = 0;
-  AnimationManager::receivingFrameIndex = -1;
-
-  if (!removeTempFiles) {
-    return;
+bool writeAnimationBlobToPath(const char* path, const uint8_t* data, size_t len) {
+  if (path == nullptr || data == nullptr || len == 0) {
+    return false;
   }
   if (!ensureLittleFSMounted()) {
-    return;
+    return false;
   }
-  LittleFS.remove(kAnimationUploadFilePath);
-  LittleFS.remove(kAnimationBackupFilePath);
+
+  File file = LittleFS.open(path, "w");
+  if (!file) {
+    Serial.printf("打开动画临时文件写入失败: %s\n", path);
+    return false;
+  }
+
+  size_t written = file.write(data, len);
+  file.flush();
+  file.close();
+  if (written != len) {
+    Serial.printf("写入动画临时文件失败: %s written=%u expected=%u\n",
+                  path,
+                  static_cast<unsigned>(written),
+                  static_cast<unsigned>(len));
+    return false;
+  }
+
+  return true;
 }
 
 bool prepareLoopBridgeFrames() {
@@ -214,21 +184,6 @@ bool saveGIFAnimationToPath(const char* path, GIFAnimation* gif) {
   file.close();
   Serial.printf("动画已保存: %d 帧, %d bytes\n", frameCount, fileSize);
   return true;
-}
-
-bool hasReadableAnimationFile(const char* path) {
-  if (!ensureLittleFSMounted()) {
-    return false;
-  }
-
-  File file = LittleFS.open(path, "r");
-  if (!file) {
-    return false;
-  }
-
-  size_t fileSize = file.size();
-  file.close();
-  return fileSize >= 2;
 }
 
 bool loadGIFAnimationFromPath(const char* path, GIFAnimation*& outGif) {
@@ -362,72 +317,26 @@ bool loadGIFAnimationFromPath(const char* path, GIFAnimation*& outGif) {
   return true;
 }
 
-bool appendPixelToFrame(AnimationFrame& frame, uint8_t x, uint8_t y, uint8_t r, uint8_t g, uint8_t b) {
-  if (x >= DisplayManager::PANEL_RES_X || y >= DisplayManager::PANEL_RES_Y) {
-    return true;
-  }
-  if (frame.pixelCount >= frame.capacity) {
-    return false;
-  }
-  if (frame.pixels == nullptr && frame.capacity > 0) {
-    return false;
-  }
-
-  if (frame.capacity == 0) {
-    return false;
-  }
-
-  frame.pixels[frame.pixelCount].x = x;
-  frame.pixels[frame.pixelCount].y = y;
-  frame.pixels[frame.pixelCount].r = r;
-  frame.pixels[frame.pixelCount].g = g;
-  frame.pixels[frame.pixelCount].b = b;
-  frame.pixelCount++;
-  return true;
-}
-
-bool appendPixelToUploadFile(
-  AnimationFrame& frame,
-  File& file,
-  uint8_t x,
-  uint8_t y,
-  uint8_t r,
-  uint8_t g,
-  uint8_t b
-) {
-  if (x >= DisplayManager::PANEL_RES_X || y >= DisplayManager::PANEL_RES_Y) {
-    return true;
-  }
-  if (frame.pixelCount >= frame.capacity) {
-    return false;
-  }
-  if (frame.capacity == 0 || !file) {
-    return false;
-  }
-
-  uint8_t buf[5] = {x, y, r, g, b};
-  if (file.write(buf, sizeof(buf)) != sizeof(buf)) {
-    return false;
-  }
-
-  frame.pixelCount++;
-  return true;
-}
-
 void activateLoadedGif(GIFAnimation* nextGIF) {
   AnimationManager::freeGIFAnimation();
   AnimationManager::currentGIF = nextGIF;
   resetLoopBridgeState();
 }
 
-bool restoreRuntimeAnimationFromPath(const char* path) {
-  GIFAnimation* restoredGIF = nullptr;
-  if (!loadGIFAnimationFromPath(path, restoredGIF)) {
-    return false;
+void resetAnimationFrame(AnimationFrame& frame) {
+  if (frame.pixels != nullptr) {
+    free(frame.pixels);
+    frame.pixels = nullptr;
   }
+  frame.type = "full";
+  frame.delay = 100;
+  frame.pixelCount = 0;
+  frame.capacity = 0;
+}
 
-  activateLoadedGif(restoredGIF);
-  return true;
+bool shouldLoadPersistedAnimationOnInit() {
+  return DisplayManager::currentBusinessModeTag == ModeTags::ANIMATION ||
+         DisplayManager::currentBusinessModeTag == ModeTags::GIF_PLAYER;
 }
 }
 
@@ -438,8 +347,11 @@ int AnimationManager::receivingFrameIndex = -1;
 void AnimationManager::init() {
   currentGIF = nullptr;
   receivingFrameIndex = -1;
-  clearUploadSessionState(true);
   resetLoopBridgeState();
+
+  if (!shouldLoadPersistedAnimationOnInit()) {
+    return;
+  }
 
   if (loadAnimation() && currentGIF != nullptr) {
     Serial.printf("已恢复保存的动画: %d 帧\n", currentGIF->frameCount);
@@ -524,6 +436,7 @@ void AnimationManager::renderGIFFrame(int frameIndex) {
 void AnimationManager::freeGIFAnimation() {
   freeGIFAnimationInstance(currentGIF);
   currentGIF = nullptr;
+  receivingFrameIndex = -1;
   resetLoopBridgeState();
 }
 
@@ -636,6 +549,43 @@ bool AnimationManager::loadGIFAnimation(JsonVariant animData) {
   return true;
 }
 
+bool AnimationManager::loadGIFAnimationBinary(const uint8_t* data, size_t len) {
+  if (!stageGIFAnimationBinaryUpload(data, len)) {
+    return false;
+  }
+
+  return loadStagedGIFAnimationUpload();
+}
+
+bool AnimationManager::stageGIFAnimationBinaryUpload(const uint8_t* data, size_t len) {
+  if (data == nullptr || len < 2) {
+    Serial.printf("动画二进制数据无效: len=%u\n", static_cast<unsigned>(len));
+    return false;
+  }
+
+  if (!writeAnimationBlobToPath(kAnimationUploadTempPath, data, len)) {
+    return false;
+  }
+
+  return true;
+}
+
+bool AnimationManager::loadStagedGIFAnimationUpload() {
+  GIFAnimation* nextGIF = nullptr;
+  bool loaded = loadGIFAnimationFromPath(kAnimationUploadTempPath, nextGIF);
+  if (ensureLittleFSMounted() && LittleFS.exists(kAnimationUploadTempPath)) {
+    LittleFS.remove(kAnimationUploadTempPath);
+  }
+
+  if (!loaded || nextGIF == nullptr) {
+    return false;
+  }
+
+  activateLoadedGif(nextGIF);
+  Serial.printf("动画二进制加载完成: %d 帧\n", currentGIF->frameCount);
+  return true;
+}
+
 void AnimationManager::playAnimation() {
   if (currentGIF != nullptr) {
     currentGIF->isPlaying = true;
@@ -662,311 +612,192 @@ void AnimationManager::stopAnimation() {
 }
 
 bool AnimationManager::beginAnimation(int frameCount) {
+  freeGIFAnimation();
+
   if (frameCount <= 0 || frameCount > kMaxAnimationFrames) {
-    Serial.printf("帧数无效: %d (最大%d)\n", frameCount, kMaxAnimationFrames);
-    return false;
-  }
-  if (!ensureLittleFSMounted()) {
+    Serial.printf("动画帧数无效: %d\n", frameCount);
     return false;
   }
 
-  clearUploadSessionState(true);
+  GIFAnimation* nextGIF = static_cast<GIFAnimation*>(malloc(sizeof(GIFAnimation)));
+  if (nextGIF == nullptr) {
+    Serial.println("动画结构内存分配失败");
+    return false;
+  }
+  memset(nextGIF, 0, sizeof(GIFAnimation));
 
-  File file = LittleFS.open(kAnimationUploadFilePath, "w");
-  if (!file) {
-    Serial.println("打开临时动画文件失败");
+  nextGIF->frames = static_cast<AnimationFrame*>(calloc(frameCount, sizeof(AnimationFrame)));
+  if (nextGIF->frames == nullptr) {
+    free(nextGIF);
+    Serial.println("动画帧数组内存分配失败");
     return false;
   }
 
-  uint16_t headerFrameCount = static_cast<uint16_t>(frameCount);
-  if (file.write(reinterpret_cast<uint8_t*>(&headerFrameCount), 2) != 2) {
-    file.close();
-    LittleFS.remove(kAnimationUploadFilePath);
-    return false;
-  }
-  file.flush();
+  nextGIF->frameCount = frameCount;
+  nextGIF->currentFrame = 0;
+  nextGIF->lastFrameTime = millis();
+  nextGIF->isPlaying = false;
 
-  s_uploadSession.active = true;
-  s_uploadSession.readyToActivate = false;
-  s_uploadSession.expectedFrameCount = frameCount;
-  s_uploadSession.committedFrameCount = 0;
-  s_uploadSession.inFlightFrameIndex = -1;
-  s_uploadSession.lastCommittedFrameIndex = -1;
-  s_uploadSession.lastCommittedPixelCount = 0;
-  resetAnimationFrame(s_uploadSession.inFlightFrame);
-  s_uploadSession.file = file;
+  for (int i = 0; i < frameCount; i++) {
+    nextGIF->frames[i].type = "full";
+    nextGIF->frames[i].delay = 100;
+    nextGIF->frames[i].pixelCount = 0;
+    nextGIF->frames[i].capacity = 0;
+    nextGIF->frames[i].pixels = nullptr;
+  }
+
+  currentGIF = nextGIF;
   receivingFrameIndex = -1;
-
-  Serial.printf("动画上传会话已创建，准备接收 %d 帧\n", frameCount);
+  resetLoopBridgeState();
+  Serial.printf("动画上传会话已创建: frameCount=%d\n", frameCount);
   return true;
 }
 
-bool AnimationManager::addFrame(int index, JsonVariant frameData) {
+bool AnimationManager::beginFrame(int index, int type, int delay, int totalPixels) {
   if (currentGIF == nullptr || index < 0 || index >= currentGIF->frameCount) {
-    Serial.printf("添加帧失败: GIF=%p, index=%d\n", currentGIF, index);
+    Serial.printf("动画帧初始化失败: index=%d\n", index);
+    return false;
+  }
+  if (type != 0 && type != 1) {
+    Serial.printf("动画帧类型无效: index=%d type=%d\n", index, type);
+    return false;
+  }
+  if (delay < 0 || totalPixels < 0) {
+    Serial.printf("动画帧参数无效: index=%d delay=%d totalPixels=%d\n", index, delay, totalPixels);
     return false;
   }
 
-  JsonArray frameArray = frameData.as<JsonArray>();
-  if (frameArray.size() < 4) {
-    Serial.printf("帧 %d 数据格式错误\n", index);
+  const uint16_t maxPixels = type == 1 ? kMaxFullFramePixels : kMaxDiffFramePixels;
+  if (totalPixels > maxPixels) {
+    Serial.printf("动画帧像素超限: index=%d totalPixels=%d max=%u\n",
+                  index,
+                  totalPixels,
+                  maxPixels);
     return false;
   }
 
   AnimationFrame& frame = currentGIF->frames[index];
   resetAnimationFrame(frame);
+  frame.type = type == 1 ? "full" : "diff";
+  frame.delay = delay;
+  frame.pixelCount = 0;
+  frame.capacity = totalPixels;
 
-  frame.type = frameArray[0].as<int>() == 1 ? "full" : "diff";
-  frame.delay = frameArray[1] | 100;
-  frame.pixelCount = frameArray[2] | 0;
-  frame.capacity = frame.pixelCount;
-
-  uint16_t maxPixels = maxPixelsForFrameType(frame.type);
-  if (frame.pixelCount > maxPixels) {
-    Serial.printf("帧 %d 像素过多 (%d)，限制为 %d\n", index, frame.pixelCount, maxPixels);
-    frame.pixelCount = maxPixels;
-    frame.capacity = maxPixels;
-  }
-
-  if (frame.pixelCount > 0) {
-    frame.pixels = static_cast<PixelData*>(malloc(sizeof(PixelData) * frame.pixelCount));
+  if (totalPixels > 0) {
+    frame.pixels = static_cast<PixelData*>(malloc(sizeof(PixelData) * totalPixels));
     if (frame.pixels == nullptr) {
-      Serial.printf("帧 %d 像素内存分配失败\n", index);
-      frame.pixelCount = 0;
-      frame.capacity = 0;
+      resetAnimationFrame(frame);
+      Serial.printf("动画帧像素内存分配失败: index=%d pixels=%d freeHeap=%u\n",
+                    index,
+                    totalPixels,
+                    ESP.getFreeHeap());
       return false;
     }
   }
 
-  JsonArray pixels = frameArray[3];
-  for (int j = 0; j < frame.pixelCount && j < static_cast<int>(pixels.size()); j++) {
-    JsonArray pixel = pixels[j];
-    if (pixel.size() >= 5) {
-      frame.pixels[j].x = pixel[0];
-      frame.pixels[j].y = pixel[1];
-      frame.pixels[j].r = pixel[2];
-      frame.pixels[j].g = pixel[3];
-      frame.pixels[j].b = pixel[4];
-    }
-  }
-
-  Serial.printf("帧 %d 加载完成: %s, %d像素, %dms延迟\n",
-    index, frame.type.c_str(), frame.pixelCount, frame.delay);
-
-  yield();
-  return true;
-}
-
-bool AnimationManager::beginFrame(int index, int type, int delay, int totalPixels) {
-  if (!s_uploadSession.active || s_uploadSession.readyToActivate) {
-    Serial.println("未处于可接收动画帧的上传会话");
-    return false;
-  }
-  if (index < 0 || index >= s_uploadSession.expectedFrameCount) {
-    Serial.printf("帧索引无效: %d\n", index);
-    return false;
-  }
-  if (s_uploadSession.inFlightFrameIndex >= 0) {
-    Serial.printf("上一帧 %d 尚未提交，拒绝并发初始化新帧\n", s_uploadSession.inFlightFrameIndex);
-    return false;
-  }
-  if (index != s_uploadSession.committedFrameCount) {
-    Serial.printf("帧顺序错误: 期望 %d，收到 %d\n", s_uploadSession.committedFrameCount, index);
-    return false;
-  }
-  if (totalPixels < 0) {
-    Serial.printf("帧 %d totalPixels 无效: %d\n", index, totalPixels);
-    return false;
-  }
-  if (type != 0 && type != 1) {
-    Serial.printf("帧 %d type 无效: %d\n", index, type);
-    return false;
-  }
-  if (delay < 0) {
-    Serial.printf("帧 %d delay 无效: %d\n", index, delay);
-    return false;
-  }
-
-  uint16_t maxPixels = maxPixelsForFrameTypeInt(type);
-  if (totalPixels > maxPixels) {
-    Serial.printf("帧 %d totalPixels 超限: %d > %d\n", index, totalPixels, maxPixels);
-    return false;
-  }
-
-  resetAnimationFrame(s_uploadSession.inFlightFrame);
-  s_uploadSession.inFlightFrame.type = type == 1 ? "full" : "diff";
-  s_uploadSession.inFlightFrame.delay = delay;
-  s_uploadSession.inFlightFrame.pixelCount = 0;
-  s_uploadSession.inFlightFrame.capacity = totalPixels;
-
-  if (!s_uploadSession.file) {
-    Serial.printf("帧 %d 初始化失败：上传文件未打开\n", index);
-    resetAnimationFrame(s_uploadSession.inFlightFrame);
-    return false;
-  }
-
-  if (!writeFrameHeaderToFile(
-        s_uploadSession.file,
-        s_uploadSession.inFlightFrame,
-        static_cast<uint16_t>(totalPixels))) {
-    Serial.printf("帧 %d 写入帧头失败\n", index);
-    resetAnimationFrame(s_uploadSession.inFlightFrame);
-    return false;
-  }
-
-  s_uploadSession.inFlightFrameIndex = index;
   receivingFrameIndex = index;
-
-  Serial.printf("帧 %d 初始化: %s, 精确容量 %d 像素, %dms延迟\n",
-    index,
-    s_uploadSession.inFlightFrame.type.c_str(),
-    totalPixels,
-    s_uploadSession.inFlightFrame.delay
-  );
+  Serial.printf("动画帧已初始化: index=%d type=%s totalPixels=%d delay=%d\n",
+                index,
+                frame.type.c_str(),
+                totalPixels,
+                delay);
   return true;
 }
 
-bool AnimationManager::addFrameChunk(int index, JsonArray pixels) {
-  if (!s_uploadSession.active || index != s_uploadSession.inFlightFrameIndex) {
-    Serial.printf("帧 %d 未初始化，无法追加 chunk\n", index);
+bool AnimationManager::addFrameChunkBinary(int index, uint8_t* data, int pixelCount) {
+  if (currentGIF == nullptr || index < 0 || index >= currentGIF->frameCount) {
+    return false;
+  }
+  if (data == nullptr || pixelCount < 0) {
     return false;
   }
 
-  AnimationFrame& frame = s_uploadSession.inFlightFrame;
-  int added = 0;
-
-  for (size_t j = 0; j < pixels.size(); j++) {
-    JsonArray pixel = pixels[j];
-    if (pixel.size() < 5) {
-      continue;
-    }
-
-    if (!appendPixelToUploadFile(
-          frame,
-          s_uploadSession.file,
-          pixel[0].as<uint8_t>(),
-          pixel[1].as<uint8_t>(),
-          pixel[2].as<uint8_t>(),
-          pixel[3].as<uint8_t>(),
-          pixel[4].as<uint8_t>())) {
-      return false;
-    }
-    added++;
-  }
-
-  Serial.printf("帧 %d chunk: +%d 像素, 累计 %d/%d\n",
-    index, added, frame.pixelCount, frame.capacity);
-  yield();
-  return true;
-}
-
-bool AnimationManager::addFrameChunkBinary(int index, uint8_t *data, int pixelCount) {
-  if (!s_uploadSession.active || index != s_uploadSession.inFlightFrameIndex) {
-    Serial.printf("帧 %d 未初始化，无法追加 binary chunk\n", index);
+  AnimationFrame& frame = currentGIF->frames[index];
+  if (frame.pixelCount + pixelCount > frame.capacity) {
+    Serial.printf("动画帧写入越界: index=%d current=%d incoming=%d capacity=%d\n",
+                  index,
+                  frame.pixelCount,
+                  pixelCount,
+                  frame.capacity);
     return false;
   }
 
-  AnimationFrame& frame = s_uploadSession.inFlightFrame;
-  int added = 0;
+  for (int pixelIndex = 0; pixelIndex < pixelCount; pixelIndex++) {
+    const int offset = pixelIndex * 5;
+    const uint8_t x = data[offset];
+    const uint8_t y = data[offset + 1];
+    const uint8_t r = data[offset + 2];
+    const uint8_t g = data[offset + 3];
+    const uint8_t b = data[offset + 4];
 
-  for (int j = 0; j < pixelCount; j++) {
-    int offset = j * 5;
-    if (!appendPixelToUploadFile(
-          frame,
-          s_uploadSession.file,
-          data[offset],
-          data[offset + 1],
-          data[offset + 2],
-          data[offset + 3],
-          data[offset + 4])) {
+    if (x >= DisplayManager::PANEL_RES_X || y >= DisplayManager::PANEL_RES_Y) {
+      Serial.printf("动画帧像素越界: index=%d x=%u y=%u\n", index, x, y);
       return false;
     }
 
-    if (data[offset] < DisplayManager::PANEL_RES_X &&
-        data[offset + 1] < DisplayManager::PANEL_RES_Y) {
-      added++;
+    if (frame.capacity > 0 && frame.pixels == nullptr) {
+      Serial.printf("动画帧像素缓冲缺失: index=%d capacity=%d\n", index, frame.capacity);
+      return false;
     }
 
-    if (j % 50 == 0) {
+    frame.pixels[frame.pixelCount].x = x;
+    frame.pixels[frame.pixelCount].y = y;
+    frame.pixels[frame.pixelCount].r = r;
+    frame.pixels[frame.pixelCount].g = g;
+    frame.pixels[frame.pixelCount].b = b;
+    frame.pixelCount += 1;
+
+    if (pixelIndex % 50 == 0) {
       yield();
     }
   }
 
-  Serial.printf("帧 %d binary chunk: +%d 像素, 累计 %d/%d\n",
-    index, added, frame.pixelCount, frame.capacity);
-  return true;
-}
-
-bool AnimationManager::frameStatus(int index, int& outCount) {
-  outCount = 0;
-  if (!s_uploadSession.active) {
-    return false;
-  }
-
-  if (index == s_uploadSession.lastCommittedFrameIndex &&
-      s_uploadSession.inFlightFrameIndex != index) {
-    outCount = s_uploadSession.lastCommittedPixelCount;
-    return true;
-  }
-
-  if (index != s_uploadSession.inFlightFrameIndex) {
-    return false;
-  }
-
-  AnimationFrame& frame = s_uploadSession.inFlightFrame;
-  outCount = frame.pixelCount;
-  if (frame.pixelCount != frame.capacity) {
-    return false;
-  }
-  if (!s_uploadSession.file) {
-    return false;
-  }
-  s_uploadSession.file.flush();
-
-  s_uploadSession.committedFrameCount++;
-  s_uploadSession.lastCommittedFrameIndex = index;
-  s_uploadSession.lastCommittedPixelCount = frame.pixelCount;
-  resetAnimationFrame(frame);
-  s_uploadSession.inFlightFrameIndex = -1;
-  receivingFrameIndex = -1;
-
-  Serial.printf("帧 %d 已提交到临时文件，累计 %d/%d 帧\n",
-    index,
-    s_uploadSession.committedFrameCount,
-    s_uploadSession.expectedFrameCount
-  );
   return true;
 }
 
 bool AnimationManager::endAnimation() {
-  if (!s_uploadSession.active) {
-    Serial.println("没有可结束的动画上传会话");
-    return false;
-  }
-  if (s_uploadSession.readyToActivate) {
-    return false;
-  }
-  if (s_uploadSession.inFlightFrameIndex >= 0) {
-    Serial.printf("仍有未提交帧 %d，拒绝结束上传\n", s_uploadSession.inFlightFrameIndex);
-    return false;
-  }
-  if (s_uploadSession.committedFrameCount != s_uploadSession.expectedFrameCount) {
-    Serial.printf("动画上传不完整: %d/%d 帧\n",
-      s_uploadSession.committedFrameCount,
-      s_uploadSession.expectedFrameCount
-    );
+  if (currentGIF == nullptr || currentGIF->frameCount <= 0) {
     return false;
   }
 
-  closeUploadFileIfOpen();
-  s_uploadSession.readyToActivate = true;
+  receivingFrameIndex = -1;
+  for (int frameIndex = 0; frameIndex < currentGIF->frameCount; frameIndex++) {
+    AnimationFrame& frame = currentGIF->frames[frameIndex];
+    if (frame.pixelCount != frame.capacity) {
+      Serial.printf("动画帧未接收完整: index=%d count=%d capacity=%d\n",
+                    frameIndex,
+                    frame.pixelCount,
+                    frame.capacity);
+      return false;
+    }
+  }
 
-  Serial.printf("动画上传已完成，等待最终模式切换: %d 帧\n",
-    s_uploadSession.expectedFrameCount);
+  currentGIF->currentFrame = 0;
+  currentGIF->lastFrameTime = millis();
+  currentGIF->isPlaying = true;
+  Serial.printf("动画上传完成: frameCount=%d\n", currentGIF->frameCount);
   return true;
 }
 
 bool AnimationManager::saveAnimation() {
+  if (!ensureLittleFSMounted()) {
+    return false;
+  }
+
+  if (currentGIF == nullptr || currentGIF->frameCount <= 0) {
+    if (!LittleFS.exists(kAnimationFilePath)) {
+      return true;
+    }
+
+    if (!LittleFS.remove(kAnimationFilePath)) {
+      Serial.println("清除动画文件失败");
+      return false;
+    }
+
+    Serial.println("已清除保存的动画文件");
+    return true;
+  }
+
   return saveGIFAnimationToPath(kAnimationFilePath, currentGIF);
 }
 
@@ -979,93 +810,4 @@ bool AnimationManager::loadAnimation() {
   activateLoadedGif(nextGIF);
   Serial.printf("动画已加载: %d 帧\n", currentGIF->frameCount);
   return true;
-}
-
-bool AnimationManager::hasPendingUploadReady() {
-  return s_uploadSession.active && s_uploadSession.readyToActivate;
-}
-
-bool AnimationManager::isUploadSessionActive() {
-  return s_uploadSession.active;
-}
-
-bool AnimationManager::finalizeUploadSession() {
-  if (!hasPendingUploadReady()) {
-    return false;
-  }
-  closeUploadFileIfOpen();
-
-  const bool hadExistingAnimation =
-    AnimationManager::currentGIF != nullptr &&
-    AnimationManager::currentGIF->frameCount > 0 &&
-    hasReadableAnimationFile(kAnimationFilePath);
-
-  if (AnimationManager::currentGIF != nullptr) {
-    Serial.printf("动画提交前释放旧动画内存: %d 帧\n",
-      AnimationManager::currentGIF->frameCount);
-    AnimationManager::freeGIFAnimation();
-  }
-
-  GIFAnimation* nextGIF = nullptr;
-  if (!loadGIFAnimationFromPath(kAnimationUploadFilePath, nextGIF)) {
-    Serial.printf("动画提交失败：上传文件加载失败 %s\n", kAnimationUploadFilePath);
-    if (hadExistingAnimation && restoreRuntimeAnimationFromPath(kAnimationFilePath)) {
-      Serial.println("新动画加载失败，已恢复旧动画到运行态");
-    }
-    return false;
-  }
-  if (!ensureLittleFSMounted()) {
-    Serial.println("动画提交失败：LittleFS 不可用");
-    freeGIFAnimationInstance(nextGIF);
-    if (hadExistingAnimation && restoreRuntimeAnimationFromPath(kAnimationFilePath)) {
-      Serial.println("文件系统不可用，已恢复旧动画到运行态");
-    }
-    return false;
-  }
-
-  if (LittleFS.exists(kAnimationBackupFilePath)) {
-    LittleFS.remove(kAnimationBackupFilePath);
-  }
-
-  if (hadExistingAnimation && !LittleFS.rename(kAnimationFilePath, kAnimationBackupFilePath)) {
-    Serial.printf("动画提交失败：旧动画备份失败 %s -> %s\n",
-      kAnimationFilePath,
-      kAnimationBackupFilePath);
-    freeGIFAnimationInstance(nextGIF);
-    if (restoreRuntimeAnimationFromPath(kAnimationFilePath)) {
-      Serial.println("旧动画备份失败，已恢复旧动画到运行态");
-    }
-    return false;
-  }
-
-  if (!LittleFS.rename(kAnimationUploadFilePath, kAnimationFilePath)) {
-    Serial.printf("动画提交失败：上传文件提交失败 %s -> %s\n",
-      kAnimationUploadFilePath,
-      kAnimationFilePath);
-    if (hadExistingAnimation && LittleFS.exists(kAnimationBackupFilePath)) {
-      LittleFS.rename(kAnimationBackupFilePath, kAnimationFilePath);
-    }
-    freeGIFAnimationInstance(nextGIF);
-    if (hadExistingAnimation && restoreRuntimeAnimationFromPath(kAnimationFilePath)) {
-      Serial.println("新动画文件提交失败，已恢复旧动画到运行态");
-    }
-    return false;
-  }
-
-  if (hadExistingAnimation && LittleFS.exists(kAnimationBackupFilePath)) {
-    LittleFS.remove(kAnimationBackupFilePath);
-  }
-
-  activateLoadedGif(nextGIF);
-  clearUploadSessionState(false);
-  Serial.printf("动画上传事务提交成功: %d 帧\n", currentGIF->frameCount);
-  return true;
-}
-
-void AnimationManager::abortUploadSession() {
-  if (!s_uploadSession.active) {
-    return;
-  }
-  Serial.println("动画上传会话已中止");
-  clearUploadSessionState(true);
 }

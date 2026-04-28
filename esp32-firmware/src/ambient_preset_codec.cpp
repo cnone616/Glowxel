@@ -42,12 +42,6 @@ const char* toString(uint8_t preset) {
   if (preset == AMBIENT_PRESET_CLOCK_SCENE) {
     return "clock_scene";
   }
-  if (preset == AMBIENT_PRESET_COUNTDOWN_SCENE) {
-    return "countdown_scene";
-  }
-  if (preset == AMBIENT_PRESET_WEATHER_SCENE) {
-    return "weather_scene";
-  }
   if (preset == AMBIENT_PRESET_GAME_OF_LIFE) {
     return "game_of_life";
   }
@@ -65,6 +59,15 @@ const char* toString(uint8_t preset) {
   }
   if (preset == AMBIENT_PRESET_DEEP_SPACE_NEBULA) {
     return "deep_space_nebula";
+  }
+  if (preset == AMBIENT_PRESET_WATER_SURFACE) {
+    return "surface";
+  }
+  if (preset == AMBIENT_PRESET_WATER_CURRENT) {
+    return "current";
+  }
+  if (preset == AMBIENT_PRESET_WATER_CAUSTICS) {
+    return "caustics";
   }
   return "";
 }
@@ -122,14 +125,6 @@ bool fromString(const String& value, uint8_t& preset) {
     preset = AMBIENT_PRESET_CLOCK_SCENE;
     return true;
   }
-  if (value == "countdown_scene") {
-    preset = AMBIENT_PRESET_COUNTDOWN_SCENE;
-    return true;
-  }
-  if (value == "weather_scene") {
-    preset = AMBIENT_PRESET_WEATHER_SCENE;
-    return true;
-  }
   if (value == "game_of_life") {
     preset = AMBIENT_PRESET_GAME_OF_LIFE;
     return true;
@@ -152,6 +147,18 @@ bool fromString(const String& value, uint8_t& preset) {
   }
   if (value == "deep_space_nebula") {
     preset = AMBIENT_PRESET_DEEP_SPACE_NEBULA;
+    return true;
+  }
+  if (value == "surface") {
+    preset = AMBIENT_PRESET_WATER_SURFACE;
+    return true;
+  }
+  if (value == "current") {
+    preset = AMBIENT_PRESET_WATER_CURRENT;
+    return true;
+  }
+  if (value == "caustics") {
+    preset = AMBIENT_PRESET_WATER_CAUSTICS;
     return true;
   }
   return false;

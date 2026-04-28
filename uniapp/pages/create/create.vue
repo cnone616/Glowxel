@@ -81,7 +81,11 @@
                   <text class="preview-btn-text">更换图片</text>
                 </view>
                 <view class="preview-btn danger" @click="clearImage">
-                  <Icon name="close" :size="28" />
+                  <Icon
+                    name="close"
+                    :size="28"
+                    color="var(--nb-ink)"
+                  />
                 </view>
               </view>
             </view>
@@ -320,11 +324,14 @@
                 {{ usedColors.reduce((sum, c) => sum + c.count, 0) }} 个</text
               >
             </view>
+            <text class="used-colors-hint">点击颜色可删除或替换</text>
             <view class="used-colors-grid">
               <view
                 v-for="color in usedColors"
                 :key="color.code"
                 class="used-color-item"
+                :class="{ active: activeReplaceColorCode === color.code }"
+                @click="openColorReplacePanel(color.code)"
               >
                 <view
                   class="color-swatch"
@@ -332,6 +339,66 @@
                 ></view>
                 <text class="color-code">{{ color.code }}</text>
                 <text class="color-count">{{ color.count }}</text>
+              </view>
+            </view>
+
+            <view v-if="activeReplaceColor" class="color-replace-panel">
+              <view class="color-replace-header">
+                <view class="replace-target">
+                  <view
+                    class="replace-target-swatch"
+                    :style="{ backgroundColor: activeReplaceColor.hex }"
+                  ></view>
+                  <view class="replace-target-info">
+                    <text class="color-replace-title"
+                      >处理颜色 {{ activeReplaceColor.code }}</text
+                    >
+                    <text class="color-replace-subtitle"
+                      >可删除并自动替换，或手动替换成当前套装颜色</text
+                    >
+                  </view>
+                </view>
+                <view class="replace-close-btn" @click="closeColorReplacePanel">
+                  <Icon
+                    name="close"
+                    :size="24"
+                    color="var(--nb-ink)"
+                  />
+                </view>
+              </view>
+
+              <view class="replace-actions">
+                <view
+                  class="replace-action-btn"
+                  @click="replaceColorByNearest(activeReplaceColor.code)"
+                >
+                  <text class="replace-action-text">删除并自动替换</text>
+                </view>
+              </view>
+
+              <view class="replace-palette-section">
+                <text class="replace-palette-title">手动替换到</text>
+                <view class="replace-palette-grid">
+                  <view
+                    v-for="color in selectedColorOptions"
+                    :key="`replace-${color.code}`"
+                    class="replace-color-item"
+                    :class="{ current: color.code === activeReplaceColor.code }"
+                    @click="replaceColorByCode(activeReplaceColor.code, color.code)"
+                  >
+                    <view
+                      class="replace-color-swatch"
+                      :style="{ backgroundColor: color.hex }"
+                    ></view>
+                    <text class="replace-color-code">{{ color.code }}</text>
+                    <text
+                      v-if="color.code === activeReplaceColor.code"
+                      class="replace-color-tag"
+                      >当前</text
+                    >
+                    <text v-else class="replace-color-tag">替换</text>
+                  </view>
+                </view>
               </view>
             </view>
           </view>
@@ -437,6 +504,7 @@ import { useToast } from "../../composables/useToast.js";
 import {
   ARTKAL_OFFICIAL_SETS,
   ARTKAL_PRESETS,
+  getColorByCode,
 } from "../../data/artkal-colors-full.js";
 import statusBarMixin from "../../mixins/statusBar.js";
 import Icon from "../../components/Icon.vue";
@@ -483,6 +551,7 @@ export default {
       previewPixels: null, // 预览的像素数据
       previewImageUrl: "", // 小程序预览图片URL
       usedColors: [], // 使用的颜色列表
+      activeReplaceColorCode: "",
       isProcessing: false,
       stepAnimationClass: "step-enter",
       isNameFocused: false,
@@ -524,6 +593,36 @@ export default {
     // 总板子数量
     totalBoards() {
       return this.boardsX * this.boardsY;
+    },
+
+    selectedColorOptions() {
+      const options = [];
+
+      this.selectedColors.forEach((code) => {
+        const color = getColorByCode(code);
+        if (color) {
+          options.push(color);
+        }
+      });
+
+      return options;
+    },
+
+    activeReplaceColor() {
+      if (!this.activeReplaceColorCode) {
+        return null;
+      }
+
+      const usedColor = this.usedColors.find(
+        (color) => color.code === this.activeReplaceColorCode,
+      );
+      if (usedColor) {
+        return usedColor;
+      }
+
+      return this.selectedColorOptions.find(
+        (color) => color.code === this.activeReplaceColorCode,
+      );
     },
 
     canProceed() {
@@ -633,6 +732,7 @@ export default {
       this.contentRatio = null;
       this.previewImageUrl = "";
       this.usedColors = [];
+      this.activeReplaceColorCode = "";
       this.isProcessing = false;
       this.stepAnimationClass = "step-enter";
       this.isNameFocused = false;
@@ -674,6 +774,9 @@ export default {
         // 在向导第一步，返回到 workspace 页面
         uni.navigateBack();
       } else {
+        if (this.step === 3) {
+          this.activeReplaceColorCode = "";
+        }
         // 在向导其他步骤，返回上一步
         this.stepAnimationClass = "step-exit-reverse";
         setTimeout(() => {
@@ -686,6 +789,7 @@ export default {
     handlePresetChange(preset) {
       this.selectedPreset = preset;
       this.selectedColors = new Set(ARTKAL_OFFICIAL_SETS[preset].colors);
+      this.activeReplaceColorCode = "";
     },
 
     handleNext() {
@@ -1105,7 +1209,7 @@ export default {
   flex: 1;
   min-height: 92rpx;
   padding: 0 24rpx;
-  background: #ffffff;
+  background: #ffd23f;
   border: 4rpx solid #000000;
   border-radius: 0;
   box-shadow: none;
@@ -1118,8 +1222,7 @@ export default {
 .preview-btn.danger {
   flex: 0 0 auto;
   width: 96rpx;
-  background: #d92d20;
-  border-color: #000000;
+  background: #ffd23f;
 }
 
 .recommend-tip {
@@ -1149,11 +1252,7 @@ export default {
 
 .preview-btn-text {
   font-size: 28rpx;
-  color: var(--text-primary);
-}
-
-.preview-btn.danger .preview-btn-text {
-  color: #ffffff;
+  color: #000000;
 }
 
 /* 自定义尺寸输入 */
@@ -1241,7 +1340,7 @@ export default {
   font-size: 28rpx;
   font-family: monospace;
   font-weight: bold;
-  color: var(--nb-yellow);
+  color: #000000;
 }
 
 /* 内联尺寸预览（在标题右侧） */
@@ -1252,7 +1351,7 @@ export default {
 
 .size-preview-inline .size-preview-value {
   font-size: 24rpx;
-  color: #ffd23f;
+  color: #000000;
 }
 
 /* 尺寸选择 */
@@ -1274,7 +1373,7 @@ export default {
 
 .size-title {
   font-size: 28rpx;
-  color: var(--text-secondary);
+  color: #000000;
   font-weight: 500;
 }
 
@@ -1304,7 +1403,7 @@ export default {
   font-size: 24rpx;
   font-family: monospace;
   font-weight: bold;
-  color: #ffd23f;
+  color: #000000;
 }
 
 .size-hint {
@@ -1329,7 +1428,7 @@ export default {
 }
 
 .size-option.active {
-  border-color: #ffd23f;
+  border-color: #000000;
   background-color: #ffd23f;
   box-shadow: none;
 }
@@ -1401,7 +1500,7 @@ export default {
 
 .colors-title {
   font-size: 28rpx;
-  color: var(--text-secondary);
+  color: #000000;
   font-weight: 500;
 }
 
@@ -1510,7 +1609,7 @@ export default {
 .preview-title {
   font-size: 32rpx;
   font-weight: bold;
-  color: var(--text-primary);
+  color: #000000;
 }
 
 .preview-subtitle {
@@ -1593,7 +1692,12 @@ export default {
 .used-colors-title {
   font-size: 28rpx;
   font-weight: 500;
-  color: var(--text-primary);
+  color: #000000;
+}
+
+.used-colors-hint {
+  font-size: 22rpx;
+  color: var(--text-secondary);
 }
 
 .used-colors-total {
@@ -1619,6 +1723,11 @@ export default {
   border: 2rpx solid var(--nb-ink);
 }
 
+.used-color-item.active {
+  background-color: #ffd23f;
+  border-color: #000000;
+}
+
 .color-swatch {
   width: 48rpx;
   height: 48rpx;
@@ -1634,6 +1743,144 @@ export default {
 }
 
 .color-count {
+  font-size: 18rpx;
+  color: var(--text-secondary);
+}
+
+.color-replace-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 24rpx;
+  padding: 24rpx;
+  border: 4rpx solid #000000;
+  border-radius: 0;
+  background: #ffffff;
+}
+
+.color-replace-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16rpx;
+}
+
+.replace-target {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+}
+
+.replace-target-swatch {
+  width: 56rpx;
+  height: 56rpx;
+  border: 2rpx solid #000000;
+  border-radius: 0;
+  flex-shrink: 0;
+}
+
+.replace-target-info {
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+}
+
+.color-replace-title {
+  font-size: 28rpx;
+  font-weight: 700;
+  color: #000000;
+}
+
+.color-replace-subtitle {
+  font-size: 22rpx;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.replace-close-btn {
+  width: 64rpx;
+  height: 64rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 4rpx solid #000000;
+  border-radius: 0;
+  background: #ffd23f;
+  flex-shrink: 0;
+}
+
+.replace-actions {
+  display: flex;
+}
+
+.replace-action-btn {
+  width: 100%;
+  min-height: 88rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 24rpx;
+  background: #ffd23f;
+  border: 4rpx solid #000000;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.replace-action-text {
+  font-size: 26rpx;
+  font-weight: 700;
+  color: #000000;
+}
+
+.replace-palette-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
+}
+
+.replace-palette-title {
+  font-size: 24rpx;
+  font-weight: 700;
+  color: #000000;
+}
+
+.replace-palette-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16rpx;
+}
+
+.replace-color-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8rpx;
+  padding: 16rpx 12rpx;
+  border: 2rpx solid #000000;
+  border-radius: 0;
+  background: #ffffff;
+  box-shadow: none;
+}
+
+.replace-color-item.current {
+  background: #ffd23f;
+}
+
+.replace-color-swatch {
+  width: 48rpx;
+  height: 48rpx;
+  border: 2rpx solid #000000;
+  border-radius: 0;
+}
+
+.replace-color-code {
+  font-size: 20rpx;
+  font-weight: 700;
+  font-family: monospace;
+  color: #000000;
+}
+
+.replace-color-tag {
   font-size: 18rpx;
   color: var(--text-secondary);
 }
@@ -1660,18 +1907,20 @@ export default {
   padding: 32rpx;
   background: #ffd23f;
   color: #000000;
+  border: 4rpx solid #000000;
   border-radius: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 16rpx;
-  box-shadow: var(--nb-shadow-strong);
+  box-shadow: none;
   transition: var(--transition-base);
 }
 
 
 .next-btn.disabled {
   background: #ffe49a;
+  border-color: #000000;
   box-shadow: none;
   opacity: 0.75;
   pointer-events: none;

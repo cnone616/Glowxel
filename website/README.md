@@ -1,4 +1,4 @@
-# Glowxel Website
+# 光格像素工坊 Website
 
 官网与在线创作站点，基于 Vue 3 + Vite。
 

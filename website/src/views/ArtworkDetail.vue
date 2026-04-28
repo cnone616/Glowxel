@@ -1,60 +1,130 @@
 <template>
-  <div class="artwork-detail">
-    <div class="container">
-      <button class="back-btn" @click="$router.back()">← 返回</button>
-      <div class="detail-layout">
-        <div class="artwork-preview">
-          <div class="preview-img" :style="detail.cover_url ? `background-image:url(${detail.cover_url});background-size:contain;background-repeat:no-repeat;background-position:center;background-color:#f0f0f0` : 'background:#f0f0f0'"></div>
+  <div class="glx-page-shell">
+    <section class="glx-page-shell__hero">
+      <span class="glx-page-shell__eyebrow">Artwork Detail</span>
+      <h1 class="glx-page-shell__title">{{ detail.title || "作品详情" }}</h1>
+      <p class="glx-page-shell__desc">{{ detail.description || "当前作品暂无描述。" }}</p>
+      <div class="glx-hero-metrics">
+        <article class="glx-hero-metric">
+          <span class="glx-hero-metric__label">作者</span>
+          <strong class="glx-hero-metric__value">{{ detail.author_name || "--" }}</strong>
+        </article>
+        <article class="glx-hero-metric">
+          <span class="glx-hero-metric__label">点赞</span>
+          <strong class="glx-hero-metric__value">{{ detail.likes || 0 }}</strong>
+        </article>
+        <article class="glx-hero-metric">
+          <span class="glx-hero-metric__label">评论</span>
+          <strong class="glx-hero-metric__value">{{ comments.length }}</strong>
+        </article>
+      </div>
+      <div class="glx-inline-actions">
+        <button type="button" class="glx-button glx-button--ghost" @click="handleLike">
+          {{ isLiked ? "取消点赞" : "点赞" }}
+        </button>
+        <button type="button" class="glx-button glx-button--ghost" @click="handleCollect">
+          {{ isCollected ? "取消收藏" : "收藏" }}
+        </button>
+        <button
+          v-if="showFollowAction"
+          type="button"
+          class="glx-button glx-button--ghost"
+          @click="handleFollow"
+        >
+          {{ isFollowing ? "取消关注" : "关注作者" }}
+        </button>
+      </div>
+    </section>
+
+    <section class="glx-grid glx-grid--two">
+      <article class="glx-section-card glx-section-card--stack">
+        <img
+          v-if="typeof detail.cover_url === 'string' && detail.cover_url.length > 0"
+          :src="detail.cover_url"
+          alt="artwork"
+          class="artwork-cover"
+        />
+        <div v-else class="glx-empty-card">
+          <strong class="glx-section-title">暂无封面</strong>
+          <p class="glx-page-shell__desc">当前作品没有封面图。</p>
         </div>
-        <div class="artwork-sidebar">
-          <h1>{{ detail.title || '加载中...' }}</h1>
-          <div class="author-row" v-if="detail.author_name">
-            <span class="author-name" style="cursor:pointer" @click="$router.push(`/user/${detail.author_id}`)">{{ detail.author_name }}</span>
-            <button v-if="String(detail.author_id) !== String(currentUserId)" class="follow-btn" @click="handleFollow">{{ isFollowing ? '已关注' : '关注' }}</button>
-          </div>
-          <p class="desc">{{ detail.description || '暂无描述' }}</p>
-          <div class="actions">
-            <button class="action-btn" :class="{ active: isLiked }" @click="handleLike">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
-              {{ detail.likes || 0 }}
-            </button>
-            <button class="action-btn" :class="{ active: isCollected }" @click="handleCollect">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-              {{ isCollected ? '已收藏' : '收藏' }}
-            </button>
-          </div>
-          <div class="comments-section">
-            <h3>评论</h3>
-            <div class="comment-input">
-              <input v-model="commentText" placeholder="写下你的评论..." @keyup.enter="submitComment" />
-              <button @click="submitComment">发送</button>
+      </article>
+
+      <article class="glx-section-card glx-section-card--stack">
+        <div class="glx-section-head">
+          <h2 class="glx-section-title">作品信息</h2>
+          <span class="glx-section-meta">公开浏览</span>
+        </div>
+        <div class="glx-stack">
+          <div class="glx-list-card">
+            <div class="glx-list-card__copy">
+              <strong class="glx-list-card__title">作者主页</strong>
+              <span class="glx-list-card__desc">公开主页和关注链路都继续保留。</span>
             </div>
-            <div class="comment-list">
-              <div class="comment-item" v-for="c in comments" :key="c.id">
-                <span class="comment-author">{{ c.user_name }}</span>
-                <span class="comment-text">{{ c.content }}</span>
-              </div>
+            <router-link v-if="detail.author_id" :to="`/user/${detail.author_id}`" class="glx-button glx-button--ghost">查看</router-link>
+          </div>
+          <div class="glx-list-card">
+            <div class="glx-list-card__copy">
+              <strong class="glx-list-card__title">互动动作</strong>
+              <span class="glx-list-card__desc">点赞、收藏、评论和关注动作已经恢复到作品详情页。</span>
             </div>
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <section class="glx-section-card glx-section-card--stack">
+      <div class="glx-section-head">
+        <h2 class="glx-section-title">评论列表</h2>
+        <span class="glx-section-meta">{{ comments.length }} 条</span>
+      </div>
+      <div class="glx-inline-actions">
+        <input v-model="commentText" class="glx-input artwork-comment-input" placeholder="写下你的评论..." />
+        <button type="button" class="glx-button glx-button--primary" @click="submitComment">发送</button>
+      </div>
+      <div v-if="comments.length === 0" class="glx-empty-card">
+        <strong class="glx-section-title">暂无评论</strong>
+        <p class="glx-page-shell__desc">当前作品还没有公开评论。</p>
+      </div>
+      <div v-else class="glx-stack">
+        <div v-for="comment in comments" :key="comment.id" class="glx-list-card">
+          <div class="glx-list-card__copy">
+            <strong class="glx-list-card__title">{{ comment.user_name || "匿名用户" }}</strong>
+            <span class="glx-list-card__desc">{{ comment.content || "" }}</span>
           </div>
         </div>
       </div>
-    </div>
+    </section>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from 'vue'
-import { useRoute } from 'vue-router'
-import { artworkAPI, likeAPI, collectAPI, commentAPI, followAPI } from '@/api/index.js'
+import { computed, onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { artworkAPI, collectAPI, commentAPI, followAPI, likeAPI } from '@/api/index.js'
+import { useFeedback } from '@/composables/useFeedback.js'
+import { useUserStore } from '@/stores/user.js'
 
 const route = useRoute()
+const router = useRouter()
+const feedback = useFeedback()
+const userStore = useUserStore()
 const detail = ref({})
 const comments = ref([])
 const commentText = ref('')
 const isLiked = ref(false)
 const isCollected = ref(false)
 const isFollowing = ref(false)
-const currentUserId = JSON.parse(localStorage.getItem('user_info') || '{}').id
+
+const showFollowAction = computed(() => {
+  if (!(typeof detail.value.author_id !== 'undefined' && detail.value.author_id !== null)) {
+    return false
+  }
+  if (userStore.userId == null) {
+    return true
+  }
+  return String(detail.value.author_id) !== String(userStore.userId)
+})
 
 async function loadArtwork() {
   const id = route.params.id
@@ -64,95 +134,147 @@ async function loadArtwork() {
   isLiked.value = false
   isCollected.value = false
   isFollowing.value = false
-  const [res, cRes, likedRes, collectedRes] = await Promise.allSettled([
+  const [res, cRes] = await Promise.allSettled([
     artworkAPI.getDetail(id),
     commentAPI.getList(id, { page: 1, limit: 20 }),
-    likeAPI.check(id),
-    collectAPI.check(id),
   ])
-  if (res.value?.success) {
+
+  if (res.status === 'fulfilled' && res.value?.success) {
     detail.value = res.value.data?.artwork || res.value.data || {}
-    isFollowing.value = !!detail.value.isFollowing
-    isLiked.value = typeof detail.value.isLiked === 'boolean' ? detail.value.isLiked : isLiked.value
-    isCollected.value = typeof detail.value.isCollected === 'boolean' ? detail.value.isCollected : isCollected.value
+    if (typeof detail.value.isLiked === 'boolean') {
+      isLiked.value = detail.value.isLiked
+    }
+    if (typeof detail.value.isCollected === 'boolean') {
+      isCollected.value = detail.value.isCollected
+    }
+    if (typeof detail.value.isFollowing === 'boolean') {
+      isFollowing.value = detail.value.isFollowing
+    }
   }
-  if (cRes.value?.success) comments.value = cRes.value.data?.list || []
-  if (likedRes.value?.success) isLiked.value = likedRes.value.data === true
-  if (collectedRes.value?.success) isCollected.value = collectedRes.value.data === true
+  if (cRes.status === 'fulfilled' && cRes.value?.success) {
+    comments.value = cRes.value.data?.list || []
+  }
 }
 
-onMounted(loadArtwork)
-watch(() => route.params.id, loadArtwork)
+function goToLogin() {
+  router.push({
+    name: 'Login',
+    query: {
+      redirect: route.fullPath,
+    },
+  })
+}
 
 async function handleLike() {
-  if (!detail.value.id) return
-  if (isLiked.value) {
-    await likeAPI.unlike(route.params.id)
-    detail.value.likes = Math.max(0, (detail.value.likes || 1) - 1)
-  } else {
-    await likeAPI.like(route.params.id)
-    detail.value.likes = (detail.value.likes || 0) + 1
+  if (!userStore.isLoggedIn) {
+    goToLogin()
+    return
   }
+
+  let response
+  if (isLiked.value) {
+    response = await likeAPI.unlike(route.params.id)
+  } else {
+    response = await likeAPI.like(route.params.id)
+  }
+
+  if (!response.success) {
+    feedback.error('操作失败', '点赞状态没有成功更新。')
+    return
+  }
+
   isLiked.value = !isLiked.value
+  if (typeof detail.value.likes === 'number') {
+    if (isLiked.value) {
+      detail.value.likes += 1
+    } else {
+      detail.value.likes = Math.max(0, detail.value.likes - 1)
+    }
+  }
 }
 
 async function handleCollect() {
-  if (!detail.value.id) return
-  if (isCollected.value) {
-    await collectAPI.uncollect(route.params.id)
-  } else {
-    await collectAPI.collect(route.params.id)
+  if (!userStore.isLoggedIn) {
+    goToLogin()
+    return
   }
+
+  let response
+  if (isCollected.value) {
+    response = await collectAPI.uncollect(route.params.id)
+  } else {
+    response = await collectAPI.collect(route.params.id)
+  }
+
+  if (!response.success) {
+    feedback.error('操作失败', '收藏状态没有成功更新。')
+    return
+  }
+
   isCollected.value = !isCollected.value
 }
 
 async function handleFollow() {
-  if (!detail.value.author_id || String(detail.value.author_id) === String(currentUserId)) return
-  const res = await followAPI.toggle(detail.value.author_id)
-  if (res.success) isFollowing.value = res.data?.followed ?? !isFollowing.value
+  if (!userStore.isLoggedIn) {
+    goToLogin()
+    return
+  }
+
+  if (!(typeof detail.value.author_id !== 'undefined' && detail.value.author_id !== null)) {
+    return
+  }
+
+  const response = await followAPI.toggle(detail.value.author_id)
+  if (!response.success) {
+    feedback.error('操作失败', '关注状态没有成功更新。')
+    return
+  }
+
+  if (response.data != null && typeof response.data.followed === 'boolean') {
+    isFollowing.value = response.data.followed
+    return
+  }
+
+  isFollowing.value = !isFollowing.value
 }
 
 async function submitComment() {
-  if (!detail.value.id) return
-  if (!commentText.value.trim()) return
-  const res = await commentAPI.add(route.params.id, commentText.value.trim())
-  if (res.success) {
-    comments.value.unshift(res.data?.comment || { id: Date.now(), user_name: '我', content: commentText.value.trim() })
-    commentText.value = ''
+  if (!userStore.isLoggedIn) {
+    goToLogin()
+    return
   }
+
+  if (commentText.value.trim().length === 0) {
+    return
+  }
+
+  const response = await commentAPI.add(route.params.id, commentText.value.trim())
+  if (!response.success) {
+    feedback.error('发送失败', '评论没有成功发送。')
+    return
+  }
+
+  if (response.data != null && response.data.comment != null) {
+    comments.value.unshift(response.data.comment)
+  }
+  commentText.value = ''
 }
+
+onMounted(loadArtwork)
+watch(() => route.params.id, loadArtwork)
 </script>
 
 <style scoped>
-.container { max-width: 1200px; margin: 0 auto; padding: 24px 20px 56px; }
-.back-btn { min-height: 42px; padding: 0 16px; border: 2px solid var(--nb-ink); background: var(--tone-paper-soft); box-shadow: var(--nb-shadow-soft); font-size: 14px; font-weight: 800; color: var(--nb-ink); cursor: pointer; display: inline-flex; align-items: center; margin-bottom: 20px; }
-.back-btn:hover { background: #f6f6f6; }
+.artwork-cover {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: contain;
+  border: 2px solid #111111;
+  background: #f0f0f0;
+}
 
-.detail-layout { display: grid; grid-template-columns: 1fr 360px; gap: 32px; }
-.preview-img { width: 100%; aspect-ratio: 1; border: 3px solid var(--nb-ink); border-radius: 0; box-shadow: var(--nb-shadow-card); }
-
-.artwork-sidebar { align-self: start; padding: 20px; border: 3px solid var(--nb-ink); background: var(--tone-paper-soft); box-shadow: var(--nb-shadow-card); }
-.artwork-sidebar h1 { font-size: 26px; font-weight: 800; color: var(--nb-ink); }
-.author-row { display: flex; justify-content: space-between; align-items: center; margin: 12px 0; }
-.author-name { font-size: 14px; color: var(--text-secondary); font-weight: 700; }
-.follow-btn { padding: 6px 16px; border-radius: 0; border: 2px solid var(--nb-ink); background: var(--tone-paper-soft); font-size: 13px; font-weight: 800; cursor: pointer; box-shadow: var(--nb-shadow-soft); }
-.follow-btn:hover { background: #f6f6f6; }
-.desc { font-size: 14px; color: var(--text-secondary); line-height: 1.6; margin-bottom: 16px; }
-
-.actions { display: flex; gap: 12px; margin-bottom: 24px; }
-.action-btn { padding: 8px 16px; border-radius: 0; border: 2px solid var(--nb-ink); background: var(--tone-paper-soft); font-size: 13px; font-weight: 800; cursor: pointer; box-shadow: var(--nb-shadow-soft); }
-.action-btn:hover { background: #f6f6f6; }
-
-.comments-section { padding-top: 18px; border-top: 3px solid var(--nb-ink); }
-.comments-section h3 { font-size: 18px; font-weight: 800; margin-bottom: 12px; color: var(--nb-ink); }
-.comment-input { display: flex; gap: 8px; margin-bottom: 16px; }
-.comment-input input { flex: 1; padding: 8px 12px; border: 2px solid var(--nb-ink); border-radius: 0; font-size: 13px; }
-.comment-input button { padding: 8px 16px; border: 2px solid var(--nb-ink); background: var(--nb-yellow); color: var(--nb-ink); border-radius: 0; font-size: 13px; font-weight: 800; cursor: pointer; box-shadow: var(--nb-shadow-soft); }
-.comment-item { padding: 8px 0; border-bottom: 2px solid var(--nb-ink); }
-.comment-author { font-size: 13px; font-weight: 700; color: var(--nb-ink); margin-right: 8px; }
-.comment-text { font-size: 13px; color: var(--text-secondary); }
-
-@media (max-width: 768px) {
-  .detail-layout { grid-template-columns: 1fr; }
+.artwork-comment-input {
+  flex: 1;
 }
 </style>

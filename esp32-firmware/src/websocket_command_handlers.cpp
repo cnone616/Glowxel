@@ -15,10 +15,6 @@ bool WebSocketCommandHandlers::handleEffectCommand(
     return true;
   }
 
-  if (WebSocketEffectCommandDispatch::handleGameEffectCommand(client, doc, response, responseSent)) {
-    return true;
-  }
-
   (void)client;
   return false;
 }

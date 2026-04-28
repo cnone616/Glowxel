@@ -178,7 +178,25 @@
       }
     },
     {
-      "path": "pages/game-screensaver/game-screensaver",
+      "path": "pages/maze-mode/maze-mode",
+      "style": {
+        "navigationStyle": "custom",
+        "navigationBarTextStyle": "white",
+        "backgroundColor": "#1a1a1a",
+        "enablePullDownRefresh": false
+      }
+    },
+    {
+      "path": "pages/snake-mode/snake-mode",
+      "style": {
+        "navigationStyle": "custom",
+        "navigationBarTextStyle": "white",
+        "backgroundColor": "#1a1a1a",
+        "enablePullDownRefresh": false
+      }
+    },
+    {
+      "path": "pages/water-world/water-world",
       "style": {
         "navigationStyle": "custom",
         "navigationBarTextStyle": "white",
@@ -352,7 +370,7 @@
   "globalStyle": {
     "navigationStyle": "custom",
     "navigationBarTextStyle": "black",
-    "navigationBarTitleText": "RenLight",
+    "navigationBarTitleText": "光格像素工坊",
     "navigationBarBackgroundColor": "#FFFFFF",
     "backgroundColor": "#FFFFFF",
     "backgroundTextStyle": "light",

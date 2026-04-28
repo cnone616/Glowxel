@@ -1,82 +1,110 @@
 <template>
-  <div class="edit-profile">
-    <div class="container">
-      <button class="back-btn" @click="$router.back()">← 返回</button>
-      <h1 class="page-title">编辑资料</h1>
-      <div class="form-card">
-        <div class="avatar-section">
-          <div class="avatar">{{ (form.name || '?')[0].toUpperCase() }}</div>
-          <span class="avatar-tip">头像暂不支持上传</span>
-        </div>
-        <div class="form-group">
-          <label>昵称</label>
-          <input v-model="form.name" maxlength="20" placeholder="请输入昵称" />
-          <span class="char-count">{{ form.name.length }}/20</span>
-        </div>
-        <div class="form-group">
-          <label>个人简介</label>
-          <textarea v-model="form.bio" maxlength="100" placeholder="介绍一下自己吧..."></textarea>
-          <span class="char-count">{{ form.bio.length }}/100</span>
-        </div>
-        <button class="btn-save" :disabled="saving" @click="handleSave">{{ saving ? '保存中...' : '保存' }}</button>
-        <p class="msg success" v-if="msg">{{ msg }}</p>
+  <div class="glx-page-shell edit-profile-page">
+    <section class="glx-page-shell__hero">
+      <span class="glx-page-shell__eyebrow">Edit Profile</span>
+      <h1 class="glx-page-shell__title">编辑资料</h1>
+      <p class="glx-page-shell__desc">
+        资料页也恢复回来，继续承接昵称和个人简介修改。
+      </p>
+    </section>
+
+    <section class="glx-section-card glx-section-card--stack">
+      <div class="glx-form-grid">
+        <label class="glx-field">
+          <span class="glx-field__label">昵称</span>
+          <input v-model="form.name" class="glx-input" maxlength="20" placeholder="请输入昵称" />
+        </label>
+        <label class="glx-field">
+          <span class="glx-field__label">个人简介</span>
+          <textarea
+            v-model="form.bio"
+            class="glx-textarea"
+            maxlength="100"
+            placeholder="介绍一下自己吧"
+          ></textarea>
+        </label>
       </div>
-    </div>
+      <div class="glx-inline-actions">
+        <button type="button" class="glx-button glx-button--primary" :disabled="saving" @click="handleSave">
+          {{ saving ? "保存中..." : "保存" }}
+        </button>
+        <router-link to="/profile" class="glx-button glx-button--ghost">返回个人中心</router-link>
+      </div>
+      <p v-if="message.length > 0" class="edit-profile-message">{{ message }}</p>
+    </section>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
-import { userAPI } from '@/api/index.js'
+import { onMounted, reactive, ref } from "vue";
+import { useRouter } from "vue-router";
+import { useUserStore } from "@/stores/user.js";
 
-const router = useRouter()
-const saving = ref(false)
-const msg = ref('')
-const form = ref({ name: '', bio: '' })
+const router = useRouter();
+const userStore = useUserStore();
+
+const form = reactive({
+  name: "",
+  bio: "",
+});
+const saving = ref(false);
+const message = ref("");
 
 onMounted(async () => {
-  const token = localStorage.getItem('auth_token')
-  if (!token) { router.push('/login'); return }
-  const res = await userAPI.getProfile()
-  if (res.success) {
-    const u = res.data?.user || res.data || {}
-    form.value.name = u.name || ''
-    form.value.bio = u.bio || ''
+  await userStore.fetchProfile();
+  if (userStore.currentUser != null) {
+    if (typeof userStore.currentUser.name === "string") {
+      form.name = userStore.currentUser.name;
+    }
+    if (typeof userStore.currentUser.bio === "string") {
+      form.bio = userStore.currentUser.bio;
+    }
   }
-})
+});
 
 async function handleSave() {
-  if (!form.value.name.trim()) return
-  saving.value = true; msg.value = ''
-  const res = await userAPI.updateProfile({ name: form.value.name, bio: form.value.bio })
-  if (res.success) {
-    msg.value = '保存成功'
-    const info = JSON.parse(localStorage.getItem('user_info') || '{}')
-    localStorage.setItem('user_info', JSON.stringify({ ...info, ...form.value }))
-    setTimeout(() => router.push('/profile'), 1000)
-  } else { msg.value = res.message || '保存失败' }
-  saving.value = false
+  if (form.name.trim().length === 0) {
+    message.value = "昵称不能为空";
+    return;
+  }
+
+  saving.value = true;
+  message.value = "";
+
+  try {
+    const response = await userStore.updateProfile({
+      name: form.name.trim(),
+      bio: form.bio.trim(),
+    });
+
+    if (response.success) {
+      message.value = "保存成功";
+      window.setTimeout(() => {
+        router.push("/profile");
+      }, 800);
+      return;
+    }
+
+    if (typeof response.message === "string" && response.message.length > 0) {
+      message.value = response.message;
+      return;
+    }
+
+    message.value = "保存失败";
+  } finally {
+    saving.value = false;
+  }
 }
 </script>
 
 <style scoped>
-.container { max-width: 600px; margin: 0 auto; padding: 24px 20px 48px; }
-.back-btn { min-height: 42px; padding: 0 16px; border: 2px solid var(--nb-ink); background: var(--tone-paper-soft); box-shadow: var(--nb-shadow-soft); font-size: 14px; font-weight: 800; color: var(--nb-ink); cursor: pointer; display: inline-flex; align-items: center; margin-bottom: 18px; }
-.back-btn:hover { background: #f6f6f6; }
-.page-title { font-size: 28px; font-weight: 800; color: var(--nb-ink); margin-bottom: 20px; }
-.form-card { background: var(--tone-paper-soft); border: 3px solid var(--nb-ink); border-radius: 0; padding: 32px; box-shadow: var(--nb-shadow-card); }
-.avatar-section { display: flex; flex-direction: column; align-items: center; margin-bottom: 28px; gap: 8px; }
-.avatar { width: 72px; height: 72px; border: 3px solid var(--nb-ink); border-radius: 0; background: var(--tone-blue-soft); display: flex; align-items: center; justify-content: center; font-size: 28px; font-weight: 800; color: var(--nb-ink); box-shadow: var(--nb-shadow-soft); }
-.avatar-tip { font-size: 12px; color: var(--text-secondary); }
-.form-group { margin-bottom: 20px; position: relative; }
-.form-group label { display: block; font-size: 12px; font-weight: 800; color: var(--text-secondary); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.04em; }
-.form-group input, .form-group textarea { width: 100%; padding: 10px 12px; border: 2px solid var(--nb-ink); border-radius: 0; font-size: 14px; outline: none; box-sizing: border-box; background: var(--tone-paper-soft); color: var(--nb-ink); }
-.form-group input:focus, .form-group textarea:focus { border-color: var(--nb-ink); }
-.form-group textarea { min-height: 80px; resize: vertical; }
-.char-count { position: absolute; right: 10px; bottom: 10px; font-size: 11px; color: var(--text-secondary); }
-.btn-save { width: 100%; padding: 12px; border: 2px solid var(--nb-ink); border-radius: 0; background: var(--nb-yellow); color: var(--nb-ink); font-size: 15px; font-weight: 800; cursor: pointer; margin-top: 8px; box-shadow: var(--nb-shadow-soft); }
-.btn-save:hover { background: var(--color-primary-hover); }
-.btn-save:disabled { background: #ccc; cursor: not-allowed; }
-.msg { text-align: center; font-size: 13px; margin-top: 12px; color: var(--nb-green); font-weight: 700; }
+.edit-profile-page {
+  max-width: 860px;
+}
+
+.edit-profile-message {
+  color: var(--nb-green);
+  font-size: 13px;
+  font-weight: 800;
+}
 </style>

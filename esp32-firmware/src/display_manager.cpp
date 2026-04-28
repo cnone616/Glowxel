@@ -63,6 +63,9 @@ static uint16_t* s_redirectFrameBuffer = nullptr;
 static bool s_redirectFrameActive = false;
 static SemaphoreHandle_t s_runtimeAccessMutex = nullptr;
 static bool s_forceStaticClockOverlayRefresh = false;
+static unsigned long s_lastPresentDurationUs = 0;
+static uint16_t s_lastPresentChangedPixels = 0;
+static uint32_t s_lastPresentFrameHash = 0;
 
 namespace {
 void ensureRuntimeAccessMutex() {
@@ -179,8 +182,6 @@ bool isRedirectFrameReady() {
 }
 
 bool modePrefersDoubleBuffer() {
-  // 当前量产硬件没有足够的 DMA 内存稳定启用底层双缓冲。
-  // 保留底层实现，统一关闭自动尝试，固定走单缓冲渲染链。
   return false;
 }
 
@@ -278,6 +279,40 @@ void BufferMatrixPanel::drawPixel(int16_t x, int16_t y, uint16_t color) {
   targetBuffer[y * targetWidth + x] = color;
 }
 
+void BufferMatrixPanel::fillRect(int16_t x, int16_t y, int16_t w, int16_t h, uint16_t color) {
+  if (targetBuffer == nullptr || w <= 0 || h <= 0) {
+    return;
+  }
+
+  int startX = x;
+  int startY = y;
+  int endX = x + w;
+  int endY = y + h;
+
+  if (startX < 0) {
+    startX = 0;
+  }
+  if (startY < 0) {
+    startY = 0;
+  }
+  if (endX > targetWidth) {
+    endX = targetWidth;
+  }
+  if (endY > targetHeight) {
+    endY = targetHeight;
+  }
+
+  if (startX >= endX || startY >= endY) {
+    return;
+  }
+
+  for (int py = startY; py < endY; py++) {
+    for (int px = startX; px < endX; px++) {
+      targetBuffer[py * targetWidth + px] = color;
+    }
+  }
+}
+
 void BufferMatrixPanel::fillScreen(uint16_t color) {
   if (targetBuffer == nullptr) {
     return;
@@ -323,13 +358,19 @@ void DisplayManager::writeLiveFramePixelRGB888(int x, int y, uint8_t r, uint8_t 
   writeLiveFramePixel565(x, y, MatrixPanel_I2S_DMA::color565(r, g, b));
 }
 
-bool DisplayManager::beginRedirectedFrame(uint16_t* targetBuffer, uint16_t clearColor) {
+bool DisplayManager::beginRedirectedFrame(
+  uint16_t* targetBuffer,
+  uint16_t clearColor,
+  bool clearBuffer
+) {
   if (targetBuffer == nullptr || dma_display == nullptr) {
     return false;
   }
   s_redirectFrameBuffer = targetBuffer;
   s_redirectFrameActive = true;
-  fillRedirectFrame(clearColor);
+  if (clearBuffer) {
+    fillRedirectFrame(clearColor);
+  }
   return true;
 }
 
@@ -378,24 +419,46 @@ void DisplayManager::presentOffscreenFrame(const uint16_t* targetBuffer) {
     return;
   }
 
+  unsigned long presentStartedUs = micros();
   bool changed = false;
+  uint16_t changedPixels = 0;
+  uint32_t frameHash = 2166136261UL;
   for (int y = 0; y < PANEL_RES_Y; y++) {
     for (int x = 0; x < PANEL_RES_X; x++) {
       uint16_t nextColor = targetBuffer[y * PANEL_RES_X + x];
+      frameHash ^= (uint32_t)nextColor;
+      frameHash *= 16777619UL;
       if (liveFrameValid && liveFrameBuffer[y][x] == nextColor) {
         continue;
       }
       dma_display->drawPixel(x, y, nextColor);
       changed = true;
+      if (changedPixels < 0xffffU) {
+        changedPixels += 1U;
+      }
     }
   }
 
-  if (!liveFrameValid) {
-    liveFrameValid = true;
-  }
+  memcpy(liveFrameBuffer, targetBuffer, sizeof(liveFrameBuffer));
+  liveFrameValid = true;
   if (changed) {
     presentFrame();
   }
+  s_lastPresentChangedPixels = changedPixels;
+  s_lastPresentDurationUs = micros() - presentStartedUs;
+  s_lastPresentFrameHash = frameHash;
+}
+
+unsigned long DisplayManager::getLastPresentDurationUs() {
+  return s_lastPresentDurationUs;
+}
+
+uint16_t DisplayManager::getLastPresentChangedPixels() {
+  return s_lastPresentChangedPixels;
+}
+
+uint32_t DisplayManager::getLastPresentFrameHash() {
+  return s_lastPresentFrameHash;
 }
 
 void DisplayManager::init() {
@@ -452,7 +515,6 @@ bool DisplayManager::rebuildMatrix(bool doubleBuffered, bool showBootLogo) {
   doubleBufferEnabled = doubleBuffered;
   dma_display->setBrightness8(ConfigManager::deviceParamsConfig.displayBright);
   dma_display->setRotation(ConfigManager::deviceParamsConfig.displayRotation);
-  dma_display->setLatBlanking(2);
   dma_display->clearScreen();
   currentBrightness = ConfigManager::deviceParamsConfig.displayBright;
 
@@ -463,7 +525,7 @@ bool DisplayManager::rebuildMatrix(bool doubleBuffered, bool showBootLogo) {
   Serial.println("显示开机Logo...");
   drawLogo(12, 7);  // 开机 logo 偏上
   // 开机 logo 额外显示品牌名
-  const char* brandText = "RenLight";
+  const char* brandText = "Glowxel";
   int16_t textBoundsX = 0;
   int16_t textBoundsY = 0;
   uint16_t textWidth = 0;
@@ -552,7 +614,7 @@ bool DisplayManager::syncBufferStrategyForCurrentMode() {
 }
 
 void DisplayManager::drawLogo(int x, int y) {
-  // RenLight 品牌色：orange → red → yellow → blue
+  // Glowxel PixelBoard 品牌色：orange → red → yellow → blue
   uint16_t orange = dma_display->color565(249, 115, 22);
   uint16_t red    = dma_display->color565(239, 68, 68);
   uint16_t yellow = dma_display->color565(251, 191, 36);
@@ -640,6 +702,7 @@ void DisplayManager::updateLoadingAnimation() {
 
 // 前向声明
 static int clockConfig_timeY();
+static ClockConfig& resolveActiveClockConfig();
 static void writeBackgroundPixel(int x, int y, uint8_t r, uint8_t g, uint8_t b);
 static void restoreBackgroundRect(int x, int y, int w, int h);
 static void clockTextBounds(const char* text, int x, int y, uint8_t fontId, int size, int& outX, int& outW, int& outH);
@@ -648,6 +711,8 @@ static void cacheLogoBackground(int x, int y);
 static void formatTimeText(const ClockConfig& c, const struct tm& timeinfo, char* buffer, size_t bufferSize);
 static void formatDateText(const struct tm& timeinfo, char* buffer, size_t bufferSize);
 static void formatWeekText(const struct tm& timeinfo, char* buffer, size_t bufferSize);
+static bool isAmbientWaterWorldPreset(uint8_t preset);
+static void drawAmbientWaterWorldTimeOverlayIfNeeded();
 
 static void writeBackgroundPixel(int x, int y, uint8_t r, uint8_t g, uint8_t b) {
   if (x < 0 || x >= DisplayManager::PANEL_RES_X || y < 0 || y >= DisplayManager::PANEL_RES_Y) {
@@ -736,6 +801,44 @@ static void formatWeekText(const struct tm& timeinfo, char* buffer, size_t buffe
   snprintf(buffer, bufferSize, "%s", weekDays[timeinfo.tm_wday]);
 }
 
+static bool isAmbientWaterWorldPreset(uint8_t preset) {
+  return preset == AMBIENT_PRESET_WATER_SURFACE ||
+         preset == AMBIENT_PRESET_WATER_CURRENT ||
+         preset == AMBIENT_PRESET_WATER_CAUSTICS;
+}
+
+static void drawAmbientWaterWorldTimeOverlayIfNeeded() {
+  if (!isAmbientWaterWorldPreset(DisplayManager::ambientEffectConfig.preset)) {
+    return;
+  }
+
+  const ClockConfig& clockConfig = ConfigManager::animClockConfig;
+  if (!clockConfig.time.show) {
+    return;
+  }
+
+  struct tm timeinfo;
+  if (!getLocalTime(&timeinfo)) {
+    return;
+  }
+
+  char timeText[9];
+  formatTimeText(clockConfig, timeinfo, timeText, sizeof(timeText));
+  drawClockText(
+    DisplayManager::dma_display,
+    timeText,
+    clockConfig.time.x,
+    clockConfig.time.y,
+    DisplayManager::dma_display->color565(
+      clockConfig.time.r,
+      clockConfig.time.g,
+      clockConfig.time.b
+    ),
+    clockConfig.font,
+    clockConfig.time.fontSize
+  );
+}
+
 void DisplayManager::drawPixels(const PixelData* pixels, int pixelCount, bool clearFirst) {
   if (clearFirst) {
     dma_display->clearScreen();
@@ -759,7 +862,7 @@ void DisplayManager::drawPixels(const PixelData* pixels, int pixelCount, bool cl
 
 void DisplayManager::renderAnimationFrame(const PixelData* pixels, int pixelCount, bool clearFirst) {
   uint16_t* frameBuffer = &animationBuffer[0][0];
-  if (!beginRedirectedFrame(frameBuffer, 0)) {
+  if (!beginRedirectedFrame(frameBuffer, 0, false)) {
     return;
   }
 
@@ -1031,9 +1134,7 @@ void DisplayManager::displayClock(bool force) {
   // 正在接收像素，不碰屏幕
   if (receivingPixels) return;
   // 根据当前模式选择对应的时钟配置和像素数据
-  ClockConfig& cfg = (currentMode == MODE_ANIMATION)
-    ? ConfigManager::animClockConfig
-    : ConfigManager::clockConfig;
+  ClockConfig& cfg = resolveActiveClockConfig();
 
   PixelData* imagePixels = (currentMode == MODE_ANIMATION)
     ? ConfigManager::animImagePixels
@@ -1125,9 +1226,7 @@ void DisplayManager::displayTheme(bool force) {
 
 
 static int clockConfig_timeY() {
-  return (DisplayManager::currentMode == MODE_ANIMATION)
-    ? ConfigManager::animClockConfig.time.y
-    : ConfigManager::clockConfig.time.y;
+  return resolveActiveClockConfig().time.y;
 }
 
 static void drawClockOverlayAnimationMode(const ClockConfig& c, const struct tm& timeinfo) {
@@ -1346,13 +1445,12 @@ void DisplayManager::drawClockOverlay() {
   struct tm timeinfo;
   if (!getLocalTime(&timeinfo)) return;
 
-  auto& c = (currentMode == MODE_ANIMATION)
-    ? ConfigManager::animClockConfig
-    : ConfigManager::clockConfig;
+  auto& c = resolveActiveClockConfig();
 
-  // 动态背景每帧都会重画底图，所以这里直接补画前景层，
-  // 不做基于上一帧的擦除，避免文字和动态背景互相打架。
-  if (currentMode == MODE_ANIMATION) {
+  // 动态背景和俄罗斯方块屏保都会按帧合成完整画面，
+  // 这里直接补画前景层，避免静态脏区逻辑把时钟漏掉。
+  if (currentMode == MODE_ANIMATION ||
+      currentBusinessModeTag == ModeTags::TETRIS) {
     drawClockOverlayAnimationMode(c, timeinfo);
     return;
   }
@@ -1483,6 +1581,11 @@ static float smoothstepf(float edge0, float edge1, float value) {
   }
   float x = clampUnit((value - edge0) / (edge1 - edge0));
   return x * x * (3.0f - 2.0f * x);
+}
+
+static float mixf(float start, float end, float alpha) {
+  float safe = clampUnit(alpha);
+  return start + (end - start) * safe;
 }
 
 static float colorLuminance255(uint8_t r, uint8_t g, uint8_t b) {
@@ -1797,64 +1900,6 @@ static int ambientTextWidth(const char* text, int size) {
     return 0;
   }
   return len * 4 * size - size;
-}
-
-static void drawAmbientTextCenteredInBox(const char* text, int left, int width, int y, const NativeRgb& color, int size) {
-  if (DisplayManager::dma_display == nullptr || text == nullptr) {
-    return;
-  }
-  int textWidth = ambientTextWidth(text, size);
-  int x = left + (width - textWidth) / 2;
-  if (x < left) {
-    x = left;
-  }
-  DisplayManager::drawTinyText(text, x, y, DisplayManager::dma_display->color565(color.r, color.g, color.b), size);
-}
-
-static void drawAmbientPanelFrame(int x, int y, int w, int h, const NativeRgb& bg, const NativeRgb& border, const NativeRgb& accent) {
-  fillAmbientRect(x, y, w, h, bg);
-  drawAmbientRectOutline(x, y, w, h, border);
-  fillAmbientRect(x + 2, y + 2, w - 4, 1, accent);
-  fillAmbientRect(x + 2, y + h - 3, w - 4, 1, accent);
-}
-
-static void drawAmbientChip(int x, int y, int w, const NativeRgb& color) {
-  fillAmbientRect(x, y, w, 2, color);
-}
-
-static void drawAmbientSunIcon(int centerX, int centerY, const NativeRgb& color) {
-  drawAmbientGlowDot(centerX, centerY, color, 0.95f, 4);
-  NativeRgb core = addHighlightColor(color, 0.12f);
-  fillAmbientRect(centerX - 3, centerY - 3, 7, 7, core);
-  fillAmbientRect(centerX - 1, centerY - 7, 2, 3, color);
-  fillAmbientRect(centerX - 1, centerY + 5, 2, 3, color);
-  fillAmbientRect(centerX - 7, centerY - 1, 3, 2, color);
-  fillAmbientRect(centerX + 5, centerY - 1, 3, 2, color);
-}
-
-static void drawAmbientCloudIcon(int x, int y, const NativeRgb& baseColor, const NativeRgb& glowColor) {
-  drawAmbientGlowDot(x + 10, y + 8, glowColor, 0.45f, 3);
-  fillAmbientRect(x + 3, y + 8, 14, 5, baseColor);
-  fillAmbientRect(x + 1, y + 10, 18, 4, baseColor);
-  fillAmbientRect(x + 5, y + 5, 5, 4, addHighlightColor(baseColor, 0.12f));
-  fillAmbientRect(x + 9, y + 4, 6, 5, addHighlightColor(baseColor, 0.18f));
-}
-
-static void drawAmbientRainDrops(int originX, int originY, const NativeRgb& color) {
-  for (int index = 0; index < 4; index++) {
-    int x = originX + index * 4;
-    fillAmbientRect(x, originY + (index % 2), 1, 4, color);
-    fillAmbientRect(x + 1, originY + 3 + (index % 2), 1, 1, color);
-  }
-}
-
-static void drawAmbientSnowFlakes(int originX, int originY, const NativeRgb& color) {
-  for (int index = 0; index < 3; index++) {
-    int x = originX + index * 5;
-    int y = originY + (index % 2);
-    fillAmbientRect(x, y + 1, 3, 1, color);
-    fillAmbientRect(x + 1, y, 1, 3, color);
-  }
 }
 
 static NativeRgb ambientHsvToRgb(float hue, float saturation, float value) {
@@ -3157,60 +3202,270 @@ static void renderAmbientDigitalRain(unsigned long elapsed, float speedUnit) {
   }
 }
 
-static float metaBlobRandSin(int index) {
-  return sinf((float)index * 1.64f);
+struct AmbientLiquidParticle {
+  float x;
+  float y;
+  float vx;
+  float vy;
+};
+
+static constexpr int kAmbientLiquidMaxParticles = 72;
+static constexpr int kAmbientLiquidLeft = 9;
+static constexpr int kAmbientLiquidRight = 54;
+static constexpr int kAmbientLiquidTop = 9;
+static constexpr int kAmbientLiquidBottom = 57;
+
+static AmbientLiquidParticle s_ambientLiquidParticles[kAmbientLiquidMaxParticles];
+static int s_ambientLiquidParticleCount = 0;
+static unsigned long s_ambientLiquidLastElapsed = 0;
+static float s_ambientLiquidSimTimeMs = 0.0f;
+static uint8_t s_ambientLiquidLastSpeed = 0;
+static uint8_t s_ambientLiquidLastIntensity = 0;
+static bool s_ambientLiquidInitialized = false;
+
+static float ambientLiquidSeedf(int index, float offset) {
+  return fractf32(
+    sinf(((float)index + 1.0f) * 12.9898f + offset * 78.233f) * 43758.5453f
+  );
 }
 
-static void renderAmbientMetaBlob(unsigned long elapsed) {
-  DisplayManager::dma_display->fillScreenRGB888(0, 0, 0);
+static int resolveAmbientLiquidParticleCount(float intensityUnit) {
+  int particleCount = 28 + (int)roundf(intensityUnit * 36.0f);
+  if (particleCount < 28) {
+    return 28;
+  }
+  if (particleCount > kAmbientLiquidMaxParticles) {
+    return kAmbientLiquidMaxParticles;
+  }
+  return particleCount;
+}
 
-  const int numBlobs = 10;
-  const float threshold = 0.0003f;
-  const float timeValue = (float)elapsed / 1000.0f;
-  const float hue = fmodf(timeValue * 0.033f, 1.0f);
+static void resetAmbientLiquidState(float speedUnit, float intensityUnit) {
+  s_ambientLiquidParticleCount = resolveAmbientLiquidParticleCount(intensityUnit);
+  s_ambientLiquidLastElapsed = 0;
+  s_ambientLiquidSimTimeMs = 0.0f;
 
-  struct MetaBlob {
-    float x;
-    float y;
-    float radius;
-  };
+  const float usableWidth = (float)(kAmbientLiquidRight - kAmbientLiquidLeft - 4);
+  const float usableHeight = (float)(kAmbientLiquidBottom - kAmbientLiquidTop - 6);
+  for (int index = 0; index < s_ambientLiquidParticleCount; index++) {
+    s_ambientLiquidParticles[index].x =
+      (float)kAmbientLiquidLeft + 2.0f + ambientLiquidSeedf(index, 0.17f) * usableWidth;
+    s_ambientLiquidParticles[index].y =
+      (float)kAmbientLiquidTop +
+      usableHeight * (0.54f + ambientLiquidSeedf(index, 0.41f) * 0.38f);
+    s_ambientLiquidParticles[index].vx =
+      (ambientLiquidSeedf(index, 0.63f) - 0.5f) * (0.8f + speedUnit * 0.6f);
+    s_ambientLiquidParticles[index].vy =
+      (ambientLiquidSeedf(index, 0.89f) - 0.5f) * 0.2f;
+  }
+}
 
-  MetaBlob blobs[numBlobs];
-  for (int index = 0; index < numBlobs; index++) {
-    float x = 0.5f + 0.1f * metaBlobRandSin(index);
-    float y = 0.5f + 0.1f * metaBlobRandSin(index + 42);
-    x += 0.5f * sinf(0.25f * timeValue * metaBlobRandSin(index + 2)) * metaBlobRandSin(index + 56);
-    y += 0.5f * -sinf(0.25f * timeValue) * metaBlobRandSin(index * 9);
-    float radius = 0.1f * fabsf(metaBlobRandSin(index + 3));
-    blobs[index] = {
-      x * 64.0f,
-      y * 64.0f,
-      radius * 64.0f
-    };
+static void stepAmbientLiquidState(float stepMs, float speedUnit, float intensityUnit) {
+  s_ambientLiquidSimTimeMs += stepMs;
+
+  const float dt = stepMs / 16.0f;
+  const float timeSeconds = s_ambientLiquidSimTimeMs * 0.001f;
+  const float swayA = sinf(timeSeconds * (1.6f + speedUnit * 1.5f));
+  const float swayB = sinf(timeSeconds * (0.64f + speedUnit * 0.44f) + 1.7f);
+  const float swayC = sinf(timeSeconds * 0.31f + 0.9f);
+  const float gravityX =
+    (swayA * 0.08f + swayB * 0.05f + swayC * 0.03f) *
+    (0.48f + intensityUnit * 0.52f);
+  const float gravityY =
+    0.085f + 0.01f * (0.5f + 0.5f * sinf(timeSeconds * 0.73f + 0.35f));
+  const float minDist = 2.35f + intensityUnit * 0.65f;
+  const float minDistSq = minDist * minDist;
+
+  for (int index = 0; index < s_ambientLiquidParticleCount; index++) {
+    AmbientLiquidParticle& particle = s_ambientLiquidParticles[index];
+    particle.vx += gravityX * dt;
+    particle.vy += gravityY * dt;
+    particle.vx *= 0.992f;
+    particle.vy *= 0.992f;
+    particle.x += particle.vx * dt;
+    particle.y += particle.vy * dt;
+
+    if (particle.x < (float)kAmbientLiquidLeft + 1.0f) {
+      particle.x = (float)kAmbientLiquidLeft + 1.0f;
+      particle.vx *= -0.72f;
+    }
+    if (particle.x > (float)kAmbientLiquidRight - 1.0f) {
+      particle.x = (float)kAmbientLiquidRight - 1.0f;
+      particle.vx *= -0.72f;
+    }
+    if (particle.y < (float)kAmbientLiquidTop + 1.0f) {
+      particle.y = (float)kAmbientLiquidTop + 1.0f;
+      particle.vy *= -0.58f;
+    }
+    if (particle.y > (float)kAmbientLiquidBottom - 1.0f) {
+      particle.y = (float)kAmbientLiquidBottom - 1.0f;
+      particle.vy *= -0.46f;
+      particle.vx *= 0.985f;
+    }
   }
 
-  for (int y = 0; y < 64; y++) {
-    for (int x = 0; x < 64; x++) {
-      float field = 0.0f;
-      for (int index = 0; index < numBlobs; index++) {
-        float dx = (float)x - blobs[index].x;
-        float dy = (float)y - blobs[index].y;
-        float distance = max(sqrtf(dx * dx + dy * dy) + blobs[index].radius / 2.0f, 0.0f);
-        float temp = distance * distance;
-        field += 1.0f / (temp * temp);
-      }
-
-      if (field <= threshold) {
+  for (int leftIndex = 0; leftIndex < s_ambientLiquidParticleCount; leftIndex++) {
+    for (int rightIndex = leftIndex + 1;
+         rightIndex < s_ambientLiquidParticleCount;
+         rightIndex++) {
+      AmbientLiquidParticle& left = s_ambientLiquidParticles[leftIndex];
+      AmbientLiquidParticle& right = s_ambientLiquidParticles[rightIndex];
+      float dx = right.x - left.x;
+      float dy = right.y - left.y;
+      float distSq = dx * dx + dy * dy;
+      if (distSq >= minDistSq) {
         continue;
       }
 
-      float t = min(1.0f, (field - threshold) / threshold);
-      t = t * t * (3.0f - 2.0f * t);
-      NativeRgb center = ambientHsvToRgb(hue, 1.0f, 1.0f);
-      NativeRgb edge = ambientHsvToRgb(hue + 0.25f, 1.0f, 1.0f);
-      NativeRgb color = blendRgbColor(edge, center, t);
-      DisplayManager::dma_display->drawPixelRGB888(x, y, color.r, color.g, color.b);
+      if (distSq <= 0.0001f) {
+        dx = ambientLiquidSeedf(leftIndex + rightIndex, 0.27f) * 0.2f - 0.1f;
+        dy = ambientLiquidSeedf(leftIndex + rightIndex, 0.61f) * 0.2f - 0.1f;
+        distSq = dx * dx + dy * dy;
+        if (distSq <= 0.0001f) {
+          continue;
+        }
+      }
+
+      float dist = sqrtf(distSq);
+      float nx = dx / dist;
+      float ny = dy / dist;
+      float overlap = (minDist - dist) * 0.5f;
+      left.x -= nx * overlap;
+      left.y -= ny * overlap;
+      right.x += nx * overlap;
+      right.y += ny * overlap;
+
+      float leftNormal = left.vx * nx + left.vy * ny;
+      float rightNormal = right.vx * nx + right.vy * ny;
+      float sharedNormal = (leftNormal + rightNormal) * 0.5f;
+      left.vx += (sharedNormal - leftNormal) * nx;
+      left.vy += (sharedNormal - leftNormal) * ny;
+      right.vx += (sharedNormal - rightNormal) * nx;
+      right.vy += (sharedNormal - rightNormal) * ny;
     }
+  }
+}
+
+static void ensureAmbientLiquidState(
+  unsigned long elapsed,
+  uint8_t speedValue,
+  uint8_t intensityValue
+) {
+  float speedUnit = (float)speedValue / 10.0f;
+  float intensityUnit = (float)intensityValue / 100.0f;
+  if (!s_ambientLiquidInitialized ||
+      elapsed < s_ambientLiquidLastElapsed ||
+      s_ambientLiquidLastSpeed != speedValue ||
+      s_ambientLiquidLastIntensity != intensityValue) {
+    resetAmbientLiquidState(speedUnit, intensityUnit);
+    s_ambientLiquidInitialized = true;
+    s_ambientLiquidLastSpeed = speedValue;
+    s_ambientLiquidLastIntensity = intensityValue;
+  }
+
+  while (s_ambientLiquidLastElapsed < elapsed) {
+    unsigned long remaining = elapsed - s_ambientLiquidLastElapsed;
+    unsigned long stepMs = remaining > 16UL ? 16UL : remaining;
+    stepAmbientLiquidState((float)stepMs, speedUnit, intensityUnit);
+    s_ambientLiquidLastElapsed += stepMs;
+  }
+}
+
+static void renderAmbientMetaBlob(
+  unsigned long elapsed,
+  uint8_t speedValue,
+  uint8_t intensityValue
+) {
+  DisplayManager::dma_display->fillScreenRGB888(0, 0, 0);
+  ensureAmbientLiquidState(elapsed, speedValue, intensityValue);
+
+  uint8_t density[64 * 64];
+  memset(density, 0, sizeof(density));
+  const float radius = 4.0f;
+  const float radiusSq = radius * radius;
+  for (int index = 0; index < s_ambientLiquidParticleCount; index++) {
+    const AmbientLiquidParticle& particle = s_ambientLiquidParticles[index];
+    int minX = max(0, (int)floorf(particle.x - radius));
+    int maxX = min(63, (int)ceilf(particle.x + radius));
+    int minY = max(0, (int)floorf(particle.y - radius));
+    int maxY = min(63, (int)ceilf(particle.y + radius));
+    for (int y = minY; y <= maxY; y++) {
+      for (int x = minX; x <= maxX; x++) {
+        float dx = (float)x + 0.5f - particle.x;
+        float dy = (float)y + 0.5f - particle.y;
+        float distSq = dx * dx + dy * dy;
+        if (distSq > radiusSq) {
+          continue;
+        }
+        float weight = 1.0f - distSq / radiusSq;
+        int pixelIndex = y * 64 + x;
+        int nextValue =
+          (int)density[pixelIndex] + (int)roundf(weight * weight * 48.0f);
+        density[pixelIndex] = nextValue > 255 ? 255 : (uint8_t)nextValue;
+      }
+    }
+  }
+
+  float intensityUnit = (float)intensityValue / 100.0f;
+  for (int y = kAmbientLiquidTop; y <= kAmbientLiquidBottom; y++) {
+    for (int x = kAmbientLiquidLeft; x <= kAmbientLiquidRight; x++) {
+      int pixelIndex = y * 64 + x;
+      float value = (float)density[pixelIndex] / 255.0f;
+      if (value <= 0.02f) {
+        continue;
+      }
+
+      float glow = clampUnit((value - 0.05f) / 0.18f);
+      float body = clampUnit((value - 0.18f) / 0.5f);
+      float above = y > 0 ? (float)density[(y - 1) * 64 + x] / 255.0f : 0.0f;
+      float below = y < 63 ? (float)density[(y + 1) * 64 + x] / 255.0f : 0.0f;
+      float surface = clampUnit((value - above) * 5.0f);
+      float depth =
+        clampUnit((float)(y - kAmbientLiquidTop) /
+                  (float)(kAmbientLiquidBottom - kAmbientLiquidTop));
+
+      float rf = 2.0f + (18.0f - 2.0f) * glow;
+      float gf = 10.0f + (86.0f - 10.0f) * glow;
+      float bf = 28.0f + (170.0f - 28.0f) * glow;
+      rf = rf * (1.0f - body) + (22.0f + depth * 10.0f) * body;
+      gf = gf * (1.0f - body) + (110.0f + depth * 18.0f) * body;
+      bf = bf * (1.0f - body) + (205.0f + depth * 26.0f) * body;
+
+      float whitecap = surface * surface * (0.38f + intensityUnit * 0.34f);
+      uint8_t r = clampByte((int)roundf(rf + 90.0f * whitecap + below * 18.0f));
+      uint8_t g = clampByte((int)roundf(gf + 110.0f * whitecap + below * 24.0f));
+      uint8_t b = clampByte((int)roundf(bf + 120.0f * whitecap + below * 30.0f));
+      addHighlight(r, g, b, whitecap * 0.25f);
+      DisplayManager::dma_display->drawPixelRGB888(x, y, r, g, b);
+    }
+  }
+
+  const NativeRgb shell = makeRgb(10, 18, 30);
+  const NativeRgb floor = makeRgb(18, 32, 44);
+  for (int y = kAmbientLiquidTop; y <= kAmbientLiquidBottom; y++) {
+    DisplayManager::dma_display->drawPixelRGB888(
+      kAmbientLiquidLeft - 1,
+      y,
+      shell.r,
+      shell.g,
+      shell.b
+    );
+    DisplayManager::dma_display->drawPixelRGB888(
+      kAmbientLiquidRight + 1,
+      y,
+      shell.r,
+      shell.g,
+      shell.b
+    );
+  }
+  for (int x = kAmbientLiquidLeft - 1; x <= kAmbientLiquidRight + 1; x++) {
+    DisplayManager::dma_display->drawPixelRGB888(
+      x,
+      kAmbientLiquidBottom + 1,
+      floor.r,
+      floor.g,
+      floor.b
+    );
   }
 }
 
@@ -3317,6 +3572,677 @@ static void renderAmbientRainbowRain(unsigned long elapsed, float speedUnit, uin
     float brightness = 0.28f + seedB * 0.72f;
     NativeRgb dropColor = scaleRgbColor(color, brightness);
     DisplayManager::dma_display->drawPixelRGB888(x, y, dropColor.r, dropColor.g, dropColor.b);
+  }
+}
+
+struct AmbientWaterSurfacePulse {
+  float x;
+  float y;
+  float strength;
+  unsigned long bornAt;
+};
+
+static constexpr int kAmbientWaterSurfaceMaxPulses = 6;
+static AmbientWaterSurfacePulse s_ambientWaterSurfacePulses[kAmbientWaterSurfaceMaxPulses];
+static int s_ambientWaterSurfacePulseCount = 0;
+static unsigned long s_ambientWaterSurfaceLastElapsed = 0;
+static unsigned long s_ambientWaterSurfaceLastSpawnAt = 0;
+
+static float ambientWaterSeedf(int index, float offset) {
+  return ambientLiquidSeedf(index, offset);
+}
+
+static void resetAmbientWaterSurfaceState() {
+  s_ambientWaterSurfacePulseCount = 0;
+  s_ambientWaterSurfaceLastElapsed = 0;
+  s_ambientWaterSurfaceLastSpawnAt = 0;
+}
+
+static void pushAmbientWaterSurfacePulse(
+  float x,
+  float y,
+  float strength,
+  unsigned long bornAt
+) {
+  if (s_ambientWaterSurfacePulseCount >= kAmbientWaterSurfaceMaxPulses) {
+    for (int index = 1; index < s_ambientWaterSurfacePulseCount; index++) {
+      s_ambientWaterSurfacePulses[index - 1] = s_ambientWaterSurfacePulses[index];
+    }
+    s_ambientWaterSurfacePulseCount = kAmbientWaterSurfaceMaxPulses - 1;
+  }
+
+  s_ambientWaterSurfacePulses[s_ambientWaterSurfacePulseCount++] = {
+    x,
+    y,
+    strength,
+    bornAt
+  };
+}
+
+static void updateAmbientWaterSurfaceState(
+  unsigned long elapsed,
+  float densityUnit,
+  float frequencyUnit,
+  float strengthUnit
+) {
+  if (elapsed < s_ambientWaterSurfaceLastElapsed) {
+    resetAmbientWaterSurfaceState();
+  }
+
+  int nextCount = 0;
+  for (int index = 0; index < s_ambientWaterSurfacePulseCount; index++) {
+    const AmbientWaterSurfacePulse& pulse = s_ambientWaterSurfacePulses[index];
+    if (elapsed - pulse.bornAt >= 6200UL) {
+      continue;
+    }
+    s_ambientWaterSurfacePulses[nextCount++] = pulse;
+  }
+  s_ambientWaterSurfacePulseCount = nextCount;
+
+  float spawnBlend = clampUnit(frequencyUnit * 0.68f + densityUnit * 0.32f);
+  unsigned long interval = (unsigned long)roundf(mixf(3600.0f, 1850.0f, spawnBlend));
+  if (interval < 1UL) {
+    interval = 1UL;
+  }
+  if (elapsed - s_ambientWaterSurfaceLastSpawnAt >= interval) {
+    s_ambientWaterSurfaceLastSpawnAt = elapsed;
+    int seedIndex =
+      s_ambientWaterSurfacePulseCount + (int)floorf((float)elapsed / (float)interval);
+    pushAmbientWaterSurfacePulse(
+      0.18f + ambientWaterSeedf(seedIndex, 0.31f) * 0.64f,
+      0.2f + ambientWaterSeedf(seedIndex, 0.63f) * 0.46f,
+      0.14f + strengthUnit * 0.16f + ambientWaterSeedf(seedIndex, 0.87f) * 0.16f,
+      elapsed
+    );
+  }
+
+  s_ambientWaterSurfaceLastElapsed = elapsed;
+}
+
+static float sampleAmbientWaterSurfaceBaseField(
+  float nx,
+  float ny,
+  float timeBase,
+  float speedUnit,
+  float densityUnit
+) {
+  float driftX = nx - 0.5f;
+  float driftY = ny - 0.5f;
+  float bandWarpA =
+    sinf(
+      driftX * 5.8f +
+      timeBase * 0.58f +
+      sinf(driftY * 4.6f - timeBase * 0.2f) * 0.86f
+    );
+  float bandWarpB =
+    sinf(
+      driftX * 3.2f -
+      timeBase * 0.36f +
+      sinf(driftY * 7.1f + timeBase * 0.28f) * 0.58f
+    );
+  float longSwell =
+    sinf(
+      (driftY * 1.72f + bandWarpA * 0.2f + driftX * 0.09f) *
+      (10.4f + densityUnit * 3.8f) -
+      timeBase * (1.42f + speedUnit * 0.78f)
+    );
+  float secondarySwell =
+    sinf(
+      (driftY * 1.18f - driftX * 0.26f + bandWarpB * 0.16f) *
+      (14.2f + densityUnit * 4.6f) -
+      timeBase * (1.84f + speedUnit * 0.96f)
+    );
+  float diagonalSwell =
+    sinf(
+      (driftY * 0.82f + driftX * 0.42f + bandWarpA * 0.08f) * 8.6f -
+      timeBase * (1.08f + speedUnit * 0.54f)
+    );
+  float backwash =
+    cosf(
+      (driftY * 1.36f - driftX * 0.92f + bandWarpB * 0.06f) * 9.2f +
+      timeBase * (1.18f + densityUnit * 0.64f)
+    );
+  float capillary =
+    sinf(
+      (driftY * 2.84f + driftX * 0.62f + bandWarpA * 0.04f) * 22.8f -
+      timeBase * (2.46f + speedUnit * 0.84f)
+    );
+  float trough =
+    cosf(
+      (driftY * 0.66f - driftX * 0.14f) * 6.4f -
+      timeBase * (0.82f + speedUnit * 0.3f)
+    );
+
+  return clampUnit(
+    0.5f +
+    0.5f *
+      (longSwell * 0.34f +
+       secondarySwell * 0.24f +
+       diagonalSwell * 0.16f +
+       backwash * 0.1f +
+       capillary * 0.08f +
+       trough * 0.08f)
+  );
+}
+
+static float sampleAmbientWaterSurfaceRippleField(
+  float nx,
+  float ny,
+  unsigned long elapsed,
+  float speedUnit
+) {
+  float ripple = 0.0f;
+  for (int index = 0; index < s_ambientWaterSurfacePulseCount; index++) {
+    const AmbientWaterSurfacePulse& pulse = s_ambientWaterSurfacePulses[index];
+    float age = (float)(elapsed - pulse.bornAt) * 0.001f;
+    float dx = nx - pulse.x;
+    float dy = ny - pulse.y;
+    float dist = sqrtf(dx * dx + dy * dy);
+    float phase = dist * 54.0f - age * (7.4f + speedUnit * 2.8f);
+    ripple +=
+      sinf(phase) *
+      expf(-dist * 11.4f) *
+      expf(-age * 0.68f) *
+      pulse.strength;
+  }
+  return ripple;
+}
+
+static float sampleAmbientWaterSurfaceField(
+  float nx,
+  float ny,
+  unsigned long elapsed,
+  float timeBase,
+  float speedUnit,
+  float densityUnit
+) {
+  float base =
+    sampleAmbientWaterSurfaceBaseField(nx, ny, timeBase, speedUnit, densityUnit);
+  float ripple =
+    sampleAmbientWaterSurfaceRippleField(nx, ny, elapsed, speedUnit);
+  return clampUnit(base + ripple * (0.045f + densityUnit * 0.018f));
+}
+
+static void renderAmbientWaterSurface(
+  unsigned long elapsed,
+  float speedUnit,
+  float intensityUnit
+) {
+  DisplayManager::dma_display->fillScreenRGB888(1, 7, 16);
+
+  const float waterLevelUnit = 0.72f;
+  const float frequencyUnit = clampUnit(0.18f + speedUnit * 0.64f);
+  const float strengthUnit = clampUnit(0.2f + intensityUnit * 0.62f);
+  const float surfaceDensityUnit =
+    clampUnit(intensityUnit * 0.44f + frequencyUnit * 0.56f);
+  const float timeBase =
+    (float)elapsed *
+    (0.00038f + speedUnit * 0.0011f + frequencyUnit * 0.00072f);
+  const float sampleStep = 1.4f / 63.0f;
+  const NativeRgb deep = makeRgb(1, 16, 34);
+  const NativeRgb mid = makeRgb(5, 42, 88);
+  const NativeRgb shallow = makeRgb(14, 86, 150);
+  const NativeRgb bright = makeRgb(74, 166, 226);
+  const NativeRgb foam = makeRgb(226, 240, 252);
+  const NativeRgb troughColor = makeRgb(1, 10, 22);
+  const NativeRgb edgeColor = makeRgb(2, 12, 26);
+  const float lightDirX = -0.46f;
+  const float lightDirY = 0.36f;
+  const float lightDirZ = 0.82f;
+
+  updateAmbientWaterSurfaceState(
+    elapsed,
+    surfaceDensityUnit,
+    frequencyUnit,
+    strengthUnit
+  );
+
+  for (int y = 0; y < 64; y++) {
+    for (int x = 0; x < 64; x++) {
+      float nx = (float)x / 63.0f;
+      float ny = (float)y / 63.0f;
+      float field =
+        sampleAmbientWaterSurfaceField(
+          nx,
+          ny,
+          elapsed,
+          timeBase,
+          speedUnit,
+          surfaceDensityUnit
+        );
+      float fieldL =
+        sampleAmbientWaterSurfaceField(
+          max(0.0f, nx - sampleStep),
+          ny,
+          elapsed,
+          timeBase,
+          speedUnit,
+          surfaceDensityUnit
+        );
+      float fieldR =
+        sampleAmbientWaterSurfaceField(
+          min(1.0f, nx + sampleStep),
+          ny,
+          elapsed,
+          timeBase,
+          speedUnit,
+          surfaceDensityUnit
+        );
+      float fieldU =
+        sampleAmbientWaterSurfaceField(
+          nx,
+          max(0.0f, ny - sampleStep),
+          elapsed,
+          timeBase,
+          speedUnit,
+          surfaceDensityUnit
+        );
+      float fieldD =
+        sampleAmbientWaterSurfaceField(
+          nx,
+          min(1.0f, ny + sampleStep),
+          elapsed,
+          timeBase,
+          speedUnit,
+          surfaceDensityUnit
+        );
+
+      float fieldSmooth =
+        clampUnit(
+          field * 0.44f +
+          (fieldL + fieldR + fieldU + fieldD) * 0.14f
+        );
+      float gradientX = (fieldR - fieldL) / (sampleStep * 2.0f);
+      float gradientY = (fieldD - fieldU) / (sampleStep * 2.0f);
+      float curvature =
+        fieldR + fieldL + fieldD + fieldU - fieldSmooth * 4.0f;
+      float slope = fabsf(gradientX) * 0.44f + fabsf(gradientY) * 0.96f;
+      float normalX =
+        -gradientX * (0.2f + surfaceDensityUnit * 0.08f + strengthUnit * 0.06f);
+      float normalY =
+        -gradientY * (0.88f + surfaceDensityUnit * 0.18f + strengthUnit * 0.12f);
+      float normalLength = sqrtf(normalX * normalX + normalY * normalY + 1.0f);
+      float lightAmount =
+        clampUnit(
+          (normalX * lightDirX + normalY * lightDirY + lightDirZ) /
+          normalLength
+        );
+      float specular = powf(lightAmount, 14.0f - intensityUnit * 5.5f);
+      float longGlint =
+        powf(
+          clampUnit(1.0f - fabsf(gradientX * 2.6f - gradientY * 0.22f - 0.12f)),
+          7.0f
+        );
+      float undercurrent =
+        0.5f +
+        0.5f *
+          sinf(
+            (nx * (0.72f + frequencyUnit * 0.24f) - ny * 1.14f) *
+            (5.8f + frequencyUnit * 2.2f) -
+            timeBase * (1.1f + surfaceDensityUnit * 0.36f)
+          );
+      float crestAmount =
+        smoothstepf(0.58f - strengthUnit * 0.05f, 0.86f, fieldSmooth) *
+        smoothstepf(0.05f, 0.34f + strengthUnit * 0.04f, slope);
+      float ridgeHighlight =
+        crestAmount *
+        powf(
+          clampUnit(
+            0.5f +
+            0.5f *
+              sinf(
+                (ny * 2.04f + nx * 0.16f) * 15.6f -
+                timeBase * (1.12f + speedUnit * 0.22f)
+              )
+          ),
+          3.2f
+        ) *
+        (0.05f + intensityUnit * 0.09f + strengthUnit * 0.05f);
+      float foamAmount =
+        crestAmount *
+        smoothstepf(-0.2f, 0.05f, -curvature) *
+        (0.08f + intensityUnit * 0.14f + strengthUnit * 0.1f);
+      float highlightAmount =
+        crestAmount * longGlint * (0.12f + intensityUnit * 0.1f);
+      float sparkle =
+        smoothstepf(0.52f, 0.9f, fieldSmooth) *
+        powf(
+          clampUnit(1.0f - fabsf(gradientY * 0.7f + gradientX * 1.34f - 0.1f)),
+          4.0f
+        ) *
+        (0.03f + intensityUnit * 0.05f);
+      float foamGrain =
+        smoothstepf(0.8f - strengthUnit * 0.06f, 1.0f, fieldSmooth) *
+        powf(
+          clampUnit(
+            0.5f +
+            0.5f *
+              sinf(
+                nx * (26.0f + frequencyUnit * 12.0f) +
+                ny * 17.0f -
+                timeBase * (5.2f + frequencyUnit * 1.7f) +
+                sinf(ny * 11.0f + timeBase * 1.2f) * 0.6f
+              )
+          ),
+          4.6f
+        ) *
+        (0.02f + strengthUnit * 0.05f);
+      float subsurface =
+        smoothstepf(0.36f, 0.8f, fieldSmooth) *
+        (0.04f + (1.0f - ny) * (0.04f + waterLevelUnit * 0.08f) + undercurrent * 0.035f);
+      float troughShadow =
+        smoothstepf(0.08f, 0.52f, 1.0f - fieldSmooth) *
+        smoothstepf(0.035f, 0.28f, slope) *
+        0.24f;
+
+      float depthMix =
+        clampUnit(
+          0.04f +
+          ny * (0.5f + (1.0f - waterLevelUnit) * 0.18f) +
+          fieldSmooth * (0.16f + waterLevelUnit * 0.08f)
+        );
+      NativeRgb color = blendRgbColor(deep, mid, depthMix);
+      color =
+        blendRgbColor(
+          color,
+          shallow,
+          smoothstepf(0.5f, 0.88f, fieldSmooth) * 0.32f + highlightAmount * 0.08f
+        );
+      color = blendRgbColor(color, bright, subsurface);
+      color =
+        blendRgbColor(
+          color,
+          bright,
+          clampUnit(
+            highlightAmount * 0.78f +
+            ridgeHighlight * 0.74f +
+            specular * 0.28f +
+            sparkle
+          )
+        );
+      color = blendRgbColor(color, foam, foamAmount * 0.74f);
+      color = blendRgbColor(color, foam, foamGrain);
+      color = blendRgbColor(color, troughColor, troughShadow);
+
+      float edgeShade =
+        smoothstepf(
+          1.06f,
+          0.22f,
+          fabsf(nx - 0.5f) * 1.18f + fabsf(ny - 0.48f) * 0.54f
+        );
+      color = blendRgbColor(
+        edgeColor,
+        color,
+        0.42f + edgeShade * 0.58f
+      );
+
+      DisplayManager::dma_display->drawPixelRGB888(
+        x,
+        y,
+        color.r,
+        color.g,
+        color.b
+      );
+    }
+  }
+}
+
+static float sampleAmbientWaterCausticField(
+  float nx,
+  float ny,
+  float timeBase,
+  float speedUnit,
+  float intensityUnit
+) {
+  float px = (nx - 0.5f) * (11.6f + intensityUnit * 2.2f);
+  float py = (ny - 0.46f) * (13.4f + intensityUnit * 2.8f);
+  float ix = px;
+  float iy = py;
+  float energy = 0.0f;
+
+  for (int index = 0; index < 3; index++) {
+    float phase = timeBase * (1.2f + (float)index * 0.46f + speedUnit * 0.3f) + (float)index * 1.7f;
+    float warp =
+      sinf(iy * (1.7f + (float)index * 0.22f) + phase) *
+      (0.78f - (float)index * 0.12f);
+    float twist =
+      cosf(ix * (1.4f + (float)index * 0.28f) - phase * 0.86f) *
+      (0.66f - (float)index * 0.1f);
+    float nextX =
+      px + warp + sinf(phase + ix * 0.72f - iy * 0.38f) * 0.34f;
+    iy =
+      py + twist + cosf(phase * 0.92f + iy * 0.66f + ix * 0.24f) * 0.3f;
+    ix = nextX;
+    float ridge =
+      1.0f -
+      fabsf(
+        sinf(
+          ix * (2.2f + (float)index * 0.42f) +
+          iy * (1.8f + (float)index * 0.36f) +
+          phase * 1.6f
+        )
+      );
+    energy += powf(clampUnit(ridge), 2.3f - (float)index * 0.3f);
+  }
+
+  float swell =
+    0.5f +
+    0.5f *
+      sinf(
+        (nx * 1.12f - ny * 0.84f) * 6.6f -
+        timeBase * (0.56f + speedUnit * 0.18f)
+      );
+  float focus = smoothstepf(0.16f, 0.98f, ny);
+  return clampUnit(
+    powf(clampUnit(energy / 2.55f), 1.42f) * (0.72f + swell * 0.28f) * focus
+  );
+}
+
+static void renderAmbientWaterCurrent(
+  unsigned long elapsed,
+  float speedUnit,
+  float intensityUnit
+) {
+  DisplayManager::dma_display->fillScreenRGB888(1, 6, 18);
+
+  const float timeBase = (float)elapsed * (0.00032f + speedUnit * 0.00108f);
+  const NativeRgb abyss = makeRgb(1, 10, 26);
+  const NativeRgb deep = makeRgb(4, 38, 86);
+  const NativeRgb bright = makeRgb(18, 98, 176);
+  const NativeRgb glow = makeRgb(118, 198, 246);
+  const NativeRgb vein = makeRgb(1, 7, 20);
+
+  for (int y = 0; y < 64; y++) {
+    for (int x = 0; x < 64; x++) {
+      float nx = (float)x / 63.0f;
+      float ny = (float)y / 63.0f;
+      float flowA =
+        sinf(
+          nx * 8.1f +
+          timeBase * (2.2f + speedUnit * 1.4f) +
+          sinf(ny * 5.2f + timeBase * 0.8f) * 1.35f
+        );
+      float flowB =
+        sinf((nx + ny) * 7.4f - timeBase * (1.7f + speedUnit * 1.1f));
+      float flowC =
+        cosf(
+          ny * 9.2f - nx * 4.7f + timeBase * (1.3f + intensityUnit * 0.7f)
+        );
+      float currentField =
+        clampUnit(0.5f + 0.5f * (flowA * 0.42f + flowB * 0.34f + flowC * 0.24f));
+      float caustic =
+        sampleAmbientWaterCausticField(nx, ny, timeBase * 0.9f, speedUnit, intensityUnit);
+      float depthMix = clampUnit(0.1f + ny * 0.68f + currentField * 0.18f);
+      NativeRgb color = blendRgbColor(abyss, deep, depthMix);
+      color =
+        blendRgbColor(
+          color,
+          bright,
+          smoothstepf(0.48f, 0.94f, currentField) * 0.72f
+        );
+      color =
+        blendRgbColor(
+          color,
+          glow,
+          caustic * (0.44f + intensityUnit * 0.28f)
+        );
+
+      float darkVein =
+        smoothstepf(0.68f, 0.9f, currentField) * 0.18f * (1.0f - caustic);
+      color = blendRgbColor(color, vein, darkVein);
+
+      DisplayManager::dma_display->drawPixelRGB888(
+        x,
+        y,
+        color.r,
+        color.g,
+        color.b
+      );
+    }
+  }
+}
+
+static void renderAmbientWaterCaustics(
+  unsigned long elapsed,
+  float speedUnit,
+  float intensityUnit
+) {
+  DisplayManager::dma_display->fillScreenRGB888(1, 8, 20);
+
+  const float waterLevelUnit = 0.72f;
+  const float frequencyUnit = clampUnit(0.16f + speedUnit * 0.58f);
+  const float strengthUnit = clampUnit(0.18f + intensityUnit * 0.54f);
+  const float causticDensityUnit =
+    clampUnit(intensityUnit * 0.42f + frequencyUnit * 0.58f);
+  const float timeBase =
+    (float)elapsed *
+    (0.00028f + speedUnit * 0.00082f + frequencyUnit * 0.00056f);
+
+  const NativeRgb abyss = makeRgb(2, 14, 34);
+  const NativeRgb deep = makeRgb(4, 36, 78);
+  const NativeRgb teal = makeRgb(10, 82, 150);
+  const NativeRgb aqua = makeRgb(80, 172, 236);
+  const NativeRgb glint = makeRgb(208, 234, 250);
+  const NativeRgb shade = makeRgb(1, 10, 22);
+  const NativeRgb vignetteColor = makeRgb(2, 11, 24);
+
+  for (int y = 0; y < 64; y++) {
+    for (int x = 0; x < 64; x++) {
+      float nx = (float)x / 63.0f;
+      float ny = (float)y / 63.0f;
+
+      float caustic =
+        sampleAmbientWaterCausticField(
+          nx,
+          ny,
+          timeBase,
+          speedUnit,
+          causticDensityUnit
+        );
+      float lowWave =
+        0.5f +
+        0.5f *
+          sinf(
+            (nx * 0.82f + ny * (1.0f + waterLevelUnit * 0.3f)) *
+            (4.6f + frequencyUnit * 1.6f) -
+            timeBase * (0.72f + speedUnit * 0.2f)
+          );
+      float crossWave =
+        0.5f +
+        0.5f *
+          cosf(
+            (nx * 1.08f - ny * 0.48f) * (6.4f + causticDensityUnit * 2.2f) +
+            timeBase * (0.94f + causticDensityUnit * 0.24f)
+          );
+      float haze =
+        0.5f +
+        0.5f *
+          sinf(
+            (nx * 1.3f + ny * 0.64f) * 3.8f +
+            timeBase * (0.48f + intensityUnit * 0.16f) +
+              sinf(ny * 5.2f - timeBase * 0.64f) * 0.42f
+          );
+      caustic = clampUnit(caustic * 0.76f + lowWave * 0.12f + crossWave * 0.12f);
+      float bottomMix = smoothstepf(0.18f, 1.0f, ny);
+      float brightBand =
+        caustic *
+        powf(
+          clampUnit(
+            1.0f -
+            fabsf(
+              sinf(
+                (nx * 1.7f - ny * 1.18f) * 9.4f +
+                timeBase * (1.18f + speedUnit * 0.24f)
+              )
+            )
+          ),
+          3.4f
+        );
+      float dustFlash =
+        powf(
+          clampUnit(
+            0.5f +
+            0.5f *
+              sinf(
+                nx * (26.0f + frequencyUnit * 12.0f) +
+                ny * 18.0f -
+                timeBase * (4.4f + frequencyUnit * 1.2f)
+              )
+          ),
+          5.0f
+        ) *
+        (0.012f + strengthUnit * 0.04f) *
+        smoothstepf(0.18f, 0.84f, ny);
+      float darkShade = smoothstepf(0.46f, 0.96f, 1.0f - caustic) * 0.2f;
+
+      NativeRgb color =
+        blendRgbColor(
+          abyss,
+          deep,
+          0.18f + bottomMix * 0.44f + lowWave * 0.1f
+        );
+      color =
+        blendRgbColor(
+          color,
+          teal,
+          0.16f + haze * 0.22f + crossWave * 0.14f
+        );
+      color =
+        blendRgbColor(
+          color,
+          aqua,
+          clampUnit(
+            caustic * (0.22f + intensityUnit * 0.16f + strengthUnit * 0.12f) +
+            brightBand * 0.42f
+          )
+        );
+      color =
+        blendRgbColor(
+          color,
+          glint,
+          clampUnit(
+            brightBand * (0.1f + intensityUnit * 0.12f + strengthUnit * 0.08f) +
+            dustFlash
+          )
+        );
+      color = blendRgbColor(color, shade, darkShade);
+
+      float vignette =
+        smoothstepf(
+          1.12f,
+          0.16f,
+          fabsf(nx - 0.5f) * 1.08f + fabsf(ny - 0.62f) * 0.78f
+        );
+      color = blendRgbColor(vignetteColor, color, 0.46f + vignette * 0.54f);
+
+      DisplayManager::dma_display->drawPixelRGB888(
+        x,
+        y,
+        color.r,
+        color.g,
+        color.b
+      );
+    }
   }
 }
 
@@ -3450,58 +4376,6 @@ static void renderAmbientClockScene(unsigned long elapsed, float intensityUnit) 
   }
 }
 
-static void renderAmbientCountdownScene(unsigned long elapsed, float speedUnit) {
-  DisplayManager::dma_display->fillScreenRGB888(8, 10, 18);
-  int totalSeconds = 300;
-  int spent = ((int)floorf(((float)elapsed / 1000.0f) * (0.4f + speedUnit * 1.2f))) % totalSeconds;
-  int remaining = totalSeconds - spent;
-  int minutes = remaining / 60;
-  int seconds = remaining % 60;
-  char buffer[8];
-  snprintf(buffer, sizeof(buffer), "%02d:%02d", minutes, seconds);
-  float progress = (float)remaining / (float)totalSeconds;
-  bool warning = progress < 0.25f;
-  NativeRgb accent = warning ? makeRgb(255, 108, 82) : makeRgb(255, 212, 82);
-  NativeRgb border = warning ? makeRgb(124, 48, 44) : makeRgb(108, 84, 40);
-  drawAmbientPanelFrame(5, 13, 54, 38, makeRgb(10, 16, 28), border, scaleRgbColor(accent, 0.55f));
-  DisplayManager::drawTinyText("TIMER", 10, 17, DisplayManager::dma_display->color565(accent.r, accent.g, accent.b), 1);
-  drawAmbientChip(42, 17, 10, scaleRgbColor(accent, 0.7f));
-  drawAmbientTextCenteredInBox(buffer, 5, 54, 26, accent, 2);
-  drawAmbientRectOutline(10, 43, 44, 5, border);
-  int fillWidth = max(2, (int)roundf(progress * 42.0f));
-  fillAmbientRect(11, 44, fillWidth, 3, accent);
-  drawAmbientGlowDot(11 + fillWidth, 45, accent, 0.28f, 1);
-}
-
-static void renderAmbientWeatherScene(unsigned long elapsed, float speedUnit) {
-  DisplayManager::dma_display->fillScreenRGB888(6, 10, 18);
-  int phase = ((int)floorf(((float)elapsed / 1000.0f) * (0.28f + speedUnit * 0.2f))) % 3;
-  int temp = phase == 0 ? 26 : (phase == 1 ? 18 : 8);
-  char buffer[5];
-  snprintf(buffer, sizeof(buffer), "%02dC", temp);
-  NativeRgb panelBg = makeRgb(10, 16, 28);
-  NativeRgb border = makeRgb(30, 64, 94);
-  NativeRgb accent = makeRgb(224, 244, 255);
-  drawAmbientPanelFrame(6, 10, 52, 40, panelBg, border, makeRgb(92, 150, 198));
-
-  if (phase == 0) {
-    drawAmbientSunIcon(18, 24, makeRgb(255, 206, 84));
-    drawAmbientCloudIcon(10, 23, makeRgb(228, 236, 244), makeRgb(126, 184, 232));
-    DisplayManager::drawTinyText("SUN", 10, 41, DisplayManager::dma_display->color565(255, 214, 102), 1);
-  } else if (phase == 1) {
-    drawAmbientCloudIcon(8, 18, makeRgb(196, 214, 232), makeRgb(120, 176, 228));
-    drawAmbientRainDrops(13, 32, makeRgb(88, 176, 255));
-    DisplayManager::drawTinyText("RAIN", 8, 41, DisplayManager::dma_display->color565(146, 204, 255), 1);
-  } else {
-    drawAmbientCloudIcon(8, 18, makeRgb(214, 226, 236), makeRgb(156, 198, 236));
-    drawAmbientSnowFlakes(12, 33, makeRgb(240, 248, 255));
-    DisplayManager::drawTinyText("SNOW", 8, 41, DisplayManager::dma_display->color565(214, 234, 255), 1);
-  }
-
-  DisplayManager::drawTinyText(buffer, 32, 24, DisplayManager::dma_display->color565(accent.r, accent.g, accent.b), 2);
-  fillAmbientRect(35, 18, 18, 1, makeRgb(80, 132, 176));
-}
-
 static void renderAmbientGameOfLife(unsigned long elapsed, float intensityUnit) {
   DisplayManager::dma_display->fillScreenRGB888(4, 9, 13);
   uint8_t grid[16][16];
@@ -3620,7 +4494,11 @@ static bool renderAmbientExtendedScene(uint8_t preset, unsigned long elapsed, fl
     return true;
   }
   if (preset == AMBIENT_PRESET_FIREFLY_SWARM) {
-    renderAmbientMetaBlob(elapsed);
+    renderAmbientMetaBlob(
+      elapsed,
+      DisplayManager::ambientEffectConfig.speed,
+      DisplayManager::ambientEffectConfig.intensity
+    );
     return true;
   }
   if (preset == AMBIENT_PRESET_BOUNCING_LOGO) {
@@ -3633,14 +4511,6 @@ static bool renderAmbientExtendedScene(uint8_t preset, unsigned long elapsed, fl
   }
   if (preset == AMBIENT_PRESET_CLOCK_SCENE) {
     renderAmbientClockScene(elapsed, intensityUnit);
-    return true;
-  }
-  if (preset == AMBIENT_PRESET_COUNTDOWN_SCENE) {
-    renderAmbientCountdownScene(elapsed, speedUnit);
-    return true;
-  }
-  if (preset == AMBIENT_PRESET_WEATHER_SCENE) {
-    renderAmbientWeatherScene(elapsed, speedUnit);
     return true;
   }
   if (preset == AMBIENT_PRESET_GAME_OF_LIFE) {
@@ -3665,6 +4535,18 @@ static bool renderAmbientExtendedScene(uint8_t preset, unsigned long elapsed, fl
   }
   if (preset == AMBIENT_PRESET_DEEP_SPACE_NEBULA) {
     renderAmbientDeepSpaceNebula(elapsed, speedUnit, intensityUnit);
+    return true;
+  }
+  if (preset == AMBIENT_PRESET_WATER_SURFACE) {
+    renderAmbientWaterSurface(elapsed, speedUnit, intensityUnit);
+    return true;
+  }
+  if (preset == AMBIENT_PRESET_WATER_CURRENT) {
+    renderAmbientWaterCurrent(elapsed, speedUnit, intensityUnit);
+    return true;
+  }
+  if (preset == AMBIENT_PRESET_WATER_CAUSTICS) {
+    renderAmbientWaterCaustics(elapsed, speedUnit, intensityUnit);
     return true;
   }
   if (preset == AMBIENT_PRESET_SUNSET_BLUSH) {
@@ -4314,6 +5196,7 @@ void DisplayManager::renderNativeEffect() {
     float timeBase = (float)elapsed * (0.00045f + speedUnit * 0.00135f);
 
     if (renderAmbientExtendedScene(ambientEffectConfig.preset, elapsed, speedUnit, intensityUnit)) {
+      drawAmbientWaterWorldTimeOverlayIfNeeded();
       return;
     }
 
@@ -4494,7 +5377,17 @@ void DisplayManager::renderNativeEffect() {
         dma_display->drawPixelRGB888(x, y, r, g, b);
       }
     }
+    drawAmbientWaterWorldTimeOverlayIfNeeded();
     return;
   }
 
+}
+static ClockConfig& resolveActiveClockConfig() {
+  if (DisplayManager::currentBusinessModeTag == ModeTags::TETRIS) {
+    return ConfigManager::tetrisOverlayClockConfig;
+  }
+  if (DisplayManager::currentMode == MODE_ANIMATION) {
+    return ConfigManager::animClockConfig;
+  }
+  return ConfigManager::clockConfig;
 }

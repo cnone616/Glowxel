@@ -6,7 +6,6 @@
 #include "wifi_manager.h"
 #include "ota_manager.h"
 #include "tetris_effect.h"
-#include "game_screensaver_effect.h"
 #include "clock_font_renderer.h"
 #include "device_mode_tag_codec.h"
 #include "mode_tags.h"
@@ -16,9 +15,17 @@
 #include "websocket_command_handlers.h"
 
 namespace {
+constexpr uint32_t kWebSocketTcpKeepAliveMs = 15000;
+constexpr uint8_t kWebSocketTcpKeepAliveProbeCount = 3;
+constexpr size_t kImmediateWsCommandMaxLen = 128;
+constexpr size_t kImmediateWsCommandJsonCapacity = 192;
+constexpr size_t kQueuedWsCommandProbeJsonCapacity = 128;
+constexpr size_t kQueuedWsCommandBaseJsonCapacity = 2048;
+
 struct ClientTextMessageState {
   uint32_t clientId;
-  String fragmentBuffer;
+  char* buffer;
+  size_t expectedLen;
   bool inUse;
 };
 
@@ -37,7 +44,8 @@ struct ClientBinaryMessageState {
 
 constexpr size_t kClientTextStateCount = 4;
 constexpr size_t kClientBinaryStateCount = 4;
-constexpr size_t kPendingTextQueueCapacity = 8;
+constexpr size_t kPendingTextQueueCapacity = 16;
+constexpr size_t kQueuedWsCommandsPerTick = 2;
 ClientTextMessageState gClientTextStates[kClientTextStateCount] = {};
 ClientBinaryMessageState gClientBinaryStates[kClientBinaryStateCount] = {};
 PendingTextMessage* gPendingTextQueue[kPendingTextQueueCapacity] = {};
@@ -45,6 +53,8 @@ size_t gPendingTextQueueHead = 0;
 size_t gPendingTextQueueTail = 0;
 size_t gPendingTextQueueCount = 0;
 portMUX_TYPE gPendingTextQueueMux = portMUX_INITIALIZER_UNLOCKED;
+uint32_t gPendingBinaryAnimationUploadClientId = 0;
+uint32_t gStreamingAnimationUploadClientId = 0;
 PixelData* gBinaryImageBackup = nullptr;
 int gBinaryImageBackupCount = 0;
 DeviceMode gBinaryImageBackupMode = MODE_CLOCK;
@@ -71,6 +81,45 @@ void freeBinaryImageBackupStorage() {
   }
   gBinaryImageBackupCount = 0;
   gBinaryImageBackupActive = false;
+}
+
+void clearTextState(ClientTextMessageState& state) {
+  if (state.buffer != nullptr) {
+    free(state.buffer);
+    state.buffer = nullptr;
+  }
+  state.clientId = 0;
+  state.expectedLen = 0;
+  state.inUse = false;
+}
+
+bool isPendingBinaryAnimationUpload(uint32_t clientId) {
+  return gPendingBinaryAnimationUploadClientId != 0 &&
+         gPendingBinaryAnimationUploadClientId == clientId;
+}
+
+bool isStreamingAnimationUpload(uint32_t clientId) {
+  return gStreamingAnimationUploadClientId != 0 &&
+         gStreamingAnimationUploadClientId == clientId;
+}
+
+void restoreRuntimeAfterAnimationUploadFailure() {
+  WebSocketHandler::clearPendingBinaryAnimationUpload();
+  WebSocketHandler::clearStreamingAnimationUpload();
+  AnimationManager::receivingFrameIndex = -1;
+  AnimationManager::freeGIFAnimation();
+  AnimationManager::loadAnimation();
+
+  if (DisplayManager::isLoadingActive) {
+    DisplayManager::stopLoadingAnimation();
+  }
+
+  if (RuntimeModeCoordinator::isTransientRuntimeMode(DisplayManager::currentMode)) {
+    RuntimeModeCoordinator::restoreAfterTransientDisconnect(true, false);
+    return;
+  }
+
+  RuntimeModeCoordinator::restoreCurrentModeFrame(false);
 }
 
 bool snapshotBinaryImageState(DeviceMode mode) {
@@ -237,7 +286,8 @@ ClientTextMessageState* getClientTextState(uint32_t clientId, bool createIfMissi
   for (size_t i = 0; i < kClientTextStateCount; i++) {
     if (!gClientTextStates[i].inUse) {
       gClientTextStates[i].clientId = clientId;
-      gClientTextStates[i].fragmentBuffer = "";
+      gClientTextStates[i].buffer = nullptr;
+      gClientTextStates[i].expectedLen = 0;
       gClientTextStates[i].inUse = true;
       return &gClientTextStates[i];
     }
@@ -252,9 +302,7 @@ void clearClientTextState(uint32_t clientId) {
     return;
   }
 
-  state->fragmentBuffer = "";
-  state->clientId = 0;
-  state->inUse = false;
+  clearTextState(*state);
 }
 
 void clearBinaryState(ClientBinaryMessageState& state) {
@@ -364,6 +412,92 @@ void logClientIdTextSendResult(const char* tag, uint32_t clientId, size_t len, b
     millis()
   );
 }
+
+bool tryHandleImmediateWsCommand(
+  AsyncWebSocketClient* client,
+  const char* payload,
+  size_t len
+) {
+  if (client == nullptr || payload == nullptr || len == 0 || len > kImmediateWsCommandMaxLen) {
+    return false;
+  }
+
+  StaticJsonDocument<kImmediateWsCommandJsonCapacity> doc;
+  DeserializationError error = deserializeJson(doc, payload, len);
+  if (error) {
+    return false;
+  }
+
+  const char* cmd = doc["cmd"];
+  if (cmd == nullptr) {
+    return false;
+  }
+
+  if (strcmp(cmd, "ping") == 0) {
+    StaticJsonDocument<64> response;
+    response["status"] = "ok";
+    response["message"] = "pong";
+
+    String responseStr;
+    serializeJson(response, responseStr);
+    bool sent = client->text(responseStr);
+    logClientTextSendResult("ping_response_fast", client, responseStr.length(), sent);
+    return true;
+  }
+
+  return false;
+}
+
+bool queuedWsCommandNeedsExpandedJsonCapacity(const char* payload, size_t len) {
+  if (payload == nullptr || len == 0) {
+    return false;
+  }
+
+  StaticJsonDocument<32> filter;
+  filter["cmd"] = true;
+
+  StaticJsonDocument<kQueuedWsCommandProbeJsonCapacity> doc;
+  DeserializationError error =
+    deserializeJson(
+      doc,
+      static_cast<const char*>(payload),
+      len,
+      DeserializationOption::Filter(filter)
+    );
+  if (error) {
+    return false;
+  }
+
+  const char* cmd = doc["cmd"];
+  if (cmd == nullptr) {
+    return false;
+  }
+
+  return strcmp(cmd, "image") == 0 ||
+         strcmp(cmd, "image_sparse") == 0 ||
+         strcmp(cmd, "image_chunk") == 0 ||
+         strcmp(cmd, "set_gif_animation") == 0;
+}
+
+size_t resolveQueuedWsCommandJsonCapacity(
+  const char* payload,
+  size_t len,
+  size_t freeHeap
+) {
+  size_t capacity = kQueuedWsCommandBaseJsonCapacity;
+  if (queuedWsCommandNeedsExpandedJsonCapacity(payload, len)) {
+    capacity = len * 8 + kQueuedWsCommandBaseJsonCapacity;
+  }
+
+  size_t heapLimit = static_cast<size_t>(freeHeap * 0.7);
+  if (capacity > heapLimit) {
+    capacity = heapLimit;
+  }
+  if (capacity < kQueuedWsCommandBaseJsonCapacity) {
+    capacity = kQueuedWsCommandBaseJsonCapacity;
+  }
+  return capacity;
+}
 }
 
 // 静态成员初始化
@@ -371,8 +505,6 @@ AsyncWebSocket WebSocketHandler::ws("/ws");
 unsigned long WebSocketHandler::lastBinaryReceiveTime = 0;
 bool WebSocketHandler::binaryDataPending = false;
 uint32_t WebSocketHandler::lastBinaryClientId = 0;
-String WebSocketHandler::fragmentBuffer = "";
-bool WebSocketHandler::isReceivingFragments = false;
 unsigned long WebSocketHandler::lastMessageTime = 0;
 
 const char* WebSocketHandler::getCurrentModeString() {
@@ -402,10 +534,10 @@ void WebSocketHandler::syncClientConnectionState() {
 
 void WebSocketHandler::clearAllClientTextStates() {
   for (size_t i = 0; i < kClientTextStateCount; i++) {
-    gClientTextStates[i].fragmentBuffer = "";
-    gClientTextStates[i].clientId = 0;
-    gClientTextStates[i].inUse = false;
+    clearTextState(gClientTextStates[i]);
   }
+  clearPendingBinaryAnimationUpload();
+  clearStreamingAnimationUpload();
   clearAllClientBinaryStates();
   clearAllPendingTextMessages();
 }
@@ -414,10 +546,10 @@ void WebSocketHandler::resetTransientTransferState() {
   binaryDataPending = false;
   lastBinaryReceiveTime = 0;
   lastBinaryClientId = 0;
+  clearPendingBinaryAnimationUpload();
+  clearStreamingAnimationUpload();
   clearAllClientBinaryStates();
   clearBinaryImageTransferBackup();
-  AnimationManager::abortUploadSession();
-  AnimationManager::receivingFrameIndex = -1;
   DisplayManager::receivingPixels = false;
   if (DisplayManager::isLoadingActive) {
     DisplayManager::stopLoadingAnimation();
@@ -442,11 +574,22 @@ void WebSocketHandler::clearBinaryImageTransferBackup() {
 }
 
 void WebSocketHandler::finalizeClientDisconnect(uint32_t clientId, bool fromHeartbeatTimeout) {
+  const bool wasBinaryAnimationUpload = isPendingBinaryAnimationUpload(clientId);
+  const bool wasStreamingAnimationUpload = isStreamingAnimationUpload(clientId);
   clearClientTextState(clientId);
   clearClientBinaryState(clientId);
+  clearPendingBinaryAnimationUpload(clientId);
+  clearStreamingAnimationUpload(clientId);
   if (lastBinaryClientId == clientId) {
     lastBinaryClientId = 0;
   }
+
+  if (wasBinaryAnimationUpload || wasStreamingAnimationUpload) {
+    Serial.println("动画上传客户端已断开，恢复稳定态");
+    restoreRuntimeAfterAnimationUploadFailure();
+  }
+
+  RuntimeCommandBus::handleWebSocketTransactionDisconnect(clientId);
 
   syncClientConnectionState();
   if (DisplayManager::clientConnected) {
@@ -454,8 +597,7 @@ void WebSocketHandler::finalizeClientDisconnect(uint32_t clientId, bool fromHear
   }
 
   if (RuntimeModeCoordinator::isTransientRuntimeMode(DisplayManager::currentMode) ||
-      DisplayManager::receivingPixels ||
-      AnimationManager::isUploadSessionActive()) {
+      DisplayManager::receivingPixels) {
     DeviceMode fromMode = DisplayManager::currentMode;
     Serial.printf(
       "%s自动恢复模式: %s -> %s\n",
@@ -470,6 +612,32 @@ void WebSocketHandler::finalizeClientDisconnect(uint32_t clientId, bool fromHear
   if (fromHeartbeatTimeout) {
     RuntimeCommandBus::enqueueRestoreAfterTransientDisconnect(true);
   }
+}
+
+void WebSocketHandler::prepareBinaryAnimationUpload(uint32_t clientId) {
+  gPendingBinaryAnimationUploadClientId = clientId;
+}
+
+void WebSocketHandler::clearPendingBinaryAnimationUpload(uint32_t clientId) {
+  if (clientId != 0 && gPendingBinaryAnimationUploadClientId != clientId) {
+    return;
+  }
+  gPendingBinaryAnimationUploadClientId = 0;
+}
+
+void WebSocketHandler::prepareStreamingAnimationUpload(uint32_t clientId) {
+  gStreamingAnimationUploadClientId = clientId;
+}
+
+void WebSocketHandler::clearStreamingAnimationUpload(uint32_t clientId) {
+  if (clientId != 0 && gStreamingAnimationUploadClientId != clientId) {
+    return;
+  }
+  gStreamingAnimationUploadClientId = 0;
+}
+
+void WebSocketHandler::restoreAfterAnimationUploadFailure() {
+  restoreRuntimeAfterAnimationUploadFailure();
 }
 
 void WebSocketHandler::sendBinaryReceiveConfirmation(int pixelCount) {
@@ -490,72 +658,72 @@ void WebSocketHandler::sendBinaryReceiveConfirmation(int pixelCount) {
 }
 
 void WebSocketHandler::tick() {
-  PendingTextMessage* message = nullptr;
-  portENTER_CRITICAL(&gPendingTextQueueMux);
-  if (gPendingTextQueueCount > 0) {
-    message = dequeuePendingTextMessage();
-  }
-  portEXIT_CRITICAL(&gPendingTextQueueMux);
+  for (size_t processedCount = 0; processedCount < kQueuedWsCommandsPerTick; processedCount += 1) {
+    PendingTextMessage* message = nullptr;
+    portENTER_CRITICAL(&gPendingTextQueueMux);
+    if (gPendingTextQueueCount > 0) {
+      message = dequeuePendingTextMessage();
+    }
+    portEXIT_CRITICAL(&gPendingTextQueueMux);
 
-  if (message == nullptr) {
-    return;
-  }
+    if (message == nullptr) {
+      return;
+    }
 
-  AsyncWebSocketClient* client = ws.client(message->clientId);
-  if (client == nullptr || client->status() != WS_CONNECTED) {
-    Serial.printf("[WS] 丢弃已断开客户端的文本消息: client=%u\n", message->clientId);
+    AsyncWebSocketClient* client = ws.client(message->clientId);
+    if (client == nullptr || client->status() != WS_CONNECTED) {
+      Serial.printf("[WS] 丢弃已断开客户端的文本消息: client=%u\n", message->clientId);
+      destroyPendingTextMessage(message);
+      continue;
+    }
+
+    size_t freeHeap = ESP.getFreeHeap();
+    size_t maxJsonSize =
+      resolveQueuedWsCommandJsonCapacity(message->payload, message->len, freeHeap);
+
+    Serial.printf("主循环处理 JSON: client=%u data=%u bytes json=%u bytes\n",
+                  message->clientId,
+                  static_cast<unsigned>(message->len),
+                  static_cast<unsigned>(maxJsonSize));
+
+    if (maxJsonSize > freeHeap * 0.85) {
+      ws.text(
+        message->clientId,
+        String("{\"error\":\"insufficient memory\",\"needed\":") +
+        String(maxJsonSize) +
+        ",\"available\":" +
+        String(freeHeap) +
+        "}"
+      );
+      destroyPendingTextMessage(message);
+      continue;
+    }
+
+    DynamicJsonDocument doc(maxJsonSize);
+    if (doc.capacity() < maxJsonSize) {
+      Serial.printf("[WS] JSON文档分配不足: requested=%u actual=%u free=%u\n",
+                    static_cast<unsigned>(maxJsonSize),
+                    static_cast<unsigned>(doc.capacity()),
+                    static_cast<unsigned>(freeHeap));
+    }
+    DeserializationError error = deserializeJson(doc, message->payload, message->len);
+    if (error) {
+      Serial.print("JSON解析失败: ");
+      Serial.println(error.c_str());
+      ws.text(
+        message->clientId,
+        String("{\"error\":\"invalid json\",\"details\":\"") +
+        String(error.c_str()) +
+        "\"}"
+      );
+      destroyPendingTextMessage(message);
+      continue;
+    }
+
+    Serial.println("JSON解析成功，处理命令");
+    handleJsonCommand(client, doc);
     destroyPendingTextMessage(message);
-    return;
   }
-
-  size_t freeHeap = ESP.getFreeHeap();
-  bool isChunkCmd = strstr(message->payload, "\"cmd\":\"frame_chunk\"") != nullptr;
-  size_t multiplier = isChunkCmd ? 4 : 8;
-  size_t maxJsonSize = message->len * multiplier + 2048;
-  size_t heapLimit = (size_t)(freeHeap * 0.7);
-  if (maxJsonSize > heapLimit) {
-    maxJsonSize = heapLimit;
-  }
-  if (maxJsonSize < 2048) {
-    maxJsonSize = 2048;
-  }
-
-  Serial.printf("主循环处理 JSON: client=%u data=%u bytes json=%u bytes\n",
-                message->clientId,
-                static_cast<unsigned>(message->len),
-                static_cast<unsigned>(maxJsonSize));
-
-  if (maxJsonSize > freeHeap * 0.85) {
-    ws.text(
-      message->clientId,
-      String("{\"error\":\"insufficient memory\",\"needed\":") +
-      String(maxJsonSize) +
-      ",\"available\":" +
-      String(freeHeap) +
-      "}"
-    );
-    destroyPendingTextMessage(message);
-    return;
-  }
-
-  DynamicJsonDocument doc(maxJsonSize);
-  DeserializationError error = deserializeJson(doc, message->payload, message->len);
-  if (error) {
-    Serial.print("JSON解析失败: ");
-    Serial.println(error.c_str());
-    ws.text(
-      message->clientId,
-      String("{\"error\":\"invalid json\",\"details\":\"") +
-      String(error.c_str()) +
-      "\"}"
-    );
-    destroyPendingTextMessage(message);
-    return;
-  }
-
-  Serial.println("JSON解析成功，处理命令");
-  handleJsonCommand(client, doc);
-  destroyPendingTextMessage(message);
 }
 
 void WebSocketHandler::onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, 
@@ -563,6 +731,24 @@ void WebSocketHandler::onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *c
   if (type == WS_EVT_CONNECT) {
     Serial.printf("WebSocket 客户端已连接: %u\n", client->id());
     client->setCloseClientOnQueueFull(false);
+    AsyncClient* rawClient = client->client();
+    if (rawClient != nullptr) {
+      rawClient->setNoDelay(true);
+      rawClient->setKeepAlive(
+        kWebSocketTcpKeepAliveMs,
+        kWebSocketTcpKeepAliveProbeCount
+      );
+      client->keepAlivePeriod(15);
+      Serial.printf(
+        "[WS] client=%u transport tuned ack_timeout=%lu keepalive_ms=%lu keepalive_cnt=%u ws_ping_s=%u nodelay=%u\n",
+                    client->id(),
+                    static_cast<unsigned long>(rawClient->getAckTimeout()),
+                    static_cast<unsigned long>(kWebSocketTcpKeepAliveMs),
+                    static_cast<unsigned int>(kWebSocketTcpKeepAliveProbeCount),
+                    static_cast<unsigned int>(client->keepAlivePeriod()),
+                    rawClient->getNoDelay() ? 1U : 0U
+      );
+    }
     syncClientConnectionState();
     lastMessageTime = millis();
     clearClientTextState(client->id());
@@ -574,7 +760,7 @@ void WebSocketHandler::onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *c
     String modeStr = modeToString(DisplayManager::currentMode);
     String businessModeStr = getCurrentModeString();
     String response =
-      "{\"status\":\"connected\",\"device\":\"RenLight\",\"mode\":\"" +
+      "{\"status\":\"connected\",\"device\":\"Glowxel PixelBoard\",\"mode\":\"" +
       modeStr +
       "\",\"businessMode\":\"" +
       businessModeStr +
@@ -677,189 +863,67 @@ void WebSocketHandler::handleBinaryMessage(
 }
 
 void WebSocketHandler::handleBinaryData(AsyncWebSocketClient *client, uint8_t *data, size_t len) {
-  // 二进制格式：每5字节一个像素 (x, y, r, g, b)
-  lastBinaryClientId = client->id();
-
-  // 数据完整性检查
-  if (len % 5 != 0) {
-    Serial.printf("⚠️ 数据长度错误: %d 字节不能被5整除！\n", len);
-    client->text("{\"status\":\"error\",\"message\":\"invalid data length\"}");
+  StaticJsonDocument<768> txResponse;
+  bool txResponseReady = false;
+  if (RuntimeCommandBus::appendWebSocketTransactionBinary(
+        client,
+        data,
+        len,
+        txResponse,
+        txResponseReady)) {
+    if (txResponseReady && client != nullptr) {
+      RuntimeCommandBus::queueOrSendClientResponse(client->id(), txResponse);
+    }
     return;
   }
 
-  int pixelCount = len / 5;
+  if (client != nullptr && isPendingBinaryAnimationUpload(client->id())) {
+    clearPendingBinaryAnimationUpload(client->id());
 
-  if (pixelCount > 0) {
-    // 动画帧二进制数据：如果正在接收动画帧，追加到对应帧
-    if (AnimationManager::receivingFrameIndex >= 0) {
-      int idx = AnimationManager::receivingFrameIndex;
-
-      // 调试：打印接收到的数据详情
-      static int chunkCount = 0;
-      static int lastFrameIndex = -1;
-
-      // 检测帧切换，重置计数器
-      if (idx != lastFrameIndex) {
-        chunkCount = 0;
-        lastFrameIndex = idx;
+    StaticJsonDocument<256> response;
+    if (AnimationManager::loadGIFAnimationBinary(data, len)) {
+      if (!AnimationManager::saveAnimation()) {
+        response["status"] = "error";
+        response["message"] = "animation persistence failed";
+        restoreRuntimeAfterAnimationUploadFailure();
+      } else {
+        response["status"] = "success";
+        response["message"] = "compact animation loaded";
+        response["frameCount"] =
+          AnimationManager::currentGIF != nullptr ? AnimationManager::currentGIF->frameCount : 0;
       }
-
-      chunkCount++;
-      Serial.printf("[ESP32] 帧 %d chunk %d: 接收 %d 字节, %d 像素\n", idx, chunkCount, len, pixelCount);
-
-      // 打印前3个像素用于对比
-      if (chunkCount == 1 && len >= 15) {
-        Serial.printf("[ESP32] 前3像素: [%d,%d,%d,%d,%d] [%d,%d,%d,%d,%d] [%d,%d,%d,%d,%d]\n",
-          data[0], data[1], data[2], data[3], data[4],
-          data[5], data[6], data[7], data[8], data[9],
-          data[10], data[11], data[12], data[13], data[14]);
-      }
-
-      bool ok = AnimationManager::addFrameChunkBinary(idx, data, pixelCount);
-      if (!ok) {
-        client->text("{\"status\":\"error\",\"message\":\"binary chunk failed\",\"index\":" + String(idx) + "}");
-        RuntimeCommandBus::enqueueAbortTransientTransferAndRestore("动画二进制 chunk 追加失败，恢复稳定态");
-      }
-
-      return;
-    }
-
-    // 画板模式：保存到 canvasBuffer（64x64完整画布）
-    if (DisplayManager::currentMode == MODE_CANVAS) {
-      
-      // 第一次接收时初始化画布（清空）
-      if (!DisplayManager::canvasInitialized) {
-        DisplayManager::clearCanvas();
-        DisplayManager::canvasInitialized = true;
-      }
-      
-      // 先统计本批有效的黑色像素数量（在范围内的）
-      int newBlackCount = 0;
-      for (size_t i = 0; i + 4 < len; i += 5) {
-        uint8_t x = data[i];
-        uint8_t y = data[i + 1];
-        uint8_t r = data[i + 2];
-        uint8_t g = data[i + 3];
-        uint8_t b = data[i + 4];
-        if (x < DisplayManager::PANEL_RES_X && y < DisplayManager::PANEL_RES_Y && r == 0 && g == 0 && b == 0) {
-          newBlackCount++;
-        }
-      }
-      
-      // 扩展黑色像素数组（累加，不是替换）
-      if (newBlackCount > 0) {
-        DisplayManager::BlackPixel* newBuffer = (DisplayManager::BlackPixel*)realloc(DisplayManager::blackPixels, sizeof(DisplayManager::BlackPixel) * (DisplayManager::blackPixelCount + newBlackCount));
-        if (newBuffer == nullptr) {
-          return;
-        }
-        DisplayManager::blackPixels = newBuffer;
-      }
-      
-      int validPixels = 0;
-      for (size_t i = 0; i + 4 < len; i += 5) {
-        uint8_t x = data[i];
-        uint8_t y = data[i + 1];
-        uint8_t r = data[i + 2];
-        uint8_t g = data[i + 3];
-        uint8_t b = data[i + 4];
-        
-        if (x < DisplayManager::PANEL_RES_X && y < DisplayManager::PANEL_RES_Y) {
-          // 存储到画布缓冲区
-          DisplayManager::canvasBuffer[y][x][0] = r;
-          DisplayManager::canvasBuffer[y][x][1] = g;
-          DisplayManager::canvasBuffer[y][x][2] = b;
-          validPixels++;
-          
-          // 如果是黑色，记录坐标
-          if (r == 0 && g == 0 && b == 0 && DisplayManager::blackPixels != nullptr) {
-            DisplayManager::blackPixels[DisplayManager::blackPixelCount].x = x;
-            DisplayManager::blackPixels[DisplayManager::blackPixelCount].y = y;
-            DisplayManager::blackPixelCount++;
-          }
-          
-          // 立即绘制
-          DisplayManager::dma_display->drawPixelRGB888(x, y, r, g, b);
-        }
-        
-        if (i % 500 == 0) yield();
-      }
-      
-      return;
-    }
-    
-    // 静态时钟背景模式：保存到 staticImagePixels
-    PixelData*& imagePixels = (DisplayManager::currentMode == MODE_ANIMATION)
-      ? ConfigManager::animImagePixels
-      : ConfigManager::staticImagePixels;
-
-    int& imagePixelCount = (DisplayManager::currentMode == MODE_ANIMATION)
-      ? ConfigManager::animImagePixelCount
-      : ConfigManager::staticImagePixelCount;
-
-    DeviceMode imageMode = DisplayManager::currentMode;
-
-    bool needStartNewBatch = !DisplayManager::receivingPixels && !binaryDataPending;
-
-    // 如果是新的一批数据（距离上次超过1秒），终止上一次未完成批次并恢复稳定画面
-    if (!needStartNewBatch && millis() - lastBinaryReceiveTime > 1000) {
-      if (DisplayManager::receivingPixels || binaryDataPending) {
-        Serial.println("静态像素接收超时，恢复上一稳定画面");
-        RuntimeCommandBus::enqueueAbortTransientTransferAndRestore("静态像素接收超时，恢复上一稳定画面");
-        return;
-      }
-      needStartNewBatch = true;
-    }
-
-    if (needStartNewBatch) {
-      beginBinaryImageBatch(imageMode);
-    }
-
-    // 追加数据
-    PixelData* newBuffer = (PixelData*)realloc(imagePixels, sizeof(PixelData) * (imagePixelCount + pixelCount));
-    if (newBuffer != nullptr) {
-      imagePixels = newBuffer;
-
-      int validPixels = 0;
-      // 复制像素数据
-      for (size_t i = 0; i + 4 < len; i += 5) {
-        // 达到最大像素数量后，忽略后续数据，避免占用过多 NVS 空间
-        if (imagePixelCount >= DisplayManager::MAX_PIXELS) {
-          break;
-        }
-
-        uint8_t x = data[i];
-        uint8_t y = data[i + 1];
-        uint8_t r = data[i + 2];
-        uint8_t g = data[i + 3];
-        uint8_t b = data[i + 4];
-
-        if (x < DisplayManager::PANEL_RES_X && y < DisplayManager::PANEL_RES_Y) {
-          // 保存到内存
-          imagePixels[imagePixelCount].x = x;
-          imagePixels[imagePixelCount].y = y;
-          imagePixels[imagePixelCount].r = r;
-          imagePixels[imagePixelCount].g = g;
-          imagePixels[imagePixelCount].b = b;
-          imagePixelCount++;
-          validPixels++;
-
-          // 立即绘制
-          DisplayManager::dma_display->drawPixelRGB888(x, y, r, g, b);
-        }
-
-        // 每处理100个像素让出CPU，防止看门狗超时
-        if (i % 500 == 0) {
-          yield();
-        }
-      }
-      
-      // 更新接收时间，标记有待保存的数据
-      lastBinaryReceiveTime = millis();
-      binaryDataPending = true;
-      
     } else {
-      Serial.println("✗ 内存分配失败！");
+      response["status"] = "error";
+      response["message"] = "animation load failed";
+      restoreRuntimeAfterAnimationUploadFailure();
     }
+
+    String responseStr;
+    serializeJson(response, responseStr);
+    bool sent = client->text(responseStr);
+    logClientTextSendResult("animation_binary_response", client, responseStr.length(), sent);
+    return;
+  }
+
+  if (client != nullptr &&
+      isStreamingAnimationUpload(client->id()) &&
+      AnimationManager::receivingFrameIndex >= 0) {
+    if (len % 5 != 0) {
+      client->text("{\"status\":\"error\",\"message\":\"invalid data length\"}");
+      restoreRuntimeAfterAnimationUploadFailure();
+      return;
+    }
+
+    const int pixelCount = len / 5;
+    if (!AnimationManager::addFrameChunkBinary(AnimationManager::receivingFrameIndex, data, pixelCount)) {
+      client->text("{\"status\":\"error\",\"message\":\"frame chunk failed\"}");
+      restoreRuntimeAfterAnimationUploadFailure();
+    }
+    return;
+  }
+
+  if (client != nullptr) {
+    client->text("{\"status\":\"error\",\"message\":\"binary requires active transaction\"}");
   }
 }
 
@@ -873,31 +937,52 @@ void WebSocketHandler::handleJsonCommand(AsyncWebSocketClient *client, uint8_t *
     return;
   }
 
-  // === 分片重组逻辑 ===
   if (info->index == 0) {
-    // 第一个分片，清空缓冲区
-    clientState->fragmentBuffer = "";
-    clientState->fragmentBuffer.reserve(info->len);
+    clearTextState(*clientState);
+    clientState->clientId = client->id();
+    clientState->buffer = static_cast<char*>(malloc(info->len + 1));
+    if (clientState->buffer == nullptr) {
+      clearTextState(*clientState);
+      client->text("{\"status\":\"error\",\"message\":\"out of memory\"}");
+      return;
+    }
+    clientState->expectedLen = info->len;
+    clientState->inUse = true;
+
     bool isFragmentedMessage = !info->final || (info->len > len);
     if (isFragmentedMessage) {
       Serial.printf("开始接收分片数据，总大小: %llu bytes\n", info->len);
     }
   }
 
-  // 追加当前分片数据到缓冲区
-  clientState->fragmentBuffer += String((char*)data, len);
+  if (!clientState->inUse || clientState->buffer == nullptr || clientState->expectedLen != info->len) {
+    clearTextState(*clientState);
+    client->text("{\"status\":\"error\",\"message\":\"text fragment state mismatch\"}");
+    return;
+  }
 
-  // 如果还没收完，等待后续分片
+  if (info->index + len > clientState->expectedLen) {
+    clearTextState(*clientState);
+    client->text("{\"status\":\"error\",\"message\":\"text fragment overflow\"}");
+    return;
+  }
+
+  memcpy(clientState->buffer + info->index, data, len);
+
   if (!info->final || (info->index + len) < info->len) {
     Serial.printf("分片接收中: %llu/%llu bytes\n", info->index + len, info->len);
     return;
   }
 
-  // === 完整消息已收齐，开始解析 ===
-  size_t totalLen = clientState->fragmentBuffer.length();
+  clientState->buffer[clientState->expectedLen] = '\0';
+  size_t totalLen = clientState->expectedLen;
   Serial.printf("完整消息已收齐: %d bytes\n", totalLen);
-  PendingTextMessage* message = createPendingTextMessage(client->id(), clientState->fragmentBuffer.c_str(), totalLen);
-  clientState->fragmentBuffer = "";
+  if (tryHandleImmediateWsCommand(client, clientState->buffer, totalLen)) {
+    clearTextState(*clientState);
+    return;
+  }
+  PendingTextMessage* message = createPendingTextMessage(client->id(), clientState->buffer, totalLen);
+  clearTextState(*clientState);
   if (message == nullptr) {
     client->text("{\"status\":\"error\",\"message\":\"out of memory\"}");
     return;
@@ -912,6 +997,38 @@ void WebSocketHandler::handleJsonCommand(AsyncWebSocketClient *client, uint8_t *
 void WebSocketHandler::handleJsonCommand(AsyncWebSocketClient *client, JsonDocument& doc) {
   String cmd = doc["cmd"].as<String>();
   Serial.println("命令: " + cmd);
+
+  StaticJsonDocument<768> response;
+  bool responseSent = false;
+
+  if (cmd == "tx_begin") {
+    if (RuntimeCommandBus::beginWebSocketTransaction(client, doc, response, responseSent)) {
+      if (!responseSent && client != nullptr) {
+        RuntimeCommandBus::queueOrSendClientResponse(client->id(), response);
+      }
+      return;
+    }
+  }
+
+  if (cmd == "tx_commit") {
+    if (RuntimeCommandBus::commitWebSocketTransaction(client, doc, response)) {
+      const char* status = response["status"];
+      if (status != nullptr && client != nullptr) {
+        RuntimeCommandBus::queueOrSendClientResponse(client->id(), response);
+      }
+      return;
+    }
+  }
+
+  if (cmd == "tx_abort") {
+    if (RuntimeCommandBus::abortWebSocketTransaction(client, doc, response)) {
+      const char* status = response["status"];
+      if (status != nullptr && client != nullptr) {
+        RuntimeCommandBus::queueOrSendClientResponse(client->id(), response);
+      }
+      return;
+    }
+  }
 
   if (cmd == "status") {
     StaticJsonDocument<RuntimeStatusBuilder::kStatusJsonCapacity> statusResponse;
@@ -930,11 +1047,8 @@ void WebSocketHandler::handleJsonCommand(AsyncWebSocketClient *client, JsonDocum
     logClientTextSendResult("status_response", client, responseStr.length(), sent);
     return;
   }
-  
-  StaticJsonDocument<768> response;
-  response["status"] = "ok";
 
-  bool responseSent = false;
+  response["status"] = "ok";
   bool handled =
     WebSocketCommandHandlers::handleBasicCommand(client, doc, response, getCurrentModeString()) ||
     WebSocketCommandHandlers::handleModeCommand(client, doc, response, responseSent) ||
@@ -952,6 +1066,11 @@ void WebSocketHandler::handleJsonCommand(AsyncWebSocketClient *client, JsonDocum
   }
 
   if (responseSent) {
+    return;
+  }
+
+  if (client != nullptr) {
+    RuntimeCommandBus::queueOrSendClientResponse(client->id(), response);
     return;
   }
 

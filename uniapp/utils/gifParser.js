@@ -392,15 +392,20 @@ export class GIFParser {
     offsetX = 0,
     offsetY = 0,
     preRendered = null,
+    speedScale = 1,
   ) {
     const rendered = preRendered || this.renderFrames(targetW, targetH);
     const count = Math.min(rendered.length, maxFrames);
     const frames = [];
     let prevRgba = null;
+    const normalizedSpeed = Math.min(4, Math.max(0.5, speedScale));
 
     for (let i = 0; i < count; i++) {
       const { rgba, delay } = rendered[i];
-      const safeDelay = Math.max(50, delay || 100);
+      const safeDelay = Math.max(
+        50,
+        Math.round((delay || 100) / normalizedSpeed),
+      );
 
       // 收集当前帧非黑像素，用 Uint8Array 存储 [x,y,r,g,b, ...]
       const tmpFull = new Uint8Array(targetW * targetH * 5);

@@ -5,9 +5,10 @@
 #include <Preferences.h>
 #include <ArduinoJson.h>
 #include "clock_font_renderer.h"
-#include "game_screensaver_types.h"
+#include "maze_mode_types.h"
+#include "snake_mode_types.h"
 
-#define CONFIG_VERSION 11  // 改默认配置时递增此版本号
+#define CONFIG_VERSION 12  // 改默认配置时递增此版本号
 
 // 闹钟配置结构
 struct ClockConfig {
@@ -54,6 +55,12 @@ struct ClockConfig {
 };
 
 struct EyesConfig {
+  enum ExpressionRhythm : uint8_t {
+    EXPRESSION_RHYTHM_SLOW = 0,
+    EXPRESSION_RHYTHM_STANDARD = 1,
+    EXPRESSION_RHYTHM_LIVELY = 2,
+  };
+
   struct {
     int eyeY;
     int eyeSpacing;
@@ -69,6 +76,7 @@ struct EyesConfig {
     uint16_t lookIntervalMs;
     uint8_t idleMove;
     uint32_t sleepyAfterMs;
+    uint8_t expressionRhythm;
   } behavior;
 
   struct {
@@ -91,6 +99,20 @@ struct EyesConfig {
 
 struct ThemeConfig {
   char themeId[48];
+};
+
+struct TetrisModeConfig {
+  bool clearMode;
+  uint8_t cellSize;
+  uint16_t speed;
+  bool showClock;
+  uint8_t pieces;
+};
+
+struct TetrisClockModeConfig {
+  uint8_t cellSize;
+  uint16_t speed;
+  uint8_t hourFormat;
 };
 
 struct DeviceParamsConfig {
@@ -126,6 +148,8 @@ public:
   static void saveClockConfig();
   static void loadAnimClockConfig();
   static void saveAnimClockConfig();
+  static void loadTetrisOverlayClockConfig();
+  static void saveTetrisOverlayClockConfig();
   static void loadStaticImagePixels();
   static void saveStaticImagePixels();
   static void loadAnimImagePixels();
@@ -136,8 +160,18 @@ public:
   static void saveAmbientEffectConfig();
   static void loadThemeConfig();
   static void saveThemeConfig();
-  static void loadGameScreensaverConfig();
-  static void saveGameScreensaverConfig();
+  static void loadThemeClockConfig();
+  static void saveThemeClockConfig();
+  static void loadTetrisConfig();
+  static void saveTetrisConfig();
+  static void loadTetrisClockConfig();
+  static void saveTetrisClockConfig();
+  static void loadMazeConfig();
+  static void saveMazeConfig();
+  static void loadSnakeConfig();
+  static void saveSnakeConfig();
+  static void loadPlanetScreensaverConfig();
+  static void savePlanetScreensaverConfig();
   static void loadDeviceParamsConfig();
   static void saveDeviceParamsConfig();
   static void loadPacmanRoute();
@@ -150,9 +184,14 @@ public:
 
   static ClockConfig clockConfig;
   static ClockConfig animClockConfig;
+  static ClockConfig tetrisOverlayClockConfig;
   static EyesConfig eyesConfig;
   static ThemeConfig themeConfig;
-  static GameScreensaverConfig gameScreensaverConfig;
+  static ClockConfig themeClockConfig;
+  static TetrisModeConfig tetrisConfig;
+  static TetrisClockModeConfig tetrisClockConfig;
+  static MazeModeConfig mazeConfig;
+  static SnakeModeConfig snakeConfig;
   static DeviceParamsConfig deviceParamsConfig;
 
   // 静态时钟的背景图片像素

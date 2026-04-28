@@ -175,6 +175,14 @@
             >
               <Icon name="link" :size="24" />
             </view>
+            <view
+              v-if="deviceConnected"
+              class="icon-btn"
+              :class="{ active: deviceCanvasSynced }"
+              @click="syncConnectedCanvas"
+            >
+              <Icon name="upload" :size="24" />
+            </view>
             <view class="icon-btn" @click="handleFit">
               <Icon name="fullscreen-expand" :size="24" />
             </view>
@@ -383,8 +391,8 @@
     <!-- 连接弹窗 -->
     <ConnectModal
       :visible.sync="showConnectModal"
-      title="连接 RenLight 设备"
-      description="请输入设备 IP 地址"
+      title="连接 Glowxel PixelBoard"
+      description="请输入 Glowxel PixelBoard 的 IP 地址"
       :placeholder="deviceStore.deviceIp || '192.168.31.84'"
       :defaultValue="deviceStore.deviceIp"
       ref="connectModal"
@@ -446,6 +454,7 @@ export default {
       currentRow: 0,
       highlightColor: null,
       lastSyncedRow: undefined,
+      deviceCanvasSynced: false,
 
       // 进度
       completedRows: new Set(),
@@ -680,12 +689,6 @@ export default {
     if (!this.canvasReady) {
       this.initCanvas();
     }
-    if (this.deviceConnected) {
-      console.log("页面显示，确保画板模式并同步画布");
-      setTimeout(async () => {
-        this.ensureCanvasModeAndSync();
-      }, 300);
-    }
   },
 
   onUnload() {
@@ -846,9 +849,6 @@ export default {
         // 颜色模式：使用 highlight_color 命令
         if (this.assistMode === "color") {
           this.updateHighlightBrightness(previousColor, color);
-        } else {
-          // 逐行模式：完整同步
-          this.syncToDevice();
         }
       }
     },
@@ -945,9 +945,6 @@ export default {
       this.completedColors = newColorSet;
 
       // 同步板子亮度（逐行模式下已完成的行变暗）
-      if (this.deviceConnected && this.assistMode === "row") {
-        this.syncToDevice();
-      }
     },
 
     prevRow() {

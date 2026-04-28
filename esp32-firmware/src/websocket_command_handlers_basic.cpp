@@ -3,7 +3,6 @@
 #include "board_native_effect.h"
 #include "config_manager.h"
 #include "display_manager.h"
-#include "game_screensaver_effect.h"
 #include "device_mode_tag_codec.h"
 #include "mode_tags.h"
 #include "ota_manager.h"

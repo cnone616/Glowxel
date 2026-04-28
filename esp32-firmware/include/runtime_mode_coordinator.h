@@ -16,6 +16,7 @@ DeviceMode resolveTopLevelMode(const String& businessModeTag);
 bool isRecoverableBusinessModeTag(const String& businessModeTag);
 bool isReturnTargetBusinessModeTag(const String& businessModeTag);
 bool isTransientRuntimeMode(DeviceMode mode);
+bool shouldClearScreenBeforeBusinessModeEntry(const String& businessModeTag);
 
 void captureModeState(ModeStateSnapshot& snapshot);
 void restoreModeState(const ModeStateSnapshot& snapshot, bool renderFrame = true);

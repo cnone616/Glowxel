@@ -30,18 +30,19 @@ public:
   static bool binaryDataPending;
   static uint32_t lastBinaryClientId;
 
-  // WebSocket 分片数据缓存
-  static String fragmentBuffer;
-  static bool isReceivingFragments;
-
   static unsigned long lastMessageTime;
   static void sendBinaryReceiveConfirmation(int pixelCount);
   static TransientTransferAbortState abortTransientTransfer(const char* reason);
   static void clearBinaryImageTransferBackup();
+  static void prepareBinaryAnimationUpload(uint32_t clientId);
+  static void clearPendingBinaryAnimationUpload(uint32_t clientId = 0);
+  static void prepareStreamingAnimationUpload(uint32_t clientId);
+  static void clearStreamingAnimationUpload(uint32_t clientId = 0);
+  static void restoreAfterAnimationUploadFailure();
+  static bool hasConnectedClients();
   
 private:
   static const char* getCurrentModeString();
-  static bool hasConnectedClients();
   static void syncClientConnectionState();
   static void clearAllClientTextStates();
   static void resetTransientTransferState();

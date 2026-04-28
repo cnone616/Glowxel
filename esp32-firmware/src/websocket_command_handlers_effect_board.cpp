@@ -1,7 +1,9 @@
 #include "websocket_effect_command_dispatch.h"
 
 #include "board_native_effect.h"
+#include "clock_font_renderer.h"
 #include "runtime_command_bus.h"
+#include "websocket_async_command_response.h"
 #include "websocket_effect_common.h"
 
 namespace {
@@ -21,6 +23,7 @@ RuntimeCommandBus::RuntimeCommand* createWsCommand(
 }
 
 bool enqueueWsCommand(
+  AsyncWebSocketClient* client,
   RuntimeCommandBus::RuntimeCommand* command,
   StaticJsonDocument<768>& response,
   bool& responseSent
@@ -30,9 +33,7 @@ bool enqueueWsCommand(
     wsSetErrorResponse(response, "device busy");
     return true;
   }
-
-  responseSent = true;
-  return true;
+  return wsSendAcceptedResponse(client, response, responseSent);
 }
 
 bool handleTextDisplayCommand(
@@ -85,144 +86,7 @@ bool handleTextDisplayCommand(
   command->textDisplayConfig.bgColorR = bgColorR;
   command->textDisplayConfig.bgColorG = bgColorG;
   command->textDisplayConfig.bgColorB = bgColorB;
-  return enqueueWsCommand(command, response, responseSent);
-}
-
-bool handleWeatherBoardCommand(
-  AsyncWebSocketClient* client,
-  JsonDocument& doc,
-  StaticJsonDocument<768>& response,
-  bool& responseSent
-) {
-  if (!doc.containsKey("weatherType") ||
-      !doc.containsKey("city") ||
-      !doc.containsKey("temperature") ||
-      !doc.containsKey("humidity") ||
-      !doc.containsKey("unit")) {
-    wsSetErrorResponse(response, "missing weather board fields");
-    return true;
-  }
-
-  const char* unit = doc["unit"];
-  if (unit == nullptr || (strcmp(unit, "c") != 0 && strcmp(unit, "f") != 0)) {
-    wsSetErrorResponse(response, "invalid weather unit");
-    return true;
-  }
-
-  RuntimeCommandBus::RuntimeCommand* command = createWsCommand(client, response);
-  if (command == nullptr) {
-    return true;
-  }
-
-  command->type = RuntimeCommandBus::RuntimeCommandType::WEATHER_BOARD;
-  command->weatherConfig.weatherType = doc["weatherType"].as<const char*>();
-  command->weatherConfig.city = doc["city"].as<const char*>();
-  command->weatherConfig.temperature = (int16_t)doc["temperature"].as<int>();
-  command->weatherConfig.humidity = (uint8_t)wsClampInt(doc["humidity"].as<int>(), 0, 100);
-  command->weatherConfig.unit = unit;
-  return enqueueWsCommand(command, response, responseSent);
-}
-
-bool handleCountdownBoardCommand(
-  AsyncWebSocketClient* client,
-  JsonDocument& doc,
-  StaticJsonDocument<768>& response,
-  bool& responseSent
-) {
-  if (!doc.containsKey("hours") ||
-      !doc.containsKey("minutes") ||
-      !doc.containsKey("seconds") ||
-      !doc.containsKey("progress")) {
-    wsSetErrorResponse(response, "missing countdown board fields");
-    return true;
-  }
-
-  RuntimeCommandBus::RuntimeCommand* command = createWsCommand(client, response);
-  if (command == nullptr) {
-    return true;
-  }
-
-  command->type = RuntimeCommandBus::RuntimeCommandType::COUNTDOWN_BOARD;
-  command->countdownConfig.hours = (uint8_t)wsClampInt(doc["hours"].as<int>(), 0, 99);
-  command->countdownConfig.minutes = (uint8_t)wsClampInt(doc["minutes"].as<int>(), 0, 59);
-  command->countdownConfig.seconds = (uint8_t)wsClampInt(doc["seconds"].as<int>(), 0, 59);
-  command->countdownConfig.progress = (uint8_t)wsClampInt(doc["progress"].as<int>(), 0, 100);
-  return enqueueWsCommand(command, response, responseSent);
-}
-
-bool handleStopwatchBoardCommand(
-  AsyncWebSocketClient* client,
-  JsonDocument& doc,
-  StaticJsonDocument<768>& response,
-  bool& responseSent
-) {
-  if (!doc.containsKey("previewSeconds") ||
-      !doc.containsKey("lapCount") ||
-      !doc.containsKey("showMilliseconds")) {
-    wsSetErrorResponse(response, "missing stopwatch board fields");
-    return true;
-  }
-
-  RuntimeCommandBus::RuntimeCommand* command = createWsCommand(client, response);
-  if (command == nullptr) {
-    return true;
-  }
-
-  command->type = RuntimeCommandBus::RuntimeCommandType::STOPWATCH_BOARD;
-  command->stopwatchConfig.previewSeconds =
-    (uint16_t)wsClampInt(doc["previewSeconds"].as<int>(), 0, 35999);
-  command->stopwatchConfig.lapCount = (uint8_t)wsClampInt(doc["lapCount"].as<int>(), 0, 99);
-  command->stopwatchConfig.showMilliseconds = doc["showMilliseconds"].as<bool>();
-  return enqueueWsCommand(command, response, responseSent);
-}
-
-bool handleNotificationBoardCommand(
-  AsyncWebSocketClient* client,
-  JsonDocument& doc,
-  StaticJsonDocument<768>& response,
-  bool& responseSent
-) {
-  if (!doc.containsKey("repeatMode") ||
-      !doc.containsKey("text") ||
-      !doc.containsKey("icon") ||
-      !doc.containsKey("accentColor") ||
-      !doc.containsKey("contentType") ||
-      !doc.containsKey("textTemplate") ||
-      !doc.containsKey("staticTemplate") ||
-      !doc.containsKey("animationTemplate") ||
-      !doc.containsKey("hour") ||
-      !doc.containsKey("minute")) {
-    wsSetErrorResponse(response, "missing notification board fields");
-    return true;
-  }
-
-  uint8_t accentR = 0;
-  uint8_t accentG = 0;
-  uint8_t accentB = 0;
-  if (!wsParseRequiredColorObject(doc, "accentColor", accentR, accentG, accentB)) {
-    wsSetErrorResponse(response, "invalid notification accent color");
-    return true;
-  }
-
-  RuntimeCommandBus::RuntimeCommand* command = createWsCommand(client, response);
-  if (command == nullptr) {
-    return true;
-  }
-
-  command->type = RuntimeCommandBus::RuntimeCommandType::NOTIFICATION_BOARD;
-  command->notificationConfig.repeatMode = doc["repeatMode"].as<const char*>();
-  command->notificationConfig.text = doc["text"].as<const char*>();
-  command->notificationConfig.icon = doc["icon"].as<const char*>();
-  command->notificationConfig.accentR = accentR;
-  command->notificationConfig.accentG = accentG;
-  command->notificationConfig.accentB = accentB;
-  command->notificationConfig.contentType = doc["contentType"].as<const char*>();
-  command->notificationConfig.textTemplate = doc["textTemplate"].as<const char*>();
-  command->notificationConfig.staticTemplate = doc["staticTemplate"].as<const char*>();
-  command->notificationConfig.animationTemplate = doc["animationTemplate"].as<const char*>();
-  command->notificationConfig.hour = (uint8_t)wsClampInt(doc["hour"].as<int>(), 0, 23);
-  command->notificationConfig.minute = (uint8_t)wsClampInt(doc["minute"].as<int>(), 0, 59);
-  return enqueueWsCommand(command, response, responseSent);
+  return enqueueWsCommand(client, command, response, responseSent);
 }
 
 bool handlePlanetScreensaverCommand(
@@ -236,7 +100,12 @@ bool handlePlanetScreensaverCommand(
       !doc.containsKey("direction") ||
       !doc.containsKey("speed") ||
       !doc.containsKey("seed") ||
-      !doc.containsKey("colorSeed")) {
+      !doc.containsKey("colorSeed") ||
+      !doc.containsKey("planetX") ||
+      !doc.containsKey("planetY") ||
+      !doc.containsKey("font") ||
+      !doc.containsKey("showSeconds") ||
+      !doc.containsKey("time")) {
     wsSetErrorResponse(response, "missing planet screensaver fields");
     return true;
   }
@@ -276,6 +145,30 @@ bool handlePlanetScreensaverCommand(
     return true;
   }
 
+  const char* fontName = doc["font"];
+  uint8_t fontId = 0;
+  if (fontName == nullptr || !clockFontIdFromString(fontName, fontId)) {
+    wsSetErrorResponse(response, "invalid planet font");
+    return true;
+  }
+
+  JsonObject time = doc["time"].as<JsonObject>();
+  if (time.isNull() ||
+      !time.containsKey("show") ||
+      !time.containsKey("fontSize") ||
+      !time.containsKey("x") ||
+      !time.containsKey("y") ||
+      !time.containsKey("color")) {
+    wsSetErrorResponse(response, "missing planet time fields");
+    return true;
+  }
+
+  JsonObject timeColor = time["color"].as<JsonObject>();
+  if (timeColor.isNull() || !wsEnsureColorObject(timeColor)) {
+    wsSetErrorResponse(response, "invalid planet time color");
+    return true;
+  }
+
   RuntimeCommandBus::RuntimeCommand* command = createWsCommand(client, response);
   if (command == nullptr) {
     return true;
@@ -288,7 +181,23 @@ bool handlePlanetScreensaverCommand(
   command->planetConfig.speed = (uint8_t)wsClampInt(doc["speed"].as<int>(), 1, 7);
   command->planetConfig.seed = doc["seed"].as<uint32_t>();
   command->planetConfig.colorSeed = doc["colorSeed"].as<uint32_t>();
-  return enqueueWsCommand(command, response, responseSent);
+  command->planetConfig.planetX =
+    (uint8_t)wsClampInt(doc["planetX"].as<int>(), 0, 63);
+  command->planetConfig.planetY =
+    (uint8_t)wsClampInt(doc["planetY"].as<int>(), 0, 63);
+  command->planetConfig.font = fontId;
+  command->planetConfig.showSeconds = doc["showSeconds"].as<bool>();
+  command->planetConfig.time.show = time["show"].as<bool>();
+  command->planetConfig.time.fontSize =
+    (uint8_t)wsClampInt(time["fontSize"].as<int>(), 1, 3);
+  command->planetConfig.time.x =
+    (uint8_t)wsClampInt(time["x"].as<int>(), 0, 63);
+  command->planetConfig.time.y =
+    (uint8_t)wsClampInt(time["y"].as<int>(), 0, 63);
+  command->planetConfig.time.r = timeColor["r"].as<uint8_t>();
+  command->planetConfig.time.g = timeColor["g"].as<uint8_t>();
+  command->planetConfig.time.b = timeColor["b"].as<uint8_t>();
+  return enqueueWsCommand(client, command, response, responseSent);
 }
 }
 
@@ -303,22 +212,6 @@ bool handleBoardEffectCommand(
 
   if (cmd == "set_text_display") {
     return handleTextDisplayCommand(client, doc, response, responseSent);
-  }
-
-  if (cmd == "set_weather_board") {
-    return handleWeatherBoardCommand(client, doc, response, responseSent);
-  }
-
-  if (cmd == "set_countdown_board") {
-    return handleCountdownBoardCommand(client, doc, response, responseSent);
-  }
-
-  if (cmd == "set_stopwatch_board") {
-    return handleStopwatchBoardCommand(client, doc, response, responseSent);
-  }
-
-  if (cmd == "set_notification_board") {
-    return handleNotificationBoardCommand(client, doc, response, responseSent);
   }
 
   if (cmd == "set_planet_screensaver") {
