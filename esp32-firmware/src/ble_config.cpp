@@ -15,7 +15,6 @@ String BLEConfig::receivedPassword = "";
 class BLEConfigServerCallbacks : public BLEServerCallbacks {
   void onConnect(BLEServer* pServer) {
     BLEConfig::deviceConnected = true;
-    Serial.println("客户端已连接");
     // 发送状态通知
     if (BLEConfig::pStatusChar) {
       BLEConfig::pStatusChar->setValue("ready");
@@ -25,7 +24,6 @@ class BLEConfigServerCallbacks : public BLEServerCallbacks {
 
   void onDisconnect(BLEServer* pServer) {
     BLEConfig::deviceConnected = false;
-    Serial.println("客户端已断开");
     // 重新开始广播
     pServer->startAdvertising();
   }
@@ -38,7 +36,6 @@ class WiFiConfigCallbacks : public BLECharacteristicCallbacks {
     if (value.length() == 0) return;
 
     String data = String(value.c_str());
-    Serial.println("收到数据: " + data);
 
     // 格式: "SSID\nPASSWORD"
     int separatorIndex = data.indexOf('\n');
@@ -54,16 +51,11 @@ class WiFiConfigCallbacks : public BLECharacteristicCallbacks {
     BLEConfig::receivedSSID = data.substring(0, separatorIndex);
     BLEConfig::receivedPassword = data.substring(separatorIndex + 1);
 
-    Serial.println("SSID: " + BLEConfig::receivedSSID);
-    Serial.println("Password: ***");
-
     // 保存到 Preferences
     ConfigManager::preferences.begin("wifi", false);
     ConfigManager::preferences.putString("ssid", BLEConfig::receivedSSID);
     ConfigManager::preferences.putString("password", BLEConfig::receivedPassword);
     ConfigManager::preferences.end();
-
-    Serial.println("WiFi 配置已保存");
 
     // 通知客户端配置已保存
     if (BLEConfig::pStatusChar) {
@@ -78,8 +70,6 @@ class WiFiConfigCallbacks : public BLECharacteristicCallbacks {
 };
 
 void BLEConfig::init() {
-  Serial.println("初始化蓝牙配网服务...");
-
   BLEDevice::init("Glowxel PixelBoard-Setup");
   pServer = BLEDevice::createServer();
   pServer->setCallbacks(new BLEConfigServerCallbacks());
@@ -111,8 +101,6 @@ void BLEConfig::init() {
   pAdvertising->setMinPreferred(0x06);
   pAdvertising->setMinPreferred(0x12);
   BLEDevice::startAdvertising();
-
-  Serial.println("蓝牙配网服务已启动，设备名: Glowxel PixelBoard-Setup");
 }
 
 void BLEConfig::stop() {
@@ -122,7 +110,6 @@ void BLEConfig::stop() {
     pWifiChar = nullptr;
     pStatusChar = nullptr;
     deviceConnected = false;
-    Serial.println("蓝牙服务已关闭");
   }
 }
 

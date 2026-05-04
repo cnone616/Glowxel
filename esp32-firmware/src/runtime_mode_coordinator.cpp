@@ -106,7 +106,6 @@ bool renderAnimationBusinessFrame(const String& businessModeTag) {
     if (!MazeEffect::isActive()) {
       return false;
     }
-    MazeEffect::render();
     return true;
   }
 

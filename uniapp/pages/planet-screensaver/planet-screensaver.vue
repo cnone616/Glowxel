@@ -289,7 +289,7 @@ import {
   createRandomPlanetPreviewSeed,
   createRandomPlanetColorSeed,
   getPlanetPreviewCycleDuration,
-  buildPlanetScreensaverPreviewFrame,
+  buildPlanetScreensaverPreviewSequence,
 } from "../../utils/planetScreensaverPreview.js";
 
 const PLANET_TIME_FONT_OPTIONS = getClockFontOptions();
@@ -435,7 +435,6 @@ function normalizePlanetPageState(saved) {
   return {
     config,
     clockConfig,
-    previewUseDefaultColors: state.previewUseDefaultColors === true,
   };
 }
 
@@ -464,12 +463,14 @@ export default {
       previewOffset: { x: 0, y: 0 },
       previewContainerSize: { width: 320, height: 320 },
       previewFrameMaps: [],
+      previewFrameDelays: [],
+      previewFrameIndex: 0,
+      previewDisplayPixels: new Map(),
       sendingPreviewPixels: new Map(),
       sendingPreviewTick: 0,
       previewPlaybackStartedAt: 0,
       previewTimer: null,
       previewRefreshTimer: null,
-      previewUseDefaultColors: true,
       presetOptions: PLANET_SCREEN_PRESETS,
       sizeOptions: PLANET_SIZE_OPTIONS,
       directionOptions: PLANET_DIRECTION_OPTIONS,
@@ -487,10 +488,7 @@ export default {
   },
   computed: {
     currentPreviewPixels() {
-      if (this.previewFrameMaps.length === 0) {
-        return new Map();
-      }
-      return this.previewFrameMaps[0];
+      return this.previewDisplayPixels;
     },
     previewCanvasBoxStyle() {
       const size =
@@ -521,9 +519,6 @@ export default {
         this.persistLocalState();
       },
     },
-    previewUseDefaultColors(value) {
-      this.persistLocalState();
-    },
   },
   onLoad() {
     this.deviceStore = useDeviceStore();
@@ -534,7 +529,6 @@ export default {
     );
     this.config = savedState.config;
     this.clockConfig = savedState.clockConfig;
-    this.previewUseDefaultColors = savedState.previewUseDefaultColors;
   },
   onReady() {
     if (this.$refs.toastRef) {
@@ -597,7 +591,6 @@ export default {
             align: this.clockConfig.time.align,
           },
         },
-        previewUseDefaultColors: this.previewUseDefaultColors,
       });
     },
     getPlanetTimeText() {
@@ -650,39 +643,44 @@ export default {
       if (!status || typeof status !== "object") {
         return;
       }
-      if (status.businessMode !== "planet_screensaver") {
+      const {
+        businessMode,
+        preset,
+        size,
+        direction,
+        speed: rawSpeed,
+        seed: rawSeed,
+        colorSeed: rawColorSeed,
+        planetX: rawPlanetX,
+        planetY: rawPlanetY,
+        font,
+        showSeconds,
+        time,
+      } = status;
+      if (businessMode !== "planet_screensaver") {
         return;
       }
-      if (
-        typeof status.preset !== "string" ||
-        typeof status.size !== "string"
-      ) {
+      if (typeof preset !== "string" || typeof size !== "string") {
         return;
       }
-      if (
-        typeof status.direction !== "string" ||
-        !status.time ||
-        typeof status.time !== "object"
-      ) {
+      if (typeof direction !== "string" || !time || typeof time !== "object") {
         return;
       }
-      if (!status.time.color || typeof status.time.color !== "object") {
+      if (!time.color || typeof time.color !== "object") {
         return;
       }
 
-      if (PLANET_SCREEN_PRESETS.some((item) => item.id === status.preset)) {
-        this.config.preset = status.preset;
+      if (PLANET_SCREEN_PRESETS.some((item) => item.id === preset)) {
+        this.config.preset = preset;
       }
-      if (PLANET_SIZE_OPTIONS.some((item) => item.id === status.size)) {
-        this.config.size = status.size;
+      if (PLANET_SIZE_OPTIONS.some((item) => item.id === size)) {
+        this.config.size = size;
       }
-      if (
-        PLANET_DIRECTION_OPTIONS.some((item) => item.id === status.direction)
-      ) {
-        this.config.direction = status.direction;
+      if (PLANET_DIRECTION_OPTIONS.some((item) => item.id === direction)) {
+        this.config.direction = direction;
       }
 
-      const speed = Number(status.speed);
+      const speed = Number(rawSpeed);
       if (Number.isFinite(speed)) {
         this.config.speed = Math.max(
           PLANET_PREVIEW_MIN_SPEED,
@@ -690,53 +688,53 @@ export default {
         );
       }
 
-      const seed = Number(status.seed);
+      const seed = Number(rawSeed);
       if (Number.isFinite(seed) && seed >= 0) {
         this.config.seed = Math.round(seed);
       }
 
-      const colorSeed = Number(status.colorSeed);
+      const colorSeed = Number(rawColorSeed);
       if (Number.isFinite(colorSeed) && colorSeed >= 0) {
         this.config.colorSeed = Math.round(colorSeed);
       }
-      const planetX = Number(status.planetX);
+      const planetX = Number(rawPlanetX);
       if (Number.isFinite(planetX)) {
         this.config.planetX = Math.max(0, Math.min(63, Math.round(planetX)));
       }
-      const planetY = Number(status.planetY);
+      const planetY = Number(rawPlanetY);
       if (Number.isFinite(planetY)) {
         this.config.planetY = Math.max(0, Math.min(63, Math.round(planetY)));
       }
 
-      if (PLANET_TIME_FONT_IDS.has(status.font)) {
-        this.clockConfig.font = status.font;
+      if (PLANET_TIME_FONT_IDS.has(font)) {
+        this.clockConfig.font = font;
       }
-      if (status.showSeconds === true || status.showSeconds === false) {
-        this.clockConfig.showSeconds = status.showSeconds;
+      if (showSeconds === true || showSeconds === false) {
+        this.clockConfig.showSeconds = showSeconds;
       }
 
-      if (status.time.show === true || status.time.show === false) {
-        this.clockConfig.time.show = status.time.show;
+      if (time.show === true || time.show === false) {
+        this.clockConfig.time.show = time.show;
       }
-      const fontSize = Number(status.time.fontSize);
+      const fontSize = Number(time.fontSize);
       if (Number.isFinite(fontSize)) {
         this.clockConfig.time.fontSize = Math.max(
           1,
           Math.min(3, Math.round(fontSize)),
         );
       }
-      const boardX = Number(status.time.x);
+      const boardX = Number(time.x);
       if (Number.isFinite(boardX)) {
         this.clockConfig.time.x = this.resolveAnchorTimeXFromBoardX(
           boardX,
           this.getPlanetTimeText(),
         );
       }
-      const y = Number(status.time.y);
+      const y = Number(time.y);
       if (Number.isFinite(y)) {
         this.clockConfig.time.y = Math.max(0, Math.min(63, Math.round(y)));
       }
-      this.clockConfig.time.color = this.rgbToHex(status.time.color);
+      this.clockConfig.time.color = this.rgbToHex(time.color);
 
       if (this.previewCanvasReady) {
         this.schedulePreviewRefresh(this.getCurrentPreviewProgress());
@@ -814,14 +812,33 @@ export default {
         }, 80);
       });
     },
-    renderPreviewFrame(progress) {
-      const frameMap = buildPlanetScreensaverPreviewFrame(
-        {
-          ...this.config,
-          useDefaultColors: this.previewUseDefaultColors,
-        },
-        progress,
-      );
+    rebuildPreviewSequence() {
+      const sequence = buildPlanetScreensaverPreviewSequence({
+        ...this.config,
+      });
+      this.previewFrameMaps = Array.isArray(sequence.maps) ? sequence.maps : [];
+      this.previewFrameDelays = Array.isArray(sequence.delays)
+        ? sequence.delays
+        : [];
+    },
+    resolvePreviewFrameIndex(progress) {
+      if (this.previewFrameMaps.length === 0) {
+        return 0;
+      }
+      const normalizedProgress = ((progress % 1) + 1) % 1;
+      const rawIndex = Math.floor(normalizedProgress * this.previewFrameMaps.length);
+      if (rawIndex >= this.previewFrameMaps.length) {
+        return this.previewFrameMaps.length - 1;
+      }
+      return rawIndex;
+    },
+    renderPreviewFrame(frameIndex = this.previewFrameIndex) {
+      const baseFrame = this.previewFrameMaps[frameIndex];
+      if (!baseFrame) {
+        this.previewDisplayPixels = new Map();
+        return;
+      }
+      const frameMap = new Map(baseFrame);
       if (this.clockConfig.time.show) {
         const text = this.getPlanetTimeText();
         const placement = this.resolveBoardTimePlacement(text);
@@ -836,7 +853,7 @@ export default {
           "left",
         );
       }
-      this.previewFrameMaps = [frameMap];
+      this.previewDisplayPixels = frameMap;
     },
     resolveBoardTimePlacement(text) {
       const { fontSize, width, height } = this.getPlanetTimeMetrics(text);
@@ -885,7 +902,10 @@ export default {
       if (!this.previewCanvasReady) {
         return;
       }
-      this.renderPreviewFrame(this.getCurrentPreviewProgress());
+      this.previewFrameIndex = this.resolvePreviewFrameIndex(
+        this.getCurrentPreviewProgress(),
+      );
+      this.renderPreviewFrame(this.previewFrameIndex);
     },
     schedulePreviewRefresh(preservedProgress = null) {
       if (this.previewRefreshTimer) {
@@ -906,7 +926,6 @@ export default {
       }
       const progress = this.getCurrentPreviewProgress();
       this.config.preset = presetId;
-      this.previewUseDefaultColors = true;
       this.schedulePreviewRefresh(progress);
     },
     handleSizeSelect(sizeId) {
@@ -920,7 +939,6 @@ export default {
     handleRandomColor() {
       const progress = this.getCurrentPreviewProgress();
       this.config.colorSeed = createRandomPlanetColorSeed();
-      this.previewUseDefaultColors = false;
       this.schedulePreviewRefresh(progress);
     },
     handleRandomPlanet() {
@@ -1081,6 +1099,11 @@ export default {
       if (!this.previewCanvasReady) {
         return;
       }
+      this.rebuildPreviewSequence();
+      if (this.previewFrameMaps.length === 0) {
+        this.previewDisplayPixels = new Map();
+        return;
+      }
       const cycleDuration = getPlanetPreviewCycleDuration(this.config.speed);
       const normalizedProgress =
         typeof preservedProgress === "number" &&
@@ -1091,7 +1114,8 @@ export default {
         cycleDuration > 0
           ? Date.now() - normalizedProgress * cycleDuration
           : Date.now();
-      this.renderPreviewFrame(normalizedProgress);
+      this.previewFrameIndex = this.resolvePreviewFrameIndex(normalizedProgress);
+      this.renderPreviewFrame(this.previewFrameIndex);
 
       const tick = () => {
         const cycleDuration = getPlanetPreviewCycleDuration(this.config.speed);
@@ -1100,14 +1124,24 @@ export default {
         if (cycleDuration > 0) {
           progress = (elapsed % cycleDuration) / cycleDuration;
         }
-        this.renderPreviewFrame(progress);
+        this.previewFrameIndex = this.resolvePreviewFrameIndex(progress);
+        this.renderPreviewFrame(this.previewFrameIndex);
+        const nextDelay = Number(this.previewFrameDelays[this.previewFrameIndex]);
         this.previewTimer = setTimeout(
           tick,
-          PLANET_PREVIEW_PLAYBACK_INTERVAL_MS,
+          Number.isFinite(nextDelay) && nextDelay > 0
+            ? nextDelay
+            : PLANET_PREVIEW_PLAYBACK_INTERVAL_MS,
         );
       };
 
-      this.previewTimer = setTimeout(tick, PLANET_PREVIEW_PLAYBACK_INTERVAL_MS);
+      const initialDelay = Number(this.previewFrameDelays[this.previewFrameIndex]);
+      this.previewTimer = setTimeout(
+        tick,
+        Number.isFinite(initialDelay) && initialDelay > 0
+          ? initialDelay
+          : PLANET_PREVIEW_PLAYBACK_INTERVAL_MS,
+      );
     },
     stopPreviewPlayback() {
       if (this.previewTimer) {

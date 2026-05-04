@@ -207,8 +207,20 @@ public:
     bool clearBuffer = true
   );
   static void endRedirectedFrame(bool present = true);
-  static MatrixPanel_I2S_DMA* beginOffscreenFrame(uint16_t* targetBuffer, uint16_t clearColor = 0);
+  static MatrixPanel_I2S_DMA* beginOffscreenFrame(
+    uint16_t* targetBuffer,
+    uint16_t clearColor = 0,
+    bool clearBuffer = true
+  );
+  struct SolidRectUpdate {
+    uint8_t x;
+    uint8_t y;
+    uint8_t width;
+    uint8_t height;
+    uint16_t color;
+  };
   static void presentOffscreenFrame(const uint16_t* targetBuffer);
+  static void presentSolidRectUpdates(const SolidRectUpdate* updates, size_t updateCount);
   static unsigned long getLastPresentDurationUs();
   static uint16_t getLastPresentChangedPixels();
   static uint32_t getLastPresentFrameHash();

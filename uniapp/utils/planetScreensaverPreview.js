@@ -26,7 +26,7 @@ const RING_TIME_BASE = 314.15;
 
 const PREVIEW_CACHE = new Map();
 const STARFIELD_CACHE = new Map();
-const RANDOM_PALETTE_CACHE = new Map();
+const PLANET_COLOR_VARIANT_CACHE = new Map();
 let ACTIVE_PREVIEW_CENTER_X = PREVIEW_CENTER;
 let ACTIVE_PREVIEW_CENTER_Y = PREVIEW_CENTER;
 
@@ -39,6 +39,7 @@ const COLOR_WARM_WHITE = rgba(1, 0.937255, 0.619608, 1);
 const COLOR_SPACE_BLUE = rgba(0.14902, 0.258824, 0.501961, 1);
 const COLOR_SPACE_TEAL = rgba(0.109804, 0.388235, 0.431373, 1);
 const COLOR_SPACE_ROSE = rgba(0.341176, 0.14902, 0.301961, 1);
+const STAR_BLOB_COLOR = rgba(1, 1, 0.894118, 1);
 
 const SMALL_STAR_PATTERNS = [
   [[0, 0]],
@@ -548,312 +549,116 @@ function hsvToRgb(hue, saturation, value) {
   return [red + match, green + match, blue + match];
 }
 
-function randomRange(random, min, max) {
-  return min + random() * (max - min);
-}
-
-function randomInt(random, minInclusive, maxInclusive) {
-  return Math.floor(randomRange(random, minInclusive, maxInclusive + 1));
-}
-
 function makeColor(red, green, blue, alpha = 1) {
   return [clamp01(red), clamp01(green), clamp01(blue), clamp01(alpha)];
 }
 
-function colorFromHex(hex) {
-  const normalized = hex.replace(/^#/, "");
-  return makeColor(
-    parseInt(normalized.slice(0, 2), 16) / 255,
-    parseInt(normalized.slice(2, 4), 16) / 255,
-    parseInt(normalized.slice(4, 6), 16) / 255,
-  );
+function nextPlanetSeededRandom(state) {
+  const nextState = (Math.imul(state >>> 0, 1664525) + 1013904223) >>> 0;
+  return {
+    state: nextState,
+    value: nextState / 4294967296,
+  };
 }
 
-function darkenColor(color, amount) {
-  const factor = 1 - amount;
-  return makeColor(color[0] * factor, color[1] * factor, color[2] * factor, color[3]);
+function seededPlanetRange(seed, key, minValue, maxValue) {
+  const startState = ((seed >>> 0) ^ hashString(key)) >>> 0;
+  const random = nextPlanetSeededRandom(startState);
+  return minValue + (maxValue - minValue) * random.value;
 }
 
-function lightenColor(color, amount) {
-  return makeColor(
-    color[0] + (1 - color[0]) * amount,
-    color[1] + (1 - color[1]) * amount,
-    color[2] + (1 - color[2]) * amount,
-    color[3],
-  );
-}
-
-function shiftHue(color, deltaHue) {
-  const hsv = rgbToHsv(color[0], color[1], color[2]);
-  const shifted = hsvToRgb(hsv[0] + deltaHue, hsv[1], hsv[2]);
-  return makeColor(shifted[0], shifted[1], shifted[2], color[3]);
-}
-
-function generateNewColorscheme(random, count, hueDiff = 0.9, saturation = 0.5) {
-  const base = [0.5, 0.5, 0.5];
-  const amplitude = [0.5 * saturation, 0.5 * saturation, 0.5 * saturation];
-  const frequency = [
-    randomRange(random, 0.5, 1.5) * hueDiff,
-    randomRange(random, 0.5, 1.5) * hueDiff,
-    randomRange(random, 0.5, 1.5) * hueDiff,
-  ];
-  const phaseScale = randomRange(random, 1, 3);
-  const phase = [random(), random(), random()].map((value) => value * phaseScale);
-  const colors = [];
-  const divisor = Math.max(1, count - 1);
-  for (let index = 0; index < count; index += 1) {
-    const ratio = index / divisor;
-    colors.push(
-      makeColor(
-        base[0] + amplitude[0] * Math.cos(TWO_PI * (frequency[0] * ratio + phase[0])),
-        base[1] + amplitude[1] * Math.cos(TWO_PI * (frequency[1] * ratio + phase[1])),
-        base[2] + amplitude[2] * Math.cos(TWO_PI * (frequency[2] * ratio + phase[2])),
-      ),
-    );
+function writePlanetColorVariantCache(key, variant) {
+  if (PLANET_COLOR_VARIANT_CACHE.size >= 32) {
+    const firstKey = PLANET_COLOR_VARIANT_CACHE.keys().next().value;
+    PLANET_COLOR_VARIANT_CACHE.delete(firstKey);
   }
-  return colors;
+  PLANET_COLOR_VARIANT_CACHE.set(key, variant);
 }
 
-function pickPaletteColors(palette, key, fallbackColors) {
-  if (!palette || !palette[key]) {
-    return fallbackColors;
-  }
-  return palette[key];
-}
-
-function buildRandomizedPresetPalette(frame) {
-  if (frame.config.useDefaultColors) {
-    return null;
-  }
-
+function buildPlanetColorVariant(frame) {
   const cacheKey = `${frame.preset.id}:${frame.config.colorSeed >>> 0}`;
-  const cachedPalette = RANDOM_PALETTE_CACHE.get(cacheKey);
-  if (cachedPalette) {
-    return cachedPalette;
+  const cachedVariant = PLANET_COLOR_VARIANT_CACHE.get(cacheKey);
+  if (cachedVariant) {
+    return cachedVariant;
   }
 
-  const random = createSeededRandom(
-    frame.config.colorSeed >>> 0,
-    hashString(`${frame.preset.id}_random_palette`),
-  );
+  const variant = {
+    hueShift: seededPlanetRange(frame.config.colorSeed, `${frame.preset.id}_color_variant_hue`, -0.32, 0.32),
+    saturationScale: seededPlanetRange(frame.config.colorSeed, `${frame.preset.id}_color_variant_sat`, 0.68, 1.42),
+    valueScale: seededPlanetRange(frame.config.colorSeed, `${frame.preset.id}_color_variant_val`, 0.78, 1.26),
+    tintMix: seededPlanetRange(frame.config.colorSeed, `${frame.preset.id}_color_variant_mix`, 0.04, 0.26),
+    tint: makeColor(
+      seededPlanetRange(frame.config.colorSeed, `${frame.preset.id}_color_variant_r`, 0.2, 1.0),
+      seededPlanetRange(frame.config.colorSeed, `${frame.preset.id}_color_variant_g`, 0.2, 1.0),
+      seededPlanetRange(frame.config.colorSeed, `${frame.preset.id}_color_variant_b`, 0.2, 1.0),
+      1,
+    ),
+  };
+  writePlanetColorVariantCache(cacheKey, variant);
+  return variant;
+}
 
-  let palette = null;
-  if (frame.preset.id === "terran_wet") {
-    const seedColors = generateNewColorscheme(
-      random,
-      randomInt(random, 3, 4),
-      randomRange(random, 0.7, 1.0),
-      randomRange(random, 0.45, 0.55),
-    );
-    const landColors = [];
-    const waterColors = [];
-    const cloudColors = [];
-    for (let index = 0; index < 4; index += 1) {
-      landColors.push(shiftHue(darkenColor(seedColors[0], index / 4), 0.2 * (index / 4)));
+function applyPlanetColorVariantToBuffer(buffer, frame) {
+  const variant = buildPlanetColorVariant(frame);
+  for (let offset = 0; offset < buffer.length; offset += 3) {
+    const red = buffer[offset];
+    const green = buffer[offset + 1];
+    const blue = buffer[offset + 2];
+    if (red <= 0 && green <= 0 && blue <= 0) {
+      continue;
     }
-    for (let index = 0; index < 2; index += 1) {
-      waterColors.push(shiftHue(darkenColor(seedColors[1], index / 2), 0.2 * (index / 2)));
-    }
-    for (let index = 0; index < 4; index += 1) {
-      cloudColors.push(shiftHue(lightenColor(seedColors[2], (1 - index / 4) * 0.8), 0.2 * (index / 4)));
-    }
-    palette = {
-      terranWetLand: [...landColors, ...waterColors],
-      terranWetClouds: cloudColors,
-    };
-  } else if (frame.preset.id === "terran_dry") {
-    const seedColors = generateNewColorscheme(
-      random,
-      randomInt(random, 5, 7),
-      randomRange(random, 0.3, 0.65),
-      1.0,
+
+    const hsv = rgbToHsv(red, green, blue);
+    const remapped = hsvToRgb(
+      hsv[0] + variant.hueShift,
+      clamp01(hsv[1] * variant.saturationScale),
+      clamp01(hsv[2] * variant.valueScale),
     );
-    palette = {
-      terranDry: Array.from({ length: 5 }, (_, index) =>
-        lightenColor(darkenColor(seedColors[index], index / 5), (1 - index / 5) * 0.2),
-      ),
-    };
-  } else if (frame.preset.id === "islands") {
-    const seedColors = generateNewColorscheme(
-      random,
-      randomInt(random, 3, 4),
-      randomRange(random, 0.7, 1.0),
-      randomRange(random, 0.45, 0.55),
-    );
-    const landColors = [];
-    const waterColors = [];
-    const cloudColors = [];
-    for (let index = 0; index < 4; index += 1) {
-      landColors.push(shiftHue(darkenColor(seedColors[0], index / 4), 0.2 * (index / 4)));
-    }
-    for (let index = 0; index < 3; index += 1) {
-      waterColors.push(shiftHue(darkenColor(seedColors[1], index / 5), 0.1 * (index / 2)));
-    }
-    for (let index = 0; index < 4; index += 1) {
-      cloudColors.push(shiftHue(lightenColor(seedColors[2], (1 - index / 4) * 0.8), 0.2 * (index / 4)));
-    }
-    palette = {
-      islandsWater: waterColors,
-      islandsLand: landColors,
-      islandsClouds: cloudColors,
-    };
-  } else if (frame.preset.id === "no_atmosphere") {
-    const seedColors = generateNewColorscheme(
-      random,
-      randomInt(random, 3, 4),
-      randomRange(random, 0.3, 0.6),
-      0.7,
-    );
-    const groundColors = Array.from({ length: 3 }, (_, index) =>
-      lightenColor(darkenColor(seedColors[index], index / 3), (1 - index / 3) * 0.2),
-    );
-    palette = {
-      noAtmosphereGround: groundColors,
-      noAtmosphereCraters: [groundColors[1], groundColors[2]],
-    };
-  } else if (frame.preset.id === "gas_giant_1") {
-    const seedColors = generateNewColorscheme(
-      random,
-      randomInt(random, 8, 11),
-      randomRange(random, 0.3, 0.8),
-      1.0,
-    );
-    const gasBase = [];
-    const gasAccent = [];
-    for (let index = 0; index < 4; index += 1) {
-      gasBase.push(darkenColor(darkenColor(seedColors[index], index / 6), 0.7));
-      gasAccent.push(lightenColor(darkenColor(seedColors[index + 4], index / 4), (1 - index / 4) * 0.5));
-    }
-    palette = {
-      gasGiantOneBase: gasBase,
-      gasGiantOneAccent: gasAccent,
-    };
-  } else if (frame.preset.id === "gas_giant_2") {
-    const seedColors = generateNewColorscheme(
-      random,
-      randomInt(random, 6, 9),
-      randomRange(random, 0.3, 0.55),
-      1.4,
-    );
-    const colors = [];
-    for (let index = 0; index < 6; index += 1) {
-      colors.push(lightenColor(darkenColor(seedColors[index], index / 7), (1 - index / 6) * 0.3));
-    }
-    palette = {
-      gasGiantTwoColors: colors.slice(0, 3),
-      gasGiantTwoDarkColors: colors.slice(3, 6),
-    };
-  } else if (frame.preset.id === "ice_world") {
-    const seedColors = generateNewColorscheme(
-      random,
-      randomInt(random, 3, 4),
-      randomRange(random, 0.7, 1.0),
-      randomRange(random, 0.45, 0.55),
-    );
-    const landColors = [];
-    const lakeColors = [];
-    const cloudColors = [];
-    for (let index = 0; index < 3; index += 1) {
-      landColors.push(shiftHue(darkenColor(seedColors[0], index / 3), 0.2 * (index / 4)));
-      lakeColors.push(shiftHue(darkenColor(seedColors[1], index / 3), 0.2 * (index / 3)));
-    }
-    for (let index = 0; index < 4; index += 1) {
-      cloudColors.push(shiftHue(lightenColor(seedColors[2], (1 - index / 4) * 0.8), 0.2 * (index / 4)));
-    }
-    palette = {
-      iceWorldLand: landColors,
-      iceWorldLakes: lakeColors,
-      iceWorldClouds: cloudColors,
-    };
-  } else if (frame.preset.id === "lava_world") {
-    const seedColors = generateNewColorscheme(
-      random,
-      randomInt(random, 2, 4),
-      randomRange(random, 0.6, 1.0),
-      randomRange(random, 0.7, 0.8),
-    );
-    const landColors = [];
-    const lavaColors = [];
-    for (let index = 0; index < 3; index += 1) {
-      landColors.push(shiftHue(darkenColor(seedColors[0], index / 3), 0.2 * (index / 4)));
-      lavaColors.push(shiftHue(darkenColor(seedColors[1], index / 3), 0.2 * (index / 3)));
-    }
-    palette = {
-      lavaWorldLand: landColors,
-      lavaWorldCraters: [landColors[1], landColors[2]],
-      lavaWorldRivers: lavaColors,
-    };
-  } else if (frame.preset.id === "asteroid") {
-    const seedColors = generateNewColorscheme(
-      random,
-      randomInt(random, 3, 4),
-      randomRange(random, 0.3, 0.6),
-      0.7,
-    );
-    palette = {
-      asteroid: Array.from({ length: 3 }, (_, index) =>
-        lightenColor(darkenColor(seedColors[index], index / 3), (1 - index / 3) * 0.2),
-      ),
-    };
-  } else if (frame.preset.id === "black_hole") {
-    const seedColors = generateNewColorscheme(
-      random,
-      randomInt(random, 5, 6),
-      randomRange(random, 0.3, 0.5),
-      2.0,
-    );
-    const diskColors = Array.from({ length: 5 }, (_, index) =>
-      lightenColor(
-        darkenColor(seedColors[index], (index / 5) * 0.7),
-        (1 - index / 5) * 0.9,
-      ),
-    );
-    palette = {
-      blackHoleCore: [colorFromHex("272736"), diskColors[0], diskColors[3]],
-      blackHoleDisk: diskColors,
-    };
-  } else if (frame.preset.id === "galaxy") {
-    const seedColors = generateNewColorscheme(
-      random,
-      6,
-      randomRange(random, 0.5, 0.8),
-      1.4,
-    );
-    palette = {
-      galaxy: Array.from({ length: 6 }, (_, index) =>
-        lightenColor(darkenColor(seedColors[index], index / 7), (1 - index / 6) * 0.6),
-      ),
-    };
-  } else if (frame.preset.id === "star") {
-    const seedColors = generateNewColorscheme(
-      random,
-      4,
-      randomRange(random, 0.2, 0.4),
-      2.0,
-    );
-    const coreColors = Array.from({ length: 4 }, (_, index) =>
-      lightenColor(
-        darkenColor(seedColors[index], (index / 4) * 0.9),
-        (1 - index / 4) * 0.8,
-      ),
-    );
-    coreColors[0] = lightenColor(coreColors[0], 0.8);
-    palette = {
-      starBlob: coreColors[0],
-      starCore: coreColors,
-      starFlares: [coreColors[1], coreColors[0]],
+    buffer[offset] = clamp01(mix(remapped[0], variant.tint[0], variant.tintMix));
+    buffer[offset + 1] = clamp01(mix(remapped[1], variant.tint[1], variant.tintMix));
+    buffer[offset + 2] = clamp01(mix(remapped[2], variant.tint[2], variant.tintMix));
+  }
+}
+
+function buildStarPresetPalette(frame) {
+  const evenSeed = (frame.config.colorSeed % 2) === 0;
+  if (evenSeed) {
+    return {
+      starBlob: STAR_BLOB_COLOR,
+      starCore: [
+        rgba(0.960784, 1, 0.909804),
+        rgba(1, 0.847059, 0.196078),
+        rgba(1, 0.509804, 0.231373),
+        rgba(0.486275, 0.0980392, 0.101961),
+      ],
+      starFlares: [
+        rgba(1, 0.847059, 0.196078),
+        rgba(0.960784, 1, 0.909804),
+      ],
     };
   }
 
-  RANDOM_PALETTE_CACHE.set(cacheKey, palette);
-  return palette;
+  return {
+    starBlob: STAR_BLOB_COLOR,
+    starCore: [
+      rgba(0.960784, 1, 0.909804),
+      rgba(0.466667, 0.839216, 0.756863),
+      rgba(0.109804, 0.572549, 0.654902),
+      rgba(0.0117647, 0.243137, 0.368627),
+    ],
+    starFlares: [
+      rgba(0.466667, 0.839216, 0.756863),
+      rgba(0.960784, 1, 0.909804),
+    ],
+  };
 }
 
 function renderPresetFrame(buffer, frame) {
   ACTIVE_PREVIEW_CENTER_X = frame.centerX;
   ACTIVE_PREVIEW_CENTER_Y = frame.centerY;
-  renderBackgroundStars(buffer, frame);
   renderPresetToBuffer(buffer, frame);
+  applyPlanetColorVariantToBuffer(buffer, frame);
+  renderBackgroundStars(buffer, frame);
 }
 
 function createLayerIterator(relativeScale, planeScale, sizeScale, callback) {
@@ -2056,15 +1861,12 @@ function buildFrameState(config, preset, progressValue) {
 
 function buildPlanetScreensaverPreviewFrame(config, progressValue) {
   const normalized = normalizeConfig(config);
-  const preset = PRESET_DEFINITIONS[normalized.preset];
-  const frame = buildFrameState(normalized, preset, progressValue);
-  const buffer = createFrameBuffer();
-  renderPresetFrame(buffer, frame);
-  return bufferToMap(buffer);
+  const sequence = buildPlanetScreensaverPreviewSequenceFromNormalized(normalized);
+  const frameMap = sequence.maps[resolveSequenceFrameIndex(progressValue)];
+  return frameMap ? new Map(frameMap) : new Map();
 }
 
 function renderTerranWet(buffer, frame) {
-  const palette = buildRandomizedPresetPalette(frame);
   renderLandRivers(buffer, frame, {
     planeScale: 1,
     pixelsScale: 1,
@@ -2077,14 +1879,14 @@ function renderTerranWet(buffer, frame) {
     riverCutoff: 0.368,
     size: 4.6,
     octaves: 6,
-    colors: pickPaletteColors(palette, "terranWetLand", [
+    colors: [
       rgba(0.388235, 0.670588, 0.247059),
       rgba(0.231373, 0.490196, 0.309804),
       rgba(0.184314, 0.341176, 0.32549),
       rgba(0.156863, 0.207843, 0.25098),
       rgba(0.309804, 0.643137, 0.721569),
       rgba(0.25098, 0.286275, 0.45098),
-    ]),
+    ],
   });
 
   renderClouds(buffer, frame, {
@@ -2100,17 +1902,16 @@ function renderTerranWet(buffer, frame) {
     lightBorder2: 0.62,
     size: 7.315,
     octaves: 2,
-    colors: pickPaletteColors(palette, "terranWetClouds", [
+    colors: [
       rgba(0.960784, 1, 0.909804),
       rgba(0.87451, 0.878431, 0.909804),
       rgba(0.407843, 0.435294, 0.6),
       rgba(0.25098, 0.286275, 0.45098),
-    ]),
+    ],
   });
 }
 
 function renderTerranDry(buffer, frame) {
-  const palette = buildRandomizedPresetPalette(frame);
   renderDryTerran(buffer, frame, {
     planeScale: 1,
     pixelsScale: 1,
@@ -2120,18 +1921,17 @@ function renderTerranDry(buffer, frame) {
     timeSpeed: 0.1,
     size: 8,
     octaves: 3,
-    colors: pickPaletteColors(palette, "terranDry", [
+    colors: [
       rgba(1, 0.537255, 0.2),
       rgba(0.901961, 0.270588, 0.223529),
       rgba(0.678431, 0.184314, 0.270588),
       rgba(0.321569, 0.2, 0.247059),
       rgba(0.239216, 0.160784, 0.211765),
-    ]),
+    ],
   });
 }
 
 function renderIslands(buffer, frame) {
-  const palette = buildRandomizedPresetPalette(frame);
   renderPlanetUnder(buffer, frame, {
     planeScale: 1,
     pixelsScale: 1,
@@ -2142,11 +1942,11 @@ function renderIslands(buffer, frame) {
     lightBorder2: 0.6,
     size: 5.228,
     octaves: 3,
-    colors: pickPaletteColors(palette, "islandsWater", [
+    colors: [
       rgba(0.572549, 0.909804, 0.752941),
       rgba(0.309804, 0.643137, 0.721569),
       rgba(0.172549, 0.207843, 0.301961),
-    ]),
+    ],
   });
 
   renderLandMass(buffer, frame, {
@@ -2160,12 +1960,12 @@ function renderIslands(buffer, frame) {
     landCutoff: 0.633,
     size: 4.292,
     octaves: 6,
-    colors: pickPaletteColors(palette, "islandsLand", [
+    colors: [
       rgba(0.784314, 0.831373, 0.364706),
       rgba(0.388235, 0.670588, 0.247059),
       rgba(0.184314, 0.341176, 0.32549),
       rgba(0.156863, 0.207843, 0.25098),
-    ]),
+    ],
   });
 
   renderClouds(buffer, frame, {
@@ -2180,17 +1980,16 @@ function renderIslands(buffer, frame) {
     lightBorder2: 0.62,
     size: 7.745,
     octaves: 2,
-    colors: pickPaletteColors(palette, "islandsClouds", [
+    colors: [
       rgba(0.87451, 0.878431, 0.909804),
       rgba(0.639216, 0.654902, 0.760784),
       rgba(0.407843, 0.435294, 0.6),
       rgba(0.25098, 0.286275, 0.45098),
-    ]),
+    ],
   });
 }
 
 function renderNoAtmosphere(buffer, frame) {
-  const palette = buildRandomizedPresetPalette(frame);
   renderNoAtmosphereBase(buffer, frame, {
     planeScale: 1,
     pixelsScale: 1,
@@ -2201,11 +2000,11 @@ function renderNoAtmosphere(buffer, frame) {
     lightBorder2: 0.729,
     size: 8,
     octaves: 4,
-    colors: pickPaletteColors(palette, "noAtmosphereGround", [
+    colors: [
       rgba(0.639216, 0.654902, 0.760784),
       rgba(0.298039, 0.407843, 0.521569),
       rgba(0.227451, 0.247059, 0.368627),
-    ]),
+    ],
   });
 
   renderCraters(buffer, frame, {
@@ -2216,15 +2015,14 @@ function renderNoAtmosphere(buffer, frame) {
     lightBorder: 0.465,
     size: 5,
     offset: 0.03,
-    colors: pickPaletteColors(palette, "noAtmosphereCraters", [
+    colors: [
       rgba(0.298039, 0.407843, 0.521569),
       rgba(0.227451, 0.247059, 0.368627),
-    ]),
+    ],
   });
 }
 
 function renderGasGiantOne(buffer, frame) {
-  const palette = buildRandomizedPresetPalette(frame);
   renderGasClouds(buffer, frame, {
     planeScale: 1,
     pixelsScale: 1,
@@ -2237,12 +2035,12 @@ function renderGasGiantOne(buffer, frame) {
     lightBorder2: 0.666,
     size: 9,
     octaves: 5,
-    colors: pickPaletteColors(palette, "gasGiantOneBase", [
+    colors: [
       rgba(0.231373, 0.12549, 0.152941),
       rgba(0.231373, 0.12549, 0.152941),
       rgba(0, 0, 0),
       rgba(0.129412, 0.0941176, 0.105882),
-    ]),
+    ],
   });
 
   renderGasClouds(buffer, frame, {
@@ -2257,17 +2055,16 @@ function renderGasGiantOne(buffer, frame) {
     lightBorder2: 0.746,
     size: 9,
     octaves: 5,
-    colors: pickPaletteColors(palette, "gasGiantOneAccent", [
+    colors: [
       rgba(0.941176, 0.709804, 0.254902),
       rgba(0.811765, 0.458824, 0.168627),
       rgba(0.670588, 0.317647, 0.188235),
       rgba(0.490196, 0.219608, 0.2),
-    ]),
+    ],
   });
 }
 
 function renderGasGiantTwo(buffer, frame) {
-  const palette = buildRandomizedPresetPalette(frame);
   renderDenseGas(buffer, frame, {
     planeScale: 1,
     pixelsScale: 1,
@@ -2276,16 +2073,16 @@ function renderGasGiantTwo(buffer, frame) {
     bands: 0.892,
     size: 10.107,
     octaves: 3,
-    colors: pickPaletteColors(palette, "gasGiantTwoColors", [
+    colors: [
       rgba(0.933333, 0.764706, 0.603922),
       rgba(0.85098, 0.627451, 0.4),
       rgba(0.560784, 0.337255, 0.231373),
-    ]),
-    darkColors: pickPaletteColors(palette, "gasGiantTwoDarkColors", [
+    ],
+    darkColors: [
       rgba(0.4, 0.223529, 0.192157),
       rgba(0.270588, 0.156863, 0.235294),
       rgba(0.133333, 0.12549, 0.203922),
-    ]),
+    ],
   });
 
   renderRing(buffer, frame, {
@@ -2299,21 +2096,20 @@ function renderGasGiantTwo(buffer, frame) {
     rotationOffset: 0.7,
     size: 15,
     octaves: 4,
-    colors: pickPaletteColors(palette, "gasGiantTwoColors", [
+    colors: [
       rgba(0.933333, 0.764706, 0.603922),
       rgba(0.701961, 0.478431, 0.313726),
       rgba(0.560784, 0.337255, 0.231373),
-    ]),
-    darkColors: pickPaletteColors(palette, "gasGiantTwoDarkColors", [
+    ],
+    darkColors: [
       rgba(0.333333, 0.188235, 0.211765),
       rgba(0.196078, 0.137255, 0.215686),
       rgba(0.133333, 0.12549, 0.203922),
-    ]),
+    ],
   });
 }
 
 function renderIceWorld(buffer, frame) {
-  const palette = buildRandomizedPresetPalette(frame);
   renderPlanetUnder(buffer, frame, {
     planeScale: 1,
     pixelsScale: 1,
@@ -2324,11 +2120,11 @@ function renderIceWorld(buffer, frame) {
     lightBorder2: 0.632,
     size: 8,
     octaves: 2,
-    colors: pickPaletteColors(palette, "iceWorldLand", [
+    colors: [
       rgba(0.980392, 1, 1),
       rgba(0.780392, 0.831373, 0.882353),
       rgba(0.572549, 0.560784, 0.721569),
-    ]),
+    ],
   });
 
   renderIceLakes(buffer, frame, {
@@ -2341,11 +2137,11 @@ function renderIceWorld(buffer, frame) {
     lakeCutoff: 0.55,
     size: 10,
     octaves: 3,
-    colors: pickPaletteColors(palette, "iceWorldLakes", [
+    colors: [
       rgba(0.309804, 0.643137, 0.721569),
       rgba(0.298039, 0.407843, 0.521569),
       rgba(0.227451, 0.247059, 0.368627),
-    ]),
+    ],
   });
 
   renderClouds(buffer, frame, {
@@ -2360,17 +2156,16 @@ function renderIceWorld(buffer, frame) {
     lightBorder2: 0.781,
     size: 4,
     octaves: 4,
-    colors: pickPaletteColors(palette, "iceWorldClouds", [
+    colors: [
       rgba(0.882353, 0.94902, 1),
       rgba(0.752941, 0.890196, 1),
       rgba(0.368627, 0.439216, 0.647059),
       rgba(0.25098, 0.286275, 0.45098),
-    ]),
+    ],
   });
 }
 
 function renderLavaWorld(buffer, frame) {
-  const palette = buildRandomizedPresetPalette(frame);
   renderNoAtmosphereBase(buffer, frame, {
     planeScale: 1,
     pixelsScale: 1,
@@ -2381,11 +2176,11 @@ function renderLavaWorld(buffer, frame) {
     lightBorder2: 0.6,
     size: 10,
     octaves: 3,
-    colors: pickPaletteColors(palette, "lavaWorldLand", [
+    colors: [
       rgba(0.560784, 0.301961, 0.341176),
       rgba(0.321569, 0.2, 0.247059),
       rgba(0.239216, 0.160784, 0.211765),
-    ]),
+    ],
   });
 
   renderCraters(buffer, frame, {
@@ -2396,10 +2191,10 @@ function renderLavaWorld(buffer, frame) {
     lightBorder: 0.4,
     size: 3.5,
     offset: 0.03,
-    colors: pickPaletteColors(palette, "lavaWorldCraters", [
+    colors: [
       rgba(0.321569, 0.2, 0.247059),
       rgba(0.239216, 0.160784, 0.211765),
-    ]),
+    ],
   });
 
   renderLavaRivers(buffer, frame, {
@@ -2412,42 +2207,40 @@ function renderLavaWorld(buffer, frame) {
     riverCutoff: 0.579,
     size: 10,
     octaves: 4,
-    colors: pickPaletteColors(palette, "lavaWorldRivers", [
+    colors: [
       rgba(1, 0.537255, 0.2),
       rgba(0.901961, 0.270588, 0.223529),
       rgba(0.678431, 0.184314, 0.270588),
-    ]),
+    ],
   });
 }
 
 function renderAsteroidPreset(buffer, frame) {
-  const palette = buildRandomizedPresetPalette(frame);
   renderAsteroid(buffer, frame, {
     planeScale: 1,
     pixelsScale: 1,
     lightOrigin: [0, 0],
     size: 5.294,
     octaves: 2,
-    colors: pickPaletteColors(palette, "asteroid", [
+    colors: [
       rgba(0.639216, 0.654902, 0.760784),
       rgba(0.298039, 0.407843, 0.521569),
       rgba(0.227451, 0.247059, 0.368627),
-    ]),
+    ],
   });
 }
 
 function renderBlackHolePreset(buffer, frame) {
-  const palette = buildRandomizedPresetPalette(frame);
   renderBlackHoleCore(buffer, frame, {
     planeScale: 1,
     pixelsScale: 1,
     radius: 0.247,
     lightWidth: 0.028,
-    colors: pickPaletteColors(palette, "blackHoleCore", [
+    colors: [
       rgba(0.152941, 0.152941, 0.211765),
       rgba(1, 1, 0.921569),
       rgba(0.929412, 0.482353, 0.223529),
-    ]),
+    ],
   });
 
   renderBlackHoleDisk(buffer, frame, {
@@ -2459,18 +2252,17 @@ function renderBlackHolePreset(buffer, frame) {
     rotationOffset: 0.766,
     size: 6.598,
     octaves: 3,
-    colors: pickPaletteColors(palette, "blackHoleDisk", [
+    colors: [
       rgba(1, 1, 0.921569),
       rgba(1, 0.960784, 0.25098),
       rgba(1, 0.721569, 0.290196),
       rgba(0.929412, 0.482353, 0.223529),
       rgba(0.741176, 0.25098, 0.207843),
-    ]),
+    ],
   });
 }
 
 function renderGalaxyPreset(buffer, frame) {
-  const palette = buildRandomizedPresetPalette(frame);
   renderGalaxy(buffer, frame, {
     planeScale: 1,
     pixelsScale: 1,
@@ -2484,7 +2276,7 @@ function renderGalaxyPreset(buffer, frame) {
     zoom: 1.375,
     swirl: -9,
     nColors: 6,
-    colors: pickPaletteColors(palette, "galaxy", [
+    colors: [
       rgba(1, 1, 0.921569),
       rgba(1, 0.913725, 0.552941),
       rgba(0.709804, 0.878431, 0.4),
@@ -2492,22 +2284,12 @@ function renderGalaxyPreset(buffer, frame) {
       rgba(0.223529, 0.364706, 0.392157),
       rgba(0.196078, 0.223529, 0.301961),
       rgba(0.196078, 0.160784, 0.278431),
-    ]),
+    ],
   });
 }
 
 function renderStarPreset(buffer, frame) {
-  const palette = buildRandomizedPresetPalette(frame);
-  const starColors = pickPaletteColors(palette, "starCore", [
-    rgba(0.960784, 1, 0.909804),
-    rgba(0.466667, 0.839216, 0.756863),
-    rgba(0.109804, 0.572549, 0.654902),
-    rgba(0.0117647, 0.243137, 0.368627),
-  ]);
-  const flareColors = pickPaletteColors(palette, "starFlares", [
-    rgba(0.466667, 0.839216, 0.756863),
-    rgba(0.960784, 1, 0.909804),
-  ]);
+  const palette = buildStarPresetPalette(frame);
 
   renderStarBlobs(buffer, frame, {
     planeScale: 2,
@@ -2516,7 +2298,7 @@ function renderStarPreset(buffer, frame) {
     size: 4.93,
     circleAmount: 2,
     circleSize: 1,
-    color: palette && palette.starBlob ? palette.starBlob : rgba(1, 1, 0.894118),
+    color: palette.starBlob,
   });
 
   renderStarCore(buffer, frame, {
@@ -2524,7 +2306,7 @@ function renderStarPreset(buffer, frame) {
     pixelsScale: 1,
     timeSpeed: 0.05,
     tiles: 1,
-    colors: starColors,
+    colors: palette.starCore,
   });
 
   renderStarFlares(buffer, frame, {
@@ -2538,7 +2320,7 @@ function renderStarPreset(buffer, frame) {
     scale: 1,
     size: 1.6,
     octaves: 4,
-    colors: flareColors,
+    colors: palette.starFlares,
   });
 }
 
@@ -2647,8 +2429,38 @@ function normalizeConfig(config) {
     direction,
     speed,
     dither: typeof nextConfig.dither === "boolean" ? nextConfig.dither : defaults.dither,
-    useDefaultColors: nextConfig.useDefaultColors === true,
   };
+}
+
+function resolveSequenceFrameIndex(progressValue) {
+  const numericValue = Number(progressValue);
+  if (!Number.isFinite(numericValue)) {
+    return 0;
+  }
+  const wrappedProgress = mod(numericValue, 1);
+  return Math.floor(wrappedProgress * FRAME_COUNT);
+}
+
+function buildSequenceCacheKey(normalized) {
+  return [
+    normalized.preset,
+    normalized.pixels,
+    normalized.size,
+    normalized.seed,
+    normalized.colorSeed,
+    normalized.planetX,
+    normalized.planetY,
+    normalized.direction,
+    normalized.speed,
+    normalized.dither ? "1" : "0",
+  ].join("|");
+}
+
+function renderPlanetScreensaverPreviewMap(normalized, preset, progressValue) {
+  const frame = buildFrameState(normalized, preset, progressValue);
+  const buffer = createFrameBuffer();
+  renderPresetFrame(buffer, frame);
+  return bufferToMap(buffer);
 }
 
 function readPreviewCache(key) {
@@ -2663,22 +2475,8 @@ function writePreviewCache(key, sequence) {
   PREVIEW_CACHE.set(key, sequence);
 }
 
-function buildPlanetScreensaverPreviewSequence(config) {
-  const normalized = normalizeConfig(config);
-  const cacheKey = [
-    normalized.preset,
-    normalized.pixels,
-    normalized.size,
-    normalized.seed,
-    normalized.colorSeed,
-    normalized.planetX,
-    normalized.planetY,
-    normalized.useDefaultColors ? "1" : "0",
-    normalized.direction,
-    normalized.speed,
-    normalized.dither ? "1" : "0",
-  ].join("|");
-
+function buildPlanetScreensaverPreviewSequenceFromNormalized(normalized) {
+  const cacheKey = buildSequenceCacheKey(normalized);
   const cached = readPreviewCache(cacheKey);
   if (cached) {
     return cached;
@@ -2687,22 +2485,29 @@ function buildPlanetScreensaverPreviewSequence(config) {
   const preset = PRESET_DEFINITIONS[normalized.preset];
   const maps = [];
   const delays = [];
+  const frameDelay = getFrameDelay(normalized.speed);
 
   for (let frameIndex = 0; frameIndex < FRAME_COUNT; frameIndex += 1) {
     const progress = FRAME_COUNT > 0 ? frameIndex / FRAME_COUNT : 0;
-    const frame = buildFrameState(normalized, preset, progress);
-    const buffer = createFrameBuffer();
-    renderPresetFrame(buffer, frame);
-    maps.push(bufferToMap(buffer));
-    delays.push(frame.frameDelay);
+    maps.push(renderPlanetScreensaverPreviewMap(normalized, preset, progress));
+    delays.push(frameDelay);
   }
 
   const sequence = {
+    cacheKey,
+    config: normalized,
+    frameCount: FRAME_COUNT,
+    frameDelay,
     maps,
     delays,
   };
   writePreviewCache(cacheKey, sequence);
   return sequence;
+}
+
+function buildPlanetScreensaverPreviewSequence(config) {
+  const normalized = normalizeConfig(config);
+  return buildPlanetScreensaverPreviewSequenceFromNormalized(normalized);
 }
 
 export {

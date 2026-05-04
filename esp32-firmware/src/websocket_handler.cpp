@@ -174,7 +174,6 @@ bool restoreBinaryImageBackupIfNeeded() {
 
 void beginBinaryImageBatch(DeviceMode mode) {
   if (!snapshotBinaryImageState(mode)) {
-    Serial.println("静态像素批次快照失败，仍继续接收");
   }
 
   PixelData*& imagePixels = currentImagePixelsForMode(mode);
@@ -237,10 +236,6 @@ bool enqueuePendingTextMessage(PendingTextMessage* message) {
   portEXIT_CRITICAL(&gPendingTextQueueMux);
 
   if (queued) {
-    Serial.printf("[WS] 文本消息已排队: client=%u len=%u pending=%u\n",
-                  message->clientId,
-                  static_cast<unsigned>(message->len),
-                  static_cast<unsigned>(pendingCount));
   }
   return queued;
 }
@@ -358,59 +353,17 @@ const char* modeToString(DeviceMode mode) {
 }
 
 void logClientTextSendResult(const char* tag, AsyncWebSocketClient* client, size_t len, bool sent) {
-  if (client == nullptr) {
-    Serial.printf(
-      "[WS SEND] %s client=0 sent=%d len=%u queue=0 available=0 millis=%lu\n",
-      tag,
-      sent ? 1 : 0,
-      (unsigned int)len,
-      millis()
-    );
-    return;
-  }
-
-  bool available = false;
-  AsyncWebSocket* server = client->server();
-  if (server != nullptr) {
-    available = server->availableForWrite(client->id());
-  }
-
-  Serial.printf(
-    "[WS SEND] %s client=%u sent=%d len=%u queue=%u available=%d millis=%lu\n",
-    tag,
-    client->id(),
-    sent ? 1 : 0,
-    (unsigned int)len,
-    (unsigned int)client->queueLen(),
-    available ? 1 : 0,
-    millis()
-  );
+  (void)tag;
+  (void)client;
+  (void)len;
+  (void)sent;
 }
 
 void logClientIdTextSendResult(const char* tag, uint32_t clientId, size_t len, bool sent) {
-  AsyncWebSocketClient* client = WebSocketHandler::ws.client(clientId);
-  if (client == nullptr) {
-    Serial.printf(
-      "[WS SEND] %s client=%u sent=%d len=%u connected=0 queue=0 available=0 millis=%lu\n",
-      tag,
-      clientId,
-      sent ? 1 : 0,
-      (unsigned int)len,
-      millis()
-    );
-    return;
-  }
-
-  Serial.printf(
-    "[WS SEND] %s client=%u sent=%d len=%u connected=1 queue=%u available=%d millis=%lu\n",
-    tag,
-    clientId,
-    sent ? 1 : 0,
-    (unsigned int)len,
-    (unsigned int)client->queueLen(),
-    WebSocketHandler::ws.availableForWrite(clientId) ? 1 : 0,
-    millis()
-  );
+  (void)tag;
+  (void)clientId;
+  (void)len;
+  (void)sent;
 }
 
 bool tryHandleImmediateWsCommand(
@@ -516,7 +469,6 @@ const char* WebSocketHandler::getCurrentModeString() {
 
 void WebSocketHandler::init() {
   ws.onEvent(onWsEvent);
-  Serial.println("WebSocket 已初始化");
 }
 
 bool WebSocketHandler::hasConnectedClients() {
@@ -557,10 +509,6 @@ void WebSocketHandler::resetTransientTransferState() {
 }
 
 WebSocketHandler::TransientTransferAbortState WebSocketHandler::abortTransientTransfer(const char* reason) {
-  if (reason != nullptr && reason[0] != '\0') {
-    Serial.println(reason);
-  }
-
   TransientTransferAbortState state;
   state.wasTransientMode = RuntimeModeCoordinator::isTransientRuntimeMode(DisplayManager::currentMode);
   state.hadBinaryPixels = DisplayManager::receivingPixels || binaryDataPending;
@@ -585,7 +533,6 @@ void WebSocketHandler::finalizeClientDisconnect(uint32_t clientId, bool fromHear
   }
 
   if (wasBinaryAnimationUpload || wasStreamingAnimationUpload) {
-    Serial.println("动画上传客户端已断开，恢复稳定态");
     restoreRuntimeAfterAnimationUploadFailure();
   }
 
@@ -598,13 +545,6 @@ void WebSocketHandler::finalizeClientDisconnect(uint32_t clientId, bool fromHear
 
   if (RuntimeModeCoordinator::isTransientRuntimeMode(DisplayManager::currentMode) ||
       DisplayManager::receivingPixels) {
-    DeviceMode fromMode = DisplayManager::currentMode;
-    Serial.printf(
-      "%s自动恢复模式: %s -> %s\n",
-      fromHeartbeatTimeout ? "心跳超时后" : "客户端断开时",
-      modeToString(fromMode),
-      DisplayManager::lastBusinessModeTag.c_str()
-    );
     RuntimeCommandBus::enqueueAbortTransientTransferAndRestore("客户端断开，终止当前传输并恢复稳定态");
     return;
   }
@@ -672,7 +612,6 @@ void WebSocketHandler::tick() {
 
     AsyncWebSocketClient* client = ws.client(message->clientId);
     if (client == nullptr || client->status() != WS_CONNECTED) {
-      Serial.printf("[WS] 丢弃已断开客户端的文本消息: client=%u\n", message->clientId);
       destroyPendingTextMessage(message);
       continue;
     }
@@ -680,11 +619,6 @@ void WebSocketHandler::tick() {
     size_t freeHeap = ESP.getFreeHeap();
     size_t maxJsonSize =
       resolveQueuedWsCommandJsonCapacity(message->payload, message->len, freeHeap);
-
-    Serial.printf("主循环处理 JSON: client=%u data=%u bytes json=%u bytes\n",
-                  message->clientId,
-                  static_cast<unsigned>(message->len),
-                  static_cast<unsigned>(maxJsonSize));
 
     if (maxJsonSize > freeHeap * 0.85) {
       ws.text(
@@ -720,7 +654,6 @@ void WebSocketHandler::tick() {
       continue;
     }
 
-    Serial.println("JSON解析成功，处理命令");
     handleJsonCommand(client, doc);
     destroyPendingTextMessage(message);
   }
@@ -729,7 +662,6 @@ void WebSocketHandler::tick() {
 void WebSocketHandler::onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, 
                                 AwsEventType type, void *arg, uint8_t *data, size_t len) {
   if (type == WS_EVT_CONNECT) {
-    Serial.printf("WebSocket 客户端已连接: %u\n", client->id());
     client->setCloseClientOnQueueFull(false);
     AsyncClient* rawClient = client->client();
     if (rawClient != nullptr) {
@@ -739,15 +671,6 @@ void WebSocketHandler::onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *c
         kWebSocketTcpKeepAliveProbeCount
       );
       client->keepAlivePeriod(15);
-      Serial.printf(
-        "[WS] client=%u transport tuned ack_timeout=%lu keepalive_ms=%lu keepalive_cnt=%u ws_ping_s=%u nodelay=%u\n",
-                    client->id(),
-                    static_cast<unsigned long>(rawClient->getAckTimeout()),
-                    static_cast<unsigned long>(kWebSocketTcpKeepAliveMs),
-                    static_cast<unsigned int>(kWebSocketTcpKeepAliveProbeCount),
-                    static_cast<unsigned int>(client->keepAlivePeriod()),
-                    rawClient->getNoDelay() ? 1U : 0U
-      );
     }
     syncClientConnectionState();
     lastMessageTime = millis();
@@ -769,7 +692,6 @@ void WebSocketHandler::onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *c
     logClientTextSendResult("connect_ack", client, response.length(), sent);
   }
   else if (type == WS_EVT_DISCONNECT) {
-    Serial.printf("WebSocket 客户端已断开: %u\n", client->id());
     finalizeClientDisconnect(client->id(), false);
   }
   else if (type == WS_EVT_PING || type == WS_EVT_PONG) {
@@ -835,7 +757,6 @@ void WebSocketHandler::handleBinaryMessage(
     }
     state->expectedLen = info->len;
     state->inUse = true;
-    Serial.printf("开始接收二进制分片，总大小: %llu bytes\n", info->len);
   }
 
   if (!state->inUse || state->buffer == nullptr || state->expectedLen != info->len) {
@@ -853,11 +774,9 @@ void WebSocketHandler::handleBinaryMessage(
   memcpy(state->buffer + info->index, data, len);
 
   if (!info->final || (info->index + len) < info->len) {
-    Serial.printf("二进制分片接收中: %llu/%llu bytes\n", info->index + len, info->len);
     return;
   }
 
-  Serial.printf("完整二进制消息已收齐: %u bytes\n", static_cast<unsigned>(state->expectedLen));
   handleBinaryData(client, state->buffer, state->expectedLen);
   clearBinaryState(*state);
 }
@@ -928,9 +847,6 @@ void WebSocketHandler::handleBinaryData(AsyncWebSocketClient *client, uint8_t *d
 }
 
 void WebSocketHandler::handleJsonCommand(AsyncWebSocketClient *client, uint8_t *data, size_t len, AwsFrameInfo *info) {
-  Serial.printf("收到 WebSocket 数据: %d bytes, final=%d, index=%llu, total=%llu\n",
-    len, info->final, info->index, info->len);
-
   ClientTextMessageState* clientState = getClientTextState(client->id(), true);
   if (clientState == nullptr) {
     client->text("{\"error\":\"message state unavailable\"}");
@@ -949,10 +865,6 @@ void WebSocketHandler::handleJsonCommand(AsyncWebSocketClient *client, uint8_t *
     clientState->expectedLen = info->len;
     clientState->inUse = true;
 
-    bool isFragmentedMessage = !info->final || (info->len > len);
-    if (isFragmentedMessage) {
-      Serial.printf("开始接收分片数据，总大小: %llu bytes\n", info->len);
-    }
   }
 
   if (!clientState->inUse || clientState->buffer == nullptr || clientState->expectedLen != info->len) {
@@ -970,13 +882,11 @@ void WebSocketHandler::handleJsonCommand(AsyncWebSocketClient *client, uint8_t *
   memcpy(clientState->buffer + info->index, data, len);
 
   if (!info->final || (info->index + len) < info->len) {
-    Serial.printf("分片接收中: %llu/%llu bytes\n", info->index + len, info->len);
     return;
   }
 
   clientState->buffer[clientState->expectedLen] = '\0';
   size_t totalLen = clientState->expectedLen;
-  Serial.printf("完整消息已收齐: %d bytes\n", totalLen);
   if (tryHandleImmediateWsCommand(client, clientState->buffer, totalLen)) {
     clearTextState(*clientState);
     return;
@@ -996,7 +906,6 @@ void WebSocketHandler::handleJsonCommand(AsyncWebSocketClient *client, uint8_t *
 
 void WebSocketHandler::handleJsonCommand(AsyncWebSocketClient *client, JsonDocument& doc) {
   String cmd = doc["cmd"].as<String>();
-  Serial.println("命令: " + cmd);
 
   StaticJsonDocument<768> response;
   bool responseSent = false;

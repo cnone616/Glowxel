@@ -60,38 +60,15 @@ unsigned long currentNtpRetryIntervalMs() {
 }
 
 void disableStationPowerSave(const char* stage) {
-  bool sleep_ok = WiFi.setSleep(false);
-  esp_err_t set_ps_err = esp_wifi_set_ps(WIFI_PS_NONE);
-  wifi_ps_type_t current_ps = WIFI_PS_MIN_MODEM;
-  esp_err_t get_ps_err = esp_wifi_get_ps(&current_ps);
-  Serial.printf(
-    "[WiFi] %s 关闭省电: WiFi.setSleep(false)=%d, esp_wifi_set_ps=%d, esp_wifi_get_ps=%d, current_ps=%d\n",
-    stage == nullptr ? "unknown" : stage,
-    sleep_ok ? 1 : 0,
-    (int)set_ps_err,
-    (int)get_ps_err,
-    (int)current_ps
-  );
+  (void)stage;
+  WiFi.setSleep(false);
+  esp_wifi_set_ps(WIFI_PS_NONE);
 }
 
 void applyStationRadioTuning(const char* stage, bool logLinkMetrics) {
-  bool tx_power_ok = WiFi.setTxPower(WIFI_POWER_19_5dBm);
-  if (!logLinkMetrics) {
-    Serial.printf(
-      "[WiFi] %s 射频配置: WiFi.setTxPower(WIFI_POWER_19_5dBm)=%d\n",
-      stage == nullptr ? "unknown" : stage,
-      tx_power_ok ? 1 : 0
-    );
-    return;
-  }
-
-  Serial.printf(
-    "[WiFi] %s 射频配置: WiFi.setTxPower(WIFI_POWER_19_5dBm)=%d, RSSI=%d dBm, channel=%d\n",
-    stage == nullptr ? "unknown" : stage,
-    tx_power_ok ? 1 : 0,
-    WiFi.RSSI(),
-    WiFi.channel()
-  );
+  (void)stage;
+  (void)logLinkMetrics;
+  WiFi.setTxPower(WIFI_POWER_19_5dBm);
 }
 
 String buildConfigPortalSSID() {
@@ -109,15 +86,14 @@ void copyScanItem(WiFiScanResultItem& item, const String& ssid, int32_t rssi, bo
 }
 
 void stopWifiScanDriverIfNeeded(const char* reason) {
+  (void)reason;
   esp_err_t err = esp_wifi_scan_stop();
   if (err == ESP_OK) {
-    Serial.printf("[WiFi] %s，已请求停止底层扫描\n", reason);
     return;
   }
   if (err == ESP_ERR_WIFI_STATE || err == ESP_ERR_WIFI_NOT_STARTED || err == ESP_ERR_WIFI_NOT_INIT) {
     return;
   }
-  Serial.printf("[WiFi] %s，停止底层扫描失败: %d\n", reason, (int)err);
 }
 
 const char* wifiEventLogLabel(arduino_event_id_t eventId) {
@@ -284,14 +260,8 @@ uint32_t WiFiManager::scan_attempt_counter = 0;
 uint32_t WiFiManager::active_scan_attempt_id = 0;
 
 void WiFiManager::init() {
-  Serial.println("3. 连接WiFi...");
-  Serial.printf("[WiFi] init: heap=%u bytes, mode=%d\n", ESP.getFreeHeap(), (int)WiFi.getMode());
-  Serial.println("[WiFi] init: 调用 WiFi.persistent(false)");
   WiFi.persistent(false);
-  Serial.println("[WiFi] init: WiFi.persistent(false) 完成");
-  Serial.println("[WiFi] init: 注册 WiFi 事件回调");
   WiFi.onEvent(WiFiManager::handleWiFiEvent);
-  Serial.println("[WiFi] init: WiFi.onEvent 完成，开始执行 setupWiFi()");
   setupWiFi();
 }
 
@@ -314,14 +284,10 @@ void WiFiManager::clearScannedNetworkCache() {
 }
 
 void WiFiManager::setScanPhase(WifiScanPhase nextPhase, const char* reason) {
+  (void)reason;
   if (scan_phase == nextPhase) {
     return;
   }
-
-  Serial.printf("[WiFi] ScanPhase %s -> %s (%s)\n",
-                scanPhaseLabel(scan_phase),
-                scanPhaseLabel(nextPhase),
-                reason == nullptr ? "no reason" : reason);
   scan_phase = nextPhase;
 }
 
@@ -341,22 +307,13 @@ void WiFiManager::beginStationConnect() {
   config_portal_ssid = "";
   resetNtpRetrySchedule();
 
-  Serial.printf("[WiFi] STA 冷启动前: heap=%u bytes, mode=%d\n", ESP.getFreeHeap(), (int)WiFi.getMode());
-  Serial.println("尝试连接到保存的WiFi: " + saved_ssid);
-  Serial.printf("[WiFi] 进入非阻塞 STA 连接，超时窗口=%lu ms\n", kStaConnectTimeoutMs);
   // 对齐旧稳定路径：STA 冷启动时不做额外 radio 清理和熄屏动作。
-  bool mode_ok = WiFi.mode(WIFI_STA);
-  Serial.printf("[WiFi] WiFi.mode(WIFI_STA)=%d, 当前模式=%d, heap=%u bytes\n",
-                mode_ok ? 1 : 0,
-                (int)WiFi.getMode(),
-                ESP.getFreeHeap());
-  bool disconnect_ok = WiFi.disconnect();
-  Serial.printf("[WiFi] WiFi.disconnect()=%d\n", disconnect_ok ? 1 : 0);
+  WiFi.mode(WIFI_STA);
+  WiFi.disconnect();
   delay(50);
   disableStationPowerSave("beginStationConnect()");
   applyStationRadioTuning("beginStationConnect()", false);
-  wl_status_t begin_status = WiFi.begin(saved_ssid.c_str(), saved_password.c_str());
-  Serial.printf("[WiFi] WiFi.begin 已调用，返回=%d\n", (int)begin_status);
+  WiFi.begin(saved_ssid.c_str(), saved_password.c_str());
 }
 
 void WiFiManager::finalizeStationConnected() {
@@ -382,23 +339,14 @@ void WiFiManager::finalizeStationConnected() {
   String ip = WiFi.localIP().toString();
   disableStationPowerSave("finalizeStationConnected()");
   applyStationRadioTuning("finalizeStationConnected()", true);
-  Serial.println("WiFi已连接");
-  Serial.print("IP地址: ");
-  Serial.println(ip);
-  Serial.println("[WiFi] STA 已连接，已再次确认关闭省电以稳定 HTTP/WebSocket 入站访问");
-  Serial.println("已发起网络时间同步，后台更新中");
   showWiFiConnectedScreen(ip);
 }
 
 void WiFiManager::setupWiFi() {
-  Serial.println("[WiFi] setupWiFi: 打开 Preferences(wifi)");
   ConfigManager::preferences.begin("wifi", false);
   saved_ssid = ConfigManager::preferences.getString("ssid", "");
   saved_password = ConfigManager::preferences.getString("password", "");
   ConfigManager::preferences.end();
-  Serial.printf("[WiFi] setupWiFi: 已读取凭据，ssid_length=%u, has_password=%d\n",
-                (unsigned int)saved_ssid.length(),
-                saved_password.length() > 0 ? 1 : 0);
 
   sta_connecting = false;
   sta_reconnect_pending = false;
@@ -414,7 +362,6 @@ void WiFiManager::setupWiFi() {
   resetScanState();
 
   if (saved_ssid.length() == 0) {
-    Serial.println("未找到WiFi配置，进入热点配网模式");
     startConfigPortal();
     return;
   }
@@ -451,16 +398,6 @@ void WiFiManager::startConfigPortal() {
   dns_server.stop();
   dns_server.start(53, "*", kConfigPortalIp);
   WiFi.scanDelete();
-
-  Serial.println("\n=================================");
-  Serial.println("WiFi 热点配网模式已启动");
-  Serial.print("热点名称: ");
-  Serial.println(config_portal_ssid);
-  Serial.print("配网页地址: http://");
-  Serial.println(getConfigPortalIP());
-  Serial.printf("[WiFi] 当前模式=%d, heap=%u bytes\n", (int)WiFi.getMode(), ESP.getFreeHeap());
-  Serial.println("仅支持 2.4GHz WiFi");
-  Serial.println("=================================");
 
   if (DisplayManager::dma_display != nullptr) {
     DisplayManager::dma_display->clearScreen();
@@ -500,13 +437,6 @@ void WiFiManager::ensureRuntimeSettingsAccessPoint() {
   }
 
   runtime_access_ap_started = true;
-  Serial.printf(
-    "[WiFi] 运行态设置热点已启动: ssid=%s ip=%s mode=%d heap=%u bytes\n",
-    config_portal_ssid.c_str(),
-    kConfigPortalIp.toString().c_str(),
-    (int)WiFi.getMode(),
-    ESP.getFreeHeap()
-  );
 }
 
 void WiFiManager::scanNearbyNetworks() {
@@ -515,12 +445,10 @@ void WiFiManager::scanNearbyNetworks() {
   }
 
   if (scan_phase != WifiScanPhase::IDLE) {
-    Serial.println("[WiFi] 扫描正在进行中，忽略重复请求");
     return;
   }
 
   setScanPhase(WifiScanPhase::REQUESTED, "收到门户扫描请求");
-  Serial.println("[WiFi] 已收到扫描请求，等待主循环启动异步扫描");
 }
 
 void WiFiManager::finalizeNetworkScan(int networkCount) {
@@ -532,8 +460,6 @@ void WiFiManager::finalizeNetworkScan(int networkCount) {
     setScanPhase(WifiScanPhase::IDLE, "扫描失败");
     return;
   }
-
-  Serial.printf("[WiFi] 扫描完成，scan#%lu，共发现 %d 个热点\n", (unsigned long)active_scan_attempt_id, networkCount);
 
   size_t nextCapacity = static_cast<size_t>(networkCount);
   WiFiScanResultItem* nextResults = nullptr;
@@ -600,9 +526,6 @@ void WiFiManager::finalizeNetworkScan(int networkCount) {
   WiFi.scanDelete();
   active_scan_attempt_id = 0;
   setScanPhase(WifiScanPhase::IDLE, "扫描结果已整理完成");
-  Serial.printf("[WiFi] 热点列表已整理，缓存热点=%u，当前可用堆内存: %u bytes\n",
-                (unsigned int)scanned_network_count,
-                ESP.getFreeHeap());
 }
 
 void WiFiManager::handleWiFiEvent(arduino_event_t* event) {
@@ -610,59 +533,30 @@ void WiFiManager::handleWiFiEvent(arduino_event_t* event) {
     return;
   }
 
-  const char* label = wifiEventLogLabel(event->event_id);
-  if (label != nullptr) {
-    Serial.printf("[WiFi Event] %s, mode=%d, config_mode=%d, sta_connecting=%d, scan_phase=%s, active_scan=%lu\n",
-                  label,
-                  (int)WiFi.getMode(),
-                  config_mode ? 1 : 0,
-                  sta_connecting ? 1 : 0,
-                  scanPhaseLabel(scan_phase),
-                  (unsigned long)active_scan_attempt_id);
-  }
-
   if (event->event_id == ARDUINO_EVENT_WIFI_AP_STACONNECTED) {
-    Serial.printf("[WiFi Event] AP client connected, aid=%d\n",
-                  (int)event->event_info.wifi_ap_staconnected.aid);
     if (!config_mode) {
       startRuntimeSettingsWindow(kRuntimeSettingsWindowDefaultHoldMs);
-      Serial.printf("[WiFi] 运行态检测到热点客户端接入，设置窗口续期=%lu ms\n",
-                    kRuntimeSettingsWindowDefaultHoldMs);
     }
     return;
   }
 
   if (event->event_id == ARDUINO_EVENT_WIFI_AP_STADISCONNECTED) {
-    Serial.printf("[WiFi Event] AP client disconnected, aid=%d\n",
-                  (int)event->event_info.wifi_ap_stadisconnected.aid);
     return;
   }
 
   if (event->event_id == ARDUINO_EVENT_WIFI_STA_DISCONNECTED) {
-    Serial.printf(
-      "[WiFi Event] STA disconnected, millis=%lu, reason=%u, mode=%d, ws_clients=%u, current_mode=%d, business_mode=%s\n",
-      millis(),
-      (unsigned int)event->event_info.wifi_sta_disconnected.reason,
-      (int)WiFi.getMode(),
-      (unsigned int)WebSocketHandler::ws.count(),
-      (int)DisplayManager::currentMode,
-      DisplayManager::currentBusinessModeTag.c_str()
-    );
     if (!config_mode && saved_ssid.length() > 0) {
       if (sta_connecting) {
-        Serial.println("[WiFi] 当前仍处于 STA 连接窗口内，保持本轮连接超时控制，不立即重置重连状态机");
         return;
       }
       sta_connecting = false;
       sta_reconnect_pending = true;
       sta_reconnect_due_at = millis() + kStaReconnectDelayMs;
-      Serial.printf("[WiFi] 已计划自动重连，delay=%lu ms\n", kStaReconnectDelayMs);
     }
     return;
   }
 
   if (event->event_id == ARDUINO_EVENT_WIFI_STA_GOT_IP) {
-    Serial.printf("[WiFi Event] STA got IP: %s\n", WiFi.localIP().toString().c_str());
     return;
   }
 
@@ -675,18 +569,12 @@ void WiFiManager::handleWiFiEvent(arduino_event_t* event) {
     : WIFI_SCAN_FAILED;
 
   if (!config_mode || scan_phase != WifiScanPhase::RUNNING) {
-    Serial.printf("[WiFi] 收到过期扫描完成事件，状态=%d，数量=%d，释放扫描缓存\n",
-                  (int)event->event_info.wifi_scan_done.status,
-                  (int)event->event_info.wifi_scan_done.number);
     WiFi.scanDelete();
     return;
   }
 
   scan_result_code = result;
   scan_result_ready = true;
-  Serial.printf("[WiFi] 收到扫描完成事件，状态=%d，数量=%d\n",
-                (int)event->event_info.wifi_scan_done.status,
-                (int)event->event_info.wifi_scan_done.number);
 }
 
 void WiFiManager::saveConfigPortalCredentials(const String& ssid, const String& password) {
@@ -697,7 +585,6 @@ void WiFiManager::saveConfigPortalCredentials(const String& ssid, const String& 
 
   saved_ssid = ssid;
   saved_password = password;
-  Serial.println("WiFi 配置已保存");
 }
 
 void WiFiManager::schedulePortalRestart(unsigned long delayMs) {
@@ -725,7 +612,6 @@ void WiFiManager::refreshTimeSync() {
   last_ntp_retry_at = millis();
   ntp_sync_logged = false;
   time_synced_once = false;
-  Serial.printf("已更新 NTP 服务器并重新发起同步: %s\n", ConfigManager::deviceParamsConfig.ntpServer);
 }
 
 bool WiFiManager::hasSavedCredentials() {
@@ -853,9 +739,6 @@ void WiFiManager::tick() {
       scan_result_code = WIFI_SCAN_FAILED;
       stopWifiScanDriverIfNeeded("启动新扫描前");
       WiFi.scanDelete();
-      Serial.printf("[WiFi] 开始异步扫描附近热点，scan#%lu，当前可用堆内存: %u bytes\n",
-                    (unsigned long)active_scan_attempt_id,
-                    ESP.getFreeHeap());
       wifi_scan_config_t config = {};
       config.ssid = nullptr;
       config.bssid = nullptr;
@@ -922,7 +805,6 @@ void WiFiManager::tick() {
     }
 
     if (sta_reconnect_due_at != 0 && millis() >= sta_reconnect_due_at) {
-      Serial.println("[WiFi] 执行 STA 自动重连");
       beginStationConnect();
     }
     return;
@@ -936,8 +818,6 @@ void WiFiManager::tick() {
     if (saved_ssid.length() > 0) {
       sta_reconnect_pending = true;
       sta_reconnect_due_at = millis() + kStaReconnectDelayMs;
-      Serial.printf("[WiFi] 检测到 STA 离线，补发自动重连计划，delay=%lu ms\n",
-                    kStaReconnectDelayMs);
     }
     return;
   }
@@ -946,7 +826,6 @@ void WiFiManager::tick() {
     time_synced_once = true;
     if (!ntp_sync_logged) {
       ntp_sync_logged = true;
-      Serial.println("NTP时间同步成功");
     }
     return;
   }
@@ -961,8 +840,5 @@ void WiFiManager::tick() {
   noteNtpSyncRequest();
   ntp_sync_logged = false;
   // configTime() 会停止并重新初始化 SNTP，频繁调用会打断正在进行的同步流程。
-  Serial.printf("NTP 未同步，重新初始化同步客户端... request#%u, interval=%lu ms\n",
-                (unsigned int)s_ntpRequestAttemptCount,
-                retryIntervalMs);
   requestTimeSync();
 }

@@ -22,7 +22,6 @@ class CloudService {
     this.db = wx.cloud.database()
     this._ = this.db.command
     this.isInitialized = true
-    console.log('云开发初始化成功')
     // #endif
   }
 

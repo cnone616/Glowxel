@@ -84,23 +84,15 @@ export default {
         saveData.themeId = this.lastAppliedClockThemeId;
       }
 
-      console.log("保存配置:", {
-        模式: this.clockMode,
-        图片像素数量: this.imagePixels ? this.imagePixels.size : 0,
-        hasGif: saveData.hasGif,
-      });
-
       const storageKey = this.getClockEditorStorageKey();
 
       uni.setStorageSync(storageKey, JSON.stringify(saveData));
-      console.log(`配置已保存到 ${storageKey}`);
     },
 
     loadConfig() {
       const storageKey = this.getClockEditorStorageKey();
 
       const saved = uni.getStorageSync(storageKey);
-      console.log(`从 ${storageKey} 加载配置，模式: ${this.clockMode}`);
 
       if (saved) {
         try {
@@ -171,21 +163,11 @@ export default {
             this.stopGifAnimation();
           }
 
-          console.log(
-            "配置加载成功，图片像素数量:",
-            this.imagePixels ? this.imagePixels.size : 0,
-            "模式:",
-            this.clockMode,
-            "hasGif:",
-            savedData.hasGif,
-          );
-
           this.drawCanvas();
         } catch (e) {
           console.error("加载配置失败:", e);
         }
       } else {
-        console.log(`${storageKey} 无保存数据，使用默认配置`);
         this.imagePixels = null;
         this.gifAnimationData = null;
         this.gifRenderedFrameMaps = null;
@@ -313,7 +295,6 @@ export default {
               this.gifPlaySpeed,
             );
           }
-          console.log(`发送 GIF 动画: ${this.gifAnimationData.frameCount} 帧`);
           binaryPayload = ws.buildCompactAnimationBinaryBuffer(
             this.gifAnimationData.frames,
           );

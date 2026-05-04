@@ -85,6 +85,43 @@ void ensureRuntimeAccessMutex() {
   }
 }
 
+inline void yieldDisplayWorkByRow(int row) {
+  if ((row & 0x03) == 0x03) {
+    yield();
+  }
+}
+
+void writeLiveFrameRectClipped(int x, int y, int width, int height, uint16_t color) {
+  if (width <= 0 || height <= 0) {
+    return;
+  }
+
+  if (x < 0) {
+    width += x;
+    x = 0;
+  }
+  if (y < 0) {
+    height += y;
+    y = 0;
+  }
+  if (x + width > DisplayManager::PANEL_RES_X) {
+    width = DisplayManager::PANEL_RES_X - x;
+  }
+  if (y + height > DisplayManager::PANEL_RES_Y) {
+    height = DisplayManager::PANEL_RES_Y - y;
+  }
+  if (width <= 0 || height <= 0) {
+    return;
+  }
+
+  for (int py = 0; py < height; py++) {
+    uint16_t* row = &DisplayManager::liveFrameBuffer[y + py][x];
+    for (int px = 0; px < width; px++) {
+      row[px] = color;
+    }
+  }
+}
+
 bool isValidDriver(uint8_t driver) {
   return driver <= 5;
 }
@@ -120,27 +157,6 @@ void maybeLogAmbientWaterSurfacePerf(unsigned long now) {
   if (windowMs < 1000UL || s_ambientWaterSurfacePerfStats.frameCount == 0) {
     return;
   }
-
-  unsigned long avgDrawUs =
-    (unsigned long)(s_ambientWaterSurfacePerfStats.drawUsTotal /
-                    s_ambientWaterSurfacePerfStats.frameCount);
-  unsigned long avgPresentUs =
-    (unsigned long)(s_ambientWaterSurfacePerfStats.presentUsTotal /
-                    s_ambientWaterSurfacePerfStats.frameCount);
-  unsigned long avgChangedPixels =
-    (unsigned long)(s_ambientWaterSurfacePerfStats.changedPixelsTotal /
-                    s_ambientWaterSurfacePerfStats.frameCount);
-
-  Serial.printf(
-    "[WATER SURFACE PERF] window=%lums frames=%lu avgDrawUs=%lu maxDrawUs=%lu avgPresentUs=%lu maxPresentUs=%lu avgChangedPixels=%lu\n",
-    windowMs,
-    s_ambientWaterSurfacePerfStats.frameCount,
-    avgDrawUs,
-    s_ambientWaterSurfacePerfStats.maxDrawUs,
-    avgPresentUs,
-    s_ambientWaterSurfacePerfStats.maxPresentUs,
-    avgChangedPixels
-  );
 
   resetAmbientWaterSurfacePerfWindow(now);
 }
@@ -486,7 +502,11 @@ void DisplayManager::endRedirectedFrame(bool present) {
   }
 }
 
-MatrixPanel_I2S_DMA* DisplayManager::beginOffscreenFrame(uint16_t* targetBuffer, uint16_t clearColor) {
+MatrixPanel_I2S_DMA* DisplayManager::beginOffscreenFrame(
+  uint16_t* targetBuffer,
+  uint16_t clearColor,
+  bool clearBuffer
+) {
   if (targetBuffer == nullptr) {
     return nullptr;
   }
@@ -502,7 +522,9 @@ MatrixPanel_I2S_DMA* DisplayManager::beginOffscreenFrame(uint16_t* targetBuffer,
   }
 
   s_offscreenDisplay->setTargetBuffer(targetBuffer, PANEL_RES_X, PANEL_RES_Y);
-  s_offscreenDisplay->fillScreen(clearColor);
+  if (clearBuffer) {
+    s_offscreenDisplay->fillScreen(clearColor);
+  }
   s_offscreenDisplay->setTextWrap(true);
   s_offscreenDisplay->setCursor(0, 0);
   s_offscreenDisplay->setTextSize(1);
@@ -523,6 +545,7 @@ void DisplayManager::presentOffscreenFrame(const uint16_t* targetBuffer) {
       for (int x = 0; x < PANEL_RES_X; x++) {
         dma_display->drawPixel(x, y, targetBuffer[y * PANEL_RES_X + x]);
       }
+      yieldDisplayWorkByRow(y);
     }
     memcpy(liveFrameBuffer, targetBuffer, sizeof(liveFrameBuffer));
     liveFrameValid = true;
@@ -559,6 +582,7 @@ void DisplayManager::presentOffscreenFrame(const uint16_t* targetBuffer) {
         changedPixels += 1U;
       }
     }
+    yieldDisplayWorkByRow(y);
   }
 
   memcpy(liveFrameBuffer, targetBuffer, sizeof(liveFrameBuffer));
@@ -569,6 +593,56 @@ void DisplayManager::presentOffscreenFrame(const uint16_t* targetBuffer) {
   s_lastPresentChangedPixels = changedPixels;
   s_lastPresentDurationUs = micros() - presentStartedUs;
   s_lastPresentFrameHash = frameHash;
+}
+
+void DisplayManager::presentSolidRectUpdates(
+  const SolidRectUpdate* updates,
+  size_t updateCount
+) {
+  if (dma_display == nullptr || updates == nullptr) {
+    return;
+  }
+
+  unsigned long presentStartedUs = micros();
+  bool changed = false;
+  uint16_t changedPixels = 0;
+  for (size_t i = 0; i < updateCount; i++) {
+    const SolidRectUpdate& update = updates[i];
+    if (update.width == 0 || update.height == 0) {
+      continue;
+    }
+
+    dma_display->fillRect(
+      static_cast<int16_t>(update.x),
+      static_cast<int16_t>(update.y),
+      static_cast<int16_t>(update.width),
+      static_cast<int16_t>(update.height),
+      update.color
+    );
+    writeLiveFrameRectClipped(
+      static_cast<int>(update.x),
+      static_cast<int>(update.y),
+      static_cast<int>(update.width),
+      static_cast<int>(update.height),
+      update.color
+    );
+    changed = true;
+
+    uint32_t area = static_cast<uint32_t>(update.width) * static_cast<uint32_t>(update.height);
+    uint32_t nextCount = static_cast<uint32_t>(changedPixels) + area;
+    changedPixels = nextCount > 0xffffU ? 0xffffU : static_cast<uint16_t>(nextCount);
+    if ((i & 0x07U) == 0x07U) {
+      yield();
+    }
+  }
+
+  liveFrameValid = true;
+  if (changed) {
+    presentFrame();
+  }
+  s_lastPresentChangedPixels = changedPixels;
+  s_lastPresentDurationUs = micros() - presentStartedUs;
+  s_lastPresentFrameHash = 0;
 }
 
 unsigned long DisplayManager::getLastPresentDurationUs() {
@@ -584,7 +658,6 @@ uint32_t DisplayManager::getLastPresentFrameHash() {
 }
 
 void DisplayManager::init() {
-  Serial.println("1. 初始化LED灯板...");
   ensureRuntimeAccessMutex();
   setupMatrix();
 }
@@ -644,7 +717,6 @@ bool DisplayManager::rebuildMatrix(bool doubleBuffered, bool showBootLogo) {
     return true;
   }
 
-  Serial.println("显示开机Logo...");
   drawLogo(12, 7);  // 开机 logo 偏上
   // 开机 logo 额外显示品牌名
   const char* brandText = "Glowxel";
@@ -663,7 +735,6 @@ bool DisplayManager::rebuildMatrix(bool doubleBuffered, bool showBootLogo) {
   dma_display->print(brandText);
   presentFrame();
   delay(2000);
-  Serial.println("LED灯板初始化完成");
   return true;
 }
 
@@ -672,17 +743,14 @@ bool DisplayManager::enableDoubleBuffer() {
     return true;
   }
 
-  Serial.println("尝试启用双缓冲显示...");
   bool ok = rebuildMatrix(true, false);
   if (ok) {
-    Serial.println("双缓冲已启用");
     clearLiveFrame();
     backgroundValid = false;
     animationBufferValid = false;
     return true;
   }
 
-  Serial.println("双缓冲启用失败，恢复单缓冲");
   bool fallbackOk = rebuildMatrix(false, false);
   if (fallbackOk) {
     clearLiveFrame();
@@ -697,7 +765,6 @@ bool DisplayManager::disableDoubleBuffer() {
     return true;
   }
 
-  Serial.println("切换为单缓冲显示...");
   bool ok = rebuildMatrix(false, false);
   if (ok) {
     clearLiveFrame();
@@ -706,7 +773,6 @@ bool DisplayManager::disableDoubleBuffer() {
     return true;
   }
 
-  Serial.println("单缓冲恢复失败，尝试保留双缓冲");
   bool fallbackOk = rebuildMatrix(true, false);
   if (fallbackOk) {
     clearLiveFrame();
@@ -726,9 +792,6 @@ bool DisplayManager::syncBufferStrategyForCurrentMode() {
     return true;
   }
 
-  Serial.printf("[Display] 当前模式=%d，目标缓冲=%s\n",
-                currentMode,
-                shouldUseDoubleBuffer ? "double" : "single");
   if (shouldUseDoubleBuffer) {
     return enableDoubleBuffer();
   }
@@ -760,12 +823,10 @@ void DisplayManager::startLoadingAnimation() {
   isLoadingActive = true;
   loadingStep = 0;
   lastLoadingUpdate = millis();
-  Serial.println("Loading 动画已启动");
 }
 
 void DisplayManager::stopLoadingAnimation() {
   isLoadingActive = false;
-  Serial.println("Loading 动画已停止");
 }
 
 void DisplayManager::updateLoadingAnimation() {

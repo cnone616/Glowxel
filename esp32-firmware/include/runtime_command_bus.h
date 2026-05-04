@@ -118,6 +118,8 @@ bool hasActiveWebSocketTransaction(uint32_t clientId);
 void handleWebSocketTransactionDisconnect(uint32_t clientId);
 
 void tick();
+bool consumePostTransactionYieldHint();
+bool shouldPauseMazeForOutboundDrain();
 const char* commandTypeLabel(RuntimeCommandType type);
 }
 

@@ -870,11 +870,6 @@ void addConfigPortalNoCacheHeaders(AsyncWebServerResponse* response) {
 
 void redirectToConfigPortalRoot(AsyncWebServerRequest* request) {
   String location = "http://" + WiFiManager::getConfigPortalIP() + "/";
-  Serial.printf("[WiFi Portal] 重定向到根页: %s %s host=%s -> %s\n",
-                request->methodToString(),
-                request->url().c_str(),
-                request->host().c_str(),
-                location.c_str());
   AsyncWebServerResponse* response = request->beginResponse(
     302,
     "text/plain; charset=utf-8",
@@ -3473,7 +3468,6 @@ void handlePortalSyncRequest(WiFiClient& client, const SyncHttpRequest& request)
   }
 
   if (request.method == "GET" && request.path == "/test") {
-    Serial.println("收到测试请求");
     sendSyncResponse(client, 200, "OK", "text/plain; charset=utf-8", "ESP32 is working!");
     return;
   }
@@ -3531,7 +3525,6 @@ void handlePortalSyncRequest(WiFiClient& client, const SyncHttpRequest& request)
   }
 
   if (request.method == "GET" && request.path == "/clear-wifi") {
-    Serial.println("清除WiFi配置");
     ConfigManager::preferences.begin("wifi", false);
     ConfigManager::preferences.clear();
     ConfigManager::preferences.end();
@@ -3570,7 +3563,6 @@ void handleSyncServerClient(WiFiClient& client) {
   }
 
   if (request.method == "GET" && request.path == "/test") {
-    Serial.println("收到测试请求");
     sendSyncResponse(client, 200, "OK", "text/plain; charset=utf-8", "ESP32 is working!");
     return;
   }
@@ -3671,7 +3663,6 @@ void handleSyncServerClient(WiFiClient& client) {
   }
 
   if (request.method == "GET" && request.path == "/clear-wifi") {
-    Serial.println("清除WiFi配置");
     ConfigManager::preferences.begin("wifi", false);
     ConfigManager::preferences.clear();
     ConfigManager::preferences.end();
@@ -3696,20 +3687,16 @@ bool WebServer::isSettingsSessionActive() {
 }
 
 void WebServer::initConfigPortal() {
-  Serial.println("4. 启动热点配网页轻量HTTP服务器...");
   if (!gRuntimeSyncServerStarted) {
     gRuntimeSyncServer.begin();
     gRuntimeSyncServerStarted = true;
   }
-  Serial.println("配网页轻量HTTP服务器已启动在端口80");
 }
 
 void WebServer::initRuntime() {
-  Serial.println("4. 启动运行态 HTTP / WebSocket 服务器...");
   if (gRuntimeSyncServerStarted) {
     gRuntimeSyncServer.end();
     gRuntimeSyncServerStarted = false;
-    Serial.println("[HTTP] 已关闭配网页同步 80 端口监听，运行态仅保留 Async HTTP/WS");
   }
   if (!gRuntimeAsyncServerStarted) {
     DefaultHeaders::Instance().addHeader("Access-Control-Allow-Origin", "*");
@@ -3724,13 +3711,10 @@ void WebServer::initRuntime() {
     server.begin();
     gRuntimeAsyncServerStarted = true;
   }
-  Serial.println("运行态 HTTP / WebSocket 服务器已启动在端口80");
-  Serial.println("等待客户端连接...");
 }
 
 void WebServer::setupPortalRoutes() {
   server.on("/test", HTTP_GET, [](AsyncWebServerRequest *request){
-    Serial.println("收到测试请求");
     request->send(200, "text/plain", "ESP32 is working!");
   });
 
@@ -3796,12 +3780,10 @@ void WebServer::setupPortalRoutes() {
   });
 
   server.on("/clear-wifi", HTTP_GET, [](AsyncWebServerRequest *request){
-    Serial.println("清除WiFi配置");
     ConfigManager::preferences.begin("wifi", false);
     ConfigManager::preferences.clear();
     ConfigManager::preferences.end();
     request->send(200, "application/json", "{\"status\":\"ok\",\"message\":\"WiFi配置已清除，3秒后重启\"}");
-    Serial.println("3秒后重启...");
     delay(3000);
     ESP.restart();
   });
@@ -3836,7 +3818,6 @@ void WebServer::setupPortalRoutes() {
 
 void WebServer::setupRuntimeRoutes() {
   server.on("/test", HTTP_GET, [](AsyncWebServerRequest *request){
-    Serial.println("收到测试请求");
     request->send(200, "text/plain", "ESP32 is working!");
   });
 
@@ -3845,12 +3826,10 @@ void WebServer::setupRuntimeRoutes() {
   });
 
   server.on("/clear-wifi", HTTP_GET, [](AsyncWebServerRequest *request){
-    Serial.println("清除WiFi配置");
     ConfigManager::preferences.begin("wifi", false);
     ConfigManager::preferences.clear();
     ConfigManager::preferences.end();
     request->send(200, "application/json", "{\"status\":\"ok\",\"message\":\"WiFi配置已清除，3秒后重启\"}");
-    Serial.println("3秒后重启...");
     delay(3000);
     ESP.restart();
   });
@@ -3860,7 +3839,6 @@ void WebServer::setupRuntimeRoutes() {
       request->send(204);
       return;
     }
-    Serial.printf("404: %s %s\n", request->methodToString(), request->url().c_str());
     request->send(404, "text/plain", "Not Found");
   });
 }
