@@ -6,7 +6,7 @@
     <view class="header glx-topbar glx-page-shell__fixed">
       <view class="header-content">
         <view class="header-placeholder"></view>
-        <text class="header-title glx-topbar__title">设备控制</text>
+        <text class="header-title glx-topbar__title">光格像素工坊</text>
         <view class="header-placeholder"></view>
       </view>
     </view>
