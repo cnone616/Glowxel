@@ -28,6 +28,19 @@ portMUX_TYPE gRuntimeCommandQueueMux = portMUX_INITIALIZER_UNLOCKED;
 constexpr size_t kModeActivationErrorMessageSize = 160;
 constexpr size_t kRuntimeCommandsPerTick = 2;
 
+bool isWaterWorldAmbientPreset(uint8_t preset) {
+  return preset == AMBIENT_PRESET_WATER_SURFACE ||
+         preset == AMBIENT_PRESET_WATER_CURRENT ||
+         preset == AMBIENT_PRESET_WATER_CAUSTICS;
+}
+
+uint8_t waterWorldAmbientPresetIntensity(uint8_t preset) {
+  if (preset == AMBIENT_PRESET_WATER_CAUSTICS) {
+    return 74;
+  }
+  return 72;
+}
+
 struct PendingClientResponse {
   uint32_t clientId;
   char* payload;
@@ -674,6 +687,8 @@ bool applyClockConfigForMode(
     target = &ConfigManager::clockConfig;
   } else if (mode == ModeTags::ANIMATION || mode == ModeTags::GIF_PLAYER) {
     target = &ConfigManager::animClockConfig;
+  } else if (mode == ModeTags::LED_MATRIX_SHOWCASE) {
+    target = &ConfigManager::ledMatrixShowcaseClockConfig;
   } else if (mode == ModeTags::THEME) {
     target = &ConfigManager::themeClockConfig;
   } else if (mode == ModeTags::TETRIS || mode == ModeTags::TETRIS_CLOCK) {
@@ -686,6 +701,8 @@ bool applyClockConfigForMode(
   *target = clockConfig;
   if (mode == ModeTags::ANIMATION || mode == ModeTags::GIF_PLAYER) {
     ConfigManager::saveAnimClockConfig();
+  } else if (mode == ModeTags::LED_MATRIX_SHOWCASE) {
+    ConfigManager::saveLedMatrixShowcaseClockConfig();
   } else if (mode == ModeTags::THEME) {
     ConfigManager::saveThemeClockConfig();
   } else if (mode == ModeTags::TETRIS || mode == ModeTags::TETRIS_CLOCK) {
@@ -702,6 +719,7 @@ bool modeSupportsClockConfig(const String& mode) {
   return mode == ModeTags::CLOCK ||
          mode == ModeTags::ANIMATION ||
          mode == ModeTags::GIF_PLAYER ||
+         mode == ModeTags::LED_MATRIX_SHOWCASE ||
          mode == ModeTags::THEME ||
          mode == ModeTags::TETRIS ||
          mode == ModeTags::TETRIS_CLOCK;
@@ -1247,6 +1265,8 @@ bool prepareAmbientTransaction(const String& mode, JsonObject params, const char
   resetPreparedCommand(gWebSocketTransactionSession.preparedCommand);
   RuntimeCommandBus::RuntimeCommand& command = gWebSocketTransactionSession.preparedCommand;
   command.type = RuntimeCommandBus::RuntimeCommandType::AMBIENT_EFFECT;
+  command.targetMode = MODE_ANIMATION;
+  command.businessModeTag = mode;
   command.ambientEffectConfig.preset = preset;
   command.ambientEffectConfig.speed = params["speed"].as<uint8_t>();
   command.ambientEffectConfig.loop = params["loop"].as<bool>();
@@ -1278,6 +1298,13 @@ bool prepareAmbientTransaction(const String& mode, JsonObject params, const char
     command.ambientEffectConfig.colorR = color["r"].as<uint8_t>();
     command.ambientEffectConfig.colorG = color["g"].as<uint8_t>();
     command.ambientEffectConfig.colorB = color["b"].as<uint8_t>();
+  } else if (isWaterWorldAmbientPreset(command.ambientEffectConfig.preset)) {
+    command.ambientEffectConfig.intensity =
+      waterWorldAmbientPresetIntensity(command.ambientEffectConfig.preset);
+    command.ambientEffectConfig.density = DisplayManager::ambientEffectConfig.density;
+    command.ambientEffectConfig.colorR = DisplayManager::ambientEffectConfig.colorR;
+    command.ambientEffectConfig.colorG = DisplayManager::ambientEffectConfig.colorG;
+    command.ambientEffectConfig.colorB = DisplayManager::ambientEffectConfig.colorB;
   } else {
     if (!params.containsKey("intensity")) {
       reason = "ambient intensity missing";
@@ -2888,9 +2915,19 @@ bool beginWebSocketTransaction(
       clearWebSocketTransactionSession();
       return true;
     }
-    if (!isCanvasStaticPixelTransaction()) {
-      enterWebSocketTransactionLoadingState();
-    }
+  }
+
+  bool shouldEnterLoadingState =
+    (gWebSocketTransactionSession.hasBinary && !isCanvasStaticPixelTransaction()) ||
+    (!gWebSocketTransactionSession.hasBinary &&
+     (gWebSocketTransactionSession.mode == ModeTags::AMBIENT_EFFECT ||
+      gWebSocketTransactionSession.mode == ModeTags::LED_MATRIX_SHOWCASE));
+
+  if (shouldEnterLoadingState) {
+    enterWebSocketTransactionLoadingState();
+  }
+
+  if (gWebSocketTransactionSession.hasBinary) {
     if (!beginBinaryPayloadForTransaction(reason)) {
       fillTransactionFinalErrorResponse(gWebSocketTransactionSession.txId, reason, response);
       rollbackWebSocketTransactionSession();

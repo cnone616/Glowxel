@@ -2,22 +2,25 @@ const WIDTH = 64;
 const HEIGHT = 64;
 const WATER_WORLD_PRESET_CONFIGS = Object.freeze({
   surface: Object.freeze({
-    speed: 6,
+    speed: 4,
     intensity: 72,
     density: 58,
-    frameDelay: 48,
+    frameDelay: 40,
+    waterLevel: 72,
+    frequency: 56,
+    strength: 48,
   }),
   current: Object.freeze({
-    speed: 6,
+    speed: 5,
     intensity: 72,
     density: 58,
-    frameDelay: 48,
+    frameDelay: 40,
   }),
   caustics: Object.freeze({
-    speed: 5,
+    speed: 4,
     intensity: 74,
     density: 62,
-    frameDelay: 52,
+    frameDelay: 42,
   }),
 });
 const WATER_WORLD_COLOR_THEME_OPTIONS = Object.freeze([
@@ -621,14 +624,11 @@ function renderCurrent(buffer, elapsed, params) {
 
   const speedUnit = params.speed / 10;
   const intensityUnit = params.intensity / 100;
-  const densityUnit = params.density / 100;
-  const waterLevelUnit = params.waterLevel / 100;
-  const frequencyUnit = params.frequency / 100;
-  const strengthUnit = params.strength / 100;
-  const currentDensityUnit = clampUnit(densityUnit * 0.4 + frequencyUnit * 0.6);
-  const time =
-    elapsed *
-    (0.00026 + speedUnit * 0.00096 + frequencyUnit * 0.00072);
+  const time = elapsed * (0.00032 + speedUnit * 0.00108);
+  const flowATime = time * (2.2 + speedUnit * 1.4);
+  const flowANestedTime = time * 0.8;
+  const flowBTime = time * (1.7 + speedUnit * 1.1);
+  const flowCTime = time * (1.3 + intensityUnit * 0.7);
 
   const deep = palette.deep;
   const mid = palette.mid;
@@ -637,95 +637,34 @@ function renderCurrent(buffer, elapsed, params) {
   const vein = palette.vein;
 
   for (let y = 0; y < HEIGHT; y += 1) {
+    const ny = y / (HEIGHT - 1);
+    const rowFlowAWarp = Math.sin(ny * 5.2 + flowANestedTime) * 1.35;
+    const rowFlowB = ny * 7.4 - flowBTime;
+    const rowFlowC = ny * 9.2 + flowCTime;
     for (let x = 0; x < WIDTH; x += 1) {
       const nx = x / (WIDTH - 1);
-      const ny = y / (HEIGHT - 1);
 
-      const flowA = Math.sin(
-        nx * (6.8 + frequencyUnit * 4.4) +
-          time * (2 + speedUnit * 1.16 + frequencyUnit * 0.7) +
-          Math.sin(ny * (4.4 + frequencyUnit * 2.6) + time * 0.8) * 1.35,
+      const flowA = Math.sin(nx * 8.1 + flowATime + rowFlowAWarp);
+      const flowB = Math.sin(nx * 7.4 + rowFlowB);
+      const flowC = Math.cos(rowFlowC - nx * 4.7);
+      const currentField = clampUnit(
+        0.5 + 0.5 * (flowA * 0.42 + flowB * 0.34 + flowC * 0.24),
       );
-      const flowB = Math.sin(
-        (nx + ny) * (6.2 + frequencyUnit * 3.8) -
-          time * (1.56 + speedUnit * 0.88 + frequencyUnit * 0.46),
+      const caustic = sampleCausticsField(
+        nx,
+        ny,
+        time * 0.9,
+        speedUnit,
+        intensityUnit,
       );
-      const flowC = Math.cos(
-        ny * (7.4 + currentDensityUnit * 3.6) -
-          nx * (4 + frequencyUnit * 1.8) +
-          time * (1.2 + currentDensityUnit * 0.72),
-      );
-      const currentField =
-        0.5 + 0.5 * (flowA * 0.42 + flowB * 0.34 + flowC * 0.24);
-
-      const px = nx * Math.PI * 2 - 20;
-      const py = ny * Math.PI * 2 - 20;
-      let ix = px;
-      let iy = py;
-      let causticField = 1;
-
-      let timeSeed = time * (3.2 - speedUnit * 1.4);
-      let temp = px + Math.cos(timeSeed - ix) + Math.sin(timeSeed + iy);
-      iy = py + Math.sin(timeSeed - iy) + Math.cos(timeSeed + ix);
-      ix = temp;
-      causticField +=
-        1 /
-        Math.hypot(
-          (px / safeDivisor(Math.sin(timeSeed + ix))) *
-            (0.03 + currentDensityUnit * 0.032),
-          (py / safeDivisor(Math.cos(timeSeed + iy))) *
-            (0.03 + currentDensityUnit * 0.032),
-        );
-
-      timeSeed = time * (2.0 - speedUnit * 0.6);
-      temp = px + Math.cos(timeSeed - ix) + Math.sin(timeSeed + iy);
-      iy = py + Math.sin(timeSeed - iy) + Math.cos(timeSeed + ix);
-      ix = temp;
-      causticField +=
-        1 /
-        Math.hypot(
-          (px / safeDivisor(Math.sin(timeSeed + ix))) *
-            (0.03 + currentDensityUnit * 0.032),
-          (py / safeDivisor(Math.cos(timeSeed + iy))) *
-            (0.03 + currentDensityUnit * 0.032),
-        );
-
-      let caustic = 1.65 - Math.sqrt(Math.max(0.0001, causticField / 2));
-      caustic = clampUnit(Math.pow(caustic, 4));
-      const suspendedGlow =
-        Math.pow(
-          clampUnit(
-            0.5 +
-              0.5 *
-                Math.sin(
-                  nx * (30 + frequencyUnit * 12) -
-                    ny * 14 +
-                    time * (8 + frequencyUnit * 3.4) +
-                    Math.sin(ny * 12 + time * 2) * 0.7,
-                ),
-          ),
-          8,
-        ) *
-        (0.04 + strengthUnit * 0.12) *
-        (0.34 + (1 - ny) * 0.32);
-
-      const depthMix = clampUnit(
-        0.05 +
-          ny * (0.5 + waterLevelUnit * 0.3) +
-          currentField * (0.14 + waterLevelUnit * 0.06),
-      );
+      const depthMix = clampUnit(0.1 + ny * 0.68 + currentField * 0.18);
       let color = mixColor(deep, mid, depthMix);
       color = mixColor(
         color,
         bright,
-        smoothstep(0.46, 0.94, currentField) * (0.52 + strengthUnit * 0.24),
+        smoothstep(0.48, 0.94, currentField) * 0.72,
       );
-      color = mixColor(
-        color,
-        glow,
-        caustic * (0.32 + intensityUnit * 0.18 + strengthUnit * 0.18),
-      );
-      color = mixColor(color, glow, suspendedGlow);
+      color = mixColor(color, glow, caustic * (0.44 + intensityUnit * 0.28));
 
       const darkVein =
         smoothstep(0.68, 0.9, currentField) * 0.18 * (1 - caustic);
@@ -789,14 +728,17 @@ function renderCaustics(buffer, elapsed, params) {
 
   const speedUnit = params.speed / 10;
   const intensityUnit = params.intensity / 100;
-  const densityUnit = params.density / 100;
-  const waterLevelUnit = params.waterLevel / 100;
-  const frequencyUnit = params.frequency / 100;
-  const strengthUnit = params.strength / 100;
-  const causticDensityUnit = clampUnit(densityUnit * 0.42 + frequencyUnit * 0.58);
-  const time =
-    elapsed *
-    (0.00028 + speedUnit * 0.00082 + frequencyUnit * 0.00056);
+  const waterLevelUnit = 0.72;
+  const frequencyUnit = clampUnit(0.16 + speedUnit * 0.58);
+  const strengthUnit = clampUnit(0.18 + intensityUnit * 0.54);
+  const causticDensityUnit = clampUnit(intensityUnit * 0.42 + frequencyUnit * 0.58);
+  const time = elapsed * (0.00028 + speedUnit * 0.00082 + frequencyUnit * 0.00056);
+  const lowWaveScale = 4.6 + frequencyUnit * 1.6;
+  const lowWaveTime = time * (0.72 + speedUnit * 0.2);
+  const crossWaveScale = 6.4 + causticDensityUnit * 2.2;
+  const crossWaveTime = time * (0.94 + causticDensityUnit * 0.24);
+  const hazeTime = time * (0.48 + intensityUnit * 0.16);
+  const hazeNestedTime = time * 0.64;
 
   const abyss = palette.abyss;
   const deep = palette.deep;
@@ -807,11 +749,17 @@ function renderCaustics(buffer, elapsed, params) {
   const vignetteColor = palette.vignetteColor;
 
   for (let y = 0; y < HEIGHT; y += 1) {
+    const ny = y / (HEIGHT - 1);
+    const rowLowWave =
+      ny * (1 + waterLevelUnit * 0.3) * lowWaveScale - lowWaveTime;
+    const rowCrossWave = -(ny * 0.48) * crossWaveScale + crossWaveTime;
+    const rowHaze =
+      ny * 0.64 * 3.8 +
+      hazeTime +
+      Math.sin(ny * 5.2 - hazeNestedTime) * 0.42;
     for (let x = 0; x < WIDTH; x += 1) {
       const nx = x / (WIDTH - 1);
-      const ny = y / (HEIGHT - 1);
-
-      let caustic = sampleCausticsField(
+      const caustic = sampleCausticsField(
         nx,
         ny,
         time,
@@ -821,30 +769,19 @@ function renderCaustics(buffer, elapsed, params) {
       const lowWave =
         0.5 +
         0.5 *
-          Math.sin(
-            (nx * 0.82 + ny * (1 + waterLevelUnit * 0.3)) *
-              (4.6 + frequencyUnit * 1.6) -
-              time * (0.72 + speedUnit * 0.2),
-          );
+          Math.sin(nx * 0.82 * lowWaveScale + rowLowWave);
       const crossWave =
         0.5 +
         0.5 *
-          Math.cos(
-            (nx * 1.08 - ny * 0.48) * (6.4 + causticDensityUnit * 2.2) +
-              time * (0.94 + causticDensityUnit * 0.24),
-          );
+          Math.cos(nx * 1.08 * crossWaveScale + rowCrossWave);
       const haze =
         0.5 +
         0.5 *
-          Math.sin(
-            (nx * 1.3 + ny * 0.64) * 3.8 +
-              time * (0.48 + densityUnit * 0.16) +
-                Math.sin(ny * 5.2 - time * 0.64) * 0.42,
-          );
-      caustic = clampUnit(caustic * 0.76 + lowWave * 0.12 + crossWave * 0.12);
+          Math.sin(nx * 1.3 * 3.8 + rowHaze);
+      const causticMix = clampUnit(caustic * 0.76 + lowWave * 0.12 + crossWave * 0.12);
       const bottomMix = smoothstep(0.18, 1, ny);
       const brightBand =
-        caustic *
+        causticMix *
         Math.pow(
           clampUnit(
             1 -
@@ -872,7 +809,7 @@ function renderCaustics(buffer, elapsed, params) {
         ) *
         (0.012 + strengthUnit * 0.04) *
         smoothstep(0.18, 0.84, ny);
-      const shade = smoothstep(0.46, 0.96, 1 - caustic) * 0.2;
+      const shade = smoothstep(0.46, 0.96, 1 - causticMix) * 0.2;
 
       let color = mixColor(abyss, deep, 0.18 + bottomMix * 0.44 + lowWave * 0.1);
       color = mixColor(color, teal, 0.16 + haze * 0.22 + crossWave * 0.14);
@@ -880,7 +817,7 @@ function renderCaustics(buffer, elapsed, params) {
         color,
         aqua,
         clampUnit(
-          caustic * (0.22 + intensityUnit * 0.16 + strengthUnit * 0.12) +
+          causticMix * (0.22 + intensityUnit * 0.16 + strengthUnit * 0.12) +
             brightBand * 0.42,
         ),
       );
@@ -935,17 +872,8 @@ function getPresetConfig(preset) {
   throw new Error(`Unsupported water world preset: ${preset}`);
 }
 
-function assertPreviewField(config, fieldName) {
-  if (!Number.isFinite(config[fieldName])) {
-    throw new Error(`Missing water world preview field: ${fieldName}`);
-  }
-}
-
 function createWaterWorldPreviewState(config, colorThemeId) {
   const preset = getPresetConfig(config.preset);
-  assertPreviewField(config, "waterLevel");
-  assertPreviewField(config, "frequency");
-  assertPreviewField(config, "strength");
   return {
     preset: config.preset,
     elapsed: 0,
@@ -955,9 +883,9 @@ function createWaterWorldPreviewState(config, colorThemeId) {
       speed: preset.speed,
       intensity: preset.intensity,
       density: preset.density,
-      waterLevel: config.waterLevel,
-      frequency: config.frequency,
-      strength: config.strength,
+      waterLevel: preset.waterLevel,
+      frequency: preset.frequency,
+      strength: preset.strength,
       palette: createWaterWorldRenderPalette(colorThemeId),
     },
   };

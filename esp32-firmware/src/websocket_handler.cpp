@@ -1031,20 +1031,43 @@ void WebSocketHandler::handleJsonCommand(AsyncWebSocketClient *client, JsonDocum
   }
 
   if (cmd == "status") {
-    StaticJsonDocument<RuntimeStatusBuilder::kStatusJsonCapacity> statusResponse;
-    RuntimeStatusBuilder::fillStatus(statusResponse, false, false);
+    StaticJsonDocument<RuntimeStatusBuilder::kCompactStatusJsonCapacity> statusResponse;
+    RuntimeStatusBuilder::fillCompactStatus(statusResponse);
 
     if (statusResponse.overflowed()) {
       Serial.printf(
         "status 响应 JSON 溢出: capacity=%u\n",
-        RuntimeStatusBuilder::kStatusJsonCapacity
+        RuntimeStatusBuilder::kCompactStatusJsonCapacity
       );
     }
 
-    String responseStr;
-    serializeJson(statusResponse, responseStr);
-    bool sent = client->text(responseStr);
-    logClientTextSendResult("status_response", client, responseStr.length(), sent);
+    char responseBuffer[RuntimeStatusBuilder::kCompactStatusMessageBufferSize] = {};
+    size_t responseLen = measureJson(statusResponse);
+    if (responseLen >= sizeof(responseBuffer)) {
+      Serial.printf(
+        "status 响应缓冲不足: len=%u capacity=%u\n",
+        static_cast<unsigned>(responseLen),
+        static_cast<unsigned>(sizeof(responseBuffer))
+      );
+      return;
+    }
+
+    serializeJson(statusResponse, responseBuffer, sizeof(responseBuffer));
+
+    bool sent = false;
+    try {
+      sent = client->text(responseBuffer, responseLen);
+    } catch (...) {
+      Serial.printf(
+        "status 响应发送异常: len=%u freeHeap=%u client=%u\n",
+        static_cast<unsigned>(responseLen),
+        static_cast<unsigned>(ESP.getFreeHeap()),
+        client == nullptr ? 0U : client->id()
+      );
+      return;
+    }
+
+    logClientTextSendResult("status_response", client, responseLen, sent);
     return;
   }
 

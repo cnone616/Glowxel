@@ -66,7 +66,7 @@
     >
       <view class="content-wrapper glx-scroll-stack">
         <view v-show="currentTab === 1" class="water-tab-panel">
-          <view class="water-section-card">
+          <view class="settings-card glx-panel-card water-section-card">
             <view class="route-grid">
               <view
                 v-for="option in waterOptions"
@@ -211,7 +211,6 @@ import {
 
 const WATER_WORLD_CONFIG_KEY = "water_world_preview_config";
 const WATER_WORLD_CLOCK_CONFIG_KEY = "water_world_preview_clock_config";
-const WATER_WORLD_PRESET_PARAM_MAP_KEY = "water_world_preview_preset_params";
 const WATER_WORLD_OPTIONS = Object.freeze([
   { preset: "surface", label: "海面波浪" },
   { preset: "current", label: "深海海流" },
@@ -234,20 +233,17 @@ const WATER_WORLD_SEND_MODE = "led_matrix_showcase";
 const WATER_WORLD_BOARD_COMMANDS = Object.freeze({
   surface: Object.freeze({
     preset: "surface",
-    speed: 6,
-    intensity: 72,
+    speed: 4,
     loop: true,
   }),
   current: Object.freeze({
     preset: "current",
-    speed: 6,
-    intensity: 72,
+    speed: 5,
     loop: true,
   }),
   caustics: Object.freeze({
     preset: "caustics",
-    speed: 5,
-    intensity: 74,
+    speed: 4,
     loop: true,
   }),
 });
@@ -271,7 +267,6 @@ function buildWaterWorldSendPlan(preset) {
       cmd: "set_ambient_effect",
       preset: command.preset,
       speed: command.speed,
-      intensity: command.intensity,
       loop: command.loop,
     },
   };
@@ -280,29 +275,6 @@ function buildWaterWorldSendPlan(preset) {
 function createDefaultWaterWorldConfig() {
   return {
     preset: "surface",
-    waterLevel: 72,
-    frequency: 56,
-    strength: 48,
-  };
-}
-
-function createDefaultPresetParamMap() {
-  return {
-    surface: {
-      waterLevel: 72,
-      frequency: 56,
-      strength: 48,
-    },
-    current: {
-      waterLevel: 72,
-      frequency: 50,
-      strength: 44,
-    },
-    caustics: {
-      waterLevel: 62,
-      frequency: 46,
-      strength: 42,
-    },
   };
 }
 
@@ -318,6 +290,28 @@ function createDefaultClockConfig() {
       y: 7,
       color: "#ffffff",
       align: "center",
+    },
+    date: {
+      show: false,
+      fontSize: 1,
+      x: 32,
+      y: 22,
+      color: "#787878",
+      align: "center",
+    },
+    week: {
+      show: false,
+      x: 32,
+      y: 38,
+      color: "#646464",
+      align: "center",
+    },
+    image: {
+      show: false,
+      x: 0,
+      y: 0,
+      width: 64,
+      height: 64,
     },
   };
 }
@@ -339,41 +333,6 @@ function normalizeSavedConfig(saved) {
     normalized.preset = saved.preset;
   }
   return normalized;
-}
-
-function normalizeSavedPresetParamMap(saved) {
-  const normalized = createDefaultPresetParamMap();
-  if (!saved || typeof saved !== "object") {
-    return normalized;
-  }
-
-  WATER_WORLD_OPTIONS.forEach((option) => {
-    const source = saved[option.preset];
-    if (!source || typeof source !== "object") {
-      return;
-    }
-    if (Number.isFinite(Number(source.waterLevel))) {
-      normalized[option.preset].waterLevel = Number(source.waterLevel);
-    }
-    if (Number.isFinite(Number(source.frequency))) {
-      normalized[option.preset].frequency = Number(source.frequency);
-    }
-    if (Number.isFinite(Number(source.strength))) {
-      normalized[option.preset].strength = Number(source.strength);
-    }
-  });
-
-  return normalized;
-}
-
-function applyPresetPreviewParams(config, presetParamMap, preset) {
-  const target = config;
-  const params = presetParamMap[preset];
-  target.preset = preset;
-  target.waterLevel = params.waterLevel;
-  target.frequency = params.frequency;
-  target.strength = params.strength;
-  return target;
 }
 
 function resolveWaterWorldTimePlacement(timeText, clockConfig) {
@@ -423,6 +382,17 @@ function drawWaterWorldTimeToPixels(timeText, clockConfig, pixelMap) {
   );
 }
 
+function resolveAlignedClockX(text, fontId, fontSize, align, x) {
+  const width = getClockTextWidth(text, fontId, fontSize);
+  if (align === "center") {
+    return x - Math.floor(width / 2);
+  }
+  if (align === "right") {
+    return x - width;
+  }
+  return x;
+}
+
 function normalizeSavedClockConfig(saved) {
   const normalized = createDefaultClockConfig();
   if (!saved || typeof saved !== "object") {
@@ -468,6 +438,75 @@ function normalizeSavedClockConfig(saved) {
     }
   }
 
+  if (saved.date && typeof saved.date === "object") {
+    if (saved.date.show === true || saved.date.show === false) {
+      normalized.date.show = saved.date.show;
+    }
+    if (
+      Number.isFinite(Number(saved.date.fontSize)) &&
+      Number(saved.date.fontSize) >= 1 &&
+      Number(saved.date.fontSize) <= 3
+    ) {
+      normalized.date.fontSize = Number(saved.date.fontSize);
+    }
+    if (Number.isFinite(Number(saved.date.x))) {
+      normalized.date.x = Math.max(0, Math.min(63, Number(saved.date.x)));
+    }
+    if (Number.isFinite(Number(saved.date.y))) {
+      normalized.date.y = Math.max(0, Math.min(63, Number(saved.date.y)));
+    }
+    if (typeof saved.date.color === "string") {
+      normalized.date.color = saved.date.color;
+    }
+    if (
+      saved.date.align === "left" ||
+      saved.date.align === "center" ||
+      saved.date.align === "right"
+    ) {
+      normalized.date.align = saved.date.align;
+    }
+  }
+
+  if (saved.week && typeof saved.week === "object") {
+    if (saved.week.show === true || saved.week.show === false) {
+      normalized.week.show = saved.week.show;
+    }
+    if (Number.isFinite(Number(saved.week.x))) {
+      normalized.week.x = Math.max(0, Math.min(63, Number(saved.week.x)));
+    }
+    if (Number.isFinite(Number(saved.week.y))) {
+      normalized.week.y = Math.max(0, Math.min(63, Number(saved.week.y)));
+    }
+    if (typeof saved.week.color === "string") {
+      normalized.week.color = saved.week.color;
+    }
+    if (
+      saved.week.align === "left" ||
+      saved.week.align === "center" ||
+      saved.week.align === "right"
+    ) {
+      normalized.week.align = saved.week.align;
+    }
+  }
+
+  if (saved.image && typeof saved.image === "object") {
+    if (saved.image.show === true || saved.image.show === false) {
+      normalized.image.show = saved.image.show;
+    }
+    if (Number.isFinite(Number(saved.image.x))) {
+      normalized.image.x = Math.max(0, Math.min(63, Number(saved.image.x)));
+    }
+    if (Number.isFinite(Number(saved.image.y))) {
+      normalized.image.y = Math.max(0, Math.min(63, Number(saved.image.y)));
+    }
+    if (Number.isFinite(Number(saved.image.width))) {
+      normalized.image.width = Math.max(0, Math.min(64, Number(saved.image.width)));
+    }
+    if (Number.isFinite(Number(saved.image.height))) {
+      normalized.image.height = Math.max(0, Math.min(64, Number(saved.image.height)));
+    }
+  }
+
   return normalized;
 }
 
@@ -510,7 +549,6 @@ export default {
       waterOptions: WATER_WORLD_OPTIONS,
       colorThemeOptions: WATER_WORLD_COLOR_THEME_OPTIONS,
       colorThemeId: DEFAULT_WATER_WORLD_COLOR_THEME_ID,
-      presetParamMap: createDefaultPresetParamMap(),
       config: createDefaultWaterWorldConfig(),
       clockConfig: createDefaultClockConfig(),
       fontOptions: WATER_WORLD_FONT_OPTIONS,
@@ -565,14 +603,7 @@ export default {
     const savedConfig = normalizeSavedConfig(
       uni.getStorageSync(WATER_WORLD_CONFIG_KEY),
     );
-    this.presetParamMap = normalizeSavedPresetParamMap(
-      uni.getStorageSync(WATER_WORLD_PRESET_PARAM_MAP_KEY),
-    );
-    this.config = applyPresetPreviewParams(
-      savedConfig,
-      this.presetParamMap,
-      savedConfig.preset,
-    );
+    this.config = savedConfig;
     this.clockConfig = normalizeSavedClockConfig(
       uni.getStorageSync(WATER_WORLD_CLOCK_CONFIG_KEY),
     );
@@ -662,21 +693,39 @@ export default {
       uni.setStorageSync(WATER_WORLD_CONFIG_KEY, {
         preset: this.config.preset,
       });
-      uni.setStorageSync(
-        WATER_WORLD_PRESET_PARAM_MAP_KEY,
-        this.presetParamMap,
-      );
       uni.setStorageSync(WATER_WORLD_CLOCK_CONFIG_KEY, {
         font: this.clockConfig.font,
         showSeconds: this.clockConfig.showSeconds,
         hourFormat: this.clockConfig.hourFormat,
         time: {
-          show: true,
+          show: this.clockConfig.time.show,
           fontSize: this.clockConfig.time.fontSize,
           x: this.clockConfig.time.x,
           y: this.clockConfig.time.y,
           color: this.clockConfig.time.color,
           align: this.clockConfig.time.align,
+        },
+        date: {
+          show: this.clockConfig.date.show,
+          fontSize: this.clockConfig.date.fontSize,
+          x: this.clockConfig.date.x,
+          y: this.clockConfig.date.y,
+          color: this.clockConfig.date.color,
+          align: this.clockConfig.date.align,
+        },
+        week: {
+          show: this.clockConfig.week.show,
+          x: this.clockConfig.week.x,
+          y: this.clockConfig.week.y,
+          color: this.clockConfig.week.color,
+          align: this.clockConfig.week.align,
+        },
+        image: {
+          show: this.clockConfig.image.show,
+          x: this.clockConfig.image.x,
+          y: this.clockConfig.image.y,
+          width: this.clockConfig.image.width,
+          height: this.clockConfig.image.height,
         },
       });
     },
@@ -753,6 +802,75 @@ export default {
         },
       };
     },
+    hexToRgb(hex) {
+      const body = hex.replace(/^#/, "");
+      return {
+        r: parseInt(body.slice(0, 2), 16),
+        g: parseInt(body.slice(2, 4), 16),
+        b: parseInt(body.slice(4, 6), 16),
+      };
+    },
+    buildClockConfigPayload() {
+      const clockConfig = this.buildEffectiveClockConfig();
+      const timeText = getCurrentTimeText(
+        clockConfig.showSeconds,
+        clockConfig.hourFormat,
+      );
+      const timeX = resolveAlignedClockX(
+        timeText,
+        clockConfig.font,
+        clockConfig.time.fontSize,
+        clockConfig.time.align,
+        clockConfig.time.x,
+      );
+      const dateX = resolveAlignedClockX(
+        "00-00",
+        clockConfig.font,
+        clockConfig.date.fontSize,
+        clockConfig.date.align,
+        clockConfig.date.x,
+      );
+      const weekX = resolveAlignedClockX(
+        "SUN",
+        clockConfig.font,
+        1,
+        clockConfig.week.align,
+        clockConfig.week.x,
+      );
+
+      return {
+        font: clockConfig.font,
+        showSeconds: clockConfig.showSeconds,
+        hourFormat: clockConfig.hourFormat,
+        time: {
+          show: clockConfig.time.show,
+          fontSize: clockConfig.time.fontSize,
+          x: timeX,
+          y: clockConfig.time.y,
+          color: this.hexToRgb(clockConfig.time.color),
+        },
+        date: {
+          show: clockConfig.date.show,
+          fontSize: clockConfig.date.fontSize,
+          x: dateX,
+          y: clockConfig.date.y,
+          color: this.hexToRgb(clockConfig.date.color),
+        },
+        week: {
+          show: clockConfig.week.show,
+          x: weekX,
+          y: clockConfig.week.y,
+          color: this.hexToRgb(clockConfig.week.color),
+        },
+        image: {
+          show: clockConfig.image.show,
+          x: clockConfig.image.x,
+          y: clockConfig.image.y,
+          width: clockConfig.image.width,
+          height: clockConfig.image.height,
+        },
+      };
+    },
     syncPresetFromDeviceStatus(status) {
       if (!status || typeof status !== "object") {
         return;
@@ -766,7 +884,7 @@ export default {
       this.applyPreset(status.effectPreset);
     },
     applyPreset(preset) {
-      applyPresetPreviewParams(this.config, this.presetParamMap, preset);
+      this.config.preset = preset;
     },
     applyColorTheme(themeId) {
       if (this.isSending || this.colorThemeId === themeId) {
@@ -779,14 +897,6 @@ export default {
         return;
       }
       this.colorThemeId = pickRandomWaterWorldColorThemeId(this.colorThemeId);
-    },
-    handlePresetParamChange(key, event) {
-      if (!event || !event.detail) {
-        return;
-      }
-      const nextValue = Number(event.detail.value);
-      this.config[key] = nextValue;
-      this.presetParamMap[this.config.preset][key] = nextValue;
     },
     selectFont(fontId) {
       this.clockConfig.font = fontId;
@@ -834,7 +944,9 @@ export default {
         const sendPlan = buildWaterWorldSendPlan(this.config.preset);
         expectedMode = sendPlan.deviceMode;
         const ws = this.deviceStore.getWebSocket();
-        await ws.setAmbientEffect(sendPlan.command);
+        await ws.setAmbientEffect(sendPlan.command, {
+          clockConfig: this.buildClockConfigPayload(),
+        });
         const status = await this.deviceStore.syncDeviceStatus();
         this.syncPresetFromDeviceStatus(status);
         this.showSendSuccess();
@@ -876,19 +988,23 @@ export default {
   min-height: 0;
   box-sizing: border-box;
   background: var(--bg-tertiary);
-  padding: 4rpx 12rpx 0;
+  padding: 16rpx 20rpx 0;
 }
 
 .content-wrapper {
-  padding: 0 0 20rpx;
+  padding: 0 0 56rpx;
 }
 
 .water-tab-panel {
-  padding-top: 8rpx;
+  padding-top: 0;
 }
 
 .water-section-card {
-  padding: 0 4rpx 4rpx;
+  background-color: transparent;
+  border: 0;
+  padding: 8rpx 12rpx 14rpx;
+  margin-bottom: 16rpx;
+  box-shadow: none;
 }
 
 .route-grid {

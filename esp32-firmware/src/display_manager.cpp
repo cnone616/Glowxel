@@ -66,6 +66,17 @@ static bool s_forceStaticClockOverlayRefresh = false;
 static unsigned long s_lastPresentDurationUs = 0;
 static uint16_t s_lastPresentChangedPixels = 0;
 static uint32_t s_lastPresentFrameHash = 0;
+struct AmbientWaterSurfacePerfStats {
+  unsigned long windowStartedAt;
+  unsigned long frameCount;
+  uint64_t drawUsTotal;
+  uint64_t presentUsTotal;
+  uint32_t changedPixelsTotal;
+  unsigned long maxDrawUs;
+  unsigned long maxPresentUs;
+};
+static AmbientWaterSurfacePerfStats s_ambientWaterSurfacePerfStats = {};
+static unsigned long s_pendingAmbientWaterSurfaceDrawUs = 0;
 
 namespace {
 void ensureRuntimeAccessMutex() {
@@ -76,6 +87,91 @@ void ensureRuntimeAccessMutex() {
 
 bool isValidDriver(uint8_t driver) {
   return driver <= 5;
+}
+
+bool shouldTrackAmbientWaterSurfacePerf() {
+  return DisplayManager::nativeEffectType == NATIVE_EFFECT_AMBIENT &&
+         DisplayManager::ambientEffectConfig.preset == AMBIENT_PRESET_WATER_SURFACE &&
+         DisplayManager::currentBusinessModeTag == ModeTags::LED_MATRIX_SHOWCASE;
+}
+
+void resetAmbientWaterSurfacePerfWindow(unsigned long now) {
+  s_ambientWaterSurfacePerfStats.windowStartedAt = now;
+  s_ambientWaterSurfacePerfStats.frameCount = 0;
+  s_ambientWaterSurfacePerfStats.drawUsTotal = 0;
+  s_ambientWaterSurfacePerfStats.presentUsTotal = 0;
+  s_ambientWaterSurfacePerfStats.changedPixelsTotal = 0;
+  s_ambientWaterSurfacePerfStats.maxDrawUs = 0;
+  s_ambientWaterSurfacePerfStats.maxPresentUs = 0;
+}
+
+void maybeLogAmbientWaterSurfacePerf(unsigned long now) {
+  if (!shouldTrackAmbientWaterSurfacePerf()) {
+    resetAmbientWaterSurfacePerfWindow(now);
+    return;
+  }
+
+  if (s_ambientWaterSurfacePerfStats.windowStartedAt == 0) {
+    resetAmbientWaterSurfacePerfWindow(now);
+    return;
+  }
+
+  unsigned long windowMs = now - s_ambientWaterSurfacePerfStats.windowStartedAt;
+  if (windowMs < 1000UL || s_ambientWaterSurfacePerfStats.frameCount == 0) {
+    return;
+  }
+
+  unsigned long avgDrawUs =
+    (unsigned long)(s_ambientWaterSurfacePerfStats.drawUsTotal /
+                    s_ambientWaterSurfacePerfStats.frameCount);
+  unsigned long avgPresentUs =
+    (unsigned long)(s_ambientWaterSurfacePerfStats.presentUsTotal /
+                    s_ambientWaterSurfacePerfStats.frameCount);
+  unsigned long avgChangedPixels =
+    (unsigned long)(s_ambientWaterSurfacePerfStats.changedPixelsTotal /
+                    s_ambientWaterSurfacePerfStats.frameCount);
+
+  Serial.printf(
+    "[WATER SURFACE PERF] window=%lums frames=%lu avgDrawUs=%lu maxDrawUs=%lu avgPresentUs=%lu maxPresentUs=%lu avgChangedPixels=%lu\n",
+    windowMs,
+    s_ambientWaterSurfacePerfStats.frameCount,
+    avgDrawUs,
+    s_ambientWaterSurfacePerfStats.maxDrawUs,
+    avgPresentUs,
+    s_ambientWaterSurfacePerfStats.maxPresentUs,
+    avgChangedPixels
+  );
+
+  resetAmbientWaterSurfacePerfWindow(now);
+}
+
+void trackAmbientWaterSurfacePerfFrame(
+  unsigned long now,
+  unsigned long drawUs,
+  unsigned long presentUs,
+  uint16_t changedPixels
+) {
+  if (!shouldTrackAmbientWaterSurfacePerf()) {
+    resetAmbientWaterSurfacePerfWindow(now);
+    return;
+  }
+
+  if (s_ambientWaterSurfacePerfStats.windowStartedAt == 0) {
+    resetAmbientWaterSurfacePerfWindow(now);
+  }
+
+  s_ambientWaterSurfacePerfStats.frameCount += 1UL;
+  s_ambientWaterSurfacePerfStats.drawUsTotal += (uint64_t)drawUs;
+  s_ambientWaterSurfacePerfStats.presentUsTotal += (uint64_t)presentUs;
+  s_ambientWaterSurfacePerfStats.changedPixelsTotal += (uint32_t)changedPixels;
+  if (drawUs > s_ambientWaterSurfacePerfStats.maxDrawUs) {
+    s_ambientWaterSurfacePerfStats.maxDrawUs = drawUs;
+  }
+  if (presentUs > s_ambientWaterSurfacePerfStats.maxPresentUs) {
+    s_ambientWaterSurfacePerfStats.maxPresentUs = presentUs;
+  }
+
+  maybeLogAmbientWaterSurfacePerf(now);
 }
 
 bool isValidI2SSpeed(uint32_t speed) {
@@ -420,6 +516,32 @@ void DisplayManager::presentOffscreenFrame(const uint16_t* targetBuffer) {
   }
 
   unsigned long presentStartedUs = micros();
+  if (nativeEffectType == NATIVE_EFFECT_AMBIENT &&
+      ambientEffectConfig.preset == AMBIENT_PRESET_WATER_SURFACE &&
+      currentBusinessModeTag == ModeTags::LED_MATRIX_SHOWCASE) {
+    for (int y = 0; y < PANEL_RES_Y; y++) {
+      for (int x = 0; x < PANEL_RES_X; x++) {
+        dma_display->drawPixel(x, y, targetBuffer[y * PANEL_RES_X + x]);
+      }
+    }
+    memcpy(liveFrameBuffer, targetBuffer, sizeof(liveFrameBuffer));
+    liveFrameValid = true;
+    presentFrame();
+    s_lastPresentChangedPixels = PANEL_RES_X * PANEL_RES_Y;
+    s_lastPresentDurationUs = micros() - presentStartedUs;
+    s_lastPresentFrameHash = 0;
+    if (s_pendingAmbientWaterSurfaceDrawUs > 0UL) {
+      trackAmbientWaterSurfacePerfFrame(
+        millis(),
+        s_pendingAmbientWaterSurfaceDrawUs,
+        s_lastPresentDurationUs,
+        s_lastPresentChangedPixels
+      );
+      s_pendingAmbientWaterSurfaceDrawUs = 0;
+    }
+    return;
+  }
+
   bool changed = false;
   uint16_t changedPixels = 0;
   uint32_t frameHash = 2166136261UL;
@@ -706,6 +828,7 @@ static ClockConfig& resolveActiveClockConfig();
 static void writeBackgroundPixel(int x, int y, uint8_t r, uint8_t g, uint8_t b);
 static void restoreBackgroundRect(int x, int y, int w, int h);
 static void clockTextBounds(const char* text, int x, int y, uint8_t fontId, int size, int& outX, int& outW, int& outH);
+static void drawClockOverlayAnimationMode(const ClockConfig& c, const struct tm& timeinfo);
 static void drawStaticClockOverlayDirty(const ClockConfig& c, const struct tm& timeinfo);
 static void cacheLogoBackground(int x, int y);
 static void formatTimeText(const ClockConfig& c, const struct tm& timeinfo, char* buffer, size_t bufferSize);
@@ -713,6 +836,12 @@ static void formatDateText(const struct tm& timeinfo, char* buffer, size_t buffe
 static void formatWeekText(const struct tm& timeinfo, char* buffer, size_t bufferSize);
 static bool isAmbientWaterWorldPreset(uint8_t preset);
 static void drawAmbientWaterWorldTimeOverlayIfNeeded();
+static bool rebuildStaticClockBackgroundFrame(
+  const PixelData* imagePixels,
+  int imagePixelCount,
+  bool hasCustomImage
+);
+static bool presentStaticClockFrame(const ClockConfig& c, const struct tm& timeinfo);
 
 static void writeBackgroundPixel(int x, int y, uint8_t r, uint8_t g, uint8_t b) {
   if (x < 0 || x >= DisplayManager::PANEL_RES_X || y < 0 || y >= DisplayManager::PANEL_RES_Y) {
@@ -807,13 +936,138 @@ static bool isAmbientWaterWorldPreset(uint8_t preset) {
          preset == AMBIENT_PRESET_WATER_CAUSTICS;
 }
 
+struct AmbientWaterOverlayRect {
+  int x;
+  int y;
+  int w;
+  int h;
+};
+
+static unsigned long s_ambientWaterMotionLastTickAt = 0;
+static unsigned long s_ambientWaterMotionElapsed = 0;
+static uint8_t s_ambientWaterMotionPreset = 0xFF;
+static bool s_ambientWaterDirty = false;
+static AmbientWaterOverlayRect s_ambientWaterOverlayRects[3];
+static int s_ambientWaterOverlayRectCount = 0;
+static bool s_ambientWaterOverlayFrameActive = false;
+
+static unsigned long ambientWaterMotionTickMs(uint8_t preset) {
+  if (preset == AMBIENT_PRESET_WATER_SURFACE) {
+    return 16UL;
+  }
+  if (preset == AMBIENT_PRESET_WATER_CURRENT) {
+    return 16UL;
+  }
+  if (preset == AMBIENT_PRESET_WATER_CAUSTICS) {
+    return 16UL;
+  }
+  return 16UL;
+}
+
+static void resetAmbientWaterOverlayState() {
+  s_ambientWaterOverlayRectCount = 0;
+  s_ambientWaterOverlayFrameActive = false;
+  s_forceStaticClockOverlayRefresh = true;
+}
+
+static void resetAmbientWaterMotionTimeline() {
+  s_ambientWaterMotionLastTickAt = 0;
+  s_ambientWaterMotionElapsed = 0;
+  s_ambientWaterMotionPreset = 0xFF;
+  s_ambientWaterDirty = false;
+  resetAmbientWaterOverlayState();
+}
+
+static void advanceAmbientWaterMotionTimeline(unsigned long now, uint8_t preset) {
+  if (s_ambientWaterMotionLastTickAt == 0 || s_ambientWaterMotionPreset != preset) {
+    s_ambientWaterMotionLastTickAt = now;
+    s_ambientWaterMotionElapsed = 0;
+    s_ambientWaterMotionPreset = preset;
+    s_ambientWaterDirty = true;
+    return;
+  }
+
+  unsigned long tickMs = ambientWaterMotionTickMs(preset);
+  unsigned long delta = now - s_ambientWaterMotionLastTickAt;
+  if (delta < tickMs) {
+    return;
+  }
+
+  s_ambientWaterMotionLastTickAt = now;
+  s_ambientWaterMotionElapsed += delta;
+  s_ambientWaterDirty = true;
+}
+
+static void pushAmbientWaterOverlayRect(int x, int y, int w, int h) {
+  if (w <= 0 || h <= 0 || s_ambientWaterOverlayRectCount >= 3) {
+    return;
+  }
+  s_ambientWaterOverlayRects[s_ambientWaterOverlayRectCount++] = {x, y, w, h};
+}
+
+static bool ambientWaterOverlayRectContainsPixel(int x, int y) {
+  for (int index = 0; index < s_ambientWaterOverlayRectCount; index++) {
+    const AmbientWaterOverlayRect& rect = s_ambientWaterOverlayRects[index];
+    if (x >= rect.x && x < rect.x + rect.w &&
+        y >= rect.y && y < rect.y + rect.h) {
+      return true;
+    }
+  }
+  return false;
+}
+
+static void prepareAmbientWaterOverlayFrame(const ClockConfig& clockConfig, const struct tm& timeinfo) {
+  s_ambientWaterOverlayRectCount = 0;
+  s_ambientWaterOverlayFrameActive = false;
+
+  if (!clockConfig.time.show && !clockConfig.date.show && !clockConfig.week.show) {
+    return;
+  }
+
+  if (clockConfig.time.show) {
+    char timeText[9];
+    int x = 0;
+    int w = 0;
+    int h = 0;
+    formatTimeText(clockConfig, timeinfo, timeText, sizeof(timeText));
+    clockTextBounds(timeText, clockConfig.time.x, clockConfig.time.y, clockConfig.font, clockConfig.time.fontSize, x, w, h);
+    pushAmbientWaterOverlayRect(x, clockConfig.time.y, w, h);
+  }
+
+  if (clockConfig.date.show) {
+    char dateText[6];
+    int x = 0;
+    int w = 0;
+    int h = 0;
+    formatDateText(timeinfo, dateText, sizeof(dateText));
+    clockTextBounds(dateText, clockConfig.date.x, clockConfig.date.y, clockConfig.font, clockConfig.date.fontSize, x, w, h);
+    pushAmbientWaterOverlayRect(x, clockConfig.date.y, w, h);
+  }
+
+  if (clockConfig.week.show) {
+    char weekText[4];
+    int x = 0;
+    int w = 0;
+    int h = 0;
+    formatWeekText(timeinfo, weekText, sizeof(weekText));
+    clockTextBounds(weekText, clockConfig.week.x, clockConfig.week.y, clockConfig.font, 1, x, w, h);
+    pushAmbientWaterOverlayRect(x, clockConfig.week.y, w, h);
+  }
+
+  s_ambientWaterOverlayFrameActive = s_ambientWaterOverlayRectCount > 0;
+}
+
+static void drawAmbientWaterPixel(int x, int y, uint8_t r, uint8_t g, uint8_t b) {
+  DisplayManager::dma_display->drawPixelRGB888(x, y, r, g, b);
+}
+
 static void drawAmbientWaterWorldTimeOverlayIfNeeded() {
   if (!isAmbientWaterWorldPreset(DisplayManager::ambientEffectConfig.preset)) {
     return;
   }
 
-  const ClockConfig& clockConfig = ConfigManager::animClockConfig;
-  if (!clockConfig.time.show) {
+  const ClockConfig& clockConfig = ConfigManager::ledMatrixShowcaseClockConfig;
+  if (!clockConfig.time.show && !clockConfig.date.show && !clockConfig.week.show) {
     return;
   }
 
@@ -822,21 +1076,39 @@ static void drawAmbientWaterWorldTimeOverlayIfNeeded() {
     return;
   }
 
-  char timeText[9];
-  formatTimeText(clockConfig, timeinfo, timeText, sizeof(timeText));
-  drawClockText(
-    DisplayManager::dma_display,
-    timeText,
-    clockConfig.time.x,
-    clockConfig.time.y,
-    DisplayManager::dma_display->color565(
-      clockConfig.time.r,
-      clockConfig.time.g,
-      clockConfig.time.b
-    ),
-    clockConfig.font,
-    clockConfig.time.fontSize
-  );
+  drawClockOverlayAnimationMode(clockConfig, timeinfo);
+}
+
+static bool rebuildStaticClockBackgroundFrame(
+  const PixelData* imagePixels,
+  int imagePixelCount,
+  bool hasCustomImage
+) {
+  if (!DisplayManager::beginRedirectedFrame(&DisplayManager::backgroundBuffer[0][0], 0, true)) {
+    return false;
+  }
+
+  if (hasCustomImage) {
+    DisplayManager::drawPixels(imagePixels, imagePixelCount, false);
+  } else {
+    DisplayManager::drawLogo(12, 18);
+    cacheLogoBackground(12, 18);
+  }
+
+  DisplayManager::endRedirectedFrame(false);
+  DisplayManager::backgroundValid = true;
+  return true;
+}
+
+static bool presentStaticClockFrame(const ClockConfig& c, const struct tm& timeinfo) {
+  memcpy(DisplayManager::animationBuffer, DisplayManager::backgroundBuffer, sizeof(DisplayManager::backgroundBuffer));
+  if (!DisplayManager::beginRedirectedFrame(&DisplayManager::animationBuffer[0][0], 0, false)) {
+    return false;
+  }
+
+  drawClockOverlayAnimationMode(c, timeinfo);
+  DisplayManager::endRedirectedFrame(true);
+  return true;
 }
 
 void DisplayManager::drawPixels(const PixelData* pixels, int pixelCount, bool clearFirst) {
@@ -1163,20 +1435,26 @@ void DisplayManager::displayClock(bool force) {
   }
 
   if (rebuildBackground) {
-    dma_display->clearScreen();
-    memset(backgroundBuffer, 0, sizeof(backgroundBuffer));
-    backgroundValid = true;
     if (currentMode == MODE_CLOCK) {
+      if (!rebuildStaticClockBackgroundFrame(imagePixels, imagePixelCount, hasCustomImage)) {
+        return;
+      }
       s_forceStaticClockOverlayRefresh = true;
+    } else {
+      dma_display->clearScreen();
+      memset(backgroundBuffer, 0, sizeof(backgroundBuffer));
+      backgroundValid = true;
     }
   }
 
-  if (currentMode == MODE_CLOCK || currentMode == MODE_ANIMATION) {
+  if (currentMode == MODE_CLOCK) {
+    presentStaticClockFrame(cfg, timeinfo);
+    return;
+  }
+
+  if (currentMode == MODE_ANIMATION) {
     if (hasCustomImage) {
       drawPixels(imagePixels, imagePixelCount, false);
-    } else if (currentMode == MODE_CLOCK) {
-      drawLogo(12, 18);
-      cacheLogoBackground(12, 18);
     }
   }
 
@@ -1533,6 +1811,7 @@ void DisplayManager::drawTinyTextCentered(const char* text, int y, uint16_t colo
 
 void DisplayManager::setNativeEffectNone() {
   nativeEffectType = NATIVE_EFFECT_NONE;
+  resetAmbientWaterMotionTimeline();
 }
 
 void DisplayManager::activateBreathEffect(const BreathEffectConfig& config) {
@@ -1557,6 +1836,7 @@ void DisplayManager::activateAmbientEffect(const AmbientEffectConfig& config) {
   ambientEffectConfig = config;
   nativeEffectType = NATIVE_EFFECT_AMBIENT;
   nativeEffectStartTime = millis();
+  resetAmbientWaterMotionTimeline();
 }
 
 static uint8_t clampByte(int value) {
@@ -1586,6 +1866,137 @@ static float smoothstepf(float edge0, float edge1, float value) {
 static float mixf(float start, float end, float alpha) {
   float safe = clampUnit(alpha);
   return start + (end - start) * safe;
+}
+
+static float pow4fExact(float value) {
+  float squared = value * value;
+  return squared * squared;
+}
+
+static float pow5fExact(float value) {
+  return pow4fExact(value) * value;
+}
+
+static float pow7fExact(float value) {
+  float squared = value * value;
+  float fourth = squared * squared;
+  return fourth * squared * value;
+}
+
+static constexpr float kAmbientTrigTau = 6.28318530718f;
+static constexpr float kAmbientTrigHalfPi = 1.57079632679f;
+static constexpr int kAmbientWaterTrigLutSize = 128;
+static constexpr int kAmbientWaterPowLutSize = 128;
+static float s_ambientWaterTrigLut[kAmbientWaterTrigLutSize + 1];
+static bool s_ambientWaterTrigLutReady = false;
+
+static void ensureAmbientWaterTrigLut() {
+  if (s_ambientWaterTrigLutReady) {
+    return;
+  }
+
+  for (int index = 0; index <= kAmbientWaterTrigLutSize; index++) {
+    float angle = ((float)index / (float)kAmbientWaterTrigLutSize) * kAmbientTrigTau;
+    s_ambientWaterTrigLut[index] = sinf(angle);
+  }
+  s_ambientWaterTrigLutReady = true;
+}
+
+static float wrapAmbientTrigAngle(float angle) {
+  float wrapped = angle - floorf(angle / kAmbientTrigTau) * kAmbientTrigTau;
+  if (wrapped < 0.0f) {
+    wrapped += kAmbientTrigTau;
+  }
+  return wrapped;
+}
+
+static float ambientWaterSin(float angle) {
+  ensureAmbientWaterTrigLut();
+  float wrapped = wrapAmbientTrigAngle(angle);
+  float position = wrapped * ((float)kAmbientWaterTrigLutSize / kAmbientTrigTau);
+  int baseIndex = (int)position;
+  float alpha = position - (float)baseIndex;
+  return mixf(
+    s_ambientWaterTrigLut[baseIndex],
+    s_ambientWaterTrigLut[baseIndex + 1],
+    alpha
+  );
+}
+
+static float ambientWaterCos(float angle) {
+  return ambientWaterSin(angle + kAmbientTrigHalfPi);
+}
+
+static void buildAmbientWaterUnitPowLut(float* lut, float exponent) {
+  for (int index = 0; index <= kAmbientWaterPowLutSize; index++) {
+    float x = (float)index / (float)kAmbientWaterPowLutSize;
+    lut[index] = powf(x, exponent);
+  }
+}
+
+static inline float sampleAmbientWaterUnitPowLut(
+  const float* lut,
+  float value
+) {
+  float clamped = clampUnit(value) * (float)kAmbientWaterPowLutSize;
+  int index0 = (int)clamped;
+  int index1 = index0 < kAmbientWaterPowLutSize ? (index0 + 1) : index0;
+  return mixf(lut[index0], lut[index1], clamped - (float)index0);
+}
+
+static unsigned long ambientPresetMinRenderIntervalMs(uint8_t preset) {
+  if (preset == AMBIENT_PRESET_WATER_SURFACE) {
+    return 16UL;
+  }
+  if (preset == AMBIENT_PRESET_WATER_CURRENT) {
+    return 16UL;
+  }
+  if (preset == AMBIENT_PRESET_WATER_CAUSTICS) {
+    return 42UL;
+  }
+  return 33UL;
+}
+
+static unsigned long ambientPresetQuantizedElapsedMs(
+  uint8_t preset,
+  unsigned long elapsed
+) {
+  if (preset == AMBIENT_PRESET_WATER_CAUSTICS) {
+    const unsigned long stepMs = 42UL;
+    return elapsed - (elapsed % stepMs);
+  }
+  return elapsed;
+}
+
+static void fillAmbientWaterWaveSequence(
+  float* values,
+  float startPhase,
+  float deltaPhase,
+  bool cosine
+) {
+  float sinValue = ambientWaterSin(startPhase);
+  float cosValue = ambientWaterCos(startPhase);
+  float deltaSin = ambientWaterSin(deltaPhase);
+  float deltaCos = ambientWaterCos(deltaPhase);
+
+  for (int index = 0; index < 64; index++) {
+    values[index] = cosine ? cosValue : sinValue;
+    if (index == 63) {
+      break;
+    }
+
+    if ((index & 15) == 15) {
+      float nextPhase = startPhase + deltaPhase * (float)(index + 1);
+      sinValue = ambientWaterSin(nextPhase);
+      cosValue = ambientWaterCos(nextPhase);
+      continue;
+    }
+
+    float nextSin = sinValue * deltaCos + cosValue * deltaSin;
+    float nextCos = cosValue * deltaCos - sinValue * deltaSin;
+    sinValue = nextSin;
+    cosValue = nextCos;
+  }
 }
 
 static float colorLuminance255(uint8_t r, uint8_t g, uint8_t b) {
@@ -3582,14 +3993,96 @@ struct AmbientWaterSurfacePulse {
   unsigned long bornAt;
 };
 
+struct AmbientWaterSurfacePulseFrameState {
+  float x;
+  float y;
+  float strength;
+  float phaseOffset;
+  float ageDecay;
+};
+
+struct AmbientWaterSurfaceAxisSample {
+  uint8_t index0;
+  uint8_t index1;
+  float alpha;
+};
+
+static constexpr int kAmbientWaterPanelSize = 64;
+static constexpr int kAmbientWaterPanelPixels = kAmbientWaterPanelSize * kAmbientWaterPanelSize;
 static constexpr int kAmbientWaterSurfaceMaxPulses = 6;
+static constexpr float kAmbientWaterSurfacePulseDistanceCutoffSq = 0.18f;
+static constexpr float kAmbientWaterSurfacePulseDistanceCutoff = 0.42426407f;
+static constexpr float kAmbientWaterUnitCoordStep = 1.0f / 63.0f;
 static AmbientWaterSurfacePulse s_ambientWaterSurfacePulses[kAmbientWaterSurfaceMaxPulses];
+static AmbientWaterSurfacePulseFrameState s_ambientWaterSurfacePulseFrameStates[kAmbientWaterSurfaceMaxPulses];
 static int s_ambientWaterSurfacePulseCount = 0;
 static unsigned long s_ambientWaterSurfaceLastElapsed = 0;
 static unsigned long s_ambientWaterSurfaceLastSpawnAt = 0;
+static float s_ambientUnitCoordLut[kAmbientWaterPanelSize];
+static bool s_ambientUnitCoordLutReady = false;
+static AmbientWaterSurfaceAxisSample
+  s_ambientWaterSurfaceNegativeOffsetSamples[kAmbientWaterPanelSize];
+static AmbientWaterSurfaceAxisSample
+  s_ambientWaterSurfacePositiveOffsetSamples[kAmbientWaterPanelSize];
+static bool s_ambientWaterSurfaceAxisSamplesReady = false;
+static uint16_t s_ambientWaterSurfaceFieldCache[kAmbientWaterPanelPixels];
 
 static float ambientWaterSeedf(int index, float offset) {
   return ambientLiquidSeedf(index, offset);
+}
+
+static void ensureAmbientUnitCoordLut() {
+  if (s_ambientUnitCoordLutReady) {
+    return;
+  }
+
+  for (int index = 0; index < kAmbientWaterPanelSize; index++) {
+    s_ambientUnitCoordLut[index] = (float)index / (float)(kAmbientWaterPanelSize - 1);
+  }
+  s_ambientUnitCoordLutReady = true;
+}
+
+static AmbientWaterSurfaceAxisSample buildAmbientWaterSurfaceAxisSample(
+  int index,
+  float offsetPixels
+) {
+  float samplePosition = (float)index + offsetPixels;
+  if (samplePosition < 0.0f) {
+    samplePosition = 0.0f;
+  } else if (samplePosition > (float)(kAmbientWaterPanelSize - 1)) {
+    samplePosition = (float)(kAmbientWaterPanelSize - 1);
+  }
+
+  int index0 = (int)samplePosition;
+  int index1 = index0 < (kAmbientWaterPanelSize - 1) ? (index0 + 1) : index0;
+  return {
+    (uint8_t)index0,
+    (uint8_t)index1,
+    samplePosition - (float)index0
+  };
+}
+
+static void ensureAmbientWaterSurfaceAxisSamples() {
+  if (s_ambientWaterSurfaceAxisSamplesReady) {
+    return;
+  }
+
+  for (int index = 0; index < kAmbientWaterPanelSize; index++) {
+    s_ambientWaterSurfaceNegativeOffsetSamples[index] =
+      buildAmbientWaterSurfaceAxisSample(index, -1.4f);
+    s_ambientWaterSurfacePositiveOffsetSamples[index] =
+      buildAmbientWaterSurfaceAxisSample(index, 1.4f);
+  }
+
+  s_ambientWaterSurfaceAxisSamplesReady = true;
+}
+
+static uint16_t encodeAmbientUnitField(float value) {
+  return (uint16_t)roundf(clampUnit(value) * 65535.0f);
+}
+
+static float decodeAmbientUnitField(uint16_t value) {
+  return (float)value / 65535.0f;
 }
 
 static void resetAmbientWaterSurfaceState() {
@@ -3660,55 +4153,43 @@ static void updateAmbientWaterSurfaceState(
 }
 
 static float sampleAmbientWaterSurfaceBaseField(
-  float nx,
-  float ny,
+  float driftX,
+  float driftY,
+  float bandWarpA,
+  float bandWarpB,
   float timeBase,
   float speedUnit,
   float densityUnit
 ) {
-  float driftX = nx - 0.5f;
-  float driftY = ny - 0.5f;
-  float bandWarpA =
-    sinf(
-      driftX * 5.8f +
-      timeBase * 0.58f +
-      sinf(driftY * 4.6f - timeBase * 0.2f) * 0.86f
-    );
-  float bandWarpB =
-    sinf(
-      driftX * 3.2f -
-      timeBase * 0.36f +
-      sinf(driftY * 7.1f + timeBase * 0.28f) * 0.58f
-    );
   float longSwell =
-    sinf(
+    ambientWaterSin(
       (driftY * 1.72f + bandWarpA * 0.2f + driftX * 0.09f) *
       (10.4f + densityUnit * 3.8f) -
       timeBase * (1.42f + speedUnit * 0.78f)
     );
   float secondarySwell =
-    sinf(
+    ambientWaterSin(
       (driftY * 1.18f - driftX * 0.26f + bandWarpB * 0.16f) *
       (14.2f + densityUnit * 4.6f) -
       timeBase * (1.84f + speedUnit * 0.96f)
     );
   float diagonalSwell =
-    sinf(
+    ambientWaterSin(
       (driftY * 0.82f + driftX * 0.42f + bandWarpA * 0.08f) * 8.6f -
       timeBase * (1.08f + speedUnit * 0.54f)
     );
   float backwash =
-    cosf(
+    ambientWaterCos(
       (driftY * 1.36f - driftX * 0.92f + bandWarpB * 0.06f) * 9.2f +
       timeBase * (1.18f + densityUnit * 0.64f)
     );
   float capillary =
-    sinf(
+    ambientWaterSin(
       (driftY * 2.84f + driftX * 0.62f + bandWarpA * 0.04f) * 22.8f -
       timeBase * (2.46f + speedUnit * 0.84f)
     );
   float trough =
-    cosf(
+    ambientWaterCos(
       (driftY * 0.66f - driftX * 0.14f) * 6.4f -
       timeBase * (0.82f + speedUnit * 0.3f)
     );
@@ -3725,126 +4206,304 @@ static float sampleAmbientWaterSurfaceBaseField(
   );
 }
 
-static float sampleAmbientWaterSurfaceRippleField(
-  float nx,
-  float ny,
-  unsigned long elapsed,
-  float speedUnit
-) {
-  float ripple = 0.0f;
-  for (int index = 0; index < s_ambientWaterSurfacePulseCount; index++) {
-    const AmbientWaterSurfacePulse& pulse = s_ambientWaterSurfacePulses[index];
-    float age = (float)(elapsed - pulse.bornAt) * 0.001f;
-    float dx = nx - pulse.x;
-    float dy = ny - pulse.y;
-    float dist = sqrtf(dx * dx + dy * dy);
-    float phase = dist * 54.0f - age * (7.4f + speedUnit * 2.8f);
-    ripple +=
-      sinf(phase) *
-      expf(-dist * 11.4f) *
-      expf(-age * 0.68f) *
-      pulse.strength;
-  }
-  return ripple;
-}
-
-static float sampleAmbientWaterSurfaceField(
-  float nx,
-  float ny,
+static void buildAmbientWaterSurfaceFieldCache(
   unsigned long elapsed,
   float timeBase,
   float speedUnit,
   float densityUnit
 ) {
-  float base =
-    sampleAmbientWaterSurfaceBaseField(nx, ny, timeBase, speedUnit, densityUnit);
-  float ripple =
-    sampleAmbientWaterSurfaceRippleField(nx, ny, elapsed, speedUnit);
-  return clampUnit(base + ripple * (0.045f + densityUnit * 0.018f));
+  ensureAmbientUnitCoordLut();
+  const float rippleScale = 0.045f + densityUnit * 0.018f;
+  const float scaledMaxIndex = (float)(kAmbientWaterPanelSize - 1);
+
+  for (int y = 0; y < kAmbientWaterPanelSize; y++) {
+    float ny = s_ambientUnitCoordLut[y];
+    float driftY = ny - 0.5f;
+    float rowBandWarpSeedA = ambientWaterSin(driftY * 4.6f - timeBase * 0.2f);
+    float rowBandWarpSeedB = ambientWaterSin(driftY * 7.1f + timeBase * 0.28f);
+    int rowOffset = y * kAmbientWaterPanelSize;
+    float baseRow[kAmbientWaterPanelSize];
+    float rippleRow[kAmbientWaterPanelSize] = {};
+    const float driftXStart = -0.5f;
+    const float bandWarpAPhaseStart =
+      driftXStart * 5.8f + timeBase * 0.58f + rowBandWarpSeedA * 0.86f;
+    const float bandWarpBPhaseStart =
+      driftXStart * 3.2f - timeBase * 0.36f + rowBandWarpSeedB * 0.58f;
+    const float bandWarpADelta = 5.8f * kAmbientWaterUnitCoordStep;
+    const float bandWarpBDelta = 3.2f * kAmbientWaterUnitCoordStep;
+    float bandWarpASin = ambientWaterSin(bandWarpAPhaseStart);
+    float bandWarpACos = ambientWaterCos(bandWarpAPhaseStart);
+    float bandWarpADeltaSin = ambientWaterSin(bandWarpADelta);
+    float bandWarpADeltaCos = ambientWaterCos(bandWarpADelta);
+    float bandWarpBSin = ambientWaterSin(bandWarpBPhaseStart);
+    float bandWarpBCos = ambientWaterCos(bandWarpBPhaseStart);
+    float bandWarpBDeltaSin = ambientWaterSin(bandWarpBDelta);
+    float bandWarpBDeltaCos = ambientWaterCos(bandWarpBDelta);
+
+    for (int x = 0; x < kAmbientWaterPanelSize; x++) {
+      float driftX = s_ambientUnitCoordLut[x] - 0.5f;
+      baseRow[x] =
+        sampleAmbientWaterSurfaceBaseField(
+          driftX,
+          driftY,
+          bandWarpASin,
+          bandWarpBSin,
+          timeBase,
+          speedUnit,
+          densityUnit
+        );
+
+      if (x == (kAmbientWaterPanelSize - 1)) {
+        continue;
+      }
+
+      if ((x & 15) == 15) {
+        float nextDriftX = s_ambientUnitCoordLut[x + 1] - 0.5f;
+        float nextBandWarpAPhase =
+          nextDriftX * 5.8f + timeBase * 0.58f + rowBandWarpSeedA * 0.86f;
+        bandWarpASin = ambientWaterSin(nextBandWarpAPhase);
+        bandWarpACos = ambientWaterCos(nextBandWarpAPhase);
+        float nextBandWarpBPhase =
+          nextDriftX * 3.2f - timeBase * 0.36f + rowBandWarpSeedB * 0.58f;
+        bandWarpBSin = ambientWaterSin(nextBandWarpBPhase);
+        bandWarpBCos = ambientWaterCos(nextBandWarpBPhase);
+        continue;
+      }
+
+      float nextBandWarpASin =
+        bandWarpASin * bandWarpADeltaCos + bandWarpACos * bandWarpADeltaSin;
+      float nextBandWarpACos =
+        bandWarpACos * bandWarpADeltaCos - bandWarpASin * bandWarpADeltaSin;
+      bandWarpASin = nextBandWarpASin;
+      bandWarpACos = nextBandWarpACos;
+
+      float nextBandWarpBSin =
+        bandWarpBSin * bandWarpBDeltaCos + bandWarpBCos * bandWarpBDeltaSin;
+      float nextBandWarpBCos =
+        bandWarpBCos * bandWarpBDeltaCos - bandWarpBSin * bandWarpBDeltaSin;
+      bandWarpBSin = nextBandWarpBSin;
+      bandWarpBCos = nextBandWarpBCos;
+    }
+
+    for (int pulseIndex = 0; pulseIndex < s_ambientWaterSurfacePulseCount; pulseIndex++) {
+      const AmbientWaterSurfacePulseFrameState& pulse =
+        s_ambientWaterSurfacePulseFrameStates[pulseIndex];
+      float dy = ny - pulse.y;
+      float dySq = dy * dy;
+      if (dySq > kAmbientWaterSurfacePulseDistanceCutoffSq) {
+        continue;
+      }
+
+      float spanX = sqrtf(kAmbientWaterSurfacePulseDistanceCutoffSq - dySq);
+      int minX =
+        (int)floorf((pulse.x - kAmbientWaterSurfacePulseDistanceCutoff) * scaledMaxIndex);
+      int maxX =
+        (int)ceilf((pulse.x + kAmbientWaterSurfacePulseDistanceCutoff) * scaledMaxIndex);
+      if (minX < 0) {
+        minX = 0;
+      }
+      if (maxX > (kAmbientWaterPanelSize - 1)) {
+        maxX = kAmbientWaterPanelSize - 1;
+      }
+
+      int tighterMinX = (int)floorf((pulse.x - spanX) * scaledMaxIndex);
+      int tighterMaxX = (int)ceilf((pulse.x + spanX) * scaledMaxIndex);
+      if (tighterMinX > minX) {
+        minX = tighterMinX;
+      }
+      if (tighterMaxX < maxX) {
+        maxX = tighterMaxX;
+      }
+      if (minX > maxX) {
+        continue;
+      }
+
+      float pulseScale = pulse.ageDecay * pulse.strength;
+      for (int x = minX; x <= maxX; x++) {
+        float dx = s_ambientUnitCoordLut[x] - pulse.x;
+        float distSq = dx * dx + dySq;
+        if (distSq > kAmbientWaterSurfacePulseDistanceCutoffSq) {
+          continue;
+        }
+        float dist = sqrtf(distSq);
+        rippleRow[x] +=
+          ambientWaterSin(dist * 54.0f - pulse.phaseOffset) *
+          expf(-dist * 11.4f) *
+          pulseScale;
+      }
+    }
+
+    for (int x = 0; x < kAmbientWaterPanelSize; x++) {
+      s_ambientWaterSurfaceFieldCache[rowOffset + x] =
+        encodeAmbientUnitField(clampUnit(baseRow[x] + rippleRow[x] * rippleScale));
+    }
+  }
 }
 
-static void renderAmbientWaterSurface(
-  unsigned long elapsed,
-  float speedUnit,
-  float intensityUnit
-) {
-  DisplayManager::dma_display->fillScreenRGB888(1, 7, 16);
+static inline float readAmbientWaterSurfaceFieldCacheValue(int offset) {
+  return decodeAmbientUnitField(s_ambientWaterSurfaceFieldCache[offset]);
+}
 
-  const float waterLevelUnit = 0.72f;
-  const float frequencyUnit = clampUnit(0.18f + speedUnit * 0.64f);
-  const float strengthUnit = clampUnit(0.2f + intensityUnit * 0.62f);
-  const float surfaceDensityUnit =
-    clampUnit(intensityUnit * 0.44f + frequencyUnit * 0.56f);
-  const float timeBase =
-    (float)elapsed *
-    (0.00038f + speedUnit * 0.0011f + frequencyUnit * 0.00072f);
-  const float sampleStep = 1.4f / 63.0f;
-  const NativeRgb deep = makeRgb(1, 16, 34);
-  const NativeRgb mid = makeRgb(5, 42, 88);
-  const NativeRgb shallow = makeRgb(14, 86, 150);
-  const NativeRgb bright = makeRgb(74, 166, 226);
-  const NativeRgb foam = makeRgb(226, 240, 252);
-  const NativeRgb troughColor = makeRgb(1, 10, 22);
-  const NativeRgb edgeColor = makeRgb(2, 12, 26);
+static inline float sampleAmbientWaterSurfaceFieldCacheHorizontal(
+  int rowOffset,
+  const AmbientWaterSurfaceAxisSample& sample
+) {
+  return mixf(
+    readAmbientWaterSurfaceFieldCacheValue(rowOffset + (int)sample.index0),
+    readAmbientWaterSurfaceFieldCacheValue(rowOffset + (int)sample.index1),
+    sample.alpha
+  );
+}
+
+static inline float sampleAmbientWaterSurfaceFieldCacheVertical(
+  int x,
+  int rowOffset0,
+  int rowOffset1,
+  float alpha
+) {
+  return mixf(
+    readAmbientWaterSurfaceFieldCacheValue(rowOffset0 + x),
+    readAmbientWaterSurfaceFieldCacheValue(rowOffset1 + x),
+    alpha
+  );
+}
+
+static void prepareAmbientWaterSurfacePulseFrameStates(
+  unsigned long elapsed,
+  float speedUnit
+) {
+  const float pulsePhaseSpeed = 7.4f + speedUnit * 2.8f;
+  for (int index = 0; index < s_ambientWaterSurfacePulseCount; index++) {
+    const AmbientWaterSurfacePulse& pulse = s_ambientWaterSurfacePulses[index];
+    float age = (float)(elapsed - pulse.bornAt) * 0.001f;
+    s_ambientWaterSurfacePulseFrameStates[index] = {
+      pulse.x,
+      pulse.y,
+      pulse.strength,
+      age * pulsePhaseSpeed,
+      expf(-age * 0.68f)
+    };
+  }
+}
+
+static void shadeAmbientWaterSurfaceFrame(
+  float timeBase,
+  float speedUnit,
+  float intensityUnit,
+  float frequencyUnit,
+  float strengthUnit,
+  float waterLevelUnit,
+  float surfaceDensityUnit
+) {
+  const float sampleStep = 1.4f * kAmbientWaterUnitCoordStep;
+  const NativeRgb deep = makeRgb(7, 33, 93);
+  const NativeRgb mid = makeRgb(20, 90, 176);
+  const NativeRgb shallow = makeRgb(49, 129, 199);
+  const NativeRgb bright = makeRgb(119, 209, 245);
+  const NativeRgb foam = makeRgb(228, 246, 255);
+  const NativeRgb troughColor = makeRgb(3, 16, 48);
+  const NativeRgb edgeColor = makeRgb(2, 11, 33);
   const float lightDirX = -0.46f;
   const float lightDirY = 0.36f;
   const float lightDirZ = 0.82f;
+  const float invGradientSpan = 1.0f / (sampleStep * 2.0f);
+  const float normalXScale =
+    0.2f + surfaceDensityUnit * 0.08f + strengthUnit * 0.06f;
+  const float normalYScale =
+    0.88f + surfaceDensityUnit * 0.18f + strengthUnit * 0.12f;
+  const float specularPower = 14.0f - intensityUnit * 5.5f;
+  const float ridgeHighlightScale =
+    0.05f + intensityUnit * 0.09f + strengthUnit * 0.05f;
+  const float foamAmountScale =
+    0.08f + intensityUnit * 0.14f + strengthUnit * 0.1f;
+  const float highlightScale = 0.12f + intensityUnit * 0.1f;
+  const float sparkleScale = 0.03f + intensityUnit * 0.05f;
+  const float foamGrainScale = 0.02f + strengthUnit * 0.05f;
+  const float subsurfaceRowScale = 0.04f + waterLevelUnit * 0.08f;
+  const float depthMixRowScale = 0.5f + (1.0f - waterLevelUnit) * 0.18f;
+  const float depthMixFieldScale = 0.16f + waterLevelUnit * 0.08f;
+  const float ridgeXScale = 0.16f * 15.6f;
+  const float ridgeTimeScale = timeBase * (1.12f + speedUnit * 0.22f);
+  const float foamXScale = 26.0f + frequencyUnit * 12.0f;
+  const float foamTimeScale = timeBase * (5.2f + frequencyUnit * 1.7f);
+  const float undercurrentScale = 5.8f + frequencyUnit * 2.2f;
+  const float undercurrentXScale =
+    (0.72f + frequencyUnit * 0.24f) * undercurrentScale;
+  const float undercurrentTimeScale =
+    timeBase * (1.1f + surfaceDensityUnit * 0.36f);
+  const float ridgeDelta = ridgeXScale * kAmbientWaterUnitCoordStep;
+  const float foamDelta = foamXScale * kAmbientWaterUnitCoordStep;
+  const float undercurrentDelta =
+    undercurrentXScale * kAmbientWaterUnitCoordStep;
+  float pow32Lut[kAmbientWaterPowLutSize + 1];
+  float pow46Lut[kAmbientWaterPowLutSize + 1];
+  float specularLut[kAmbientWaterPowLutSize + 1];
+  float waveScratchA[64];
+  float waveScratchB[64];
+  float waveScratchC[64];
 
-  updateAmbientWaterSurfaceState(
-    elapsed,
-    surfaceDensityUnit,
-    frequencyUnit,
-    strengthUnit
-  );
+  ensureAmbientUnitCoordLut();
+  ensureAmbientWaterSurfaceAxisSamples();
+  buildAmbientWaterUnitPowLut(pow32Lut, 3.2f);
+  buildAmbientWaterUnitPowLut(pow46Lut, 4.6f);
+  for (int index = 0; index <= kAmbientWaterPowLutSize; index++) {
+    float x = (float)index / (float)kAmbientWaterPowLutSize;
+    specularLut[index] = powf(x, specularPower);
+  }
 
   for (int y = 0; y < 64; y++) {
+    float ny = s_ambientUnitCoordLut[y];
+    float edgeShadeY = fabsf(ny - 0.48f) * 0.54f;
+    float subsurfaceBase = 0.04f + (1.0f - ny) * subsurfaceRowScale;
+    float depthMixBase = 0.04f + ny * depthMixRowScale;
+    int rowOffset = y * kAmbientWaterPanelSize;
+    const AmbientWaterSurfaceAxisSample& upSample =
+      s_ambientWaterSurfaceNegativeOffsetSamples[y];
+    const AmbientWaterSurfaceAxisSample& downSample =
+      s_ambientWaterSurfacePositiveOffsetSamples[y];
+    int upRowOffset0 = (int)upSample.index0 * kAmbientWaterPanelSize;
+    int upRowOffset1 = (int)upSample.index1 * kAmbientWaterPanelSize;
+    int downRowOffset0 = (int)downSample.index0 * kAmbientWaterPanelSize;
+    int downRowOffset1 = (int)downSample.index1 * kAmbientWaterPanelSize;
+    const float ridgeRowPhase = ny * 2.04f * 15.6f - ridgeTimeScale;
+    const float foamRowPhase =
+      ny * 17.0f -
+      foamTimeScale +
+      ambientWaterSin(ny * 11.0f + timeBase * 1.2f) * 0.6f;
+    const float undercurrentRowPhase =
+      (-ny * 1.14f) * undercurrentScale - undercurrentTimeScale;
+    fillAmbientWaterWaveSequence(waveScratchA, ridgeRowPhase, ridgeDelta, false);
+    fillAmbientWaterWaveSequence(waveScratchB, foamRowPhase, foamDelta, false);
+    fillAmbientWaterWaveSequence(
+      waveScratchC,
+      undercurrentRowPhase,
+      undercurrentDelta,
+      false
+    );
     for (int x = 0; x < 64; x++) {
-      float nx = (float)x / 63.0f;
-      float ny = (float)y / 63.0f;
-      float field =
-        sampleAmbientWaterSurfaceField(
-          nx,
-          ny,
-          elapsed,
-          timeBase,
-          speedUnit,
-          surfaceDensityUnit
-        );
+      float edgeShadeX = fabsf(s_ambientUnitCoordLut[x] - 0.5f) * 1.18f;
+      const AmbientWaterSurfaceAxisSample& leftSample =
+        s_ambientWaterSurfaceNegativeOffsetSamples[x];
+      const AmbientWaterSurfaceAxisSample& rightSample =
+        s_ambientWaterSurfacePositiveOffsetSamples[x];
+      float field = readAmbientWaterSurfaceFieldCacheValue(rowOffset + x);
       float fieldL =
-        sampleAmbientWaterSurfaceField(
-          max(0.0f, nx - sampleStep),
-          ny,
-          elapsed,
-          timeBase,
-          speedUnit,
-          surfaceDensityUnit
-        );
+        sampleAmbientWaterSurfaceFieldCacheHorizontal(rowOffset, leftSample);
       float fieldR =
-        sampleAmbientWaterSurfaceField(
-          min(1.0f, nx + sampleStep),
-          ny,
-          elapsed,
-          timeBase,
-          speedUnit,
-          surfaceDensityUnit
-        );
+        sampleAmbientWaterSurfaceFieldCacheHorizontal(rowOffset, rightSample);
       float fieldU =
-        sampleAmbientWaterSurfaceField(
-          nx,
-          max(0.0f, ny - sampleStep),
-          elapsed,
-          timeBase,
-          speedUnit,
-          surfaceDensityUnit
+        sampleAmbientWaterSurfaceFieldCacheVertical(
+          x,
+          upRowOffset0,
+          upRowOffset1,
+          upSample.alpha
         );
       float fieldD =
-        sampleAmbientWaterSurfaceField(
-          nx,
-          min(1.0f, ny + sampleStep),
-          elapsed,
-          timeBase,
-          speedUnit,
-          surfaceDensityUnit
+        sampleAmbientWaterSurfaceFieldCacheVertical(
+          x,
+          downRowOffset0,
+          downRowOffset1,
+          downSample.alpha
         );
 
       float fieldSmooth =
@@ -3852,84 +4511,60 @@ static void renderAmbientWaterSurface(
           field * 0.44f +
           (fieldL + fieldR + fieldU + fieldD) * 0.14f
         );
-      float gradientX = (fieldR - fieldL) / (sampleStep * 2.0f);
-      float gradientY = (fieldD - fieldU) / (sampleStep * 2.0f);
+      float gradientX = (fieldR - fieldL) * invGradientSpan;
+      float gradientY = (fieldD - fieldU) * invGradientSpan;
       float curvature =
         fieldR + fieldL + fieldD + fieldU - fieldSmooth * 4.0f;
       float slope = fabsf(gradientX) * 0.44f + fabsf(gradientY) * 0.96f;
-      float normalX =
-        -gradientX * (0.2f + surfaceDensityUnit * 0.08f + strengthUnit * 0.06f);
-      float normalY =
-        -gradientY * (0.88f + surfaceDensityUnit * 0.18f + strengthUnit * 0.12f);
+      float normalX = -gradientX * normalXScale;
+      float normalY = -gradientY * normalYScale;
       float normalLength = sqrtf(normalX * normalX + normalY * normalY + 1.0f);
       float lightAmount =
         clampUnit(
           (normalX * lightDirX + normalY * lightDirY + lightDirZ) /
           normalLength
         );
-      float specular = powf(lightAmount, 14.0f - intensityUnit * 5.5f);
+      float specular =
+        sampleAmbientWaterUnitPowLut(specularLut, lightAmount);
       float longGlint =
-        powf(
-          clampUnit(1.0f - fabsf(gradientX * 2.6f - gradientY * 0.22f - 0.12f)),
-          7.0f
+        pow7fExact(
+          clampUnit(1.0f - fabsf(gradientX * 2.6f - gradientY * 0.22f - 0.12f))
         );
       float undercurrent =
         0.5f +
-        0.5f *
-          sinf(
-            (nx * (0.72f + frequencyUnit * 0.24f) - ny * 1.14f) *
-            (5.8f + frequencyUnit * 2.2f) -
-            timeBase * (1.1f + surfaceDensityUnit * 0.36f)
-          );
+        0.5f * waveScratchC[x];
       float crestAmount =
         smoothstepf(0.58f - strengthUnit * 0.05f, 0.86f, fieldSmooth) *
         smoothstepf(0.05f, 0.34f + strengthUnit * 0.04f, slope);
       float ridgeHighlight =
         crestAmount *
-        powf(
-          clampUnit(
-            0.5f +
-            0.5f *
-              sinf(
-                (ny * 2.04f + nx * 0.16f) * 15.6f -
-                timeBase * (1.12f + speedUnit * 0.22f)
-              )
-          ),
-          3.2f
+        sampleAmbientWaterUnitPowLut(
+          pow32Lut,
+          0.5f + 0.5f * waveScratchA[x]
         ) *
-        (0.05f + intensityUnit * 0.09f + strengthUnit * 0.05f);
+        ridgeHighlightScale;
       float foamAmount =
         crestAmount *
         smoothstepf(-0.2f, 0.05f, -curvature) *
-        (0.08f + intensityUnit * 0.14f + strengthUnit * 0.1f);
+        foamAmountScale;
       float highlightAmount =
-        crestAmount * longGlint * (0.12f + intensityUnit * 0.1f);
+        crestAmount * longGlint * highlightScale;
       float sparkle =
         smoothstepf(0.52f, 0.9f, fieldSmooth) *
-        powf(
-          clampUnit(1.0f - fabsf(gradientY * 0.7f + gradientX * 1.34f - 0.1f)),
-          4.0f
+        pow4fExact(
+          clampUnit(1.0f - fabsf(gradientY * 0.7f + gradientX * 1.34f - 0.1f))
         ) *
-        (0.03f + intensityUnit * 0.05f);
+        sparkleScale;
       float foamGrain =
         smoothstepf(0.8f - strengthUnit * 0.06f, 1.0f, fieldSmooth) *
-        powf(
-          clampUnit(
-            0.5f +
-            0.5f *
-              sinf(
-                nx * (26.0f + frequencyUnit * 12.0f) +
-                ny * 17.0f -
-                timeBase * (5.2f + frequencyUnit * 1.7f) +
-                sinf(ny * 11.0f + timeBase * 1.2f) * 0.6f
-              )
-          ),
-          4.6f
+        sampleAmbientWaterUnitPowLut(
+          pow46Lut,
+          0.5f + 0.5f * waveScratchB[x]
         ) *
-        (0.02f + strengthUnit * 0.05f);
+        foamGrainScale;
       float subsurface =
         smoothstepf(0.36f, 0.8f, fieldSmooth) *
-        (0.04f + (1.0f - ny) * (0.04f + waterLevelUnit * 0.08f) + undercurrent * 0.035f);
+        (subsurfaceBase + undercurrent * 0.035f);
       float troughShadow =
         smoothstepf(0.08f, 0.52f, 1.0f - fieldSmooth) *
         smoothstepf(0.035f, 0.28f, slope) *
@@ -3937,9 +4572,8 @@ static void renderAmbientWaterSurface(
 
       float depthMix =
         clampUnit(
-          0.04f +
-          ny * (0.5f + (1.0f - waterLevelUnit) * 0.18f) +
-          fieldSmooth * (0.16f + waterLevelUnit * 0.08f)
+          depthMixBase +
+          fieldSmooth * depthMixFieldScale
         );
       NativeRgb color = blendRgbColor(deep, mid, depthMix);
       color =
@@ -3968,7 +4602,7 @@ static void renderAmbientWaterSurface(
         smoothstepf(
           1.06f,
           0.22f,
-          fabsf(nx - 0.5f) * 1.18f + fabsf(ny - 0.48f) * 0.54f
+          edgeShadeX + edgeShadeY
         );
       color = blendRgbColor(
         edgeColor,
@@ -3976,7 +4610,7 @@ static void renderAmbientWaterSurface(
         0.42f + edgeShade * 0.58f
       );
 
-      DisplayManager::dma_display->drawPixelRGB888(
+      drawAmbientWaterPixel(
         x,
         y,
         color.r,
@@ -3985,6 +4619,44 @@ static void renderAmbientWaterSurface(
       );
     }
   }
+}
+
+static void renderAmbientWaterSurface(
+  unsigned long elapsed,
+  float speedUnit,
+  float intensityUnit
+) {
+  const float waterLevelUnit = 0.72f;
+  const float densityUnit = 0.58f;
+  const float frequencyUnit = 0.56f;
+  const float strengthUnit = 0.48f;
+  const float surfaceDensityUnit =
+    clampUnit(densityUnit * 0.44f + frequencyUnit * 0.56f);
+  const float timeBase =
+    (float)elapsed *
+    (0.00038f + speedUnit * 0.0011f + frequencyUnit * 0.00072f);
+  updateAmbientWaterSurfaceState(
+    elapsed,
+    densityUnit,
+    frequencyUnit,
+    strengthUnit
+  );
+  prepareAmbientWaterSurfacePulseFrameStates(elapsed, speedUnit);
+  buildAmbientWaterSurfaceFieldCache(
+    elapsed,
+    timeBase,
+    speedUnit,
+    surfaceDensityUnit
+  );
+  shadeAmbientWaterSurfaceFrame(
+    timeBase,
+    speedUnit,
+    intensityUnit,
+    frequencyUnit,
+    strengthUnit,
+    waterLevelUnit,
+    surfaceDensityUnit
+  );
 }
 
 static float sampleAmbientWaterCausticField(
@@ -4003,20 +4675,20 @@ static float sampleAmbientWaterCausticField(
   for (int index = 0; index < 3; index++) {
     float phase = timeBase * (1.2f + (float)index * 0.46f + speedUnit * 0.3f) + (float)index * 1.7f;
     float warp =
-      sinf(iy * (1.7f + (float)index * 0.22f) + phase) *
+      ambientWaterSin(iy * (1.7f + (float)index * 0.22f) + phase) *
       (0.78f - (float)index * 0.12f);
     float twist =
-      cosf(ix * (1.4f + (float)index * 0.28f) - phase * 0.86f) *
+      ambientWaterCos(ix * (1.4f + (float)index * 0.28f) - phase * 0.86f) *
       (0.66f - (float)index * 0.1f);
     float nextX =
-      px + warp + sinf(phase + ix * 0.72f - iy * 0.38f) * 0.34f;
+      px + warp + ambientWaterSin(phase + ix * 0.72f - iy * 0.38f) * 0.34f;
     iy =
-      py + twist + cosf(phase * 0.92f + iy * 0.66f + ix * 0.24f) * 0.3f;
+      py + twist + ambientWaterCos(phase * 0.92f + iy * 0.66f + ix * 0.24f) * 0.3f;
     ix = nextX;
     float ridge =
       1.0f -
       fabsf(
-        sinf(
+        ambientWaterSin(
           ix * (2.2f + (float)index * 0.42f) +
           iy * (1.8f + (float)index * 0.36f) +
           phase * 1.6f
@@ -4028,7 +4700,7 @@ static float sampleAmbientWaterCausticField(
   float swell =
     0.5f +
     0.5f *
-      sinf(
+      ambientWaterSin(
         (nx * 1.12f - ny * 0.84f) * 6.6f -
         timeBase * (0.56f + speedUnit * 0.18f)
       );
@@ -4043,9 +4715,19 @@ static void renderAmbientWaterCurrent(
   float speedUnit,
   float intensityUnit
 ) {
-  DisplayManager::dma_display->fillScreenRGB888(1, 6, 18);
+  ensureAmbientUnitCoordLut();
 
   const float timeBase = (float)elapsed * (0.00032f + speedUnit * 0.00108f);
+  const float flowATime = timeBase * (2.2f + speedUnit * 1.4f);
+  const float flowANestedTime = timeBase * 0.8f;
+  const float flowBTime = timeBase * (1.7f + speedUnit * 1.1f);
+  const float flowCTime = timeBase * (1.3f + intensityUnit * 0.7f);
+  const float flowADelta = 8.1f * kAmbientWaterUnitCoordStep;
+  const float flowBDelta = 7.4f * kAmbientWaterUnitCoordStep;
+  const float flowCDelta = -4.7f * kAmbientWaterUnitCoordStep;
+  float waveScratchA[64];
+  float waveScratchB[64];
+  float waveScratchC[64];
   const NativeRgb abyss = makeRgb(1, 10, 26);
   const NativeRgb deep = makeRgb(4, 38, 86);
   const NativeRgb bright = makeRgb(18, 98, 176);
@@ -4053,21 +4735,23 @@ static void renderAmbientWaterCurrent(
   const NativeRgb vein = makeRgb(1, 7, 20);
 
   for (int y = 0; y < 64; y++) {
+    float ny = s_ambientUnitCoordLut[y];
+    float rowFlowAWarp = ambientWaterSin(ny * 5.2f + flowANestedTime) * 1.35f;
+    float rowFlowB = ny * 7.4f - flowBTime;
+    float rowFlowC = ny * 9.2f + flowCTime;
+    fillAmbientWaterWaveSequence(
+      waveScratchA,
+      flowATime + rowFlowAWarp,
+      flowADelta,
+      false
+    );
+    fillAmbientWaterWaveSequence(waveScratchB, rowFlowB, flowBDelta, false);
+    fillAmbientWaterWaveSequence(waveScratchC, rowFlowC, flowCDelta, true);
     for (int x = 0; x < 64; x++) {
-      float nx = (float)x / 63.0f;
-      float ny = (float)y / 63.0f;
-      float flowA =
-        sinf(
-          nx * 8.1f +
-          timeBase * (2.2f + speedUnit * 1.4f) +
-          sinf(ny * 5.2f + timeBase * 0.8f) * 1.35f
-        );
-      float flowB =
-        sinf((nx + ny) * 7.4f - timeBase * (1.7f + speedUnit * 1.1f));
-      float flowC =
-        cosf(
-          ny * 9.2f - nx * 4.7f + timeBase * (1.3f + intensityUnit * 0.7f)
-        );
+      float nx = s_ambientUnitCoordLut[x];
+      float flowA = waveScratchA[x];
+      float flowB = waveScratchB[x];
+      float flowC = waveScratchC[x];
       float currentField =
         clampUnit(0.5f + 0.5f * (flowA * 0.42f + flowB * 0.34f + flowC * 0.24f));
       float caustic =
@@ -4091,7 +4775,7 @@ static void renderAmbientWaterCurrent(
         smoothstepf(0.68f, 0.9f, currentField) * 0.18f * (1.0f - caustic);
       color = blendRgbColor(color, vein, darkVein);
 
-      DisplayManager::dma_display->drawPixelRGB888(
+      drawAmbientWaterPixel(
         x,
         y,
         color.r,
@@ -4107,7 +4791,7 @@ static void renderAmbientWaterCaustics(
   float speedUnit,
   float intensityUnit
 ) {
-  DisplayManager::dma_display->fillScreenRGB888(1, 8, 20);
+  ensureAmbientUnitCoordLut();
 
   const float waterLevelUnit = 0.72f;
   const float frequencyUnit = clampUnit(0.16f + speedUnit * 0.58f);
@@ -4117,6 +4801,23 @@ static void renderAmbientWaterCaustics(
   const float timeBase =
     (float)elapsed *
     (0.00028f + speedUnit * 0.00082f + frequencyUnit * 0.00056f);
+  const float lowWaveScale = 4.6f + frequencyUnit * 1.6f;
+  const float lowWaveTime = timeBase * (0.72f + speedUnit * 0.2f);
+  const float crossWaveScale = 6.4f + causticDensityUnit * 2.2f;
+  const float crossWaveTime = timeBase * (0.94f + causticDensityUnit * 0.24f);
+  const float hazeTime = timeBase * (0.48f + intensityUnit * 0.16f);
+  const float hazeNestedTime = timeBase * 0.64f;
+  const float lowWaveDelta = 0.82f * lowWaveScale * kAmbientWaterUnitCoordStep;
+  const float crossWaveDelta = 1.08f * crossWaveScale * kAmbientWaterUnitCoordStep;
+  const float hazeDelta = 1.3f * 3.8f * kAmbientWaterUnitCoordStep;
+  const float brightBandDelta = 1.7f * 9.4f * kAmbientWaterUnitCoordStep;
+  const float dustFlashDelta =
+    (26.0f + frequencyUnit * 12.0f) * kAmbientWaterUnitCoordStep;
+  float waveScratchA[64];
+  float waveScratchB[64];
+  float waveScratchC[64];
+  float waveScratchD[64];
+  float waveScratchE[64];
 
   const NativeRgb abyss = makeRgb(2, 14, 34);
   const NativeRgb deep = makeRgb(4, 36, 78);
@@ -4127,9 +4828,43 @@ static void renderAmbientWaterCaustics(
   const NativeRgb vignetteColor = makeRgb(2, 11, 24);
 
   for (int y = 0; y < 64; y++) {
+    float ny = s_ambientUnitCoordLut[y];
+    float rowLowWave =
+      ny * (1.0f + waterLevelUnit * 0.3f) * lowWaveScale - lowWaveTime;
+    float rowCrossWave =
+      -(ny * 0.48f) * crossWaveScale + crossWaveTime;
+    float rowHaze =
+      ny * 0.64f * 3.8f +
+      hazeTime +
+      ambientWaterSin(ny * 5.2f - hazeNestedTime) * 0.42f;
+    float brightBandRowPhase =
+      (-ny * 1.18f) * 9.4f +
+      timeBase * (1.18f + speedUnit * 0.24f);
+    float dustFlashRowPhase =
+      ny * 18.0f -
+      timeBase * (4.4f + frequencyUnit * 1.2f);
+    fillAmbientWaterWaveSequence(waveScratchA, rowLowWave, lowWaveDelta, false);
+    fillAmbientWaterWaveSequence(
+      waveScratchB,
+      rowCrossWave,
+      crossWaveDelta,
+      true
+    );
+    fillAmbientWaterWaveSequence(waveScratchC, rowHaze, hazeDelta, false);
+    fillAmbientWaterWaveSequence(
+      waveScratchD,
+      brightBandRowPhase,
+      brightBandDelta,
+      false
+    );
+    fillAmbientWaterWaveSequence(
+      waveScratchE,
+      dustFlashRowPhase,
+      dustFlashDelta,
+      false
+    );
     for (int x = 0; x < 64; x++) {
-      float nx = (float)x / 63.0f;
-      float ny = (float)y / 63.0f;
+      float nx = s_ambientUnitCoordLut[x];
 
       float caustic =
         sampleAmbientWaterCausticField(
@@ -4141,27 +4876,13 @@ static void renderAmbientWaterCaustics(
         );
       float lowWave =
         0.5f +
-        0.5f *
-          sinf(
-            (nx * 0.82f + ny * (1.0f + waterLevelUnit * 0.3f)) *
-            (4.6f + frequencyUnit * 1.6f) -
-            timeBase * (0.72f + speedUnit * 0.2f)
-          );
+        0.5f * waveScratchA[x];
       float crossWave =
         0.5f +
-        0.5f *
-          cosf(
-            (nx * 1.08f - ny * 0.48f) * (6.4f + causticDensityUnit * 2.2f) +
-            timeBase * (0.94f + causticDensityUnit * 0.24f)
-          );
+        0.5f * waveScratchB[x];
       float haze =
         0.5f +
-        0.5f *
-          sinf(
-            (nx * 1.3f + ny * 0.64f) * 3.8f +
-            timeBase * (0.48f + intensityUnit * 0.16f) +
-              sinf(ny * 5.2f - timeBase * 0.64f) * 0.42f
-          );
+        0.5f * waveScratchC[x];
       caustic = clampUnit(caustic * 0.76f + lowWave * 0.12f + crossWave * 0.12f);
       float bottomMix = smoothstepf(0.18f, 1.0f, ny);
       float brightBand =
@@ -4169,27 +4890,16 @@ static void renderAmbientWaterCaustics(
         powf(
           clampUnit(
             1.0f -
-            fabsf(
-              sinf(
-                (nx * 1.7f - ny * 1.18f) * 9.4f +
-                timeBase * (1.18f + speedUnit * 0.24f)
-              )
-            )
+            fabsf(waveScratchD[x])
           ),
           3.4f
         );
       float dustFlash =
-        powf(
+        pow5fExact(
           clampUnit(
             0.5f +
-            0.5f *
-              sinf(
-                nx * (26.0f + frequencyUnit * 12.0f) +
-                ny * 18.0f -
-                timeBase * (4.4f + frequencyUnit * 1.2f)
-              )
-          ),
-          5.0f
+            0.5f * waveScratchE[x]
+          )
         ) *
         (0.012f + strengthUnit * 0.04f) *
         smoothstepf(0.18f, 0.84f, ny);
@@ -4235,7 +4945,7 @@ static void renderAmbientWaterCaustics(
         );
       color = blendRgbColor(vignetteColor, color, 0.46f + vignette * 0.54f);
 
-      DisplayManager::dma_display->drawPixelRGB888(
+      drawAmbientWaterPixel(
         x,
         y,
         color.r,
@@ -4585,18 +5295,20 @@ void DisplayManager::renderNativeEffect() {
   struct NativeRenderGuard {
     bool active;
     bool shouldPresent;
+    bool bypassRedirect;
 
-    NativeRenderGuard()
+    NativeRenderGuard(bool useRedirect = true)
       : active(false),
-        shouldPresent(true) {
-      if (DisplayManager::doubleBufferEnabled) {
+        shouldPresent(true),
+        bypassRedirect(!useRedirect) {
+      if (!useRedirect || DisplayManager::doubleBufferEnabled) {
         return;
       }
       active = DisplayManager::beginRedirectedFrame(&DisplayManager::animationBuffer[0][0], 0);
     }
 
     bool ready() const {
-      if (DisplayManager::doubleBufferEnabled) {
+      if (bypassRedirect || DisplayManager::doubleBufferEnabled) {
         return true;
       }
       return active;
@@ -5166,7 +5878,10 @@ void DisplayManager::renderNativeEffect() {
   }
 
   if (nativeEffectType == NATIVE_EFFECT_AMBIENT) {
-    if (s_lastAmbientRenderAt != 0 && now - s_lastAmbientRenderAt < 33UL) {
+    unsigned long minRenderIntervalMs =
+      ambientPresetMinRenderIntervalMs(ambientEffectConfig.preset);
+    if (s_lastAmbientRenderAt != 0 &&
+        now - s_lastAmbientRenderAt < minRenderIntervalMs) {
       return;
     }
     s_lastAmbientRenderAt = now;
@@ -5193,10 +5908,22 @@ void DisplayManager::renderNativeEffect() {
 
     float speedUnit = (float)speed / 10.0f;
     float intensityUnit = (float)intensity / 100.0f;
-    float timeBase = (float)elapsed * (0.00045f + speedUnit * 0.00135f);
+    unsigned long visualElapsed =
+      ambientPresetQuantizedElapsedMs(ambientEffectConfig.preset, elapsed);
+    float timeBase = (float)visualElapsed * (0.00045f + speedUnit * 0.00135f);
+    s_pendingAmbientWaterSurfaceDrawUs = 0;
+    unsigned long extendedSceneDrawStartedUs = micros();
 
-    if (renderAmbientExtendedScene(ambientEffectConfig.preset, elapsed, speedUnit, intensityUnit)) {
+    if (renderAmbientExtendedScene(
+          ambientEffectConfig.preset,
+          visualElapsed,
+          speedUnit,
+          intensityUnit)) {
       drawAmbientWaterWorldTimeOverlayIfNeeded();
+      if (shouldTrackAmbientWaterSurfacePerf()) {
+        s_pendingAmbientWaterSurfaceDrawUs =
+          micros() - extendedSceneDrawStartedUs;
+      }
       return;
     }
 

@@ -1554,6 +1554,10 @@ class WebSocket {
   }
 
   async setAmbientEffect(config, options = {}) {
+    const isWaterWorldPreset =
+      config.preset === "surface" ||
+      config.preset === "current" ||
+      config.preset === "caustics";
     const params =
       config.preset === "rain_scene"
         ? {
@@ -1563,12 +1567,22 @@ class WebSocket {
             color: hexToRgb(config.color),
             loop: config.loop,
           }
+        : isWaterWorldPreset
+          ? {
+              preset: config.preset,
+              speed: config.speed,
+              loop: config.loop,
+            }
         : {
             preset: config.preset,
             speed: config.speed,
             intensity: config.intensity,
             loop: config.loop,
           };
+
+    if (options.clockConfig) {
+      params.config = options.clockConfig;
+    }
 
     return this.runModeTransaction({
       mode: "led_matrix_showcase",

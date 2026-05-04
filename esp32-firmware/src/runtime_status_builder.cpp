@@ -16,6 +16,22 @@
 #include "wifi_manager.h"
 
 namespace {
+bool isWaterWorldAmbientPreset(uint8_t preset) {
+  return preset == AMBIENT_PRESET_WATER_SURFACE ||
+         preset == AMBIENT_PRESET_WATER_CURRENT ||
+         preset == AMBIENT_PRESET_WATER_CAUSTICS;
+}
+
+void fillCompactCommonStatus(JsonDocument& doc) {
+  doc["status"] = "ok";
+  doc["ip"] = WiFiManager::getDeviceIP();
+  doc["width"] = DisplayManager::PANEL_RES_X;
+  doc["height"] = DisplayManager::PANEL_RES_Y;
+  doc["brightness"] = DisplayManager::currentBrightness;
+  doc["mode"] = DeviceModeTagCodec::toTagOrUnknown(DisplayManager::currentMode);
+  doc["businessMode"] = DisplayManager::currentBusinessModeTag;
+}
+
 void fillCommonStatus(JsonDocument& doc, bool includeSystemInfo, bool includeFreeHeap) {
   doc["status"] = "ok";
   doc["ip"] = WiFiManager::getDeviceIP();
@@ -55,9 +71,11 @@ void fillCommonStatus(JsonDocument& doc, bool includeSystemInfo, bool includeFre
 void fillAmbientEffectStatus(JsonDocument& doc) {
   doc["effectPreset"] = AmbientPresetCodec::toString(DisplayManager::ambientEffectConfig.preset);
   doc["effectSpeed"] = DisplayManager::ambientEffectConfig.speed;
-  doc["effectIntensity"] = DisplayManager::ambientEffectConfig.intensity;
-  doc["effectDensity"] = DisplayManager::ambientEffectConfig.density;
   doc["effectLoop"] = DisplayManager::ambientEffectConfig.loop;
+  if (!isWaterWorldAmbientPreset(DisplayManager::ambientEffectConfig.preset)) {
+    doc["effectIntensity"] = DisplayManager::ambientEffectConfig.intensity;
+    doc["effectDensity"] = DisplayManager::ambientEffectConfig.density;
+  }
   JsonObject effectColor = doc.createNestedObject("effectColor");
   effectColor["r"] = DisplayManager::ambientEffectConfig.colorR;
   effectColor["g"] = DisplayManager::ambientEffectConfig.colorG;
@@ -147,6 +165,105 @@ void fillBoardNativeStatus(JsonDocument& doc) {
   }
 }
 
+void fillCompactPlanetScreensaverStatus(JsonDocument& doc) {
+  const PlanetScreensaverNativeConfig& config =
+    BoardNativeEffect::getPlanetScreensaverConfig();
+  doc["effectMode"] = ModeTags::PLANET_SCREENSAVER;
+  doc["preset"] = config.preset;
+  doc["size"] = config.size;
+  doc["direction"] = config.direction;
+  doc["speed"] = config.speed;
+  doc["seed"] = config.seed;
+  doc["colorSeed"] = config.colorSeed;
+  doc["planetX"] = config.planetX;
+  doc["planetY"] = config.planetY;
+  doc["font"] = clockFontNameFromId(config.font);
+  doc["showSeconds"] = config.showSeconds;
+  JsonObject time = doc.createNestedObject("time");
+  time["show"] = config.time.show;
+  time["fontSize"] = config.time.fontSize;
+  time["x"] = config.time.x;
+  time["y"] = config.time.y;
+  JsonObject color = time.createNestedObject("color");
+  color["r"] = config.time.r;
+  color["g"] = config.time.g;
+  color["b"] = config.time.b;
+}
+
+void fillCompactEffectStatus(JsonDocument& doc) {
+  if (DisplayManager::nativeEffectType == NATIVE_EFFECT_BREATH) {
+    doc["effectMode"] = ModeTags::BREATH_EFFECT;
+    return;
+  }
+
+  if (DisplayManager::nativeEffectType == NATIVE_EFFECT_RHYTHM) {
+    doc["effectMode"] = ModeTags::RHYTHM_EFFECT;
+    return;
+  }
+
+  if (DisplayManager::nativeEffectType == NATIVE_EFFECT_EYES) {
+    doc["effectMode"] = ModeTags::EYES;
+    return;
+  }
+
+  if (DisplayManager::nativeEffectType == NATIVE_EFFECT_AMBIENT) {
+    doc["effectMode"] = DisplayManager::currentBusinessModeTag;
+    fillAmbientEffectStatus(doc);
+    return;
+  }
+
+  if ((ModeTags::isBoardNativeModeTag(DisplayManager::currentBusinessModeTag) ||
+       DisplayManager::currentBusinessModeTag == ModeTags::PLANET_SCREENSAVER) &&
+      BoardNativeEffect::isActive()) {
+    if (DisplayManager::currentBusinessModeTag == ModeTags::PLANET_SCREENSAVER) {
+      fillCompactPlanetScreensaverStatus(doc);
+      return;
+    }
+
+    doc["effectMode"] = DisplayManager::currentBusinessModeTag;
+    return;
+  }
+
+  if (DisplayManager::currentBusinessModeTag == ModeTags::MAZE &&
+      MazeEffect::isActive()) {
+    fillMazeStatus(doc);
+    return;
+  }
+
+  if (DisplayManager::currentBusinessModeTag == ModeTags::SNAKE &&
+      SnakeEffect::isActive()) {
+    fillSnakeStatus(doc);
+    return;
+  }
+
+  if (DisplayManager::currentBusinessModeTag == ModeTags::TETRIS &&
+      TetrisEffect::isActive) {
+    doc["effectMode"] = ModeTags::TETRIS;
+    return;
+  }
+
+  if (DisplayManager::currentBusinessModeTag == ModeTags::TETRIS_CLOCK &&
+      TetrisClockEffect::isActive) {
+    doc["effectMode"] = ModeTags::TETRIS_CLOCK;
+    doc["cellSize"] = ConfigManager::tetrisClockConfig.cellSize;
+    doc["speed"] = ConfigManager::tetrisClockConfig.speed;
+    doc["hourFormat"] = ConfigManager::tetrisClockConfig.hourFormat;
+    return;
+  }
+
+  if ((DisplayManager::currentBusinessModeTag == ModeTags::ANIMATION ||
+       DisplayManager::currentBusinessModeTag == ModeTags::GIF_PLAYER) &&
+      AnimationManager::currentGIF != nullptr) {
+    doc["effectMode"] = DisplayManager::currentBusinessModeTag;
+    doc["animationFrames"] = AnimationManager::currentGIF->frameCount;
+    doc["animationPlaying"] = AnimationManager::currentGIF->isPlaying;
+    doc["currentFrame"] = AnimationManager::currentGIF->currentFrame;
+    return;
+  }
+
+  doc["effectMode"] = "none";
+}
+
 void fillEffectStatus(JsonDocument& doc) {
   if (DisplayManager::nativeEffectType == NATIVE_EFFECT_BREATH) {
     doc["effectMode"] = ModeTags::BREATH_EFFECT;
@@ -221,5 +338,10 @@ namespace RuntimeStatusBuilder {
 void fillStatus(JsonDocument& doc, bool includeSystemInfo, bool includeFreeHeap) {
   fillCommonStatus(doc, includeSystemInfo, includeFreeHeap);
   fillEffectStatus(doc);
+}
+
+void fillCompactStatus(JsonDocument& doc) {
+  fillCompactCommonStatus(doc);
+  fillCompactEffectStatus(doc);
 }
 }

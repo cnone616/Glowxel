@@ -19,6 +19,7 @@
 ## Contract Boundary
 
 本轮继续复用现有 `ambient_effect` 发送链，不新增字段，不新增业务模式。
+`水世界 / led_matrix_showcase` 的时间样式沿用既有 `ClockConfig` 负载字段，但必须作为该模式自己的独立配置保存与下发，不得复用 `animation` 或其他模式的时钟配置实例。
 
 | field | source |
 | --- | --- |
@@ -26,6 +27,13 @@
 | `speed` | 该路线约定的默认速度值 |
 | `intensity` | 该路线约定的默认强度值 |
 | `loop` | 固定持续播放 |
+| `config.font` | `水世界` 页字体选择 |
+| `config.showSeconds` | `水世界` 页秒钟开关 |
+| `config.hourFormat` | `水世界` 页小时制式 |
+| `config.time.*` | `水世界` 页时间分组设置 |
+| `config.date.*` | `水世界` 页独立时钟配置中的日期占位字段 |
+| `config.week.*` | `水世界` 页独立时钟配置中的星期占位字段 |
+| `config.image.*` | `水世界` 页独立时钟配置中的图片占位字段 |
 
 ## Non-Negotiable Rules
 

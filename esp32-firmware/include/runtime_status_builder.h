@@ -5,7 +5,10 @@
 
 namespace RuntimeStatusBuilder {
 constexpr size_t kStatusJsonCapacity = 2048;
+constexpr size_t kCompactStatusJsonCapacity = 1024;
+constexpr size_t kCompactStatusMessageBufferSize = 1024;
 void fillStatus(JsonDocument& doc, bool includeSystemInfo, bool includeFreeHeap);
+void fillCompactStatus(JsonDocument& doc);
 }
 
 #endif

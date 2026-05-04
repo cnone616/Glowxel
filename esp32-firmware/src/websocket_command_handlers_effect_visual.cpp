@@ -9,6 +9,21 @@
 #include "runtime_mode_coordinator.h"
 #include "websocket_effect_common.h"
 
+namespace {
+bool isWaterWorldAmbientPreset(uint8_t preset) {
+  return preset == AMBIENT_PRESET_WATER_SURFACE ||
+         preset == AMBIENT_PRESET_WATER_CURRENT ||
+         preset == AMBIENT_PRESET_WATER_CAUSTICS;
+}
+
+uint8_t waterWorldAmbientPresetIntensity(uint8_t preset) {
+  if (preset == AMBIENT_PRESET_WATER_CAUSTICS) {
+    return 74;
+  }
+  return 72;
+}
+}
+
 namespace WebSocketEffectCommandDispatch {
 bool handleVisualEffectCommand(
   AsyncWebSocketClient* client,
@@ -226,6 +241,12 @@ bool handleVisualEffectCommand(
       config.colorR = color["r"].as<uint8_t>();
       config.colorG = color["g"].as<uint8_t>();
       config.colorB = color["b"].as<uint8_t>();
+    } else if (isWaterWorldAmbientPreset(config.preset)) {
+      config.intensity = waterWorldAmbientPresetIntensity(config.preset);
+      config.density = DisplayManager::ambientEffectConfig.density;
+      config.colorR = DisplayManager::ambientEffectConfig.colorR;
+      config.colorG = DisplayManager::ambientEffectConfig.colorG;
+      config.colorB = DisplayManager::ambientEffectConfig.colorB;
     } else {
       if (!doc.containsKey("intensity")) {
         wsSetErrorResponse(response, "missing ambient intensity field");

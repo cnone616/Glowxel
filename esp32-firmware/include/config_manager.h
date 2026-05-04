@@ -148,6 +148,8 @@ public:
   static void saveClockConfig();
   static void loadAnimClockConfig();
   static void saveAnimClockConfig();
+  static void loadLedMatrixShowcaseClockConfig();
+  static void saveLedMatrixShowcaseClockConfig();
   static void loadTetrisOverlayClockConfig();
   static void saveTetrisOverlayClockConfig();
   static void loadStaticImagePixels();
@@ -184,6 +186,7 @@ public:
 
   static ClockConfig clockConfig;
   static ClockConfig animClockConfig;
+  static ClockConfig ledMatrixShowcaseClockConfig;
   static ClockConfig tetrisOverlayClockConfig;
   static EyesConfig eyesConfig;
   static ThemeConfig themeConfig;

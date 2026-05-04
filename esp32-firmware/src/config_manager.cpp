@@ -370,6 +370,15 @@ ClockConfig ConfigManager::animClockConfig = {
   .week = {false, 26, 47, 100, 100, 100},
   .image = {false, 0, 0, 64, 64}
 };
+ClockConfig ConfigManager::ledMatrixShowcaseClockConfig = {
+  .font = CLOCK_FONT_CLASSIC_5X7,
+  .showSeconds = false,
+  .hourFormat = 24,
+  .time = {true, 1, 17, 5, 255, 255, 255},
+  .date = {false, 1, 22, 10, 120, 120, 120},
+  .week = {false, 26, 47, 100, 100, 100},
+  .image = {false, 0, 0, 64, 64}
+};
 ClockConfig ConfigManager::tetrisOverlayClockConfig = {
   .font = CLOCK_FONT_CLASSIC_5X7,
   .showSeconds = false,
@@ -421,6 +430,7 @@ void ConfigManager::init() {
     loadDeviceParamsConfig();
     loadClockConfig();
     loadAnimClockConfig();
+    loadLedMatrixShowcaseClockConfig();
     loadTetrisOverlayClockConfig();
     loadStaticImagePixels();
     loadAnimImagePixels();
@@ -564,6 +574,29 @@ void ConfigManager::saveAnimClockConfig() {
   preferences.putBytes("config", &animClockConfig, sizeof(ClockConfig));
   preferences.end();
   Serial.println("anim clock config saved");
+}
+
+void ConfigManager::loadLedMatrixShowcaseClockConfig() {
+  preferences.begin("ledmx_clk", true);
+  size_t configSize = preferences.getBytesLength("config");
+  if (configSize == sizeof(ClockConfig)) {
+    preferences.getBytes("config", &ledMatrixShowcaseClockConfig, sizeof(ClockConfig));
+    if (migrateLegacyDefaultClockLayout(ledMatrixShowcaseClockConfig)) {
+      Serial.println("已迁移像素场景集时钟默认布局");
+      saveLedMatrixShowcaseClockConfig();
+    }
+    Serial.println("led matrix showcase clock config loaded");
+  } else {
+    Serial.println("led matrix showcase clock config: using default");
+  }
+  preferences.end();
+}
+
+void ConfigManager::saveLedMatrixShowcaseClockConfig() {
+  preferences.begin("ledmx_clk", false);
+  preferences.putBytes("config", &ledMatrixShowcaseClockConfig, sizeof(ClockConfig));
+  preferences.end();
+  Serial.println("led matrix showcase clock config saved");
 }
 
 void ConfigManager::loadTetrisOverlayClockConfig() {
@@ -1134,6 +1167,16 @@ void ConfigManager::resetToDefault() {
   };
 
   animClockConfig = {
+    .font = CLOCK_FONT_CLASSIC_5X7,
+    .showSeconds = false,
+    .hourFormat = 24,
+    .time = {true, 1, 17, 5, 255, 255, 255},
+    .date = {false, 1, 22, 10, 120, 120, 120},
+    .week = {false, 26, 47, 100, 100, 100},
+    .image = {false, 0, 0, 64, 64}
+  };
+
+  ledMatrixShowcaseClockConfig = {
     .font = CLOCK_FONT_CLASSIC_5X7,
     .showSeconds = false,
     .hourFormat = 24,

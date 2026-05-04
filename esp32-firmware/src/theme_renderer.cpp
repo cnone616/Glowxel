@@ -1808,12 +1808,6 @@ void renderPacmanTheme(
   stepPacmanTheme(&gPacmanThemeState);
   drawPacmanMap(display, gPacmanThemeState);
 
-  if (!gPacmanThemeState.showingWin &&
-      millis() - gPacmanThemeState.lastSecondBlinkAt >= 1000) {
-    gPacmanThemeState.showSeconds = !gPacmanThemeState.showSeconds;
-    gPacmanThemeState.lastSecondBlinkAt = millis();
-  }
-
   uint16_t pacmanColor = 0xFE40;
   if (gPacmanThemeState.invincible && (gPacmanThemeState.stepCount % 2 == 0)) {
     pacmanColor = static_cast<uint16_t>(random(0xFFFF));

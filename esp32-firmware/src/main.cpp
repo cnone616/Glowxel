@@ -376,14 +376,18 @@ void loop() {
     if (DisplayManager::currentMode == MODE_CANVAS) {
       // 纯画板模式：不画时钟，不干预显示
     } else {
-      // 静态时钟模式，无客户端：每分钟更新一次时钟
+      // 静态时钟模式：按当前时间显示粒度刷新，避免秒显停住。
       static unsigned long lastClockUpdate = 0;
-      static int lastMinute = -1;
+      static int lastClockTick = -1;
+      static bool lastShowSeconds = false;
 
       struct tm timeinfo;
       if (getLocalTime(&timeinfo, 0)) {
-        if (timeinfo.tm_min != lastMinute) {
-          lastMinute = timeinfo.tm_min;
+        bool showSeconds = ConfigManager::clockConfig.showSeconds;
+        int tickValue = showSeconds ? timeinfo.tm_sec : timeinfo.tm_min;
+        if (tickValue != lastClockTick || showSeconds != lastShowSeconds) {
+          lastClockTick = tickValue;
+          lastShowSeconds = showSeconds;
           DisplayManager::displayClock();
         }
       } else {
