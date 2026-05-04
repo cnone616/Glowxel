@@ -2,7 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import { getStoredAuthToken } from '@/utils/session.js'
 
 const routes = [
-  { path: '/', name: 'Home', component: () => import('@/views/Home.vue'), meta: { shell: 'public' } },
+  { path: '/', name: 'Home', component: () => import('@/views/Home.vue'), meta: { shell: 'app' } },
   { path: '/community', name: 'Community', component: () => import('@/views/Community.vue'), meta: { shell: 'public' } },
   { path: '/templates', name: 'Templates', component: () => import('@/views/Templates.vue'), meta: { shell: 'public' } },
   { path: '/challenges', name: 'Challenges', component: () => import('@/views/Challenges.vue'), meta: { shell: 'public' } },
@@ -37,25 +37,19 @@ const routes = [
   { path: '/device-control', name: 'DeviceControl', component: () => import('@/views/DeviceControl.vue'), meta: { shell: 'app' } },
   { path: '/ble-config', name: 'BleConfig', component: () => import('@/views/BleConfig.vue'), meta: { shell: 'app' } },
   { path: '/device-params', name: 'DeviceParams', component: () => import('@/views/DeviceParams.vue'), meta: { shell: 'app' } },
-  {
-    path: '/canvas-editor',
-    name: 'CanvasEditor',
-    component: () => import('@/views/DeviceModePage.vue'),
-    meta: {
-      shell: 'app',
-      businessMode: 'canvas',
-      modeTitle: '画板模式',
-      modeEyebrow: 'Canvas',
-      modeActionLabel: '切换到画板模式',
-      modeDescription: '画板模式页负责把设备切到 `canvas`，并把创作入口和设备反馈链合在同一页里。',
-      modeNotes: ['进入当前页后可以先完成模式切换，再回到编辑器继续画布创作。', '设备状态回显、发送前准备和参数入口都统一放在网站主端。'],
-      modeActions: ['切到画板模式后再进入编辑器，避免发图时模式不一致。', '若画面或亮度异常，直接去设备参数页检查兼容项。'],
-      modeLinks: [
-        { label: '继续编辑', to: '/editor', tone: 'accent' },
-        { label: '设备参数', to: '/device-params', tone: 'ghost' },
-      ],
-    },
-  },
+  { path: '/clock', name: 'Clock', component: () => import('@/views/Clock.vue'), meta: { shell: 'app' } },
+  { path: '/animation-clock', name: 'AnimationClock', component: () => import('@/views/AnimationClock.vue'), meta: { shell: 'app' } },
+  { path: '/theme-clock', name: 'ThemeClock', component: () => import('@/views/ThemeClock.vue'), meta: { shell: 'app' } },
+  { path: '/spirit-screen', name: 'SpiritScreen', component: () => import('@/views/SpiritScreen.vue'), meta: { shell: 'app' } },
+  { path: '/canvas-editor', name: 'CanvasEditor', component: () => import('@/views/CanvasEditor.vue'), meta: { shell: 'app' } },
+  { path: '/gif-player', name: 'GifPlayer', component: () => import('@/views/GifPlayer.vue'), meta: { shell: 'app' } },
+  { path: '/led-matrix', name: 'LedMatrix', component: () => import('@/views/LedMatrix.vue'), meta: { shell: 'app' } },
+  { path: '/maze-mode', name: 'MazeMode', component: () => import('@/views/MazeMode.vue'), meta: { shell: 'app' } },
+  { path: '/snake-mode', name: 'SnakeMode', component: () => import('@/views/SnakeMode.vue'), meta: { shell: 'app' } },
+  { path: '/planet-screensaver', name: 'PlanetScreensaver', component: () => import('@/views/PlanetScreensaver.vue'), meta: { shell: 'app' } },
+  { path: '/tetris-settings', name: 'TetrisSettings', component: () => import('@/views/TetrisSettings.vue'), meta: { shell: 'app' } },
+  { path: '/tetris-clock-settings', name: 'TetrisClockSettings', component: () => import('@/views/TetrisClockSettings.vue'), meta: { shell: 'app' } },
+  { path: '/water-world', name: 'WaterWorld', component: () => import('@/views/WaterWorld.vue'), meta: { shell: 'app' } },
 
 ]
 
