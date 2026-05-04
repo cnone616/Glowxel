@@ -160,15 +160,6 @@
       }
     },
     {
-      "path": "pages/github-scene-preview/index",
-      "style": {
-        "navigationStyle": "custom",
-        "navigationBarTextStyle": "white",
-        "backgroundColor": "#1a1a1a",
-        "enablePullDownRefresh": false
-      }
-    },
-    {
       "path": "pages/gif-player/gif-player",
       "style": {
         "navigationStyle": "custom",
