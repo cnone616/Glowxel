@@ -1,8 +1,18 @@
 <script>
+import { useProjectStore } from './store/project.js'
+import { useUserStore } from './store/user.js'
 import { useDeviceStore } from './store/device.js'
 
 export default {
   onLaunch: function() {
+    // 初始化项目数据
+    const projectStore = useProjectStore()
+    projectStore.init()
+    
+    // 初始化用户状态
+    const userStore = useUserStore()
+    userStore.init()
+    
     // 初始化设备连接
     const deviceStore = useDeviceStore()
     deviceStore.init()
@@ -18,6 +28,7 @@ export default {
 @import './styles/theme.css';
 @import './styles/neubrutalism-global.css';
 @import './styles/glx-style-system.css';
+@import './static/iconfont/iconfont.css';
 
 /* 非小程序平台全局重置 */
 /* #ifndef MP-WEIXIN */

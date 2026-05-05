@@ -66,6 +66,8 @@ static bool s_forceStaticClockOverlayRefresh = false;
 static unsigned long s_lastPresentDurationUs = 0;
 static uint16_t s_lastPresentChangedPixels = 0;
 static uint32_t s_lastPresentFrameHash = 0;
+static struct tm s_lastOverlayTimeInfo = {};
+static bool s_lastOverlayTimeInfoValid = false;
 struct AmbientWaterSurfacePerfStats {
   unsigned long windowStartedAt;
   unsigned long frameCount;
@@ -140,6 +142,25 @@ void resetAmbientWaterSurfacePerfWindow(unsigned long now) {
   s_ambientWaterSurfacePerfStats.changedPixelsTotal = 0;
   s_ambientWaterSurfacePerfStats.maxDrawUs = 0;
   s_ambientWaterSurfacePerfStats.maxPresentUs = 0;
+}
+
+bool resolveOverlayTimeInfo(struct tm* timeinfo) {
+  if (timeinfo == nullptr) {
+    return false;
+  }
+
+  if (getLocalTime(timeinfo)) {
+    s_lastOverlayTimeInfo = *timeinfo;
+    s_lastOverlayTimeInfoValid = true;
+    return true;
+  }
+
+  if (!s_lastOverlayTimeInfoValid) {
+    return false;
+  }
+
+  *timeinfo = s_lastOverlayTimeInfo;
+  return true;
 }
 
 void maybeLogAmbientWaterSurfacePerf(unsigned long now) {
@@ -1133,7 +1154,7 @@ static void drawAmbientWaterWorldTimeOverlayIfNeeded() {
   }
 
   struct tm timeinfo;
-  if (!getLocalTime(&timeinfo)) {
+  if (!resolveOverlayTimeInfo(&timeinfo)) {
     return;
   }
 
@@ -1538,7 +1559,7 @@ void DisplayManager::displayTheme(bool force) {
   s_lastThemeRenderAt = now;
 
   struct tm timeinfo;
-  struct tm* timePtr = getLocalTime(&timeinfo) ? &timeinfo : nullptr;
+  struct tm* timePtr = resolveOverlayTimeInfo(&timeinfo) ? &timeinfo : nullptr;
 
   const PixelData* imagePixels = nullptr;
   int imagePixelCount = 0;
@@ -1782,7 +1803,7 @@ static int fontIndex(char c) {
 
 void DisplayManager::drawClockOverlay() {
   struct tm timeinfo;
-  if (!getLocalTime(&timeinfo)) return;
+  if (!resolveOverlayTimeInfo(&timeinfo)) return;
 
   auto& c = resolveActiveClockConfig();
 

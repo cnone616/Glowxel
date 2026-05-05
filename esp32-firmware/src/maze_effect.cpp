@@ -720,6 +720,14 @@ void buildMazeInfoPanelTexts(char timeText[6], char dateText[6]) {
     return;
   }
 
+  if (s_mazeInfoPanelDrawn &&
+      s_lastInfoPanelTimeText[0] != '\0' &&
+      s_lastInfoPanelDateText[0] != '\0') {
+    memcpy(timeText, s_lastInfoPanelTimeText, sizeof(s_lastInfoPanelTimeText));
+    memcpy(dateText, s_lastInfoPanelDateText, sizeof(s_lastInfoPanelDateText));
+    return;
+  }
+
   memcpy(timeText, "--:--", 6);
   memcpy(dateText, "--.--", 6);
 }
