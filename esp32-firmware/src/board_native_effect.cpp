@@ -58,7 +58,7 @@ float s_planetPhase = 0.0f;
 unsigned long s_planetPhaseBaseAt = 0;
 bool s_planetDirty = false;
 bool s_planetForceFullRefresh = false;
-char s_lastPlanetClockText[16] = "";
+char s_lastPlanetClockText[8] = "";
 bool s_lastPlanetClockTextValid = false;
 bool s_lastPlanetClockShowSeconds = false;
 
@@ -78,10 +78,25 @@ constexpr int kPlanetCanvasSize = 64;
 constexpr int kPlanetBufferChannels = 3;
 constexpr int kPlanetPreviewPixels = 100;
 constexpr unsigned long kPlanetPreviewFrameCount = 48UL;
-constexpr unsigned long kPlanetRenderTickMs = 16UL;
+constexpr unsigned long kPlanetRenderTickMs = 16UL;  // 16ms实现62.5 FPS，平衡性能和质量
 constexpr int kPlanetDirectColorCacheSize = 32;
 
+// 地球云层瓦片缓存配置（类似湿润星球）
+constexpr int kPlanetEarthCloudTileWidth = 64;
+constexpr int kPlanetEarthCloudTileHeight = 64;
+constexpr int kPlanetEarthCloudNoiseSamples = 3;  // circleNoise采样次数
+constexpr float kPlanetEarthCloudNoiseMax = 3.0f;  // 噪声最大值
+
 float* s_planetPreviewBuffer = nullptr;
+
+// 地球云层瓦片缓存（独立于湿润星球）
+static uint8_t* s_planetEarthCloudTile = nullptr;
+static uint8_t* s_planetEarthCloudNoiseTile = nullptr;
+
+// 地球地表瓦片缓存（预计算的陆地/海洋位图）
+constexpr int kPlanetEarthLandTileWidth = 64;
+constexpr int kPlanetEarthLandTileHeight = 64;
+static uint8_t* s_planetEarthLandTile = nullptr;
 
 struct PlanetBufferColor {
   float r;
@@ -112,15 +127,15 @@ bool s_planetDirectRenderActive = false;
 
 constexpr bool kPlanetPerfTraceEnabled = false;
 constexpr unsigned long kPlanetPerfLogIntervalMs = 1000UL;
-constexpr int kPlanetDirectMaxOctaves = 3;
-constexpr int kPlanetDirectMaxCloudNoiseSamples = 4;
+constexpr int kPlanetDirectMaxOctaves = 4;  // 恢复到4，保证云层细节质量
+constexpr int kPlanetDirectMaxCloudNoiseSamples = 6;  // 从3恢复到6，平衡质量和性能
 constexpr int kPlanetDirectSphereRenderStep = 1;
 constexpr int kPlanetDirectSpecialRenderStep = 1;
 constexpr int kPlanetTerranWetLandTileWidth = 96;
 constexpr int kPlanetTerranWetLandTileHeight = 48;
 constexpr int kPlanetTerranWetCloudTileWidth = 64;
 constexpr int kPlanetTerranWetCloudTileHeight = 64;
-constexpr int kPlanetTerranWetCloudNoiseSamples = 5;
+constexpr int kPlanetTerranWetCloudNoiseSamples = 4;  // 从5减少到4，提升性能
 constexpr float kPlanetTerranWetCloudNoiseMax = (float)kPlanetTerranWetCloudNoiseSamples;
 constexpr int kPlanetTerranWetRandCacheMax = 128;
 constexpr int kPlanetGenericFbmTileWidth = 64;
@@ -279,6 +294,11 @@ uint8_t* s_planetTerranWetLandTile = nullptr;
 uint8_t* s_planetTerranWetCloudTile = nullptr;
 uint8_t* s_planetTerranWetCloudNoiseTile = nullptr;
 bool s_planetTerranWetTileCacheDisabled = false;
+
+// 地球瓦片缓存状态（独立于湿润星球）
+PlanetTerranWetTileState s_planetEarthCloudTileState = {};
+PlanetTerranWetTileState s_planetEarthCloudNoiseTileState = {};
+PlanetTerranWetTileState s_planetEarthLandTileState = {};
 
 struct PlanetTerranWetStaticPixel {
   uint16_t offset;
@@ -673,6 +693,19 @@ float smoothstepFloat(float edge0, float edge1, float value) {
   return t * t * (3.0f - 2.0f * t);
 }
 
+// 更平滑的缓动函数 - 用于传送门动画
+float easeInOutCubic(float t) {
+  return t < 0.5f ? 4.0f * t * t * t : 1.0f - powf(-2.0f * t + 2.0f, 3.0f) / 2.0f;
+}
+
+float easeInOutBack(float t) {
+  const float c1 = 1.70158f;
+  const float c2 = c1 * 1.525f;
+  return t < 0.5f
+    ? (powf(2.0f * t, 2.0f) * ((c2 + 1.0f) * 2.0f * t - c2)) / 2.0f
+    : (powf(2.0f * t - 2.0f, 2.0f) * ((c2 + 1.0f) * (t * 2.0f - 2.0f) + c2) + 2.0f) / 2.0f;
+}
+
 PlanetRgb mixPlanetRgb(const PlanetRgb& left, const PlanetRgb& right, float amount);
 void rgbToPlanetHsv(const PlanetRgb& color, float& hue, float& saturation, float& value);
 PlanetRgb hsvToPlanetRgb(float hue, float saturation, float value);
@@ -990,13 +1023,13 @@ float resolvePlanetSizeScaleFor(const char* preset, const char* size) {
   }
   if (isPlanetPortalPresetValue(preset)) {
     if (strcmp(size, "small") == 0) {
-      return 0.68f;
+      return 0.673f;  // 35像素: 35/52
     }
     if (strcmp(size, "medium") == 0) {
-      return 0.84f;
+      return 0.962f;  // 50像素: 50/52
     }
     if (strcmp(size, "large") == 0) {
-      return 1.00f;
+      return 1.154f;  // 60像素: 60/52
     }
   }
   if (strcmp(preset, "star") == 0) {
@@ -1025,6 +1058,7 @@ float resolvePlanetDirectionFactor(const char* direction) {
 }
 
 unsigned long resolvePlanetFrameDelay(uint8_t speed) {
+  // 恢复原来的延迟数组，保持动画播放速度不变
   static const unsigned long kPlanetDelayBySpeed[10] = {
     840UL, 720UL, 620UL, 530UL, 450UL, 380UL, 320UL, 270UL, 220UL, 180UL
   };
@@ -1423,6 +1457,7 @@ float getGasGiantCloudCover(uint32_t seed) {
 }
 
 float getEarthCloudCover(uint32_t seed) {
+  // 恢复原来的云层覆盖率范围
   return seededPlanetRange(seed, "earth_cloud_cover", 0.46f, 0.60f);
 }
 
@@ -1464,7 +1499,7 @@ float samplePlanetLakeMask(float longitude, float latitude, float flow, uint32_t
 }
 
 float samplePlanetGasMask(float longitude, float latitude, float flow, uint32_t seed, float scale, float bandScale) {
-  float band = fbmPlanet(0.0f, latitude * scale * bandScale + 17.0f, seed + 163U, 4);
+  float band = fbmPlanet(0.0f, latitude * scale * bandScale + 17.0f, seed + 163U, 3);  // 从4减少到3
   float turbulence = fbmPlanet(
     longitude * scale * 0.35f - flow * 1.4f + 11.0f,
     latitude * scale * 0.55f + 23.0f,
@@ -1759,7 +1794,7 @@ void drawStarPlanet() {
       }
 
       float angle = atan2f(dx, dy);
-      float flareNoise = fbmPlanet(dist * 1.6f - flow * 0.05f + 43.0f, angle * 1.6f + 79.0f, seed + 331U, 4);
+      float flareNoise = fbmPlanet(dist * 1.6f - flow * 0.05f + 43.0f, angle * 1.6f + 79.0f, seed + 331U, 3);  // 从4减少到3
       if (flareNoise <= 0.66f) {
         continue;
       }
@@ -2320,8 +2355,7 @@ bool planetPresetEqualsValue(const char* left, const char* right) {
 }
 
 bool planetPresetUsesLightweightDirectSampling(const char* presetId) {
-  return planetPresetEqualsValue(presetId, "earth") ||
-         planetPresetEqualsValue(presetId, "asteroid") ||
+  return planetPresetEqualsValue(presetId, "asteroid") ||
          planetPresetEqualsValue(presetId, "black_hole") ||
          planetPresetEqualsValue(presetId, "galaxy") ||
          isPlanetPortalPresetValue(presetId) ||
@@ -2643,8 +2677,8 @@ float circleNoisePlanetCloud(float x, float y, float seed, float size) {
   float dx = fx - 0.25f - h * 0.5f;
   float dy = fy - 0.25f - h * 0.5f;
   float magnitude = sqrtf(dx * dx + dy * dy);
-  float radius = h * 0.25f;
-  return smoothstepFloat(0.0f, radius, magnitude * 0.75f);
+  float radius = h * 0.28f;  // 增加半径，让云层更连贯
+  return smoothstepFloat(0.0f, radius, magnitude * 0.68f);  // 调整边缘处理，改善云层形状
 }
 
 float circleNoisePlanetCrater(float x, float y, float seed, float size) {
@@ -5286,9 +5320,9 @@ constexpr const char* kPlanetPortalTemplateRows[64] = {
 
 constexpr float kPlanetPortalSwirlRotationsPerCycle = 1.35f;
 constexpr float kPlanetPortalBubbleRotationsPerCycle = 1.18f;
-constexpr float kPlanetPortalLifecycleRepeatsPerCycle = 3.0f;
-constexpr float kPlanetPortalOpenEnd = 0.16f;
-constexpr float kPlanetPortalCloseStart = 0.80f;
+constexpr float kPlanetPortalLifecycleRepeatsPerCycle = 1.0f;     // 1分钟1次循环
+constexpr float kPlanetPortalOpenEnd = 3.0f/60.0f;               // 3秒打开 (5%)
+constexpr float kPlanetPortalCloseStart = 57.0f/60.0f;           // 57秒开始关闭 (95%)
 
 struct PlanetPortalBubbleOrbit {
   float angle;
@@ -5407,18 +5441,28 @@ float resolvePlanetPortalClockwisePhase(float progress) {
 PlanetPortalLifecycle resolvePlanetPortalLifecycle(float progress) {
   PlanetPortalLifecycle lifecycle;
   float cycleProgress = modPlanetFloat(progress * kPlanetPortalLifecycleRepeatsPerCycle, 1.0f);
+  
   if (cycleProgress < kPlanetPortalOpenEnd) {
-    float t = smoothstepFloat(0.0f, kPlanetPortalOpenEnd, cycleProgress);
-    lifecycle.scale = 0.08f + 0.92f * t;
-    lifecycle.alpha = smoothstepFloat(0.02f, kPlanetPortalOpenEnd * 0.82f, cycleProgress);
+    // 打开阶段 - 从圆心向外扩展
+    float t = cycleProgress / kPlanetPortalOpenEnd;
+    float ease = easeInOutCubic(t);
+    
+    lifecycle.scale = ease;  // 从0.0放大到1.0（完全打开/关闭）
+    lifecycle.alpha = ease;
     return lifecycle;
   }
+  
   if (cycleProgress > kPlanetPortalCloseStart) {
-    float t = smoothstepFloat(kPlanetPortalCloseStart, 1.0f, cycleProgress);
-    lifecycle.scale = 1.0f - 0.94f * t;
-    lifecycle.alpha = 1.0f - smoothstepFloat(kPlanetPortalCloseStart + 0.05f, 0.99f, cycleProgress);
+    // 关闭阶段 - 从外圈向圆心收缩
+    float t = (cycleProgress - kPlanetPortalCloseStart) / (1.0f - kPlanetPortalCloseStart);
+    float ease = easeInOutCubic(1.0f - t);
+    
+    lifecycle.scale = ease;  // 从1.0缩小到0.0（完全关闭）
+    lifecycle.alpha = ease;
     return lifecycle;
   }
+  
+  // 持续阶段 - 保持稳定
   lifecycle.scale = 1.0f;
   lifecycle.alpha = 1.0f;
   return lifecycle;
@@ -5470,11 +5514,26 @@ bool resolvePlanetPortalLifecycleUv(
   float& outU,
   float& outV
 ) {
-  if (lifecycle.alpha <= 0.0f || lifecycle.scale <= 0.04f) {
+  if (lifecycle.alpha <= 0.0f) {
     return false;
   }
-  outU = 0.5f + (u - 0.5f) / lifecycle.scale;
-  outV = 0.5f + (v - 0.5f) / lifecycle.scale;
+  
+  // 计算到中心的距离
+  float dx = u - 0.5f;
+  float dy = v - 0.5f;
+  float distanceFromCenter = sqrtf(dx * dx + dy * dy);
+  
+  // 缩放后的距离
+  float scaledDistance = distanceFromCenter / lifecycle.scale;
+  
+  // 使用更大的有效区域，不做硬截断
+  if (scaledDistance > 0.55f) {
+    return false;
+  }
+  
+  // 进行缩放变换
+  outU = 0.5f + dx / lifecycle.scale;
+  outV = 0.5f + dy / lifecycle.scale;
   return true;
 }
 
@@ -5568,16 +5627,28 @@ bool samplePlanetPortal(
   if (!resolvePlanetPortalLifecycleUv(pixelU, pixelV, context.lifecycle, sampleU, sampleV)) {
     return false;
   }
+  
+  float dx = pixelU - 0.5f;
+  float dy = pixelV - 0.5f;
+  float distanceFromCenter = sqrtf(dx * dx + dy * dy);
+  float scaledDistance = distanceFromCenter / context.lifecycle.scale;
+  
+  float edgeFade = 1.0f;
+  if (scaledDistance > 0.48f) {
+    edgeFade = (0.52f - scaledDistance) / 0.04f;
+    edgeFade = clampFloat(edgeFade, 0.0f, 1.0f);
+  }
+  
   int baseLevel = readPlanetPortalTemplateLevel(sampleU, sampleV);
   int level = resolvePlanetPortalAnimatedLevel(baseLevel, sampleU, sampleV, frame, context);
-  outBubbleAlpha = resolvePlanetPortalBubbleAlpha(sampleU, sampleV, context);
+  outBubbleAlpha = resolvePlanetPortalBubbleAlpha(sampleU, sampleV, context) * edgeFade;
   if (level <= 0) {
     outColor = makePlanetBufferColor(0.0f, 0.0f, 0.0f, 0.0f);
     outAlpha = 0.0f;
     return outBubbleAlpha > 0.0f;
   }
   outColor = planetPortalColorForLevel(context.palette, level);
-  outAlpha = (baseLevel <= 2 ? 0.74f : 1.0f) * context.lifecycle.alpha;
+  outAlpha = (baseLevel <= 2 ? 0.74f : 1.0f) * context.lifecycle.alpha * edgeFade;
   return true;
 }
 
@@ -5705,10 +5776,12 @@ bool hasPlanetEarthNeighborState(
   return hasPlanetEarthNeighborCellState(column, row, expectedLand, radius);
 }
 
-bool resolvePlanetEarthSphereSample(
+bool resolvePlanetEarthSphereSampleWithRotation(
   float u,
   float v,
   const PlanetRenderFrame& frame,
+  float cosRotation,
+  float sinRotation,
   PlanetEarthSphereSample& outSample
 ) {
   float viewX = u * 2.0f - 1.0f;
@@ -5719,9 +5792,6 @@ bool resolvePlanetEarthSphereSample(
   }
 
   float sphereZ = sqrtf(fmaxf(0.0f, 1.0f - radiusSquared));
-  float rotation = kPlanetEarthCenterLongitudeRadians + frame.spinAngle;
-  float cosRotation = cosf(rotation);
-  float sinRotation = sinf(rotation);
   float worldX = viewX * cosRotation + sphereZ * sinRotation;
   float worldZ = sphereZ * cosRotation - viewX * sinRotation;
 
@@ -5737,6 +5807,20 @@ bool resolvePlanetEarthSphereSample(
     1.0f
   );
   return true;
+}
+
+bool resolvePlanetEarthSphereSample(
+  float u,
+  float v,
+  const PlanetRenderFrame& frame,
+  PlanetEarthSphereSample& outSample
+) {
+  float rotation = kPlanetEarthCenterLongitudeRadians + frame.spinAngle;
+  float cosRotation = cosf(rotation);
+  float sinRotation = sinf(rotation);
+  return resolvePlanetEarthSphereSampleWithRotation(
+    u, v, frame, cosRotation, sinRotation, outSample
+  );
 }
 
 float samplePlanetEarthTerrainValue(float longitudeDegrees, float latitudeDegrees) {
@@ -5921,6 +6005,9 @@ bool resolvePlanetEarthCloudSample(
     return false;
   }
 
+  // 优化：缓存 cloudCover 值，避免重复调用 getEarthCloudCover
+  const float cloudCover = getEarthCloudCover(frame.seed);
+
   float dLight = distancePlanet(pixelU, pixelV, 0.38f, 0.38f);
   float sphereX = 0.0f;
   float sphereY = 0.0f;
@@ -5930,12 +6017,16 @@ bool resolvePlanetEarthCloudSample(
   float timeOffset = resolvePlanetEarthCloudTimeOffset(frame);
   float scaledSphereX = sphereX * 8.6f;
   float scaledSphereCloudY = sphereCloudY * 8.6f;
+  
+  // 优化：预计算循环不变量
+  const float baseCloudX = scaledSphereX * 0.3f + 11.0f + timeOffset;
+  const float baseCloudY = scaledSphereCloudY * 0.3f;
   float cloudNoise = 0.0f;
 
-  for (int index = 0; index < 9; index += 1) {
+  for (int index = 0; index < 3; index += 1) {
     cloudNoise += circleNoisePlanetCloud(
-      scaledSphereX * 0.3f + (float)index + 11.0f + timeOffset,
-      scaledSphereCloudY * 0.3f,
+      baseCloudX + (float)index,
+      baseCloudY,
       frame.shaderSeed,
       8.6f
     );
@@ -5946,12 +6037,12 @@ bool resolvePlanetEarthCloudSample(
     scaledSphereCloudY,
     frame.shaderSeed,
     8.6f,
-    4,
+    4,  // 恢复原来的4，保证云层细节
     1.0f,
     1.0f
   );
   PlanetBufferColor color = makePlanetBufferColor(0.980392f, 1.0f, 0.992157f);
-  if (cloudValue < getEarthCloudCover(frame.seed) + 0.03f) {
+  if (cloudValue < cloudCover + 0.03f) {
     color = makePlanetBufferColor(0.878431f, 0.92549f, 0.972549f);
   }
   if (dLight + cloudValue * 0.2f > 0.52f) {
@@ -5962,7 +6053,7 @@ bool resolvePlanetEarthCloudSample(
   }
 
   outColor = color;
-  outAlpha = planetStep(getEarthCloudCover(frame.seed), cloudValue) * alphaCircle;
+  outAlpha = planetStep(cloudCover, cloudValue) * alphaCircle;
   return outAlpha > 0.0f;
 }
 
@@ -6136,6 +6227,7 @@ void renderEarthPreview(const PlanetRenderFrame& frame) {
       }
       PlanetBufferColor cloudColor;
       float cloudAlpha = 0.0f;
+      // 使用连贯的噪声函数版本
       if (resolvePlanetEarthCloudSample(pixelU, pixelV, frame, cloudColor, cloudAlpha)) {
         coverPlanetPreviewPixel(offset, cloudColor, cloudAlpha * cloudColor.a);
       }
@@ -9099,6 +9191,113 @@ bool samplePlanetGalaxyDirect(
   return true;
 }
 
+bool samplePlanetEarthSurfaceDirectCached(
+  const PlanetRenderFrame& frame,
+  float cosRotation,
+  float sinRotation,
+  int x,
+  int y,
+  PlanetBufferColor& outColor
+) {
+  // 从瓦片缓存采样地表（避免 HEX 解码）
+  if (!s_planetEarthLandTile || !s_planetEarthLandTileState.valid) {
+    return false;
+  }
+
+  PlanetDirectLayerSample sample;
+  if (!preparePlanetDirectLayerSample(frame, 1.0f, 1.0f, x, y, sample)) {
+    return false;
+  }
+
+  PlanetEarthSphereSample sphereSample;
+  if (!resolvePlanetEarthSphereSampleWithRotation(
+        sample.pixelU, sample.pixelV, frame, cosRotation, sinRotation, sphereSample)) {
+    return false;
+  }
+
+  // 计算经纬度对应的瓦片坐标
+  float longitude360 = normalizePlanetEarthLongitude360(sphereSample.longitude);
+  float latitudeClamped = clampFloat(sphereSample.latitude, -89.999f, 89.999f);
+  float tileX = (longitude360 / 360.0f) * (float)kPlanetEarthLandTileWidth;
+  float tileY = ((90.0f - latitudeClamped) / 180.0f) * (float)kPlanetEarthLandTileHeight;
+
+  // 双线性采样瓦片
+  int x0 = (int)floorf(tileX);
+  int y0 = (int)floorf(tileY);
+  int x1 = (x0 + 1) % kPlanetEarthLandTileWidth;
+  int y1 = (y0 + 1) % kPlanetEarthLandTileHeight;
+  float fx = tileX - (float)x0;
+  float fy = tileY - (float)y0;
+
+  if (x0 < 0 || x0 >= kPlanetEarthLandTileWidth || 
+      y0 < 0 || y0 >= kPlanetEarthLandTileHeight) {
+    return false;
+  }
+
+  uint8_t v00 = s_planetEarthLandTile[y0 * kPlanetEarthLandTileWidth + x0];
+  uint8_t v10 = s_planetEarthLandTile[y0 * kPlanetEarthLandTileWidth + x1];
+  uint8_t v01 = s_planetEarthLandTile[y1 * kPlanetEarthLandTileWidth + x0];
+  uint8_t v11 = s_planetEarthLandTile[y1 * kPlanetEarthLandTileWidth + x1];
+
+  float landValue = (float)v00 * (1.0f - fx) * (1.0f - fy) +
+                    (float)v10 * fx * (1.0f - fy) +
+                    (float)v01 * (1.0f - fx) * fy +
+                    (float)v11 * fx * fy;
+  landValue /= 255.0f;
+
+  // 判断是陆地还是海洋（阈值 0.5）
+  bool isLand = landValue > 0.5f;
+  
+  // 计算地形参数（优化：单点采样，避免 5 点平滑）
+  int column = (int)floorf((longitude360 / 360.0f) * (float)kPlanetEarthMapWidth);
+  int row = (int)floorf(((90.0f - latitudeClamped) / 180.0f) * (float)kPlanetEarthMapHeight);
+  
+  // 一次性计算所有纹理哈希（从 15 次 → 3 次）
+  float terrainValue = samplePlanetEarthCellHash(column, row, kPlanetEarthFastTerrainSalt);
+  float moistureValue = samplePlanetEarthCellHash(column, row, kPlanetEarthFastMoistureSalt);
+  float oceanValue = samplePlanetEarthCellHash(column, row, kPlanetEarthFastOceanSalt);
+
+  PlanetBufferColor color;
+  float distanceFromCenter = distancePlanet(sample.pixelU, sample.pixelV, 0.5f, 0.5f);
+
+  // 极地冰盖
+  if (fabsf(sphereSample.latitude) > 77.0f) {
+    color = mixPlanetBufferColor(
+      makePlanetBufferColor(0.678431f, 0.803922f, 0.921569f),
+      makePlanetBufferColor(0.921569f, 0.964706f, 1.0f),
+      sphereSample.light
+    );
+  } else if (isLand) {
+    // 陆地颜色（简化版，不检测海岸线）
+    color = resolvePlanetEarthLandColor(
+      sphereSample.latitude,
+      sphereSample.light,
+      terrainValue,
+      moistureValue,
+      false  // 不检测海岸线以提升性能
+    );
+  } else {
+    // 海洋颜色（简化版，不检测近陆）
+    color = resolvePlanetEarthOceanColor(
+      sphereSample.latitude,
+      sphereSample.light,
+      oceanValue,
+      false  // 不检测近陆以提升性能
+    );
+  }
+
+  // 大气层光晕
+  float outerGlow = smoothstepFloat(0.34f, 0.5f, distanceFromCenter) *
+                    (1.0f - smoothstepFloat(0.47f, 0.5f, distanceFromCenter));
+  if (outerGlow > 0.0f) {
+    PlanetBufferColor atmosphere = makePlanetBufferColor(0.427451f, 0.803922f, 1.0f);
+    color = mixPlanetBufferColor(color, atmosphere, outerGlow * (0.2f + sphereSample.light * 0.18f));
+  }
+
+  outColor = color;
+  return true;
+}
+
 bool samplePlanetEarthSurfaceDirect(
   const PlanetRenderFrame& frame,
   int x,
@@ -9126,11 +9325,10 @@ bool samplePlanetEarthCloudDirect(
 
   PlanetBufferColor cloudColor;
   float cloudAlpha = 0.0f;
-  if (!resolvePlanetEarthCloudSampleFast(
+  if (!resolvePlanetEarthCloudSample(
         sample.pixelU,
         sample.pixelV,
         frame,
-        context,
         cloudColor,
         cloudAlpha
       ) ||
@@ -9139,6 +9337,240 @@ bool samplePlanetEarthCloudDirect(
   }
 
   outColor = cloudColor;
+  return true;
+}
+
+// 使用瓦片缓存的地球云层采样（快速版本）
+bool samplePlanetEarthCloudDirectCached(
+  const PlanetRenderFrame& frame,
+  const PlanetEarthRenderContext& context,
+  int x,
+  int y,
+  PlanetBufferColor& outColor
+) {
+  PlanetDirectLayerSample sample;
+  if (!preparePlanetDirectLayerSample(frame, 1.0f, 1.0f, x, y, sample)) {
+    return false;
+  }
+
+  float distanceFromCenter = distancePlanet(sample.pixelU, sample.pixelV, 0.5f, 0.5f);
+  float alphaCircle = planetStep(distanceFromCenter, 0.49999f);
+  if (alphaCircle == 0.0f) {
+    return false;
+  }
+
+  float dLight = distancePlanet(sample.pixelU, sample.pixelV, 0.38f, 0.38f);
+  float sphereX = 0.0f;
+  float sphereY = 0.0f;
+  spherifyPlanetUv(sample.pixelU, sample.pixelV, sphereX, sphereY);
+  float sphereCloudY = (sphereY + smoothstepFloat(0.0f, 1.18f, fabsf(sphereX - 0.4f))) * 2.15f;
+  
+  float timeOffset = resolvePlanetEarthCloudTimeOffset(frame);
+  float scaledSphereX = sphereX * 8.6f;
+  float scaledSphereCloudY = sphereCloudY * 8.6f;
+  float cloudPeriod = resolvePlanetTiledNoisePeriod(8.6f, 1.0f);
+  
+  // 从瓦片查询云层噪声（替代3次circleNoise）
+  float cloudNoise = samplePlanetTileBilinear(
+    s_planetEarthCloudNoiseTile,
+    kPlanetEarthCloudTileWidth,
+    kPlanetEarthCloudTileHeight,
+    cloudPeriod,
+    cloudPeriod,
+    scaledSphereX * 0.3f + timeOffset,
+    scaledSphereCloudY * 0.3f,
+    kPlanetEarthCloudNoiseMax
+  );
+  
+  // 从瓦片查询云层主体（替代FBM）
+  float cloudValue = samplePlanetTileBilinear(
+    s_planetEarthCloudTile,
+    kPlanetEarthCloudTileWidth,
+    kPlanetEarthCloudTileHeight,
+    cloudPeriod,
+    cloudPeriod,
+    scaledSphereX + cloudNoise + timeOffset,
+    scaledSphereCloudY,
+    1.0f
+  );
+  
+  PlanetBufferColor cloudColor = makePlanetBufferColor(0.980392f, 1.0f, 0.992157f);
+  if (cloudValue < context.cloudCover + 0.03f) {
+    cloudColor = makePlanetBufferColor(0.878431f, 0.92549f, 0.972549f);
+  }
+  if (dLight + cloudValue * 0.2f > 0.52f) {
+    cloudColor = makePlanetBufferColor(0.470588f, 0.580392f, 0.752941f);
+  }
+  if (dLight + cloudValue * 0.2f > 0.66f) {
+    cloudColor = makePlanetBufferColor(0.262745f, 0.329412f, 0.490196f);
+  }
+  
+  float cloudAlpha = planetStep(context.cloudCover, cloudValue) * alphaCircle;
+  if (!planetDirectAlphaHit(frame, x, y, cloudAlpha * cloudColor.a)) {
+    return false;
+  }
+  
+  outColor = cloudColor;
+  return true;
+}
+
+// 地球云层瓦片缓存实现（类似湿润星球）
+
+bool ensureEarthTileStorage(uint8_t*& tile, size_t bytes, const char* name) {
+  if (tile != nullptr) {
+    return true;
+  }
+  tile = (uint8_t*)allocatePlanetBuffer(bytes);
+  if (tile == nullptr) {
+    Serial.printf("[Earth Tile] Failed to allocate %s tile: %u bytes\n", name, (unsigned int)bytes);
+    return false;
+  }
+  return true;
+}
+
+void buildEarthCloudTile(const PlanetRenderFrame& frame) {
+  bool directRenderWasActive = s_planetDirectRenderActive;
+  s_planetDirectRenderActive = false;
+  float period = resolvePlanetTiledNoisePeriod(8.6f, 1.0f);
+
+  for (int y = 0; y < kPlanetEarthCloudTileHeight; y += 1) {
+    float sampleY = ((float)y + 0.5f) / (float)kPlanetEarthCloudTileHeight * period;
+    for (int x = 0; x < kPlanetEarthCloudTileWidth; x += 1) {
+      float sampleX = ((float)x + 0.5f) / (float)kPlanetEarthCloudTileWidth * period;
+      float value = fbmPlanetPreviewTiled(
+        sampleX,
+        sampleY,
+        frame.shaderSeed,
+        8.6f,
+        4  // 4个octaves
+      );
+      s_planetEarthCloudTile[y * kPlanetEarthCloudTileWidth + x] =
+        quantizePlanetTileValue(value, 1.0f);
+    }
+  }
+
+  s_planetDirectRenderActive = directRenderWasActive;
+  s_planetEarthCloudTileState.valid = true;
+  s_planetEarthCloudTileState.seed = frame.seed;
+}
+
+void buildEarthCloudNoiseTile(const PlanetRenderFrame& frame) {
+  float period = resolvePlanetTiledNoisePeriod(8.6f, 1.0f);
+
+  for (int y = 0; y < kPlanetEarthCloudTileHeight; y += 1) {
+    float sampleY = ((float)y + 0.5f) / (float)kPlanetEarthCloudTileHeight * period;
+    for (int x = 0; x < kPlanetEarthCloudTileWidth; x += 1) {
+      float sampleX = ((float)x + 0.5f) / (float)kPlanetEarthCloudTileWidth * period;
+      float noise = 0.0f;
+      for (int index = 0; index < kPlanetEarthCloudNoiseSamples; index += 1) {
+        noise += circleNoisePlanetCloud(
+          sampleX + (float)index + 11.0f,
+          sampleY,
+          frame.shaderSeed,
+          8.6f
+        );
+      }
+      s_planetEarthCloudNoiseTile[y * kPlanetEarthCloudTileWidth + x] =
+        quantizePlanetTileValue(noise, kPlanetEarthCloudNoiseMax);
+    }
+  }
+
+  s_planetEarthCloudNoiseTileState.valid = true;
+  s_planetEarthCloudNoiseTileState.seed = frame.seed;
+}
+
+void buildEarthLandTile(const PlanetRenderFrame& frame) {
+  // 预计算地球地表位图到瓦片
+  // 将 128×64 的 HEX 位图转换为 64×64 的瓦片（双线性采样）
+  
+  for (int tileY = 0; tileY < kPlanetEarthLandTileHeight; tileY++) {
+    for (int tileX = 0; tileX < kPlanetEarthLandTileWidth; tileX++) {
+      // 计算在原始 128×64 位图中的位置
+      float mapX = ((float)tileX / (float)kPlanetEarthLandTileWidth) * (float)kPlanetEarthMapWidth;
+      float mapY = ((float)tileY / (float)kPlanetEarthLandTileHeight) * (float)kPlanetEarthMapHeight;
+      
+      // 双线性采样 4 个相邻像素
+      int x0 = (int)floorf(mapX);
+      int y0 = (int)floorf(mapY);
+      int x1 = x0 + 1;
+      int y1 = y0 + 1;
+      float fx = mapX - (float)x0;
+      float fy = mapY - (float)y0;
+      
+      // 读取 4 个角的陆地值
+      bool land00 = readPlanetEarthLandMask(x0, y0);
+      bool land10 = readPlanetEarthLandMask(x1, y0);
+      bool land01 = readPlanetEarthLandMask(x0, y1);
+      bool land11 = readPlanetEarthLandMask(x1, y1);
+      
+      // 双线性插值
+      float v0 = land00 ? (1.0f - fx) : 0.0f;
+      v0 += land10 ? fx : 0.0f;
+      float v1 = land01 ? (1.0f - fx) : 0.0f;
+      v1 += land11 ? fx : 0.0f;
+      float value = v0 * (1.0f - fy) + v1 * fy;
+      
+      // 存储为 0-255
+      s_planetEarthLandTile[tileY * kPlanetEarthLandTileWidth + tileX] = 
+        (uint8_t)(value * 255.0f);
+    }
+  }
+  
+  s_planetEarthLandTileState.valid = true;
+  s_planetEarthLandTileState.seed = frame.seed;
+  Serial.println("[Earth] Land tile built");
+}
+
+bool prepareEarthTiles(const PlanetRenderFrame& frame) {
+  if (s_planetTerranWetTileCacheDisabled) {
+    return false;
+  }
+
+  bool cloudTilesReady = true;
+  
+  if (!ensureEarthTileStorage(
+        s_planetEarthCloudTile,
+        (size_t)kPlanetEarthCloudTileWidth * (size_t)kPlanetEarthCloudTileHeight,
+        "cloud"
+      )) {
+    cloudTilesReady = false;
+  }
+  if (cloudTilesReady && !ensureEarthTileStorage(
+        s_planetEarthCloudNoiseTile,
+        (size_t)kPlanetEarthCloudTileWidth * (size_t)kPlanetEarthCloudTileHeight,
+        "cloud_noise"
+      )) {
+    cloudTilesReady = false;
+  }
+
+  if (cloudTilesReady) {
+    if (!s_planetEarthCloudTileState.valid || s_planetEarthCloudTileState.seed != frame.seed) {
+      buildEarthCloudTile(frame);
+    }
+    if (!s_planetEarthCloudNoiseTileState.valid ||
+        s_planetEarthCloudNoiseTileState.seed != frame.seed) {
+      buildEarthCloudNoiseTile(frame);
+    }
+  }
+
+  // 地表瓦片独立分配（即使云层失败也要尝试）
+  if (!ensureEarthTileStorage(
+        s_planetEarthLandTile,
+        (size_t)kPlanetEarthLandTileWidth * (size_t)kPlanetEarthLandTileHeight,
+        "land"
+      )) {
+    // 地表瓦片分配失败，但不影响云层
+    if (!cloudTilesReady) {
+      s_planetTerranWetTileCacheDisabled = true;
+      return false;
+    }
+    return cloudTilesReady;
+  }
+
+  if (!s_planetEarthLandTileState.valid || s_planetEarthLandTileState.seed != frame.seed) {
+    buildEarthLandTile(frame);
+  }
+
   return true;
 }
 
@@ -9175,33 +9607,93 @@ void drawSpherePlanetFastPreview(const PlanetRenderFrame& frame) {
   int sampleStep = resolvePlanetDirectRenderStep(frame);
 
   if (planetPresetEqualsValue(frame.presetId, "earth")) {
+    // 使用瓦片缓存（类似湿润星球）
+    bool earthTilesReady = prepareEarthTiles(frame);
     PlanetEarthRenderContext context = buildPlanetEarthRenderContext(frame);
+    
+    // 预计算旋转角度（每帧固定，避免重复计算）
+    float rotation = kPlanetEarthCenterLongitudeRadians + frame.spinAngle;
+    float cosRotation = cosf(rotation);
+    float sinRotation = sinf(rotation);
+    
     int minX = 0;
     int maxXExclusive = kPlanetCanvasSize;
     int minY = 0;
     int maxYExclusive = kPlanetCanvasSize;
     resolvePlanetDirectBounds(frame, 1.0f, minX, maxXExclusive, minY, maxYExclusive);
 
-    for (int y = minY; y < maxYExclusive; y += sampleStep) {
-      for (int x = minX; x < maxXExclusive; x += sampleStep) {
-        int sampleX = x;
-        int sampleY = y;
-        resolvePlanetDirectSamplePoint(
-          x,
-          y,
-          sampleStep,
-          maxXExclusive,
-          maxYExclusive,
-          sampleX,
-          sampleY
-        );
+    // 性能统计（调试用）
+    static int s_earthPerfFrameCount = 0;
+    static int s_earthCachedSuccess = 0;
+    static int s_earthCloudSuccess = 0;
+    static int s_earthSurfaceCached = 0;
+    static int s_earthSurfaceDirect = 0;
+    static int s_earthTotalPixels = 0;
+    static unsigned long s_earthPerfStartTime = 0;
+    
+    if (s_earthPerfFrameCount == 0) {
+      s_earthPerfStartTime = millis();
+    }
+    
+    // 逐像素渲染（和湿润星球一样）
+    for (int y = minY; y < maxYExclusive; y += 1) {
+      for (int x = minX; x < maxXExclusive; x += 1) {
         PlanetBufferColor color;
-        if (samplePlanetEarthCloudDirect(frame, context, sampleX, sampleY, color) ||
-            samplePlanetEarthSurfaceDirect(frame, sampleX, sampleY, color)) {
-          drawPlanetDirectBlockColor(display, x, y, sampleStep, color);
+        // 优先使用缓存版本，失败时回退到实时计算
+        bool hasPixel = false;
+        if (earthTilesReady) {
+          hasPixel = samplePlanetEarthCloudDirectCached(frame, context, x, y, color);
+          if (hasPixel) s_earthCachedSuccess++;
+        }
+        if (!hasPixel) {
+          hasPixel = samplePlanetEarthCloudDirect(frame, context, x, y, color);
+          if (hasPixel) s_earthCloudSuccess++;
+        }
+        if (!hasPixel) {
+          // 优先使用地表瓦片缓存（独立检查，不依赖 earthTilesReady）
+          hasPixel = samplePlanetEarthSurfaceDirectCached(frame, cosRotation, sinRotation, x, y, color);
+          if (hasPixel) {
+            s_earthSurfaceCached++;
+          } else {
+            // 回退到实时解码
+            hasPixel = samplePlanetEarthSurfaceDirect(frame, x, y, color);
+            if (hasPixel) s_earthSurfaceDirect++;
+          }
+        }
+        if (hasPixel) {
+          drawPlanetDirectBufferColor(display, x, y, color);
+          s_earthTotalPixels++;
         }
       }
     }
+    
+    // 每 60 帧输出一次统计
+    s_earthPerfFrameCount++;
+    if (s_earthPerfFrameCount >= 60) {
+      unsigned long elapsed = millis() - s_earthPerfStartTime;
+      float fps = (elapsed > 0) ? (60000.0f / (float)elapsed) : 0.0f;
+      
+      Serial.printf("[Earth Perf] 60 frames in %lu ms (%.1f FPS)\n", elapsed, fps);
+      Serial.printf("  Total pixels: %d\n", s_earthTotalPixels);
+      Serial.printf("  Cloud cached: %d (%.1f%%)\n", s_earthCachedSuccess, 
+                    s_earthTotalPixels > 0 ? (s_earthCachedSuccess * 100.0f / s_earthTotalPixels) : 0);
+      Serial.printf("  Cloud direct: %d (%.1f%%)\n", s_earthCloudSuccess,
+                    s_earthTotalPixels > 0 ? (s_earthCloudSuccess * 100.0f / s_earthTotalPixels) : 0);
+      Serial.printf("  Surface cached: %d (%.1f%%)\n", s_earthSurfaceCached,
+                    s_earthTotalPixels > 0 ? (s_earthSurfaceCached * 100.0f / s_earthTotalPixels) : 0);
+      Serial.printf("  Surface direct: %d (%.1f%%)\n", s_earthSurfaceDirect,
+                    s_earthTotalPixels > 0 ? (s_earthSurfaceDirect * 100.0f / s_earthTotalPixels) : 0);
+      
+      // 重置计数器
+      s_earthPerfFrameCount = 0;
+      s_earthCachedSuccess = 0;
+      s_earthCloudSuccess = 0;
+      s_earthSurfaceCached = 0;
+      s_earthSurfaceDirect = 0;
+      s_earthTotalPixels = 0;
+      s_earthPerfStartTime = 0;
+    }
+    
     return;
   }
 
@@ -9246,6 +9738,14 @@ void drawSpherePlanetFastPreview(const PlanetRenderFrame& frame) {
     resolvePlanetDirectBounds(frame, cloudLayer.planeScale, minX, maxXExclusive, minY, maxYExclusive);
     bool terranWetTilesReady = prepareTerranWetTiles(frame, landLayer, cloudLayer);
 
+    // 性能统计（对比用）
+    static int s_wetPerfFrameCount = 0;
+    static unsigned long s_wetPerfStartTime = 0;
+    
+    if (s_wetPerfFrameCount == 0) {
+      s_wetPerfStartTime = millis();
+    }
+
     for (int y = minY; y < maxYExclusive; y += 1) {
       for (int x = minX; x < maxXExclusive; x += 1) {
         PlanetBufferColor color;
@@ -9254,6 +9754,17 @@ void drawSpherePlanetFastPreview(const PlanetRenderFrame& frame) {
         }
       }
     }
+    
+    // 每 60 帧输出一次统计
+    s_wetPerfFrameCount++;
+    if (s_wetPerfFrameCount >= 60) {
+      unsigned long elapsed = millis() - s_wetPerfStartTime;
+      float fps = (elapsed > 0) ? (60000.0f / (float)elapsed) : 0.0f;
+      Serial.printf("[Wet Terran Perf] 60 frames in %lu ms (%.1f FPS)\n", elapsed, fps);
+      s_wetPerfFrameCount = 0;
+      s_wetPerfStartTime = 0;
+    }
+    
     return;
   }
 
@@ -9763,42 +10274,57 @@ void drawGalaxyPlanetFastPreview(const PlanetRenderFrame& frame) {
 
 void drawPortalPlanetFastPreview(const PlanetRenderFrame& frame) {
   MatrixPanel_I2S_DMA* display = DisplayManager::dma_display;
-  int sampleStep = resolvePlanetDirectRenderStep(frame);
   PlanetPortalRenderContext context = buildPlanetPortalRenderContext(frame);
-  int minX = 0;
-  int maxXExclusive = kPlanetCanvasSize;
-  int minY = 0;
-  int maxYExclusive = kPlanetCanvasSize;
-  resolvePlanetDirectBounds(frame, 1.0f, minX, maxXExclusive, minY, maxYExclusive);
-
-  for (int y = minY; y < maxYExclusive; y += sampleStep) {
-    for (int x = minX; x < maxXExclusive; x += sampleStep) {
-      int sampleX = x;
-      int sampleY = y;
-      resolvePlanetDirectSamplePoint(
-        x,
-        y,
-        sampleStep,
-        maxXExclusive,
-        maxYExclusive,
-        sampleX,
-        sampleY
-      );
-      PlanetDirectLayerSample sample;
-      if (!preparePlanetDirectLayerSample(frame, 1.0f, 1.0f, sampleX, sampleY, sample)) {
-        continue;
-      }
-      PlanetBufferColor color;
-      float alpha = 0.0f;
-      float bubbleAlpha = 0.0f;
-      if (samplePlanetPortal(frame, context, sample.u, sample.v, color, alpha, bubbleAlpha)) {
-        float colorAlpha = alpha * color.a;
-        float finalAlpha = fmaxf(colorAlpha, bubbleAlpha);
-        if (planetDirectAlphaHit(frame, sampleX, sampleY, finalAlpha)) {
-          PlanetBufferColor finalColor = bubbleAlpha > colorAlpha
+  
+  // 传送门固定尺寸（根据 sizeScale 选择）
+  // 用户指定尺寸：35, 50, 60像素
+  int portalSize = 35;  // small (0.673)
+  if (frame.sizeScale >= 1.05f) {
+    portalSize = 60;  // large (1.154)
+  } else if (frame.sizeScale >= 0.81f) {
+    portalSize = 50;  // medium (0.962)
+  }
+  
+  // 根据 lifecycle.scale 缩放传送门尺寸
+  int scaledSize = (int)roundf((float)portalSize * context.lifecycle.scale);
+  if (scaledSize < 1) {
+    return;  // 尺寸太小，不渲染
+  }
+  
+  // 传送门居中位置
+  int offsetX = (kPlanetCanvasSize - scaledSize) / 2;
+  int offsetY = (kPlanetCanvasSize - scaledSize) / 2;
+  
+  // 渲染传送门区域
+  for (int y = 0; y < scaledSize; y++) {
+    for (int x = 0; x < scaledSize; x++) {
+      int screenX = offsetX + x;
+      int screenY = offsetY + y;
+      
+      // 映射到64×64模板的坐标
+      float templateU = (float)x / (float)scaledSize;
+      float templateV = (float)y / (float)scaledSize;
+      
+      int baseLevel = readPlanetPortalTemplateLevel(templateU, templateV);
+      int level = resolvePlanetPortalAnimatedLevel(baseLevel, templateU, templateV, frame, context);
+      float bubbleAlpha = resolvePlanetPortalBubbleAlpha(templateU, templateV, context);
+      
+      if (level > 0 || bubbleAlpha > 0.0f) {
+        PlanetBufferColor color;
+        float alpha = 0.0f;
+        
+        if (level > 0) {
+          color = planetPortalColorForLevel(context.palette, level);
+          // 移除淡入淡出，完全不透明
+          alpha = (baseLevel <= 2 ? 0.74f : 1.0f);
+        }
+        
+        float finalAlpha = fmaxf(alpha * color.a, bubbleAlpha);
+        if (planetDirectAlphaHit(frame, screenX, screenY, finalAlpha)) {
+          PlanetBufferColor finalColor = bubbleAlpha > alpha * color.a
             ? makePlanetBufferColor(1.0f, 1.0f, 1.0f)
             : color;
-          drawPlanetDirectBlockColor(display, x, y, sampleStep, finalColor);
+          drawPlanetDirectBufferColor(display, screenX, screenY, finalColor);
         }
       }
     }
@@ -10035,6 +10561,16 @@ void releasePlanetRuntimeBuffers() {
     free(s_planetPreviewBuffer);
     s_planetPreviewBuffer = nullptr;
   }
+  
+  // 释放地球瓦片缓存
+  if (s_planetEarthCloudTile != nullptr) {
+    free(s_planetEarthCloudTile);
+    s_planetEarthCloudTile = nullptr;
+  }
+  if (s_planetEarthCloudNoiseTile != nullptr) {
+    free(s_planetEarthCloudNoiseTile);
+    s_planetEarthCloudNoiseTile = nullptr;
+  }
 
   if (s_planetTerranWetStaticCache.pixelsData != nullptr) {
     free(s_planetTerranWetStaticCache.pixelsData);
@@ -10169,7 +10705,6 @@ void releasePlanetRuntimeBuffers() {
   s_planetTerranWetLandRandCache.valid = false;
   s_planetTerranWetCloudRandCache.valid = false;
   s_planetDirectNoiseRandCache.valid = false;
-  s_planetTerranWetTileCacheDisabled = false;
 }
 }
 

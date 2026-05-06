@@ -317,6 +317,7 @@ import {
   createRandomPlanetColorSeed,
   getPlanetPreviewCycleDuration,
   buildPlanetScreensaverPreviewFrame,
+  buildPlanetScreensaverPreviewSequence,
 } from "../../utils/planetScreensaverPreview.js";
 
 const PLANET_TIME_FONT_OPTIONS = getClockFontOptions();
@@ -536,6 +537,7 @@ export default {
       previewPlaybackStartedAt: 0,
       previewTimer: null,
       previewRefreshTimer: null,
+      previewSequence: null,
       presetOptions: PLANET_DISPLAY_PRESETS,
       portalColorOptions: PLANET_PORTAL_COLOR_OPTIONS,
       sizeOptions: PLANET_SIZE_OPTIONS,
@@ -918,12 +920,22 @@ export default {
       });
     },
     renderPreviewFrame(progress) {
-      const frameMap = buildPlanetScreensaverPreviewFrame(
-        {
-          ...this.config,
-        },
-        progress,
-      );
+      // 使用预渲染序列缓存，避免每帧实时渲染
+      let frameMap;
+      if (this.previewSequence && this.previewSequence.maps) {
+        const frameIndex = Math.floor(progress * this.previewSequence.frameCount);
+        const clampedIndex = Math.max(0, Math.min(frameIndex, this.previewSequence.maps.length - 1));
+        frameMap = this.previewSequence.maps[clampedIndex];
+      } else {
+        // 回退：如果没有序列，实时渲染（慢）
+        frameMap = buildPlanetScreensaverPreviewFrame(
+          {
+            ...this.config,
+          },
+          progress,
+        );
+      }
+      
       if (this.clockConfig.time.show) {
         const text = this.getPlanetTimeText();
         const placement = this.resolveBoardTimePlacement(text);
@@ -1213,6 +1225,10 @@ export default {
       if (!this.previewCanvasReady) {
         return;
       }
+      
+      // 预渲染整个序列并缓存
+      this.previewSequence = buildPlanetScreensaverPreviewSequence(this.config);
+      
       const cycleDuration = getPlanetPreviewCycleDuration(this.config.speed);
       const normalizedProgress =
         typeof preservedProgress === "number" &&
