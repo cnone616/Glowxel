@@ -32,19 +32,21 @@
           </svg>
           新建
         </router-link>
-        <template v-if="isLoggedIn">
-          <router-link to="/profile" class="btn-login" @click="closeMobileMenu">我的</router-link>
-          <button class="btn-login btn-logout" @click="handleLogout">
-            退出
-          </button>
-        </template>
         <router-link
-          v-else
+          v-if="!isLoggedIn"
           to="/login"
           class="btn-login"
           @click="closeMobileMenu"
         >
           登录
+        </router-link>
+        <router-link
+          v-else
+          to="/profile"
+          class="btn-login"
+          @click="closeMobileMenu"
+        >
+          我的
         </router-link>
       </div>
 
@@ -99,9 +101,9 @@ const navItems = [
   { key: "workspace", label: "工作台", to: "/workspace" },
   { key: "device", label: "设备", to: "/device-control" },
   { key: "community", label: "社区", to: "/community" },
-  { key: "design-system", label: "控件库", to: "/design-system" },
-  { key: "templates", label: "边框", to: "/templates" },
-  { key: "challenges", label: "挑战", to: "/challenges" },
+  { key: "templates", label: "控件库", to: "/templates" },
+  { key: "challenges", label: "边框", to: "/challenges" },
+  { key: "workbench", label: "拼豆", to: "/pattern-workbench" },
 ];
 
 const activeNavKey = computed(() => {

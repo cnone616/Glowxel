@@ -119,6 +119,11 @@ defineProps({
 
 .brand-logo--footer .brand-name {
   font-size: 24px;
+  color: #ffffff;
+}
+
+.brand-logo--footer .brand-tagline {
+  color: var(--nb-ink);
 }
 
 @media (max-width: 768px) {

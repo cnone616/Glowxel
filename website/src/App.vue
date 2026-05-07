@@ -1,23 +1,19 @@
 <template>
   <div id="app">
     <PublicShell v-if="shellName === 'public'">
-      <main class="main-content">
-        <router-view v-slot="{ Component }">
-          <transition name="fade" mode="out-in">
-            <component :is="Component" />
-          </transition>
-        </router-view>
-      </main>
+      <router-view v-slot="{ Component }">
+        <transition name="fade" mode="out-in">
+          <component :is="Component" />
+        </transition>
+      </router-view>
     </PublicShell>
 
     <AppShell v-else-if="shellName === 'app'">
-      <main class="main-content">
-        <router-view v-slot="{ Component }">
-          <transition name="fade" mode="out-in">
-            <component :is="Component" />
-          </transition>
-        </router-view>
-      </main>
+      <router-view v-slot="{ Component }">
+        <transition name="fade" mode="out-in">
+          <component :is="Component" />
+        </transition>
+      </router-view>
     </AppShell>
 
     <main v-else class="main-content">
@@ -46,9 +42,7 @@ const route = useRoute()
 const userStore = useUserStore()
 
 const shellName = computed(() => {
-  if (typeof route.meta.shell === 'string') {
-    return route.meta.shell
-  }
+  // 统一使用 public shell，所有页面共用 NavBar
   return 'public'
 })
 
