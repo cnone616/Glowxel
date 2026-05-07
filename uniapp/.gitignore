@@ -54,7 +54,8 @@ Desktop.ini
 *.ttf
 *.eot
 
-# 排除重要的 logo
+# 排除重要的 logo 和 UI 图标
 !static/matrix-logo.png
 !static/clockwise-themes/*.jpg
 !static/clockwise-themes/*.png
+!static/tabbar/*.png
