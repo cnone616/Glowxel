@@ -31,7 +31,6 @@ const routes = [
   { path: '/settings/profile', name: 'EditProfile', component: () => import('@/views/EditProfile.vue'), meta: { shell: 'app', auth: true } },
   { path: '/followers', name: 'MyFollowers', component: () => import('@/views/FollowList.vue'), meta: { shell: 'app', auth: true } },
   { path: '/following', name: 'MyFollowing', component: () => import('@/views/FollowList.vue'), meta: { shell: 'app', auth: true } },
-  { path: '/design-preview', name: 'DesignPreview', component: () => import('@/views/DesignPreview.vue'), meta: { shell: 'app' } },
   { path: '/design-compare', name: 'DesignCompare', component: () => import('@/views/DesignCompare.vue'), meta: { shell: 'app' } },
 
   { path: '/device-control', name: 'DeviceControl', component: () => import('@/views/DeviceControl.vue'), meta: { shell: 'app' } },

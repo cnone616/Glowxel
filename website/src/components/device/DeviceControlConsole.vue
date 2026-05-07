@@ -197,7 +197,6 @@ import { useDeviceStore } from "@/stores/device.js";
 import { useFeedback } from "@/composables/useFeedback.js";
 import DeviceConnectModal from "@/components/device/DeviceConnectModal.vue";
 import DeviceIcon from "@/components/device/DeviceIcon.vue";
-import { devicePageGroups } from "@/config/appNavigation.js";
 
 const deviceStore = useDeviceStore();
 const feedback = useFeedback();
@@ -225,7 +224,7 @@ const utilityEntries = [
     iconShellClass: "device-home__tool-icon--green",
   },
 ];
-
+const devicePageGroups = [];
 const pageDirectoryGroups = devicePageGroups.filter((group) => {
   return group.key !== "system";
 });
