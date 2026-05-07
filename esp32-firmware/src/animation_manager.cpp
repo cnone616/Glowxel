@@ -16,8 +16,8 @@ static int s_loopBlendStep = 0;
 static unsigned long s_loopBlendDelay = 0;
 static const int LOOP_BLEND_STEPS = 4;
 static const int LOOP_BRIDGE_PIXELS = 64 * 64;
-static uint16_t s_loopBridgeFromBuffer[LOOP_BRIDGE_PIXELS];
-static uint16_t s_loopBridgeToBuffer[LOOP_BRIDGE_PIXELS];
+static uint16_t* s_loopBridgeFromBuffer = nullptr;
+static uint16_t* s_loopBridgeToBuffer = nullptr;
 
 uint16_t maxPixelsForFrameType(const String& type) {
   return type == "full" ? kMaxFullFramePixels : kMaxDiffFramePixels;
@@ -89,6 +89,25 @@ bool writeAnimationBlobToPath(const char* path, const uint8_t* data, size_t len)
 bool prepareLoopBridgeFrames() {
   if (AnimationManager::currentGIF == nullptr || AnimationManager::currentGIF->frameCount <= 0) {
     return false;
+  }
+
+  // 按需分配 loopBridge 缓冲区
+  if (s_loopBridgeFromBuffer == nullptr) {
+    s_loopBridgeFromBuffer = (uint16_t*)malloc(LOOP_BRIDGE_PIXELS * sizeof(uint16_t));
+    if (s_loopBridgeFromBuffer == nullptr) {
+      Serial.println("[LoopBridge] Failed to allocate FromBuffer, skipping transition");
+      return false;
+    }
+    Serial.println("[LoopBridge] Allocated FromBuffer (8 KB)");
+  }
+  
+  if (s_loopBridgeToBuffer == nullptr) {
+    s_loopBridgeToBuffer = (uint16_t*)malloc(LOOP_BRIDGE_PIXELS * sizeof(uint16_t));
+    if (s_loopBridgeToBuffer == nullptr) {
+      Serial.println("[LoopBridge] Failed to allocate ToBuffer, skipping transition");
+      return false;
+    }
+    Serial.println("[LoopBridge] Allocated ToBuffer (8 KB)");
   }
 
   for (int y = 0; y < 64; y++) {

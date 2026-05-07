@@ -11,7 +11,7 @@ export const PLANET_SCREEN_PRESETS = Object.freeze([
   { id: "ice_world", label: "冰封行星" },
   { id: "lava_world", label: "熔核行星" },
   { id: "black_hole", label: "黑洞" },
-  { id: "galaxy", label: "星系" },
+  // { id: "galaxy", label: "星系" },
   { id: "star", label: "恒星" },
 ]);
 export const PLANET_SIZE_OPTIONS = Object.freeze([

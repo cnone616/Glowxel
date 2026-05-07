@@ -16,7 +16,7 @@ const PLANET_PREVIEW_MAX_PIXELS = 5000;
 const MAX_PLANET_PREVIEW_SEED = 999999999;
 const PLANET_PREVIEW_MIN_SPEED = 1;
 const PLANET_PREVIEW_MAX_SPEED = 7;
-const PLANET_PREVIEW_PLAYBACK_INTERVAL_MS = 16;
+const PLANET_PREVIEW_PLAYBACK_INTERVAL_MS = 8;  // 从16ms提升到8ms，实现125 FPS
 const PLANET_SIZE_OPTIONS = [
   { id: "small", label: "小" },
   { id: "medium", label: "中" },
@@ -37,9 +37,9 @@ const PLANET_DIRECTION_OPTIONS = [
 const PLANET_PORTAL_PRESET_IDS = ["portal_green", "portal_blue", "portal_yellow"];
 const PORTAL_SWIRL_ROTATIONS_PER_CYCLE = 1.35;
 const PORTAL_BUBBLE_ROTATIONS_PER_CYCLE = 1.18;
-const PORTAL_LIFECYCLE_REPEATS_PER_CYCLE = 3;
-const PORTAL_OPEN_END = 0.16;
-const PORTAL_CLOSE_START = 0.80;
+const PORTAL_LIFECYCLE_REPEATS_PER_CYCLE = 1;     // 1分钟1次循环
+const PORTAL_OPEN_END = 1.5/60.0;               // 1.5秒打开
+const PORTAL_CLOSE_START = 58.5/60.0;           // 58.5秒开始关闭
 const PORTAL_BUBBLE_ORBITS = Object.freeze([
   { angle: -1.45, radius: 0.43, size: 0.038, alpha: 0.96, speed: 1.00, wobble: 0.72, life: 0.86, offset: 0.02 },
   { angle: -0.92, radius: 0.46, size: 0.024, alpha: 0.82, speed: 0.82, wobble: 1.08, life: 1.14, offset: 0.31 },
@@ -52,12 +52,14 @@ const PORTAL_BUBBLE_ORBITS = Object.freeze([
   { angle: 3.20, radius: 0.43, size: 0.018, alpha: 0.72, speed: 1.08, wobble: 0.88, life: 1.24, offset: 0.83 },
   { angle: 3.74, radius: 0.45, size: 0.027, alpha: 0.86, speed: 0.87, wobble: 1.02, life: 1.02, offset: 0.39 },
 ]);
-const FRAME_DELAY_BY_SPEED = [840, 720, 620, 530, 450, 380, 320, 270, 220, 180];
+const FRAME_DELAY_BY_SPEED = [480, 360, 280, 220, 180, 150, 120, 100, 80, 60];
 const RING_TIME_BASE = 314.15;
 
 const PREVIEW_CACHE = new Map();
 const STARFIELD_CACHE = new Map();
 const PLANET_COLOR_VARIANT_CACHE = new Map();
+const EARTH_SURFACE_CACHE = new Map();  // 地球表面缓存
+const EARTH_TERRAIN_CACHE = new Map();  // 地球地形值缓存
 let ACTIVE_PREVIEW_CENTER_X = PREVIEW_CENTER;
 let ACTIVE_PREVIEW_CENTER_Y = PREVIEW_CENTER;
 
@@ -364,13 +366,13 @@ const PRESET_DEFINITIONS = {
     hint: "对应原始生成器里的 Black Hole，重点看吸积盘弯曲和高亮边在 64×64 下是否还成立。",
     relativeScale: 2,
   },
-  galaxy: {
-    id: "galaxy",
-    sourceLabel: "Galaxy",
-    label: "星系",
-    hint: "对应原始生成器里的 Galaxy，主要验证旋臂层叠、倾斜和旋转是否还能读出来。",
-    relativeScale: 1,
-  },
+  // galaxy: {
+  //   id: "galaxy",
+  //   sourceLabel: "Galaxy",
+  //   label: "星系",
+  //   hint: "对应原始生成器里的 Galaxy，主要验证旋臂层叠、倾斜和旋转是否还能读出来。",
+  //   relativeScale: 1,
+  // },
   portal_green: {
     id: "portal_green",
     sourceLabel: "Portal Green",
@@ -487,6 +489,19 @@ function smoothstep(edge0, edge1, value) {
   }
   const t = clamp01((value - edge0) / (edge1 - edge0));
   return t * t * (3 - 2 * t);
+}
+
+// 更平滑的缓动函数 - 用于传送门动画
+function easeInOutCubic(t) {
+  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+}
+
+function easeInOutBack(t) {
+  const c1 = 1.70158;
+  const c2 = c1 * 1.525;
+  return t < 0.5
+    ? (Math.pow(2 * t, 2) * ((c2 + 1) * 2 * t - c2)) / 2
+    : (Math.pow(2 * t - 2, 2) * ((c2 + 1) * (t * 2 - 2) + c2) + 2) / 2;
 }
 
 function distance2(x1, y1, x2, y2) {
@@ -646,8 +661,8 @@ function circleNoiseCloud(x, y, randValue) {
   const dx = fx - 0.25 - h * 0.5;
   const dy = fy - 0.25 - h * 0.5;
   const magnitude = Math.sqrt(dx * dx + dy * dy);
-  const radius = h * 0.25;
-  return smoothstep(0, radius, magnitude * 0.75);
+  const radius = h * 0.28;  // 与ESP32保持一致
+  return smoothstep(0, radius, magnitude * 0.68);  // 与ESP32保持一致
 }
 
 function circleNoiseCrater(x, y, randValue) {
@@ -1079,13 +1094,13 @@ function getSizeScaleForPreset(presetId, sizeId) {
   }
   if (isPortalPresetValue(presetId)) {
     if (sizeId === "small") {
-      return 0.68;
+      return 0.673;  // 35像素: 35/52
     }
     if (sizeId === "medium") {
-      return 0.84;
+      return 0.962;  // 50像素: 50/52
     }
     if (sizeId === "large") {
-      return 1;
+      return 1.154;  // 60像素: 60/52
     }
   }
   if (presetId === "star") {
@@ -1330,6 +1345,7 @@ function renderClouds(buffer, frame, layer) {
     frame.motionFactor,
     layer.timeFactor || 1,
   );
+  // 改回原来的计算方式
   const timeOffset = time * layer.timeSpeed;
 
   createLayerIterator(frame.preset.relativeScale, layer.planeScale, frame.sizeScale, (offset, u, v) => {
@@ -1347,8 +1363,9 @@ function renderClouds(buffer, frame, layer) {
     let sphereY = sphere[1] + smoothstep(0, layer.cloudCurve, Math.abs(sphere[0] - 0.4));
     sphereY *= layer.stretch;
 
+    // 云层噪声计算 - 6次循环，平衡质量和性能
     let cloudNoise = 0;
-    for (let index = 0; index < 9; index += 1) {
+    for (let index = 0; index < 6; index += 1) {
       cloudNoise += circleNoiseCloud(
         sphere[0] * layer.size * 0.3 + index + 11 + timeOffset,
         sphereY * layer.size * 0.3,
@@ -1383,6 +1400,7 @@ function renderGasClouds(buffer, frame, layer) {
   const pixels = useLayerPixels(frame.config.pixels, layer.pixelsScale);
   const randValue = buildTiledRand(frame.shaderSeed, layer.size);
   const time = loopTimeFromMultiplier(frame.progress, layer.size, layer.timeSpeed, frame.motionFactor);
+  // 改回原来的计算方式
   const timeOffset = time * layer.timeSpeed;
 
   createLayerIterator(frame.preset.relativeScale, layer.planeScale, frame.sizeScale, (offset, u, v) => {
@@ -1525,6 +1543,7 @@ function renderCraters(buffer, frame, layer) {
   const pixels = useLayerPixels(frame.config.pixels, layer.pixelsScale);
   const randValue = buildTiledRand(frame.shaderSeed, layer.size);
   const time = loopTimeFromMultiplier(frame.progress, layer.size, layer.timeSpeed, frame.motionFactor);
+  // 改回原来的计算方式
   const timeOffset = time * layer.timeSpeed;
 
   createLayerIterator(frame.preset.relativeScale, layer.planeScale, frame.sizeScale, (offset, u, v) => {
@@ -1750,6 +1769,7 @@ function renderDenseGas(buffer, frame, layer) {
   const pixels = useLayerPixels(frame.config.pixels, layer.pixelsScale);
   const randValue = buildTiledRand(frame.shaderSeed, layer.size, 2, 1);
   const time = loopTimeFromMultiplier(frame.progress, layer.size, layer.timeSpeed, frame.motionFactor);
+  // 改回原来的计算方式
   const timeOffset = time * layer.timeSpeed;
 
   createLayerIterator(frame.preset.relativeScale, layer.planeScale, frame.sizeScale, (offset, u, v) => {
@@ -2240,34 +2260,59 @@ function resolvePortalClockwisePhase(progress) {
 
 function resolvePortalLifecycle(progress) {
   const cycleProgress = mod(progress * PORTAL_LIFECYCLE_REPEATS_PER_CYCLE, 1);
+  
   if (cycleProgress < PORTAL_OPEN_END) {
-    const t = smoothstep(0, PORTAL_OPEN_END, cycleProgress);
+    // 打开阶段 - 平滑放大
+    const t = cycleProgress / PORTAL_OPEN_END;
+    const ease = easeInOutCubic(t);
+    
     return {
-      scale: 0.08 + 0.92 * t,
-      alpha: smoothstep(0.02, PORTAL_OPEN_END * 0.82, cycleProgress),
+      scale: 0.25 + 0.75 * ease,  // 从0.25放大到1.0，避免过小的值
+      alpha: ease,
     };
   }
+  
   if (cycleProgress > PORTAL_CLOSE_START) {
-    const t = smoothstep(PORTAL_CLOSE_START, 1, cycleProgress);
+    // 关闭阶段 - 平滑缩小
+    const t = (cycleProgress - PORTAL_CLOSE_START) / (1 - PORTAL_CLOSE_START);
+    const ease = easeInOutCubic(1 - t);
+    
     return {
-      scale: 1 - 0.94 * t,
-      alpha: 1 - smoothstep(PORTAL_CLOSE_START + 0.05, 0.99, cycleProgress),
+      scale: 0.25 + 0.75 * ease,  // 从1.0缩小到0.25
+      alpha: ease,
     };
   }
+  
+  // 持续阶段 - 保持稳定
   return {
-    scale: 1,
-    alpha: 1,
+    scale: 1.0,
+    alpha: 1.0,
   };
 }
 
 function resolvePortalLifecycleUv(u, v, lifecycle) {
-  if (lifecycle.alpha <= 0 || lifecycle.scale <= 0.04) {
+  if (lifecycle.alpha <= 0) {
     return null;
   }
-  return [
-    0.5 + (u - 0.5) / lifecycle.scale,
-    0.5 + (v - 0.5) / lifecycle.scale,
-  ];
+  
+  // 计算到中心的距离
+  const dx = u - 0.5;
+  const dy = v - 0.5;
+  const distanceFromCenter = Math.sqrt(dx * dx + dy * dy);
+  
+  // 缩放后的距离
+  const scaledDistance = distanceFromCenter / lifecycle.scale;
+  
+  // 扩大有效区域，添加边界渐变
+  if (scaledDistance > 0.52) {
+    return null;
+  }
+  
+  // 进行缩放变换
+  const centerU = 0.5 + dx / lifecycle.scale;
+  const centerV = 0.5 + dy / lifecycle.scale;
+  
+  return [centerU, centerV];
 }
 
 function resolvePortalAnimatedLevel(baseLevel, u, v, progress) {
@@ -2334,22 +2379,38 @@ function resolvePortalBubbleAlpha(u, v, progress) {
 }
 
 function renderPortalPreset(buffer, frame) {
-  const lifecycle = resolvePortalLifecycle(frame.progress);
+  // 传送门使用固定60秒周期，不受速度影响
+  const lifecycle = resolvePortalLifecycle(frame.portalProgress);
   createLayerIterator(frame.preset.relativeScale, 1, frame.sizeScale, (offset, u, v) => {
     const lifecycleUv = resolvePortalLifecycleUv(u, v, lifecycle);
     if (!lifecycleUv) {
       return;
     }
+    
+    // 计算边界渐变
+    const dx = u - 0.5;
+    const dy = v - 0.5;
+    const distanceFromCenter = Math.sqrt(dx * dx + dy * dy);
+    const scaledDistance = distanceFromCenter / lifecycle.scale;
+    
+    // 在边界区域应用渐变
+    let edgeFade = 1;
+    if (scaledDistance > 0.48) {
+      edgeFade = (0.52 - scaledDistance) / 0.04;  // 在0.48-0.52之间线性渐变
+      edgeFade = clamp01(edgeFade);
+    }
+    
     const sampleU = lifecycleUv[0];
     const sampleV = lifecycleUv[1];
     const baseLevel = readPortalTemplateLevel(sampleU, sampleV);
+    // 旋涡和气泡动画仍使用普通progress（受速度影响）
     const level = resolvePortalAnimatedLevel(baseLevel, sampleU, sampleV, frame.progress);
     if (level > 0) {
       const color = portalColorForLevel(frame.preset.id, level);
       const alpha = baseLevel <= 2 ? 0.74 : 1;
-      blendPixel(buffer, offset, color, alpha * lifecycle.alpha * color[3]);
+      blendPixel(buffer, offset, color, alpha * lifecycle.alpha * edgeFade * color[3]);
     }
-    const bubbleAlpha = resolvePortalBubbleAlpha(sampleU, sampleV, frame.progress) * lifecycle.alpha;
+    const bubbleAlpha = resolvePortalBubbleAlpha(sampleU, sampleV, frame.progress) * lifecycle.alpha * edgeFade;
     if (bubbleAlpha > 0) {
       blendPixel(buffer, offset, COLOR_WHITE, bubbleAlpha);
     }
@@ -2369,7 +2430,8 @@ function getGasGiantCloudCover(seed) {
 }
 
 function getEarthCloudCover(seed) {
-  return seededRange(seed, "earth_cloud_cover", 0.46, 0.6);
+  // 恢复原来的云层覆盖率范围，保证云层正常成形
+  return seededRange(seed, "earth_cloud_cover", 0.46, 0.60);
 }
 
 function normalizeLongitude360(value) {
@@ -2416,9 +2478,9 @@ function resolveEarthSphereSample(u, v, frame) {
     return null;
   }
   const sphereZ = Math.sqrt(Math.max(0, 1 - radiusSquared));
-  const rotation = EARTH_CENTER_LONGITUDE_RADIANS + frame.spinAngle;
-  const cosRotation = Math.cos(rotation);
-  const sinRotation = Math.sin(rotation);
+  // 使用预计算的旋转矩阵（避免每像素重复计算cos/sin）
+  const cosRotation = frame.earthCosRotation;
+  const sinRotation = frame.earthSinRotation;
   const worldX = viewX * cosRotation + sphereZ * sinRotation;
   const worldZ = sphereZ * cosRotation - viewX * sinRotation;
   const light = clamp(
@@ -2526,8 +2588,16 @@ function renderEarthSurface(buffer, frame) {
 
     const distanceFromCenter = distance2(pixelU, pixelV, 0.5, 0.5);
     const isLand = isEarthLandCoordinate(sample.longitude, sample.latitude);
-    const isCoastline = isLand && hasEarthNeighborState(sample.longitude, sample.latitude, false);
-    const nearLand = !isLand && hasEarthNeighborState(sample.longitude, sample.latitude, true);
+    
+    // 优化：缓存邻域检查结果，避免重复计算坐标转换
+    let isCoastline = false;
+    let nearLand = false;
+    if (isLand) {
+      isCoastline = hasEarthNeighborState(sample.longitude, sample.latitude, false);
+    } else {
+      nearLand = hasEarthNeighborState(sample.longitude, sample.latitude, true);
+    }
+    
     const terrainValue = getEarthTerrainValue(sample.longitude, sample.latitude);
     const moistureValue = getEarthMoistureValue(sample.longitude, sample.latitude);
     const oceanValue = getEarthOceanValue(sample.longitude, sample.latitude);
@@ -2562,14 +2632,14 @@ function renderEarthClouds(buffer, frame) {
     pixelsScale: 1,
     lightOrigin: [0.38, 0.38],
     cloudCover: getEarthCloudCover(frame.config.seed),
-    timeSpeed: 0.12,
-    timeFactor: 0.72,
-    stretch: 2.15,
-    cloudCurve: 1.18,
-    lightBorder1: 0.52,
-    lightBorder2: 0.66,
-    size: 8.6,
-    octaves: 4,
+    timeSpeed: 0.12,      // 改回接近原来的值，稍微调整
+    timeFactor: 0.72,     // 改回原来的值
+    stretch: 2.15,        // 改回原来的值
+    cloudCurve: 1.18,     // 改回原来的值
+    lightBorder1: 0.52,   // 改回原来的值
+    lightBorder2: 0.66,   // 改回原来的值
+    size: 8.6,            // 改回原来的值
+    octaves: 4,           // 改回原来的值
     colors: [
       EARTH_CLOUD_BRIGHT,
       EARTH_CLOUD_SOFT,
@@ -2593,6 +2663,16 @@ function buildFrameState(config, preset, progressValue) {
   const motionFactor = directionFactor;
   const spinFactor = directionFactor;
   const spinAngle = progress * spinFactor * TWO_PI;
+  
+  // 预计算地球旋转矩阵（避免每像素重复计算）
+  const earthRotation = EARTH_CENTER_LONGITUDE_RADIANS + spinAngle;
+  const earthCosRotation = Math.cos(earthRotation);
+  const earthSinRotation = Math.sin(earthRotation);
+  
+  // 传送门使用真实时间（固定60秒周期），不受速度影响
+  const realTimeSeconds = (Date.now() / 1000) % 60;  // 0-60秒循环
+  const portalProgress = realTimeSeconds / 60;  // 0-1
+  
   return {
     config,
     preset,
@@ -2606,6 +2686,9 @@ function buildFrameState(config, preset, progressValue) {
     frameDelay: getFrameDelay(speedValue),
     sizeScale: getSizeScaleForPreset(config.preset, config.size),
     shaderSeed: convertShaderSeed(config.seed),
+    earthCosRotation,
+    earthSinRotation,
+    portalProgress,  // 传送门专用的progress（固定60秒）
   };
 }
 
@@ -3231,7 +3314,7 @@ function readPreviewCache(key) {
 }
 
 function writePreviewCache(key, sequence) {
-  if (PREVIEW_CACHE.size >= 8) {
+  if (PREVIEW_CACHE.size >= 16) {  // 从8增加到16，减少缓存失效
     const firstKey = PREVIEW_CACHE.keys().next().value;
     PREVIEW_CACHE.delete(firstKey);
   }
@@ -3250,20 +3333,20 @@ function buildPlanetScreensaverPreviewSequenceFromNormalized(normalized) {
   const delays = [];
   const frameDelay = getFrameDelay(normalized.speed);
 
-  for (let frameIndex = 0; frameIndex < FRAME_COUNT; frameIndex += 1) {
-    const progress = FRAME_COUNT > 0 ? frameIndex / FRAME_COUNT : 0;
-    maps.push(renderPlanetScreensaverPreviewMap(normalized, preset, progress));
-    delays.push(frameDelay);
-  }
+  // 只渲染第一帧作为静态预览
+  const firstProgress = 0;
+  maps.push(renderPlanetScreensaverPreviewMap(normalized, preset, firstProgress));
+  delays.push(frameDelay);
 
   const sequence = {
     cacheKey,
     config: normalized,
-    frameCount: FRAME_COUNT,
+    frameCount: 1,  // 只有1帧
     frameDelay,
     maps,
     delays,
   };
+  
   writePreviewCache(cacheKey, sequence);
   return sequence;
 }

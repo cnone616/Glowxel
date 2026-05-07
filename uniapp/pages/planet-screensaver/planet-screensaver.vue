@@ -920,36 +920,53 @@ export default {
       });
     },
     renderPreviewFrame(progress) {
-      // 使用预渲染序列缓存，避免每帧实时渲染
+      // 使用预渲染的第一帧（静态预览）
       let frameMap;
-      if (this.previewSequence && this.previewSequence.maps) {
-        const frameIndex = Math.floor(progress * this.previewSequence.frameCount);
-        const clampedIndex = Math.max(0, Math.min(frameIndex, this.previewSequence.maps.length - 1));
-        frameMap = this.previewSequence.maps[clampedIndex];
+      if (this.previewSequence && this.previewSequence.maps && this.previewSequence.maps.length > 0) {
+        // 始终使用第一帧
+        frameMap = this.previewSequence.maps[0];
+        
+        // 只有显示时钟时才复制frameMap，避免污染缓存
+        if (this.clockConfig.time.show) {
+          frameMap = new Map(frameMap);
+          const text = this.getPlanetTimeText();
+          const placement = this.resolveBoardTimePlacement(text);
+          drawClockTextToPixels(
+            text,
+            placement.x,
+            placement.y,
+            this.clockConfig.time.color,
+            frameMap,
+            this.clockConfig.font,
+            placement.fontSize,
+            "left",
+          );
+        }
       } else {
-        // 回退：如果没有序列，实时渲染（慢）
+        // 回退：如果没有序列，实时渲染第一帧
         frameMap = buildPlanetScreensaverPreviewFrame(
           {
             ...this.config,
           },
-          progress,
+          0,  // 始终使用第一帧
         );
+        
+        if (this.clockConfig.time.show) {
+          const text = this.getPlanetTimeText();
+          const placement = this.resolveBoardTimePlacement(text);
+          drawClockTextToPixels(
+            text,
+            placement.x,
+            placement.y,
+            this.clockConfig.time.color,
+            frameMap,
+            this.clockConfig.font,
+            placement.fontSize,
+            "left",
+          );
+        }
       }
       
-      if (this.clockConfig.time.show) {
-        const text = this.getPlanetTimeText();
-        const placement = this.resolveBoardTimePlacement(text);
-        drawClockTextToPixels(
-          text,
-          placement.x,
-          placement.y,
-          this.clockConfig.time.color,
-          frameMap,
-          this.clockConfig.font,
-          placement.fontSize,
-          "left",
-        );
-      }
       this.previewDisplayPixels = frameMap;
     },
     resolveBoardTimePlacement(text) {
@@ -1226,33 +1243,11 @@ export default {
         return;
       }
       
-      // 预渲染整个序列并缓存
+      // 只渲染第一帧作为静态预览
       this.previewSequence = buildPlanetScreensaverPreviewSequence(this.config);
       
-      const cycleDuration = getPlanetPreviewCycleDuration(this.config.speed);
-      const normalizedProgress =
-        typeof preservedProgress === "number" &&
-        Number.isFinite(preservedProgress)
-          ? ((preservedProgress % 1) + 1) % 1
-          : 0;
-      this.previewPlaybackStartedAt =
-        cycleDuration > 0
-          ? Date.now() - normalizedProgress * cycleDuration
-          : Date.now();
-      this.renderPreviewFrame(normalizedProgress);
-
-      const tick = () => {
-        const cycleDuration = getPlanetPreviewCycleDuration(this.config.speed);
-        const elapsed = Date.now() - this.previewPlaybackStartedAt;
-        let progress = 0;
-        if (cycleDuration > 0) {
-          progress = (elapsed % cycleDuration) / cycleDuration;
-        }
-        this.renderPreviewFrame(progress);
-        this.previewTimer = setTimeout(tick, PLANET_PREVIEW_PLAYBACK_INTERVAL_MS);
-      };
-
-      this.previewTimer = setTimeout(tick, PLANET_PREVIEW_PLAYBACK_INTERVAL_MS);
+      // 显示静态预览（不启动动画循环）
+      this.renderPreviewFrame(0);
     },
     stopPreviewPlayback() {
       if (this.previewTimer) {
