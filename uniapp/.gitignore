@@ -58,3 +58,4 @@ Desktop.ini
 !static/matrix-logo.png
 !static/clockwise-themes/*.jpg
 !static/clockwise-themes/*.png
+!static/tabbar/*.png

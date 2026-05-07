@@ -1,0 +1,546 @@
+{
+  "generator": "uniapp/scripts/generate_figma_assets.py",
+  "source": "Implement Now (2)",
+  "assets": [
+    {
+      "type": "basic-icon",
+      "file": "static/figma-assets/icons-svg/icon-back.svg",
+      "label": "返回",
+      "lucide_slug": "arrow-left",
+      "suggested_target": "direction-left",
+      "format": "svg",
+      "size": "24x24"
+    },
+    {
+      "type": "basic-icon",
+      "file": "static/figma-assets/icons-svg/icon-close.svg",
+      "label": "关闭",
+      "lucide_slug": "x",
+      "suggested_target": "close",
+      "format": "svg",
+      "size": "24x24"
+    },
+    {
+      "type": "basic-icon",
+      "file": "static/figma-assets/icons-svg/icon-search.svg",
+      "label": "搜索",
+      "lucide_slug": "search",
+      "suggested_target": "search",
+      "format": "svg",
+      "size": "24x24"
+    },
+    {
+      "type": "basic-icon",
+      "file": "static/figma-assets/icons-svg/icon-settings.svg",
+      "label": "设置",
+      "lucide_slug": "settings",
+      "suggested_target": "setting",
+      "format": "svg",
+      "size": "24x24"
+    },
+    {
+      "type": "basic-icon",
+      "file": "static/figma-assets/icons-svg/icon-save.svg",
+      "label": "保存",
+      "lucide_slug": "save",
+      "suggested_target": "save",
+      "format": "svg",
+      "size": "24x24"
+    },
+    {
+      "type": "basic-icon",
+      "file": "static/figma-assets/icons-svg/icon-trash.svg",
+      "label": "删除",
+      "lucide_slug": "trash-2",
+      "suggested_target": "delete",
+      "format": "svg",
+      "size": "24x24"
+    },
+    {
+      "type": "basic-icon",
+      "file": "static/figma-assets/icons-svg/icon-edit.svg",
+      "label": "编辑",
+      "lucide_slug": "square-pen",
+      "suggested_target": "edit",
+      "format": "svg",
+      "size": "24x24"
+    },
+    {
+      "type": "basic-icon",
+      "file": "static/figma-assets/icons-svg/icon-refresh.svg",
+      "label": "刷新",
+      "lucide_slug": "refresh-cw",
+      "suggested_target": "refresh",
+      "format": "svg",
+      "size": "24x24"
+    },
+    {
+      "type": "basic-icon",
+      "file": "static/figma-assets/icons-svg/icon-image.svg",
+      "label": "图片",
+      "lucide_slug": "image",
+      "suggested_target": "picture",
+      "format": "svg",
+      "size": "24x24"
+    },
+    {
+      "type": "basic-icon",
+      "file": "static/figma-assets/icons-svg/icon-upload.svg",
+      "label": "上传",
+      "lucide_slug": "upload",
+      "suggested_target": "upload",
+      "format": "svg",
+      "size": "24x24"
+    },
+    {
+      "type": "basic-icon",
+      "file": "static/figma-assets/icons-svg/icon-download.svg",
+      "label": "下载",
+      "lucide_slug": "download",
+      "suggested_target": "download",
+      "format": "svg",
+      "size": "24x24"
+    },
+    {
+      "type": "basic-icon",
+      "file": "static/figma-assets/icons-svg/icon-link.svg",
+      "label": "链接",
+      "lucide_slug": "link",
+      "suggested_target": "link",
+      "format": "svg",
+      "size": "24x24"
+    },
+    {
+      "type": "basic-icon",
+      "file": "static/figma-assets/icons-svg/icon-play.svg",
+      "label": "播放",
+      "lucide_slug": "play",
+      "suggested_target": "play",
+      "format": "svg",
+      "size": "24x24"
+    },
+    {
+      "type": "basic-icon",
+      "file": "static/figma-assets/icons-svg/icon-message.svg",
+      "label": "消息",
+      "lucide_slug": "message-square",
+      "suggested_target": "comment",
+      "format": "svg",
+      "size": "24x24"
+    },
+    {
+      "type": "basic-icon",
+      "file": "static/figma-assets/icons-svg/icon-task.svg",
+      "label": "任务",
+      "lucide_slug": "list-todo",
+      "suggested_target": "task",
+      "format": "svg",
+      "size": "24x24"
+    },
+    {
+      "type": "basic-icon",
+      "file": "static/figma-assets/icons-svg/icon-calendar.svg",
+      "label": "日历",
+      "lucide_slug": "calendar",
+      "suggested_target": "calendar",
+      "format": "svg",
+      "size": "24x24"
+    },
+    {
+      "type": "basic-icon",
+      "file": "static/figma-assets/icons-svg/icon-success.svg",
+      "label": "成功",
+      "lucide_slug": "check-circle",
+      "suggested_target": "success",
+      "format": "svg",
+      "size": "24x24"
+    },
+    {
+      "type": "basic-icon",
+      "file": "static/figma-assets/icons-svg/icon-warning.svg",
+      "label": "警告",
+      "lucide_slug": "alert-circle",
+      "suggested_target": "warning",
+      "format": "svg",
+      "size": "24x24"
+    },
+    {
+      "type": "basic-icon",
+      "file": "static/figma-assets/icons-svg/icon-info.svg",
+      "label": "信息",
+      "lucide_slug": "info",
+      "suggested_target": "info",
+      "format": "svg",
+      "size": "24x24"
+    },
+    {
+      "type": "basic-icon",
+      "file": "static/figma-assets/icons-svg/icon-heart.svg",
+      "label": "喜欢",
+      "lucide_slug": "heart",
+      "suggested_target": "heart",
+      "format": "svg",
+      "size": "24x24"
+    },
+    {
+      "type": "basic-icon",
+      "file": "static/figma-assets/icons-svg/icon-star.svg",
+      "label": "收藏",
+      "lucide_slug": "star",
+      "suggested_target": "star",
+      "format": "svg",
+      "size": "24x24"
+    },
+    {
+      "type": "basic-icon",
+      "file": "static/figma-assets/icons-svg/icon-users.svg",
+      "label": "用户",
+      "lucide_slug": "users",
+      "suggested_target": "users",
+      "format": "svg",
+      "size": "24x24"
+    },
+    {
+      "type": "basic-icon",
+      "file": "static/figma-assets/icons-svg/icon-award.svg",
+      "label": "奖励",
+      "lucide_slug": "award",
+      "suggested_target": "award",
+      "format": "svg",
+      "size": "24x24"
+    },
+    {
+      "type": "basic-icon",
+      "file": "static/figma-assets/icons-svg/icon-bell.svg",
+      "label": "通知",
+      "lucide_slug": "bell",
+      "suggested_target": "bell",
+      "format": "svg",
+      "size": "24x24"
+    },
+    {
+      "type": "basic-icon",
+      "file": "static/figma-assets/icons-svg/icon-smartphone.svg",
+      "label": "手机",
+      "lucide_slug": "smartphone",
+      "suggested_target": "mobile-phone",
+      "format": "svg",
+      "size": "24x24"
+    },
+    {
+      "type": "basic-icon",
+      "file": "static/figma-assets/icons-svg/icon-scan.svg",
+      "label": "扫描",
+      "lucide_slug": "scan",
+      "suggested_target": "scanning",
+      "format": "svg",
+      "size": "24x24"
+    },
+    {
+      "type": "basic-icon",
+      "file": "static/figma-assets/icons-svg/icon-palette.svg",
+      "label": "调色板",
+      "lucide_slug": "palette",
+      "suggested_target": "palette",
+      "format": "svg",
+      "size": "24x24"
+    },
+    {
+      "type": "basic-icon",
+      "file": "static/figma-assets/icons-svg/icon-grid.svg",
+      "label": "网格",
+      "lucide_slug": "grid-3x3",
+      "suggested_target": "grid",
+      "format": "svg",
+      "size": "24x24"
+    },
+    {
+      "type": "basic-icon",
+      "file": "static/figma-assets/icons-svg/icon-clock.svg",
+      "label": "时间",
+      "lucide_slug": "clock",
+      "suggested_target": "time",
+      "format": "svg",
+      "size": "24x24"
+    },
+    {
+      "type": "basic-icon",
+      "file": "static/figma-assets/icons-svg/icon-trophy.svg",
+      "label": "奖杯",
+      "lucide_slug": "trophy",
+      "suggested_target": "trophy",
+      "format": "svg",
+      "size": "24x24"
+    },
+    {
+      "type": "basic-icon",
+      "file": "static/figma-assets/icons-svg/icon-crown.svg",
+      "label": "皇冠",
+      "lucide_slug": "crown",
+      "suggested_target": "crown",
+      "format": "svg",
+      "size": "24x24"
+    },
+    {
+      "type": "basic-icon",
+      "file": "static/figma-assets/icons-svg/icon-zap.svg",
+      "label": "闪电",
+      "lucide_slug": "zap",
+      "suggested_target": "prompt",
+      "format": "svg",
+      "size": "24x24"
+    },
+    {
+      "type": "mode-badge",
+      "file": "static/figma-assets/mode-badges/badge-eyes@2x.png",
+      "source_svg": "static/figma-assets/mode-badges/badge-eyes@2x.svg",
+      "name": "桌面宠物",
+      "key": "eyes",
+      "format": "png",
+      "size": "120x120@2x"
+    },
+    {
+      "type": "mode-badge",
+      "file": "static/figma-assets/mode-badges/badge-clock@2x.png",
+      "source_svg": "static/figma-assets/mode-badges/badge-clock@2x.svg",
+      "name": "静态时钟",
+      "key": "clock",
+      "format": "png",
+      "size": "120x120@2x"
+    },
+    {
+      "type": "mode-badge",
+      "file": "static/figma-assets/mode-badges/badge-animation@2x.png",
+      "source_svg": "static/figma-assets/mode-badges/badge-animation@2x.svg",
+      "name": "动态时钟",
+      "key": "animation",
+      "format": "png",
+      "size": "120x120@2x"
+    },
+    {
+      "type": "mode-badge",
+      "file": "static/figma-assets/mode-badges/badge-theme@2x.png",
+      "source_svg": "static/figma-assets/mode-badges/badge-theme@2x.svg",
+      "name": "主题模式",
+      "key": "theme",
+      "format": "png",
+      "size": "120x120@2x"
+    },
+    {
+      "type": "mode-badge",
+      "file": "static/figma-assets/mode-badges/badge-canvas@2x.png",
+      "source_svg": "static/figma-assets/mode-badges/badge-canvas@2x.svg",
+      "name": "画板模式",
+      "key": "canvas",
+      "format": "png",
+      "size": "120x120@2x"
+    },
+    {
+      "type": "mode-badge",
+      "file": "static/figma-assets/mode-badges/badge-tetris@2x.png",
+      "source_svg": "static/figma-assets/mode-badges/badge-tetris@2x.svg",
+      "name": "方块屏保",
+      "key": "tetris",
+      "format": "png",
+      "size": "120x120@2x"
+    },
+    {
+      "type": "mode-badge",
+      "file": "static/figma-assets/mode-badges/badge-text-display@2x.png",
+      "source_svg": "static/figma-assets/mode-badges/badge-text-display@2x.svg",
+      "name": "文本展示",
+      "key": "text-display",
+      "format": "png",
+      "size": "120x120@2x"
+    },
+    {
+      "type": "mode-badge",
+      "file": "static/figma-assets/mode-badges/badge-ambient-light@2x.png",
+      "source_svg": "static/figma-assets/mode-badges/badge-ambient-light@2x.svg",
+      "name": "环绕灯",
+      "key": "ambient-light",
+      "format": "png",
+      "size": "120x120@2x"
+    },
+    {
+      "type": "mode-badge",
+      "file": "static/figma-assets/mode-badges/badge-rhythm@2x.png",
+      "source_svg": "static/figma-assets/mode-badges/badge-rhythm@2x.svg",
+      "name": "律动",
+      "key": "rhythm",
+      "format": "png",
+      "size": "120x120@2x"
+    },
+    {
+      "type": "achievement-badge",
+      "file": "static/figma-assets/achievement-badges/achievement-first-create-common@2x.png",
+      "source_svg": "static/figma-assets/achievement-badges/achievement-first-create-common@2x.svg",
+      "name": "首次创作",
+      "key": "first-create-common",
+      "format": "png",
+      "size": "96x96@2x"
+    },
+    {
+      "type": "achievement-badge",
+      "file": "static/figma-assets/achievement-badges/achievement-streak-7-rare@2x.png",
+      "source_svg": "static/figma-assets/achievement-badges/achievement-streak-7-rare@2x.svg",
+      "name": "连续创作7天",
+      "key": "streak-7-rare",
+      "format": "png",
+      "size": "96x96@2x"
+    },
+    {
+      "type": "achievement-badge",
+      "file": "static/figma-assets/achievement-badges/achievement-community-epic@2x.png",
+      "source_svg": "static/figma-assets/achievement-badges/achievement-community-epic@2x.svg",
+      "name": "社区达人",
+      "key": "community-epic",
+      "format": "png",
+      "size": "96x96@2x"
+    },
+    {
+      "type": "achievement-badge",
+      "file": "static/figma-assets/achievement-badges/achievement-pixel-master-legendary@2x.png",
+      "source_svg": "static/figma-assets/achievement-badges/achievement-pixel-master-legendary@2x.svg",
+      "name": "像素大师",
+      "key": "pixel-master-legendary",
+      "format": "png",
+      "size": "96x96@2x"
+    },
+    {
+      "type": "achievement-badge",
+      "file": "static/figma-assets/achievement-badges/achievement-project-first-work-common@2x.png",
+      "source_svg": "static/figma-assets/achievement-badges/achievement-project-first-work-common@2x.svg",
+      "name": "初出茅庐",
+      "key": "project-first-work-common",
+      "format": "png",
+      "size": "96x96@2x"
+    },
+    {
+      "type": "achievement-badge",
+      "file": "static/figma-assets/achievement-badges/achievement-project-work-master-common@2x.png",
+      "source_svg": "static/figma-assets/achievement-badges/achievement-project-work-master-common@2x.svg",
+      "name": "作品达人",
+      "key": "project-work-master-common",
+      "format": "png",
+      "size": "96x96@2x"
+    },
+    {
+      "type": "achievement-badge",
+      "file": "static/figma-assets/achievement-badges/achievement-project-pixel-master-rare@2x.png",
+      "source_svg": "static/figma-assets/achievement-badges/achievement-project-pixel-master-rare@2x.svg",
+      "name": "像素大师",
+      "key": "project-pixel-master-rare",
+      "format": "png",
+      "size": "96x96@2x"
+    },
+    {
+      "type": "achievement-badge",
+      "file": "static/figma-assets/achievement-badges/achievement-project-legendary-creator-legendary@2x.png",
+      "source_svg": "static/figma-assets/achievement-badges/achievement-project-legendary-creator-legendary@2x.svg",
+      "name": "传奇创作者",
+      "key": "project-legendary-creator-legendary",
+      "format": "png",
+      "size": "96x96@2x"
+    },
+    {
+      "type": "achievement-badge",
+      "file": "static/figma-assets/achievement-badges/achievement-project-social-starter-common@2x.png",
+      "source_svg": "static/figma-assets/achievement-badges/achievement-project-social-starter-common@2x.svg",
+      "name": "社交新手",
+      "key": "project-social-starter-common",
+      "format": "png",
+      "size": "96x96@2x"
+    },
+    {
+      "type": "achievement-badge",
+      "file": "static/figma-assets/achievement-badges/achievement-project-popular-author-rare@2x.png",
+      "source_svg": "static/figma-assets/achievement-badges/achievement-project-popular-author-rare@2x.svg",
+      "name": "人气作者",
+      "key": "project-popular-author-rare",
+      "format": "png",
+      "size": "96x96@2x"
+    },
+    {
+      "type": "achievement-badge",
+      "file": "static/figma-assets/achievement-badges/achievement-project-like-harvester-epic@2x.png",
+      "source_svg": "static/figma-assets/achievement-badges/achievement-project-like-harvester-epic@2x.svg",
+      "name": "点赞收割机",
+      "key": "project-like-harvester-epic",
+      "format": "png",
+      "size": "96x96@2x"
+    },
+    {
+      "type": "achievement-badge",
+      "file": "static/figma-assets/achievement-badges/achievement-project-color-artist-common@2x.png",
+      "source_svg": "static/figma-assets/achievement-badges/achievement-project-color-artist-common@2x.svg",
+      "name": "色彩搭配师",
+      "key": "project-color-artist-common",
+      "format": "png",
+      "size": "96x96@2x"
+    },
+    {
+      "type": "achievement-badge",
+      "file": "static/figma-assets/achievement-badges/achievement-project-craftsman-rare@2x.png",
+      "source_svg": "static/figma-assets/achievement-badges/achievement-project-craftsman-rare@2x.svg",
+      "name": "精密工匠",
+      "key": "project-craftsman-rare",
+      "format": "png",
+      "size": "96x96@2x"
+    },
+    {
+      "type": "achievement-badge",
+      "file": "static/figma-assets/achievement-badges/achievement-project-night-owl-epic@2x.png",
+      "source_svg": "static/figma-assets/achievement-badges/achievement-project-night-owl-epic@2x.svg",
+      "name": "夜猫子",
+      "key": "project-night-owl-epic",
+      "format": "png",
+      "size": "96x96@2x"
+    },
+    {
+      "type": "achievement-badge",
+      "file": "static/figma-assets/achievement-badges/achievement-project-perfectionist-legendary@2x.png",
+      "source_svg": "static/figma-assets/achievement-badges/achievement-project-perfectionist-legendary@2x.svg",
+      "name": "完美主义者",
+      "key": "project-perfectionist-legendary",
+      "format": "png",
+      "size": "96x96@2x"
+    },
+    {
+      "type": "achievement-badge",
+      "file": "static/figma-assets/achievement-badges/achievement-common@2x.png",
+      "source_svg": "static/figma-assets/achievement-badges/achievement-common@2x.svg",
+      "name": "普通",
+      "key": "common",
+      "format": "png",
+      "size": "96x96@2x"
+    },
+    {
+      "type": "achievement-badge",
+      "file": "static/figma-assets/achievement-badges/achievement-rare@2x.png",
+      "source_svg": "static/figma-assets/achievement-badges/achievement-rare@2x.svg",
+      "name": "稀有",
+      "key": "rare",
+      "format": "png",
+      "size": "96x96@2x"
+    },
+    {
+      "type": "achievement-badge",
+      "file": "static/figma-assets/achievement-badges/achievement-epic@2x.png",
+      "source_svg": "static/figma-assets/achievement-badges/achievement-epic@2x.svg",
+      "name": "史诗",
+      "key": "epic",
+      "format": "png",
+      "size": "96x96@2x"
+    },
+    {
+      "type": "achievement-badge",
+      "file": "static/figma-assets/achievement-badges/achievement-legendary@2x.png",
+      "source_svg": "static/figma-assets/achievement-badges/achievement-legendary@2x.svg",
+      "name": "传说",
+      "key": "legendary",
+      "format": "png",
+      "size": "96x96@2x"
+    }
+  ]
+}
