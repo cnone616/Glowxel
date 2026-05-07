@@ -136,7 +136,6 @@ export async function importImageAsPixels(options) {
           let usePixelPerfect = pixelPerfect === true
           if (pixelPerfect === 'auto') {
             usePixelPerfect = detectPixelArt(detectData, image.width, image.height)
-            console.log('检测到像素画:', usePixelPerfect)
           }
           
           // 重新设置 Canvas 尺寸为目标尺寸

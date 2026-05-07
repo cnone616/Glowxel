@@ -72,9 +72,6 @@ export class GIFParser {
     // 解析数据流
     this._parseDataStream();
 
-    console.log(
-      `GIF 解析完成: ${this.frames.length} 帧, ${this.width}x${this.height}`,
-    );
     return {
       width: this.width,
       height: this.height,

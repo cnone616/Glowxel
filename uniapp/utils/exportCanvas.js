@@ -132,10 +132,6 @@ export async function exportCanvasAsImage(options) {
       return;
     }
 
-    console.log(
-      `导出 Canvas 尺寸: ${canvasWidth}x${canvasHeight}, cellSize: ${cellSize}, 画布: ${width}x${height}, 颜色数: ${colorStats.size}`,
-    );
-
     // 判断需要哪些套装
     const requiredPresets = [];
     if (palette && palette.length > 0) {

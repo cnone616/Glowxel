@@ -112,7 +112,8 @@ bool handlePlanetScreensaverCommand(
 
   const char* preset = doc["preset"];
   if (preset == nullptr ||
-      (strcmp(preset, "terran_wet") != 0 &&
+      (strcmp(preset, "earth") != 0 &&
+       strcmp(preset, "terran_wet") != 0 &&
        strcmp(preset, "terran_dry") != 0 &&
        strcmp(preset, "islands") != 0 &&
        strcmp(preset, "no_atmosphere") != 0 &&
@@ -123,6 +124,9 @@ bool handlePlanetScreensaverCommand(
        strcmp(preset, "asteroid") != 0 &&
        strcmp(preset, "black_hole") != 0 &&
        strcmp(preset, "galaxy") != 0 &&
+       strcmp(preset, "portal_green") != 0 &&
+       strcmp(preset, "portal_blue") != 0 &&
+       strcmp(preset, "portal_yellow") != 0 &&
        strcmp(preset, "star") != 0)) {
     wsSetErrorResponse(response, "invalid planet preset");
     return true;

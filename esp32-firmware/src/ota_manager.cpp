@@ -23,12 +23,8 @@ void OTAManager::init() {
   ConfigManager::preferences.end();
 
   if (serverUrl.length() == 0) {
-    Serial.println("[OTA] 未配置服务器地址，跳过更新检查");
     return;
   }
-
-  Serial.printf("[OTA] 当前固件版本: %s\n", FIRMWARE_VERSION);
-  Serial.printf("[OTA] 服务器: %s\n", serverUrl.c_str());
 }
 
 void OTAManager::checkUpdate() {
@@ -36,8 +32,6 @@ void OTAManager::checkUpdate() {
 
   HTTPClient http;
   String url = serverUrl + "/api/firmware/check?version=" + FIRMWARE_VERSION + "&device_type=" + DEVICE_TYPE;
-  
-  Serial.printf("[OTA] 检查更新: %s\n", url.c_str());
   http.begin(url);
   http.setTimeout(10000);
   
@@ -58,16 +52,10 @@ void OTAManager::checkUpdate() {
         md5Hash = data["md5"].as<String>();
         changelog = data["changelog"].as<String>();
         isForce = data["is_force"] | false;
-        
-        Serial.printf("[OTA] 发现新版本: %s (当前: %s)\n", latestVersion.c_str(), FIRMWARE_VERSION);
-        Serial.printf("[OTA] 更新日志: %s\n", changelog.c_str());
-        
+
         if (isForce) {
-          Serial.println("[OTA] 强制更新，开始下载...");
           startUpdate();
         }
-      } else {
-        Serial.println("[OTA] 已是最新版本");
       }
     }
   } else {
@@ -93,7 +81,6 @@ bool OTAManager::startUpdate() {
 
   // 构建下载 URL
   String downloadUrl = serverUrl + "/api/firmware/download/" + latestVersion;
-  Serial.printf("[OTA] 下载固件: %s\n", downloadUrl.c_str());
 
   HTTPClient http;
   http.begin(downloadUrl);
@@ -118,16 +105,13 @@ bool OTAManager::startUpdate() {
 
   WiFiClient* stream = http.getStreamPtr();
   size_t written = Update.writeStream(*stream);
-  
-  if (written == contentLength) {
-    Serial.println("[OTA] 固件写入完成");
-  } else {
+
+  if (written != contentLength) {
     Serial.printf("[OTA] 写入不完整: %d / %d\n", written, contentLength);
   }
 
   if (Update.end()) {
     if (Update.isFinished()) {
-      Serial.println("[OTA] 更新成功，重启中...");
       d->clearScreen();
       DisplayManager::drawTinyTextCentered("UPDATE OK", 26, d->color565(100, 255, 100));
       DisplayManager::drawTinyTextCentered("REBOOTING", 36, d->color565(150, 150, 150));
@@ -136,9 +120,8 @@ bool OTAManager::startUpdate() {
       return true;
     }
   }
-  
-  Serial.printf("[OTA] 更新失败: %s\n", Update.getError());
+
+  Serial.printf("[OTA] 更新失败: %u\n", Update.getError());
   http.end();
   return false;
 }
-

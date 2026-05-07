@@ -132,15 +132,6 @@ export default {
           const fileName = (file.name || tempFilePath || "").toLowerCase();
           const isGif = fileName.endsWith(".gif");
 
-          console.log(
-            "选择文件:",
-            fileName,
-            "是否GIF:",
-            isGif,
-            "模式:",
-            this.clockMode,
-          );
-
           if (isGif && this.clockMode === "animation") {
             this._handleGifFile(tempFilePath);
           } else {
@@ -236,10 +227,6 @@ export default {
       const targetH = this.config.image.height || 64;
       const renderedFrames = parser.renderFrames(targetW, targetH);
 
-      console.log(
-        `GIF 配置: width=${targetW}, height=${targetH}, offsetX=${this.config.image.x || 0}, offsetY=${this.config.image.y || 0}`,
-      );
-
       const offsetX = this.config.image.x || 0;
       const offsetY = this.config.image.y || 0;
       if (targetW + offsetX > 64 || targetH + offsetY > 64) {
@@ -259,7 +246,6 @@ export default {
         offsetY,
         renderedFrames,
       );
-      console.log(`GIF 动画数据: ${this.gifAnimationData.frameCount} 帧`);
 
       this.gifRenderedFrameMaps = renderedFrames.map((frame) => ({
         rgba: frame.rgba,
@@ -276,7 +262,6 @@ export default {
         this.gifIsPlaying = false;
         this.gifFrameIndex = 0;
       }
-      console.log("GIF 帧已生成:", this.gifRenderedFrameMaps.length, "帧");
     },
 
     _rgbaFrameToPixelMapData(rgba, width, height) {
@@ -311,7 +296,6 @@ export default {
       try {
         const filePath = `${uni.env.USER_DATA_PATH}/clock_gif.bin`;
         uni.getFileSystemManager().writeFileSync(filePath, arrayBuffer);
-        console.log("GIF 二进制已保存到:", filePath);
       } catch (e) {
         console.error("保存 GIF 文件失败:", e);
       }
@@ -341,7 +325,6 @@ export default {
                     this.config.image.show = true;
                     this.resumeAnimationGifPreview();
                     this.drawCanvas();
-                    console.log("GIF 动画已从本地恢复");
                     if (shouldNotify && this.toast) {
                       this.toast.showSuccess("已恢复上次使用");
                     }
@@ -364,7 +347,6 @@ export default {
               });
             },
             fail: () => {
-              console.log("没有保存的 GIF 文件");
               if (shouldNotify && this.toast) {
                 this.toast.showInfo("没有可恢复的上次 GIF");
               }
@@ -395,13 +377,6 @@ export default {
       const targetWidth = this.config.image.width;
       const targetHeight = this.config.image.height;
 
-      console.log(
-        "开始转换图片为像素数据，目标尺寸:",
-        targetWidth,
-        "x",
-        targetHeight,
-      );
-
       const query = uni.createSelectorQuery().in(this);
       query
         .select("#imageProcessCanvas")
@@ -424,7 +399,6 @@ export default {
             if (conversionToken !== this._imageConvertToken) {
               return;
             }
-            console.log("图片加载成功，原始尺寸:", img.width, "x", img.height);
             try {
               const originalWidth = canvas.width;
               const originalHeight = canvas.height;
@@ -459,12 +433,6 @@ export default {
               }
 
               this.imagePixels = pixelMap;
-              console.log(
-                "图片转换完成，像素数量:",
-                pixelMap.size,
-                "/ 总数:",
-                targetWidth * targetHeight,
-              );
 
               this.drawCanvas();
             } catch (err) {

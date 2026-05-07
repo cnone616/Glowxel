@@ -3,17 +3,30 @@ const CANVAS_SIZE = 64;
 const PREVIEW_DIAMETER = 52;
 const PREVIEW_CENTER = CANVAS_SIZE * 0.5;
 const TWO_PI = Math.PI * 2;
+const PLANET_DEFAULT_COLOR_SEED = 33521;
+const PLANET_REFERENCE_DEFAULT_COLOR_SEED = 20260415;
+const EARTH_MAP_WIDTH = 128;
+const EARTH_MAP_HEIGHT = 64;
+const EARTH_CENTER_LONGITUDE_RADIANS = 135 * Math.PI / 180;
+const EARTH_STATIC_DETAIL_SEED = 4.15;
+const EARTH_STATIC_CLIMATE_SEED = 7.31;
 
 const PLANET_PREVIEW_MIN_PIXELS = 12;
 const PLANET_PREVIEW_MAX_PIXELS = 5000;
 const MAX_PLANET_PREVIEW_SEED = 999999999;
 const PLANET_PREVIEW_MIN_SPEED = 1;
 const PLANET_PREVIEW_MAX_SPEED = 7;
-const PLANET_PREVIEW_PLAYBACK_INTERVAL_MS = 16;
+const PLANET_PREVIEW_PLAYBACK_INTERVAL_MS = 8;  // 从16ms提升到8ms，实现125 FPS
 const PLANET_SIZE_OPTIONS = [
   { id: "small", label: "小" },
   { id: "medium", label: "中" },
   { id: "large", label: "大" },
+];
+
+const PLANET_EARTH_SIZE_OPTIONS = [
+  { id: "small", label: "远景" },
+  { id: "medium", label: "标准" },
+  { id: "large", label: "近景" },
 ];
 
 const PLANET_DIRECTION_OPTIONS = [
@@ -21,12 +34,32 @@ const PLANET_DIRECTION_OPTIONS = [
   { id: "right", label: "右转" },
 ];
 
-const FRAME_DELAY_BY_SPEED = [840, 720, 620, 530, 450, 380, 320, 270, 220, 180];
+const PLANET_PORTAL_PRESET_IDS = ["portal_green", "portal_blue", "portal_yellow"];
+const PORTAL_SWIRL_ROTATIONS_PER_CYCLE = 1.35;
+const PORTAL_BUBBLE_ROTATIONS_PER_CYCLE = 1.18;
+const PORTAL_LIFECYCLE_REPEATS_PER_CYCLE = 1;     // 1分钟1次循环
+const PORTAL_OPEN_END = 1.5/60.0;               // 1.5秒打开
+const PORTAL_CLOSE_START = 58.5/60.0;           // 58.5秒开始关闭
+const PORTAL_BUBBLE_ORBITS = Object.freeze([
+  { angle: -1.45, radius: 0.43, size: 0.038, alpha: 0.96, speed: 1.00, wobble: 0.72, life: 0.86, offset: 0.02 },
+  { angle: -0.92, radius: 0.46, size: 0.024, alpha: 0.82, speed: 0.82, wobble: 1.08, life: 1.14, offset: 0.31 },
+  { angle: -0.34, radius: 0.44, size: 0.020, alpha: 0.78, speed: 1.17, wobble: 0.94, life: 0.98, offset: 0.58 },
+  { angle: 0.26, radius: 0.46, size: 0.031, alpha: 0.92, speed: 0.91, wobble: 1.22, life: 1.06, offset: 0.17 },
+  { angle: 0.86, radius: 0.43, size: 0.018, alpha: 0.76, speed: 1.11, wobble: 0.84, life: 1.20, offset: 0.72 },
+  { angle: 1.34, radius: 0.45, size: 0.033, alpha: 0.94, speed: 0.76, wobble: 1.16, life: 0.92, offset: 0.46 },
+  { angle: 2.02, radius: 0.42, size: 0.023, alpha: 0.80, speed: 1.24, wobble: 0.78, life: 1.10, offset: 0.64 },
+  { angle: 2.62, radius: 0.46, size: 0.034, alpha: 0.94, speed: 0.96, wobble: 1.30, life: 0.88, offset: 0.25 },
+  { angle: 3.20, radius: 0.43, size: 0.018, alpha: 0.72, speed: 1.08, wobble: 0.88, life: 1.24, offset: 0.83 },
+  { angle: 3.74, radius: 0.45, size: 0.027, alpha: 0.86, speed: 0.87, wobble: 1.02, life: 1.02, offset: 0.39 },
+]);
+const FRAME_DELAY_BY_SPEED = [480, 360, 280, 220, 180, 150, 120, 100, 80, 60];
 const RING_TIME_BASE = 314.15;
 
 const PREVIEW_CACHE = new Map();
 const STARFIELD_CACHE = new Map();
-const RANDOM_PALETTE_CACHE = new Map();
+const PLANET_COLOR_VARIANT_CACHE = new Map();
+const EARTH_SURFACE_CACHE = new Map();  // 地球表面缓存
+const EARTH_TERRAIN_CACHE = new Map();  // 地球地形值缓存
 let ACTIVE_PREVIEW_CENTER_X = PREVIEW_CENTER;
 let ACTIVE_PREVIEW_CENTER_Y = PREVIEW_CENTER;
 
@@ -39,6 +72,90 @@ const COLOR_WARM_WHITE = rgba(1, 0.937255, 0.619608, 1);
 const COLOR_SPACE_BLUE = rgba(0.14902, 0.258824, 0.501961, 1);
 const COLOR_SPACE_TEAL = rgba(0.109804, 0.388235, 0.431373, 1);
 const COLOR_SPACE_ROSE = rgba(0.341176, 0.14902, 0.301961, 1);
+const STAR_BLOB_COLOR = rgba(1, 1, 0.894118, 1);
+const EARTH_LIGHT_DIRECTION = [-0.45, 0.35, 0.82];
+const EARTH_OCEAN_DEEP = [0.031373, 0.152941, 0.443137];
+const EARTH_OCEAN_MID = [0.058824, 0.32549, 0.639216];
+const EARTH_OCEAN_SHALLOW = [0.164706, 0.568627, 0.8];
+const EARTH_OCEAN_COAST = [0.470588, 0.772549, 0.847059];
+const EARTH_LAND_LUSH = [0.188235, 0.545098, 0.258824];
+const EARTH_LAND_DARK = [0.094118, 0.321569, 0.160784];
+const EARTH_LAND_DRY = [0.560784, 0.482353, 0.239216];
+const EARTH_LAND_HIGHLAND = [0.337255, 0.290196, 0.172549];
+const EARTH_LAND_COAST = [0.756863, 0.701961, 0.447059];
+const EARTH_ICE_BRIGHT = [0.921569, 0.964706, 1];
+const EARTH_ICE_SHADOW = [0.678431, 0.803922, 0.921569];
+const EARTH_CLOUD_BRIGHT = rgba(0.980392, 1, 0.992157, 1);
+const EARTH_CLOUD_SOFT = rgba(0.878431, 0.92549, 0.972549, 1);
+const EARTH_CLOUD_MID = rgba(0.470588, 0.580392, 0.752941, 1);
+const EARTH_CLOUD_SHADOW = rgba(0.262745, 0.329412, 0.490196, 1);
+
+const EARTH_LAND_HEX_ROWS = [
+  "00000000000000000000000000000000",
+  "00000000000000000000000000000000",
+  "000000001f80ff000000000000000000",
+  "00000003feffff8003c0000060000000",
+  "0000060070ffff80040000000c000000",
+  "00000000c00fff8000000801fe000000",
+  "00001beefc0fff00000030fffffc3800",
+  "07fffc93a703fe0003f802dffffffff7",
+  "f7ffffff83c7e0600ff5ffffffffffff",
+  "13ffffff038380001effffffffffffff",
+  "07effffc0e0080003cfffffffffffe38",
+  "00c0fffe07c000020e7fffffffffc0c0",
+  "00003fffefe0000711ffffffffff01c0",
+  "00001fffeff00003ffffffffffffe000",
+  "00001fffff180001ffffffffffffe000",
+  "00000fffffe00001fffb9fffffffa000",
+  "00000ffffe000005ebc3bfffffff3000",
+  "00000ffffc00000705ffdffffffc0000",
+  "00000ffff800000708ff9fffffcc4000",
+  "000007fff8000003f007ffffffc5c000",
+  "000003ffe0000007f90fffffffe20000",
+  "000000fd2000000fffffbfffffe00000",
+  "000000781800001ffff7dfffffe00000",
+  "000000380000003ffffbf0ffffc00000",
+  "000000188800003ffffbf87e7c000000",
+  "0000001d8a80003ffffdf03c3c000000",
+  "00000001c000003ffffdc0301e000000",
+  "000000004000003fffff00101e000000",
+  "0000000025c0001fffffc01004000000",
+  "000000000fe0000fffffc00810080000",
+  "000000000ffc00001fff800028400000",
+  "000000000ffc00001fff000011cc0000",
+  "000000001fff00001ffe000009b10000",
+  "000000001fffe0000ffc00000c10f000",
+  "000000000ffff00007fc000003007000",
+  "000000000fffe00007fc000000200800",
+  "0000000007ffc00007fc40000003a000",
+  "0000000007ffc0000ffc4000000f3000",
+  "0000000001ffc0000ff8c000001ff000",
+  "0000000001ff800007f08000007ff800",
+  "0000000001ff000007f8800000fffc00",
+  "0000000001fe000007f0000000fffc00",
+  "0000000001fc000003e00000007ffe00",
+  "0000000001f8000003c000000078fc00",
+  "0000000003f000000000000000007c00",
+  "0000000003f000000000000000002802",
+  "0000000003c000000000000000001002",
+  "00000000038000000000000000000008",
+  "00000000070000000000000000000000",
+  "00000000070000000000008000000000",
+  "00000000072000000000000000000000",
+  "00000000018000000000000000000000",
+  "00000000000000000000000000000000",
+  "00000000000000000000000000000000",
+  "00000000000000000000000000000000",
+  "00000000004000000000100008800000",
+  "00000000008000000009ff8ffffffe00",
+  "0000000007c0000fffffff7ffffffff8",
+  "0001ff8fffc0003fffffffffffffffe0",
+  "00fffffff80007ffffffffffffffffc0",
+  "000ffffff82703ffffffffffffffff80",
+  "003fffffffefffffffffffffffffffe0",
+  "00000000000000000000000000000000",
+  "00000000000000000000000000000000",
+];
 
 const SMALL_STAR_PATTERNS = [
   [[0, 0]],
@@ -101,7 +218,84 @@ const SPECIAL_STAR_PATTERNS = [
   ],
 ];
 
+const PORTAL_TEMPLATE_ROWS = [
+  "0000000000000000000000000000000000000000000000000000000000000000",
+  "0000000000000000000000000000000000000000000000000000000000000000",
+  "0000000000000000000000000000000000000000000000000000000000000000",
+  "0000000000000000000000000000000000000000000000000000000000000000",
+  "0000000000000000000000000000000000000000000000000000000000000000",
+  "0000000000000000000000000001111110000000000000000000000000000000",
+  "0000000000000000000000111111111111111771011000000000000000000000",
+  "000000000000000000000111117F111111112FF502F200000000000000000000",
+  "00000000000000000001111111352148111116A3013100000000000000000000",
+  "000000000000000001111111222124AF98863100112210000000000000000000",
+  "0000000000000000111111122236ACCCCDDDCB842AFFF2000000000000000000",
+  "00000000000000011111136537BDCBAAAAAABCDDCFFFFF100000000000000000",
+  "000000000000001111478FFFBDEEEEEDDCBA9ABBDFFFFF600000000000000000",
+  "000000000000001117FFFFFFEEEEEEEEFFFDB9999CFFFF800000000000000000",
+  "00000000000014212FFFFFFFEFFFFFFEFFEEEDA998BFFFD91000000000000000",
+  "0000000000001F813FFFDEEEEEEEEEEEEEEEEEEB9989BCCDA100000000000000",
+  "00000000000012238AABDEEEEEEEEEEEEEDCDEEEC98889CCDB20000000000000",
+  "0000000000011139A9BDEEEDCBBBAAABEEECBCEEED988789ADB1000000000000",
+  "00000000000111898CEEEDA9AABBBBBACDEEBABDECC8888879D9000000000000",
+  "00000000001115A9AEEEB9ACDDDEEEDEEDDDEA9ADCBB89A887AD600000000000",
+  "0000000000111ADABEEA9CEDCCCBBABBCDDCBCB9ADBBABF9878CB10000000000",
+  "0000000001119CFFCEDADDAACBABBBBAAACEDABCA9D9BA99998AD50000000000",
+  "000000001108DA9BEEBDC9FFAAABDEEEDBAADEAAC9AB9A889989D90000000000",
+  "00000000983DB99DEBDB9FFAACDDCCDEDDDAACEA9B9B99989998BDF100000000",
+  "00000000549C98CEACB9CFBACEEEEEDDEBCDAADD9AA9A99999989FF300000000",
+  "0000000002CA99BABC9AFFAAAABEEEEEEEACCAAEC8A9A89999988D8000000000",
+  "0000000005DA99AAF99AFBBBAAACEEEEEED9DBABEA99A99AA9998A2000000000",
+  "000000001FFFBAAFB99BFBEEAAAACEEEEEEABDAAEC99A99AB9F9881000000000",
+  "000000001FFFFCBF999FDEEDAAABDEEEDEEBADB9CE999899F899981000000000",
+  "0000000119FFFBDF99AFEEEDAACEEEECADEAACC9BEC9A999F789894000000000",
+  "0000000106FFFAFB99CEEEECABEDBBAAABB9ABD9AEEAAAA9F889985000000000",
+  "0000000107DCBAFB9AEEEEDAADDAAAAAABCCABD9AEECFABCF889986000000000",
+  "0000000119CBBBFB9CEEEEC9BEBAAAAA9ABDBCDAAEEDFAFFB889987100000000",
+  "000000102CFFBBFBADEEEEB9CDAAAAAABCCDBEBABEEDF9DFA899987100000000",
+  "000000106EFFCBFBAEEDEEBADDAAAAADEEDBDDAADEEEB9ED989AB87000000000",
+  "000000109DFFBBFBAEEBCECACDAAAAADEEEEDBAAEEEF9BEF8999986330000000",
+  "00000001ADCCCBFCAEEBBEDABEAAAAABCDDCAA9ADBFB8CEC8A98784FF1000000",
+  "00000001ADCBDBFDAEECADEBADDAAAAAAAA999999BC99DECAA988718F2000000",
+  "000000109DCBEDDEBDEDABEDABECAAAAAAAA9999AB999DECA988891010000000",
+  "000000106FDCDEBECCEDBADEBABEDBAAAAAAAABBA999AEDBB9889C8100000000",
+  "000000103DDCCECFEDEEBABEEBABDEDCBAABDEDBAA99DECDEA88BDF400000000",
+  "0000000108DCCEDBDEEECABDEECAABDEEEDDCBAAA9ADECCCD989CB6100000000",
+  "0000000112BDCCECCEEEEBABEEEDBAAAABAAA999ACEEB98AB899D80000000000",
+  "00000000114CDCCEBCEFECAABEEEEDBBAAAAAABDEEC98ADB899BD40000000000",
+  "000000001115DFBEDADEFEBAABDEEEEDDDDDDEEDBAABDFC899ACB10000000000",
+  "0000000011116DCCEDBEEFDAABDEEEEDDDDDDBBBBDFFF98999FE600000000000",
+  "00000000011116DBDEDCEFFAACEEEEEEEEEEEDDEEEFBFB999ADB100000000000",
+  "000000000011117DBDECDFFFAAEEEEEEEEEEEEEEFCAAFB99ACC3000000000000",
+  "0000000000011119DCCBBFFFFBDEEEEEEEEEEEEEBABA9ABCCD40000000000000",
+  "00000000000111119DCCBCCAACEEEEEEEEEEEDCAABBBCCCDC400000000000000",
+  "000000000000011118DCCCAAABBEEEEEEEEEDBBCCCCDFDDA2000000000000000",
+  "0000000000000011115CDCCBBB9ACDEEEEEEEDDDCCCDFF600000000000000000",
+  "000000000000000111039DDCCCBA9ABCCDDCCCCCCCDCA5000000000000000000",
+  "00000000000000000111149CFFDCCBBAAAABCCDDDB7211100000000000000000",
+  "0000000000000000000110137ABBCFFFDFFFDCB9520010000000000000000000",
+  "00000000000000000000011001125FFFFFFF8211011100000000000000000000",
+  "00000000000000000000000111111FF9FFFF5111110000000000000000000000",
+  "0000000000000000000000000111112114A61111000000000000000000000000",
+  "0000000000000000000000000000111111111000000000000000000000000000",
+  "0000000000000000000000000000000000000000000000000000000000000000",
+  "0000000000000000000000000000000000000000000000000000000000000000",
+  "0000000000000000000000000000000000000000000000000000000000000000",
+  "0000000000000000000000000000000000000000000000000000000000000000",
+  "0000000000000000000000000000000000000000000000000000000000000000",
+];
+
+const EARTH_BACKGROUND_SEED = 20260415;
+const EARTH_OCEAN_SEED = 13697;
+
 const PRESET_DEFINITIONS = {
+  earth: {
+    id: "earth",
+    sourceLabel: "Earth",
+    label: "地球",
+    hint: "固定地球海陆轮廓，默认面向亚洲太平洋，云层随时间流动但大陆不漂移。",
+    relativeScale: 1,
+  },
   terran_wet: {
     id: "terran_wet",
     sourceLabel: "Terran Wet",
@@ -172,11 +366,32 @@ const PRESET_DEFINITIONS = {
     hint: "对应原始生成器里的 Black Hole，重点看吸积盘弯曲和高亮边在 64×64 下是否还成立。",
     relativeScale: 2,
   },
-  galaxy: {
-    id: "galaxy",
-    sourceLabel: "Galaxy",
-    label: "星系",
-    hint: "对应原始生成器里的 Galaxy，主要验证旋臂层叠、倾斜和旋转是否还能读出来。",
+  // galaxy: {
+  //   id: "galaxy",
+  //   sourceLabel: "Galaxy",
+  //   label: "星系",
+  //   hint: "对应原始生成器里的 Galaxy，主要验证旋臂层叠、倾斜和旋转是否还能读出来。",
+  //   relativeScale: 1,
+  // },
+  portal_green: {
+    id: "portal_green",
+    sourceLabel: "Portal Green",
+    label: "绿色传送门",
+    hint: "正面圆形液态旋涡门，固定酸性绿色系，不走随机颜色。",
+    relativeScale: 1,
+  },
+  portal_blue: {
+    id: "portal_blue",
+    sourceLabel: "Portal Blue",
+    label: "蓝色传送门",
+    hint: "正面圆形液态旋涡门，固定蓝色系，不走随机颜色。",
+    relativeScale: 1,
+  },
+  portal_yellow: {
+    id: "portal_yellow",
+    sourceLabel: "Portal Yellow",
+    label: "金色传送门",
+    hint: "正面圆形液态旋涡门，固定黄色/金色系，不走随机颜色。",
     relativeScale: 1,
   },
   star: {
@@ -203,7 +418,7 @@ function createDefaultPlanetPreviewConfig() {
     pixels: 100,
     size: "medium",
     seed: 20260415,
-    colorSeed: 20260415,
+    colorSeed: PLANET_DEFAULT_COLOR_SEED,
     planetX: 32,
     planetY: 32,
     direction: "right",
@@ -218,6 +433,18 @@ function createRandomPlanetPreviewSeed() {
 
 function createRandomPlanetColorSeed() {
   return Math.floor(Math.random() * (MAX_PLANET_PREVIEW_SEED + 1));
+}
+
+function isReferenceDefaultPlanetColorSeed(seed) {
+  return Number(seed) === PLANET_REFERENCE_DEFAULT_COLOR_SEED;
+}
+
+function isPortalPresetValue(presetId) {
+  return PLANET_PORTAL_PRESET_IDS.includes(presetId);
+}
+
+function isFixedPalettePlanetPreset(presetId) {
+  return presetId === "earth" || isPortalPresetValue(presetId);
 }
 
 function clamp(value, min, max) {
@@ -262,6 +489,19 @@ function smoothstep(edge0, edge1, value) {
   }
   const t = clamp01((value - edge0) / (edge1 - edge0));
   return t * t * (3 - 2 * t);
+}
+
+// 更平滑的缓动函数 - 用于传送门动画
+function easeInOutCubic(t) {
+  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+}
+
+function easeInOutBack(t) {
+  const c1 = 1.70158;
+  const c2 = c1 * 1.525;
+  return t < 0.5
+    ? (Math.pow(2 * t, 2) * ((c2 + 1) * 2 * t - c2)) / 2
+    : (Math.pow(2 * t - 2, 2) * ((c2 + 1) * (t * 2 - 2) + c2) + 2) / 2;
 }
 
 function distance2(x1, y1, x2, y2) {
@@ -375,6 +615,10 @@ function buildUntiledRand(seed) {
   };
 }
 
+const EARTH_TERRAIN_RAND = buildTiledRand(EARTH_STATIC_DETAIL_SEED, 18, 2, 1);
+const EARTH_MOISTURE_RAND = buildTiledRand(EARTH_STATIC_CLIMATE_SEED, 20, 1, 1);
+const EARTH_OCEAN_RAND = buildTiledRand(EARTH_OCEAN_SEED, 24, 2, 1);
+
 function noise2(x, y, randValue) {
   const ix = Math.floor(x);
   const iy = Math.floor(y);
@@ -417,8 +661,8 @@ function circleNoiseCloud(x, y, randValue) {
   const dx = fx - 0.25 - h * 0.5;
   const dy = fy - 0.25 - h * 0.5;
   const magnitude = Math.sqrt(dx * dx + dy * dy);
-  const radius = h * 0.25;
-  return smoothstep(0, radius, magnitude * 0.75);
+  const radius = h * 0.28;  // 与ESP32保持一致
+  return smoothstep(0, radius, magnitude * 0.68);  // 与ESP32保持一致
 }
 
 function circleNoiseCrater(x, y, randValue) {
@@ -548,312 +792,225 @@ function hsvToRgb(hue, saturation, value) {
   return [red + match, green + match, blue + match];
 }
 
-function randomRange(random, min, max) {
-  return min + random() * (max - min);
-}
-
-function randomInt(random, minInclusive, maxInclusive) {
-  return Math.floor(randomRange(random, minInclusive, maxInclusive + 1));
-}
-
 function makeColor(red, green, blue, alpha = 1) {
   return [clamp01(red), clamp01(green), clamp01(blue), clamp01(alpha)];
 }
 
-function colorFromHex(hex) {
-  const normalized = hex.replace(/^#/, "");
+function mixColor(left, right, amount) {
   return makeColor(
-    parseInt(normalized.slice(0, 2), 16) / 255,
-    parseInt(normalized.slice(2, 4), 16) / 255,
-    parseInt(normalized.slice(4, 6), 16) / 255,
+    mix(left[0], right[0], amount),
+    mix(left[1], right[1], amount),
+    mix(left[2], right[2], amount),
+    mix(left[3], right[3], amount),
   );
 }
 
-function darkenColor(color, amount) {
-  const factor = 1 - amount;
+function scaleColor(color, factor) {
   return makeColor(color[0] * factor, color[1] * factor, color[2] * factor, color[3]);
 }
 
-function lightenColor(color, amount) {
-  return makeColor(
-    color[0] + (1 - color[0]) * amount,
-    color[1] + (1 - color[1]) * amount,
-    color[2] + (1 - color[2]) * amount,
-    color[3],
-  );
-}
-
-function shiftHue(color, deltaHue) {
-  const hsv = rgbToHsv(color[0], color[1], color[2]);
-  const shifted = hsvToRgb(hsv[0] + deltaHue, hsv[1], hsv[2]);
-  return makeColor(shifted[0], shifted[1], shifted[2], color[3]);
-}
-
-function generateNewColorscheme(random, count, hueDiff = 0.9, saturation = 0.5) {
-  const base = [0.5, 0.5, 0.5];
-  const amplitude = [0.5 * saturation, 0.5 * saturation, 0.5 * saturation];
-  const frequency = [
-    randomRange(random, 0.5, 1.5) * hueDiff,
-    randomRange(random, 0.5, 1.5) * hueDiff,
-    randomRange(random, 0.5, 1.5) * hueDiff,
-  ];
-  const phaseScale = randomRange(random, 1, 3);
-  const phase = [random(), random(), random()].map((value) => value * phaseScale);
-  const colors = [];
-  const divisor = Math.max(1, count - 1);
-  for (let index = 0; index < count; index += 1) {
-    const ratio = index / divisor;
-    colors.push(
-      makeColor(
-        base[0] + amplitude[0] * Math.cos(TWO_PI * (frequency[0] * ratio + phase[0])),
-        base[1] + amplitude[1] * Math.cos(TWO_PI * (frequency[1] * ratio + phase[1])),
-        base[2] + amplitude[2] * Math.cos(TWO_PI * (frequency[2] * ratio + phase[2])),
-      ),
-    );
+function decodeEarthHexRows(rows) {
+  const mask = new Uint8Array(EARTH_MAP_WIDTH * EARTH_MAP_HEIGHT);
+  for (let row = 0; row < EARTH_MAP_HEIGHT; row += 1) {
+    const line = rows[row] || "";
+    let column = 0;
+    for (let index = 0; index < line.length && column < EARTH_MAP_WIDTH; index += 1) {
+      const value = parseInt(line[index], 16);
+      if (!Number.isFinite(value)) {
+        continue;
+      }
+      for (let bit = 3; bit >= 0 && column < EARTH_MAP_WIDTH; bit -= 1) {
+        mask[row * EARTH_MAP_WIDTH + column] = (value >> bit) & 1;
+        column += 1;
+      }
+    }
   }
-  return colors;
+  return mask;
 }
 
-function pickPaletteColors(palette, key, fallbackColors) {
-  if (!palette || !palette[key]) {
-    return fallbackColors;
+function wrapEarthColumn(column) {
+  let wrapped = column % EARTH_MAP_WIDTH;
+  if (wrapped < 0) {
+    wrapped += EARTH_MAP_WIDTH;
   }
-  return palette[key];
+  return wrapped;
 }
 
-function buildRandomizedPresetPalette(frame) {
-  if (frame.config.useDefaultColors) {
-    return null;
+function clampEarthRow(row) {
+  if (row < 0) {
+    return 0;
   }
+  if (row >= EARTH_MAP_HEIGHT) {
+    return EARTH_MAP_HEIGHT - 1;
+  }
+  return row;
+}
 
+function readEarthMask(mask, column, row) {
+  return mask[clampEarthRow(row) * EARTH_MAP_WIDTH + wrapEarthColumn(column)] === 1;
+}
+
+function buildEarthNeighborMask(mask, sourceLand, neighborLand, radius) {
+  const derived = new Uint8Array(mask.length);
+  for (let row = 0; row < EARTH_MAP_HEIGHT; row += 1) {
+    for (let column = 0; column < EARTH_MAP_WIDTH; column += 1) {
+      const index = row * EARTH_MAP_WIDTH + column;
+      const currentLand = mask[index] === 1;
+      if (currentLand !== sourceLand) {
+        continue;
+      }
+      let hit = false;
+      for (let dy = -radius; dy <= radius && !hit; dy += 1) {
+        const nextRow = clampEarthRow(row + dy);
+        for (let dx = -radius; dx <= radius; dx += 1) {
+          if (dx === 0 && dy === 0) {
+            continue;
+          }
+          if (readEarthMask(mask, column + dx, nextRow) === neighborLand) {
+            hit = true;
+            break;
+          }
+        }
+      }
+      if (hit) {
+        derived[index] = 1;
+      }
+    }
+  }
+  return derived;
+}
+
+const EARTH_LAND_MASK = decodeEarthHexRows(EARTH_LAND_HEX_ROWS);
+const EARTH_COAST_LAND_MASK = buildEarthNeighborMask(EARTH_LAND_MASK, true, false, 1);
+const EARTH_SHALLOW_WATER_MASK = buildEarthNeighborMask(EARTH_LAND_MASK, false, true, 2);
+
+function nextPlanetSeededRandom(state) {
+  const nextState = (Math.imul(state >>> 0, 1664525) + 1013904223) >>> 0;
+  return {
+    state: nextState,
+    value: nextState / 4294967296,
+  };
+}
+
+function seededPlanetRange(seed, key, minValue, maxValue) {
+  const startState = ((seed >>> 0) ^ hashString(key)) >>> 0;
+  const random = nextPlanetSeededRandom(startState);
+  return minValue + (maxValue - minValue) * random.value;
+}
+
+function writePlanetColorVariantCache(key, variant) {
+  if (PLANET_COLOR_VARIANT_CACHE.size >= 32) {
+    const firstKey = PLANET_COLOR_VARIANT_CACHE.keys().next().value;
+    PLANET_COLOR_VARIANT_CACHE.delete(firstKey);
+  }
+  PLANET_COLOR_VARIANT_CACHE.set(key, variant);
+}
+
+function buildPlanetColorVariant(frame) {
   const cacheKey = `${frame.preset.id}:${frame.config.colorSeed >>> 0}`;
-  const cachedPalette = RANDOM_PALETTE_CACHE.get(cacheKey);
-  if (cachedPalette) {
-    return cachedPalette;
+  const cachedVariant = PLANET_COLOR_VARIANT_CACHE.get(cacheKey);
+  if (cachedVariant) {
+    return cachedVariant;
   }
 
-  const random = createSeededRandom(
-    frame.config.colorSeed >>> 0,
-    hashString(`${frame.preset.id}_random_palette`),
-  );
+  if (
+    isFixedPalettePlanetPreset(frame.preset.id) ||
+    isReferenceDefaultPlanetColorSeed(frame.config.colorSeed)
+  ) {
+    const variant = {
+      hueShift: 0,
+      saturationScale: 1,
+      valueScale: 1,
+      tintMix: 0,
+      tint: makeColor(0, 0, 0, 1),
+    };
+    writePlanetColorVariantCache(cacheKey, variant);
+    return variant;
+  }
 
-  let palette = null;
-  if (frame.preset.id === "terran_wet") {
-    const seedColors = generateNewColorscheme(
-      random,
-      randomInt(random, 3, 4),
-      randomRange(random, 0.7, 1.0),
-      randomRange(random, 0.45, 0.55),
-    );
-    const landColors = [];
-    const waterColors = [];
-    const cloudColors = [];
-    for (let index = 0; index < 4; index += 1) {
-      landColors.push(shiftHue(darkenColor(seedColors[0], index / 4), 0.2 * (index / 4)));
+  const variant = {
+    hueShift: seededPlanetRange(frame.config.colorSeed, `${frame.preset.id}_color_variant_hue`, -0.32, 0.32),
+    saturationScale: seededPlanetRange(frame.config.colorSeed, `${frame.preset.id}_color_variant_sat`, 0.68, 1.42),
+    valueScale: seededPlanetRange(frame.config.colorSeed, `${frame.preset.id}_color_variant_val`, 0.78, 1.26),
+    tintMix: seededPlanetRange(frame.config.colorSeed, `${frame.preset.id}_color_variant_mix`, 0.04, 0.26),
+    tint: makeColor(
+      seededPlanetRange(frame.config.colorSeed, `${frame.preset.id}_color_variant_r`, 0.2, 1.0),
+      seededPlanetRange(frame.config.colorSeed, `${frame.preset.id}_color_variant_g`, 0.2, 1.0),
+      seededPlanetRange(frame.config.colorSeed, `${frame.preset.id}_color_variant_b`, 0.2, 1.0),
+      1,
+    ),
+  };
+  writePlanetColorVariantCache(cacheKey, variant);
+  return variant;
+}
+
+function applyPlanetColorVariantToBuffer(buffer, frame) {
+  if (
+    isFixedPalettePlanetPreset(frame.preset.id) ||
+    isReferenceDefaultPlanetColorSeed(frame.config.colorSeed)
+  ) {
+    return;
+  }
+  const variant = buildPlanetColorVariant(frame);
+  for (let offset = 0; offset < buffer.length; offset += 3) {
+    const red = buffer[offset];
+    const green = buffer[offset + 1];
+    const blue = buffer[offset + 2];
+    if (red <= 0 && green <= 0 && blue <= 0) {
+      continue;
     }
-    for (let index = 0; index < 2; index += 1) {
-      waterColors.push(shiftHue(darkenColor(seedColors[1], index / 2), 0.2 * (index / 2)));
-    }
-    for (let index = 0; index < 4; index += 1) {
-      cloudColors.push(shiftHue(lightenColor(seedColors[2], (1 - index / 4) * 0.8), 0.2 * (index / 4)));
-    }
-    palette = {
-      terranWetLand: [...landColors, ...waterColors],
-      terranWetClouds: cloudColors,
-    };
-  } else if (frame.preset.id === "terran_dry") {
-    const seedColors = generateNewColorscheme(
-      random,
-      randomInt(random, 5, 7),
-      randomRange(random, 0.3, 0.65),
-      1.0,
+
+    const hsv = rgbToHsv(red, green, blue);
+    const remapped = hsvToRgb(
+      hsv[0] + variant.hueShift,
+      clamp01(hsv[1] * variant.saturationScale),
+      clamp01(hsv[2] * variant.valueScale),
     );
-    palette = {
-      terranDry: Array.from({ length: 5 }, (_, index) =>
-        lightenColor(darkenColor(seedColors[index], index / 5), (1 - index / 5) * 0.2),
-      ),
-    };
-  } else if (frame.preset.id === "islands") {
-    const seedColors = generateNewColorscheme(
-      random,
-      randomInt(random, 3, 4),
-      randomRange(random, 0.7, 1.0),
-      randomRange(random, 0.45, 0.55),
-    );
-    const landColors = [];
-    const waterColors = [];
-    const cloudColors = [];
-    for (let index = 0; index < 4; index += 1) {
-      landColors.push(shiftHue(darkenColor(seedColors[0], index / 4), 0.2 * (index / 4)));
-    }
-    for (let index = 0; index < 3; index += 1) {
-      waterColors.push(shiftHue(darkenColor(seedColors[1], index / 5), 0.1 * (index / 2)));
-    }
-    for (let index = 0; index < 4; index += 1) {
-      cloudColors.push(shiftHue(lightenColor(seedColors[2], (1 - index / 4) * 0.8), 0.2 * (index / 4)));
-    }
-    palette = {
-      islandsWater: waterColors,
-      islandsLand: landColors,
-      islandsClouds: cloudColors,
-    };
-  } else if (frame.preset.id === "no_atmosphere") {
-    const seedColors = generateNewColorscheme(
-      random,
-      randomInt(random, 3, 4),
-      randomRange(random, 0.3, 0.6),
-      0.7,
-    );
-    const groundColors = Array.from({ length: 3 }, (_, index) =>
-      lightenColor(darkenColor(seedColors[index], index / 3), (1 - index / 3) * 0.2),
-    );
-    palette = {
-      noAtmosphereGround: groundColors,
-      noAtmosphereCraters: [groundColors[1], groundColors[2]],
-    };
-  } else if (frame.preset.id === "gas_giant_1") {
-    const seedColors = generateNewColorscheme(
-      random,
-      randomInt(random, 8, 11),
-      randomRange(random, 0.3, 0.8),
-      1.0,
-    );
-    const gasBase = [];
-    const gasAccent = [];
-    for (let index = 0; index < 4; index += 1) {
-      gasBase.push(darkenColor(darkenColor(seedColors[index], index / 6), 0.7));
-      gasAccent.push(lightenColor(darkenColor(seedColors[index + 4], index / 4), (1 - index / 4) * 0.5));
-    }
-    palette = {
-      gasGiantOneBase: gasBase,
-      gasGiantOneAccent: gasAccent,
-    };
-  } else if (frame.preset.id === "gas_giant_2") {
-    const seedColors = generateNewColorscheme(
-      random,
-      randomInt(random, 6, 9),
-      randomRange(random, 0.3, 0.55),
-      1.4,
-    );
-    const colors = [];
-    for (let index = 0; index < 6; index += 1) {
-      colors.push(lightenColor(darkenColor(seedColors[index], index / 7), (1 - index / 6) * 0.3));
-    }
-    palette = {
-      gasGiantTwoColors: colors.slice(0, 3),
-      gasGiantTwoDarkColors: colors.slice(3, 6),
-    };
-  } else if (frame.preset.id === "ice_world") {
-    const seedColors = generateNewColorscheme(
-      random,
-      randomInt(random, 3, 4),
-      randomRange(random, 0.7, 1.0),
-      randomRange(random, 0.45, 0.55),
-    );
-    const landColors = [];
-    const lakeColors = [];
-    const cloudColors = [];
-    for (let index = 0; index < 3; index += 1) {
-      landColors.push(shiftHue(darkenColor(seedColors[0], index / 3), 0.2 * (index / 4)));
-      lakeColors.push(shiftHue(darkenColor(seedColors[1], index / 3), 0.2 * (index / 3)));
-    }
-    for (let index = 0; index < 4; index += 1) {
-      cloudColors.push(shiftHue(lightenColor(seedColors[2], (1 - index / 4) * 0.8), 0.2 * (index / 4)));
-    }
-    palette = {
-      iceWorldLand: landColors,
-      iceWorldLakes: lakeColors,
-      iceWorldClouds: cloudColors,
-    };
-  } else if (frame.preset.id === "lava_world") {
-    const seedColors = generateNewColorscheme(
-      random,
-      randomInt(random, 2, 4),
-      randomRange(random, 0.6, 1.0),
-      randomRange(random, 0.7, 0.8),
-    );
-    const landColors = [];
-    const lavaColors = [];
-    for (let index = 0; index < 3; index += 1) {
-      landColors.push(shiftHue(darkenColor(seedColors[0], index / 3), 0.2 * (index / 4)));
-      lavaColors.push(shiftHue(darkenColor(seedColors[1], index / 3), 0.2 * (index / 3)));
-    }
-    palette = {
-      lavaWorldLand: landColors,
-      lavaWorldCraters: [landColors[1], landColors[2]],
-      lavaWorldRivers: lavaColors,
-    };
-  } else if (frame.preset.id === "asteroid") {
-    const seedColors = generateNewColorscheme(
-      random,
-      randomInt(random, 3, 4),
-      randomRange(random, 0.3, 0.6),
-      0.7,
-    );
-    palette = {
-      asteroid: Array.from({ length: 3 }, (_, index) =>
-        lightenColor(darkenColor(seedColors[index], index / 3), (1 - index / 3) * 0.2),
-      ),
-    };
-  } else if (frame.preset.id === "black_hole") {
-    const seedColors = generateNewColorscheme(
-      random,
-      randomInt(random, 5, 6),
-      randomRange(random, 0.3, 0.5),
-      2.0,
-    );
-    const diskColors = Array.from({ length: 5 }, (_, index) =>
-      lightenColor(
-        darkenColor(seedColors[index], (index / 5) * 0.7),
-        (1 - index / 5) * 0.9,
-      ),
-    );
-    palette = {
-      blackHoleCore: [colorFromHex("272736"), diskColors[0], diskColors[3]],
-      blackHoleDisk: diskColors,
-    };
-  } else if (frame.preset.id === "galaxy") {
-    const seedColors = generateNewColorscheme(
-      random,
-      6,
-      randomRange(random, 0.5, 0.8),
-      1.4,
-    );
-    palette = {
-      galaxy: Array.from({ length: 6 }, (_, index) =>
-        lightenColor(darkenColor(seedColors[index], index / 7), (1 - index / 6) * 0.6),
-      ),
-    };
-  } else if (frame.preset.id === "star") {
-    const seedColors = generateNewColorscheme(
-      random,
-      4,
-      randomRange(random, 0.2, 0.4),
-      2.0,
-    );
-    const coreColors = Array.from({ length: 4 }, (_, index) =>
-      lightenColor(
-        darkenColor(seedColors[index], (index / 4) * 0.9),
-        (1 - index / 4) * 0.8,
-      ),
-    );
-    coreColors[0] = lightenColor(coreColors[0], 0.8);
-    palette = {
-      starBlob: coreColors[0],
-      starCore: coreColors,
-      starFlares: [coreColors[1], coreColors[0]],
+    buffer[offset] = clamp01(mix(remapped[0], variant.tint[0], variant.tintMix));
+    buffer[offset + 1] = clamp01(mix(remapped[1], variant.tint[1], variant.tintMix));
+    buffer[offset + 2] = clamp01(mix(remapped[2], variant.tint[2], variant.tintMix));
+  }
+}
+
+function buildStarPresetPalette(frame) {
+  const evenSeed = (frame.config.colorSeed % 2) === 0;
+  if (evenSeed) {
+    return {
+      starBlob: STAR_BLOB_COLOR,
+      starCore: [
+        rgba(0.960784, 1, 0.909804),
+        rgba(1, 0.847059, 0.196078),
+        rgba(1, 0.509804, 0.231373),
+        rgba(0.486275, 0.0980392, 0.101961),
+      ],
+      starFlares: [
+        rgba(1, 0.847059, 0.196078),
+        rgba(0.960784, 1, 0.909804),
+      ],
     };
   }
 
-  RANDOM_PALETTE_CACHE.set(cacheKey, palette);
-  return palette;
+  return {
+    starBlob: STAR_BLOB_COLOR,
+    starCore: [
+      rgba(0.960784, 1, 0.909804),
+      rgba(0.466667, 0.839216, 0.756863),
+      rgba(0.109804, 0.572549, 0.654902),
+      rgba(0.0117647, 0.243137, 0.368627),
+    ],
+    starFlares: [
+      rgba(0.466667, 0.839216, 0.756863),
+      rgba(0.960784, 1, 0.909804),
+    ],
+  };
 }
 
 function renderPresetFrame(buffer, frame) {
   ACTIVE_PREVIEW_CENTER_X = frame.centerX;
   ACTIVE_PREVIEW_CENTER_Y = frame.centerY;
-  renderBackgroundStars(buffer, frame);
   renderPresetToBuffer(buffer, frame);
+  applyPlanetColorVariantToBuffer(buffer, frame);
+  renderBackgroundStars(buffer, frame);
 }
 
 function createLayerIterator(relativeScale, planeScale, sizeScale, callback) {
@@ -891,6 +1048,17 @@ function getDefaultSizeScale(sizeId) {
 }
 
 function getSizeScaleForPreset(presetId, sizeId) {
+  if (presetId === "earth") {
+    if (sizeId === "small") {
+      return 0.72;
+    }
+    if (sizeId === "medium") {
+      return 0.86;
+    }
+    if (sizeId === "large") {
+      return 0.98;
+    }
+  }
   if (presetId === "gas_giant_2") {
     if (sizeId === "small") {
       return 1.15;
@@ -924,6 +1092,17 @@ function getSizeScaleForPreset(presetId, sizeId) {
       return 1.5;
     }
   }
+  if (isPortalPresetValue(presetId)) {
+    if (sizeId === "small") {
+      return 0.673;  // 35像素: 35/52
+    }
+    if (sizeId === "medium") {
+      return 0.962;  // 50像素: 50/52
+    }
+    if (sizeId === "large") {
+      return 1.154;  // 60像素: 60/52
+    }
+  }
   if (presetId === "star") {
     if (sizeId === "small") {
       return 1;
@@ -940,6 +1119,9 @@ function getSizeScaleForPreset(presetId, sizeId) {
 
 function getBackgroundStarExclusionRadius(frame) {
   if (frame.preset.id === "galaxy") {
+    return 30;
+  }
+  if (isPortalPresetValue(frame.preset.id)) {
     return 30;
   }
   if (frame.preset.id === "star") {
@@ -985,12 +1167,13 @@ function getPlanetPreviewCycleDuration(speedId) {
 }
 
 function renderBackgroundStars(buffer, frame) {
-  const cacheKey = `${frame.config.seed}:${frame.preset.id}:${frame.config.size}:${frame.config.planetX}:${frame.config.planetY}`;
+  const starSeed = frame.preset.id === "earth" ? EARTH_BACKGROUND_SEED : frame.config.seed;
+  const cacheKey = `${starSeed}:${frame.preset.id}:${frame.config.size}:${frame.config.planetX}:${frame.config.planetY}`;
   let background = STARFIELD_CACHE.get(cacheKey);
   if (!background) {
     background = [];
     const random = createSeededRandom(
-      frame.config.seed >>> 0,
+      starSeed >>> 0,
       hashString("planet_starfield_sparse"),
     );
     const exclusionRadius = getBackgroundStarExclusionRadius(frame);
@@ -1162,6 +1345,7 @@ function renderClouds(buffer, frame, layer) {
     frame.motionFactor,
     layer.timeFactor || 1,
   );
+  // 改回原来的计算方式
   const timeOffset = time * layer.timeSpeed;
 
   createLayerIterator(frame.preset.relativeScale, layer.planeScale, frame.sizeScale, (offset, u, v) => {
@@ -1179,8 +1363,9 @@ function renderClouds(buffer, frame, layer) {
     let sphereY = sphere[1] + smoothstep(0, layer.cloudCurve, Math.abs(sphere[0] - 0.4));
     sphereY *= layer.stretch;
 
+    // 云层噪声计算 - 6次循环，平衡质量和性能
     let cloudNoise = 0;
-    for (let index = 0; index < 9; index += 1) {
+    for (let index = 0; index < 6; index += 1) {
       cloudNoise += circleNoiseCloud(
         sphere[0] * layer.size * 0.3 + index + 11 + timeOffset,
         sphereY * layer.size * 0.3,
@@ -1215,6 +1400,7 @@ function renderGasClouds(buffer, frame, layer) {
   const pixels = useLayerPixels(frame.config.pixels, layer.pixelsScale);
   const randValue = buildTiledRand(frame.shaderSeed, layer.size);
   const time = loopTimeFromMultiplier(frame.progress, layer.size, layer.timeSpeed, frame.motionFactor);
+  // 改回原来的计算方式
   const timeOffset = time * layer.timeSpeed;
 
   createLayerIterator(frame.preset.relativeScale, layer.planeScale, frame.sizeScale, (offset, u, v) => {
@@ -1357,6 +1543,7 @@ function renderCraters(buffer, frame, layer) {
   const pixels = useLayerPixels(frame.config.pixels, layer.pixelsScale);
   const randValue = buildTiledRand(frame.shaderSeed, layer.size);
   const time = loopTimeFromMultiplier(frame.progress, layer.size, layer.timeSpeed, frame.motionFactor);
+  // 改回原来的计算方式
   const timeOffset = time * layer.timeSpeed;
 
   createLayerIterator(frame.preset.relativeScale, layer.planeScale, frame.sizeScale, (offset, u, v) => {
@@ -1582,6 +1769,7 @@ function renderDenseGas(buffer, frame, layer) {
   const pixels = useLayerPixels(frame.config.pixels, layer.pixelsScale);
   const randValue = buildTiledRand(frame.shaderSeed, layer.size, 2, 1);
   const time = loopTimeFromMultiplier(frame.progress, layer.size, layer.timeSpeed, frame.motionFactor);
+  // 改回原来的计算方式
   const timeOffset = time * layer.timeSpeed;
 
   createLayerIterator(frame.preset.relativeScale, layer.planeScale, frame.sizeScale, (offset, u, v) => {
@@ -2017,6 +2205,218 @@ function renderGalaxy(buffer, frame, layer) {
   });
 }
 
+function getPortalColorStops(presetId) {
+  if (presetId === "portal_green") {
+    return {
+      shadow: makeColor(0, 0.2, 0),
+      body: makeColor(0, 0.63, 0),
+      bright: makeColor(0.14, 0.94, 0),
+      highlight: makeColor(0.74, 1, 0.14),
+    };
+  }
+  if (presetId === "portal_blue") {
+    return {
+      shadow: makeColor(0.0, 0.16, 0.46),
+      body: makeColor(0.02, 0.55, 1),
+      bright: makeColor(0.16, 0.88, 1),
+      highlight: makeColor(0.78, 1, 1),
+    };
+  }
+  return {
+    shadow: makeColor(0.48, 0.22, 0.0),
+    body: makeColor(1, 0.58, 0.0),
+    bright: makeColor(1, 0.84, 0.05),
+    highlight: makeColor(1, 0.98, 0.52),
+  };
+}
+
+function readPortalTemplateLevel(u, v) {
+  if (u < 0 || u > 1 || v < 0 || v > 1) {
+    return 0;
+  }
+  const x = clamp(Math.round(u * 63), 0, 63);
+  const y = clamp(Math.round(v * 63), 0, 63);
+  return parseInt(PORTAL_TEMPLATE_ROWS[y][x], 16);
+}
+
+function portalColorForLevel(presetId, level) {
+  if (level >= 15) {
+    return COLOR_WHITE;
+  }
+  const stops = getPortalColorStops(presetId);
+  const t = clamp01(level / 14);
+  if (t < 0.35) {
+    return mixColor(stops.shadow, stops.body, t / 0.35);
+  }
+  if (t < 0.78) {
+    return mixColor(stops.body, stops.bright, (t - 0.35) / 0.43);
+  }
+  return mixColor(stops.bright, stops.highlight, (t - 0.78) / 0.22);
+}
+
+function resolvePortalClockwisePhase(progress) {
+  return progress * TWO_PI * PORTAL_SWIRL_ROTATIONS_PER_CYCLE;
+}
+
+function resolvePortalLifecycle(progress) {
+  const cycleProgress = mod(progress * PORTAL_LIFECYCLE_REPEATS_PER_CYCLE, 1);
+  
+  if (cycleProgress < PORTAL_OPEN_END) {
+    // 打开阶段 - 平滑放大
+    const t = cycleProgress / PORTAL_OPEN_END;
+    const ease = easeInOutCubic(t);
+    
+    return {
+      scale: 0.25 + 0.75 * ease,  // 从0.25放大到1.0，避免过小的值
+      alpha: ease,
+    };
+  }
+  
+  if (cycleProgress > PORTAL_CLOSE_START) {
+    // 关闭阶段 - 平滑缩小
+    const t = (cycleProgress - PORTAL_CLOSE_START) / (1 - PORTAL_CLOSE_START);
+    const ease = easeInOutCubic(1 - t);
+    
+    return {
+      scale: 0.25 + 0.75 * ease,  // 从1.0缩小到0.25
+      alpha: ease,
+    };
+  }
+  
+  // 持续阶段 - 保持稳定
+  return {
+    scale: 1.0,
+    alpha: 1.0,
+  };
+}
+
+function resolvePortalLifecycleUv(u, v, lifecycle) {
+  if (lifecycle.alpha <= 0) {
+    return null;
+  }
+  
+  // 计算到中心的距离
+  const dx = u - 0.5;
+  const dy = v - 0.5;
+  const distanceFromCenter = Math.sqrt(dx * dx + dy * dy);
+  
+  // 缩放后的距离
+  const scaledDistance = distanceFromCenter / lifecycle.scale;
+  
+  // 扩大有效区域，添加边界渐变
+  if (scaledDistance > 0.52) {
+    return null;
+  }
+  
+  // 进行缩放变换
+  const centerU = 0.5 + dx / lifecycle.scale;
+  const centerV = 0.5 + dy / lifecycle.scale;
+  
+  return [centerU, centerV];
+}
+
+function resolvePortalAnimatedLevel(baseLevel, u, v, progress) {
+  if (baseLevel <= 0) {
+    return 0;
+  }
+  const dx = u - 0.5;
+  const dy = v - 0.5;
+  const radius = Math.sqrt(dx * dx + dy * dy);
+  const phase = resolvePortalClockwisePhase(progress);
+  const radialDrag = 1.18 - smoothstep(0.14, 0.48, radius) * 0.34;
+  const rotated = rotateUv(u, v, -phase * radialDrag);
+  let sampledLevel = readPortalTemplateLevel(rotated[0], rotated[1]);
+  if (sampledLevel <= 0) {
+    sampledLevel = baseLevel;
+  }
+  if (sampledLevel >= 15) {
+    return 15;
+  }
+  if (baseLevel >= 15 && radius >= 0.42) {
+    return 0;
+  }
+  const rimLock = smoothstep(0.46, 0.52, radius);
+  const wave = Math.sin(Math.atan2(dy, dx) * 3.2 + radius * 18 - phase * 1.7);
+  const animatedLevel = clamp(Math.round(sampledLevel + wave * 1.45), 1, 14);
+  return rimLock > 0
+    ? clamp(Math.round(animatedLevel * (1 - rimLock) + baseLevel * rimLock), 1, 14)
+    : animatedLevel;
+}
+
+function resolvePortalBubbleAlpha(u, v, progress) {
+  const phase = progress * TWO_PI * PORTAL_BUBBLE_ROTATIONS_PER_CYCLE;
+  let alpha = 0;
+  PORTAL_BUBBLE_ORBITS.forEach((bubble, index) => {
+    const localLife = mod(progress * bubble.life + bubble.offset, 1);
+    const visible =
+      smoothstep(0, 0.16, localLife) *
+      (1 - smoothstep(0.72, 1, localLife));
+    if (visible <= 0) {
+      return;
+    }
+    const wobblePhase = progress * TWO_PI * bubble.wobble + bubble.offset * TWO_PI;
+    const drift = phase * bubble.speed + Math.sin(wobblePhase) * 0.18;
+    const angle = bubble.angle + drift;
+    const radius = bubble.radius + Math.sin(wobblePhase * 0.73 + index) * 0.025;
+    const size = bubble.size * (0.82 + (Math.sin(wobblePhase * 1.37) + 1) * 0.18);
+    const x = 0.5 + Math.cos(angle) * radius;
+    const y = 0.5 + Math.sin(angle) * radius;
+    const dx = u - x;
+    const dy = v - y;
+    const tangent = dx * -Math.sin(angle) + dy * Math.cos(angle);
+    const radial = dx * Math.cos(angle) + dy * Math.sin(angle);
+    const ellipseDistance = Math.sqrt(
+      (tangent / (size * 1.42)) * (tangent / (size * 1.42)) +
+      (radial / (size * 0.74)) * (radial / (size * 0.74)),
+    );
+    if (ellipseDistance >= 1) {
+      return;
+    }
+    const edge = smoothstep(1, 0.35, ellipseDistance);
+    alpha = Math.max(alpha, edge * bubble.alpha * visible);
+  });
+  return clamp01(alpha);
+}
+
+function renderPortalPreset(buffer, frame) {
+  // 传送门使用固定60秒周期，不受速度影响
+  const lifecycle = resolvePortalLifecycle(frame.portalProgress);
+  createLayerIterator(frame.preset.relativeScale, 1, frame.sizeScale, (offset, u, v) => {
+    const lifecycleUv = resolvePortalLifecycleUv(u, v, lifecycle);
+    if (!lifecycleUv) {
+      return;
+    }
+    
+    // 计算边界渐变
+    const dx = u - 0.5;
+    const dy = v - 0.5;
+    const distanceFromCenter = Math.sqrt(dx * dx + dy * dy);
+    const scaledDistance = distanceFromCenter / lifecycle.scale;
+    
+    // 在边界区域应用渐变
+    let edgeFade = 1;
+    if (scaledDistance > 0.48) {
+      edgeFade = (0.52 - scaledDistance) / 0.04;  // 在0.48-0.52之间线性渐变
+      edgeFade = clamp01(edgeFade);
+    }
+    
+    const sampleU = lifecycleUv[0];
+    const sampleV = lifecycleUv[1];
+    const baseLevel = readPortalTemplateLevel(sampleU, sampleV);
+    // 旋涡和气泡动画仍使用普通progress（受速度影响）
+    const level = resolvePortalAnimatedLevel(baseLevel, sampleU, sampleV, frame.progress);
+    if (level > 0) {
+      const color = portalColorForLevel(frame.preset.id, level);
+      const alpha = baseLevel <= 2 ? 0.74 : 1;
+      blendPixel(buffer, offset, color, alpha * lifecycle.alpha * edgeFade * color[3]);
+    }
+    const bubbleAlpha = resolvePortalBubbleAlpha(sampleU, sampleV, frame.progress) * lifecycle.alpha * edgeFade;
+    if (bubbleAlpha > 0) {
+      blendPixel(buffer, offset, COLOR_WHITE, bubbleAlpha);
+    }
+  });
+}
+
 function getWetTerranCloudCover(seed) {
   return seededRange(seed, "wet_terran_cloud_cover", 0.35, 0.6);
 }
@@ -2029,6 +2429,231 @@ function getGasGiantCloudCover(seed) {
   return seededRange(seed, "gas_giant_one_cloud_cover", 0.28, 0.5);
 }
 
+function getEarthCloudCover(seed) {
+  // 恢复原来的云层覆盖率范围，保证云层正常成形
+  return seededRange(seed, "earth_cloud_cover", 0.46, 0.60);
+}
+
+function normalizeLongitude360(value) {
+  return mod(value, 360);
+}
+
+function normalizeLongitudeDegrees(value) {
+  return mod(value + 180, 360) - 180;
+}
+
+function isEarthLandCoordinate(longitudeDegrees, latitudeDegrees) {
+  const longitude360 = normalizeLongitude360(longitudeDegrees);
+  const latitudeClamped = clamp(latitudeDegrees, -89.999, 89.999);
+  const column = wrapEarthColumn(
+    Math.floor((longitude360 / 360) * EARTH_MAP_WIDTH),
+  );
+  const row = clampEarthRow(
+    Math.floor(((90 - latitudeClamped) / 180) * EARTH_MAP_HEIGHT),
+  );
+  return readEarthMask(EARTH_LAND_MASK, column, row);
+}
+
+function hasEarthNeighborState(longitudeDegrees, latitudeDegrees, expectedLand) {
+  const longitude360 = normalizeLongitude360(longitudeDegrees);
+  const latitudeClamped = clamp(latitudeDegrees, -89.999, 89.999);
+  const column = wrapEarthColumn(
+    Math.floor((longitude360 / 360) * EARTH_MAP_WIDTH),
+  );
+  const row = clampEarthRow(
+    Math.floor(((90 - latitudeClamped) / 180) * EARTH_MAP_HEIGHT),
+  );
+  const index = row * EARTH_MAP_WIDTH + column;
+  if (expectedLand) {
+    return EARTH_SHALLOW_WATER_MASK[index] === 1;
+  }
+  return EARTH_COAST_LAND_MASK[index] === 1;
+}
+
+function resolveEarthSphereSample(u, v, frame) {
+  const viewX = u * 2 - 1;
+  const viewY = 1 - v * 2;
+  const radiusSquared = viewX * viewX + viewY * viewY;
+  if (radiusSquared > 1) {
+    return null;
+  }
+  const sphereZ = Math.sqrt(Math.max(0, 1 - radiusSquared));
+  // 使用预计算的旋转矩阵（避免每像素重复计算cos/sin）
+  const cosRotation = frame.earthCosRotation;
+  const sinRotation = frame.earthSinRotation;
+  const worldX = viewX * cosRotation + sphereZ * sinRotation;
+  const worldZ = sphereZ * cosRotation - viewX * sinRotation;
+  const light = clamp(
+    viewX * EARTH_LIGHT_DIRECTION[0] +
+      viewY * EARTH_LIGHT_DIRECTION[1] +
+      sphereZ * EARTH_LIGHT_DIRECTION[2],
+    0,
+    1,
+  );
+  return {
+    sphereX: viewX,
+    sphereY: viewY,
+    sphereZ,
+    longitude: normalizeLongitudeDegrees((Math.atan2(worldX, worldZ) * 180) / Math.PI),
+    latitude: clamp((Math.asin(viewY) * 180) / Math.PI, -90, 90),
+    light,
+  };
+}
+
+function getEarthTerrainValue(longitudeDegrees, latitudeDegrees) {
+  const longitude = normalizeLongitude360(longitudeDegrees) / 360;
+  const latitude = (latitudeDegrees + 90) / 180;
+  return fbm2(longitude * 8.2 + 0.37, latitude * 5.6 + 0.19, EARTH_TERRAIN_RAND, 4);
+}
+
+function getEarthMoistureValue(longitudeDegrees, latitudeDegrees) {
+  const longitude = normalizeLongitude360(longitudeDegrees) / 360;
+  const latitude = (latitudeDegrees + 90) / 180;
+  return fbm2(longitude * 6.1 + 1.73, latitude * 4.9 + 0.88, EARTH_MOISTURE_RAND, 3);
+}
+
+function getEarthOceanValue(longitudeDegrees, latitudeDegrees) {
+  const longitude = normalizeLongitude360(longitudeDegrees) / 360;
+  const latitude = (latitudeDegrees + 90) / 180;
+  return fbm2(longitude * 7.4 + 2.31, latitude * 7.2 + 1.17, EARTH_OCEAN_RAND, 3);
+}
+
+function resolveEarthOceanColor(latitudeDegrees, lightValue, oceanValue, nearLand) {
+  const deepOcean = makeColor(...EARTH_OCEAN_DEEP, 1);
+  const midOcean = makeColor(...EARTH_OCEAN_MID, 1);
+  const tropicalOcean = makeColor(...EARTH_OCEAN_SHALLOW, 1);
+  const shorelineOcean = makeColor(...EARTH_OCEAN_COAST, 1);
+  const polarOcean = makeColor(0.666667, 0.819608, 0.905882, 1);
+  const tropicalFactor = 1 - smoothstep(10, 48, Math.abs(latitudeDegrees));
+  const polarFactor = smoothstep(58, 82, Math.abs(latitudeDegrees));
+  let color = mixColor(deepOcean, midOcean, clamp01(lightValue * 0.6 + oceanValue * 0.35));
+  color = mixColor(color, tropicalOcean, tropicalFactor * 0.42);
+  color = mixColor(color, polarOcean, polarFactor * 0.35);
+  if (nearLand) {
+    color = mixColor(color, shorelineOcean, 0.4);
+  }
+  return scaleColor(color, 0.76 + lightValue * 0.48);
+}
+
+function resolveEarthLandColor(latitudeDegrees, lightValue, terrainValue, moistureValue, isCoastline) {
+  const tropicalForest = makeColor(...EARTH_LAND_LUSH, 1);
+  const temperateGreen = makeColor(0.431373, 0.658824, 0.290196, 1);
+  const dryGrass = makeColor(0.627451, 0.623529, 0.305882, 1);
+  const desert = makeColor(...EARTH_LAND_DRY, 1);
+  const mountain = makeColor(...EARTH_LAND_HIGHLAND, 1);
+  const taiga = makeColor(...EARTH_LAND_DARK, 1);
+  const snow = makeColor(...EARTH_ICE_BRIGHT, 1);
+  const coast = makeColor(...EARTH_LAND_COAST, 1);
+  const polarFactor = smoothstep(56, 80, Math.abs(latitudeDegrees));
+  let color = temperateGreen;
+  if (Math.abs(latitudeDegrees) > 52) {
+    color = taiga;
+  }
+  if (moistureValue < 0.3 && Math.abs(latitudeDegrees) < 38) {
+    color = desert;
+  } else if (moistureValue < 0.45 && Math.abs(latitudeDegrees) < 42) {
+    color = dryGrass;
+  } else if (moistureValue > 0.62 && Math.abs(latitudeDegrees) < 28) {
+    color = tropicalForest;
+  }
+  if (terrainValue > 0.7) {
+    color = mountain;
+  }
+  color = mixColor(color, snow, polarFactor * 0.78);
+  if (isCoastline) {
+    color = mixColor(color, coast, 0.34);
+  }
+  return scaleColor(color, 0.74 + lightValue * 0.5);
+}
+
+function renderEarthAtmosphere(buffer, offset, distanceFromCenter, lightValue) {
+  const outerGlow = smoothstep(0.34, 0.5, distanceFromCenter) * (1 - smoothstep(0.47, 0.5, distanceFromCenter));
+  if (outerGlow <= 0) {
+    return;
+  }
+  const atmosphere = makeColor(0.427451, 0.803922, 1, 1);
+  blendPixel(buffer, offset, atmosphere, outerGlow * (0.2 + lightValue * 0.18));
+}
+
+function renderEarthSurface(buffer, frame) {
+  const pixels = useLayerPixels(frame.config.pixels, 1);
+
+  createLayerIterator(frame.preset.relativeScale, 1, frame.sizeScale, (offset, u, v) => {
+    const pixelU = quantizeUv(u, pixels);
+    const pixelV = quantizeUv(v, pixels);
+    const sample = resolveEarthSphereSample(pixelU, pixelV, frame);
+    if (!sample) {
+      return;
+    }
+
+    const distanceFromCenter = distance2(pixelU, pixelV, 0.5, 0.5);
+    const isLand = isEarthLandCoordinate(sample.longitude, sample.latitude);
+    
+    // 优化：缓存邻域检查结果，避免重复计算坐标转换
+    let isCoastline = false;
+    let nearLand = false;
+    if (isLand) {
+      isCoastline = hasEarthNeighborState(sample.longitude, sample.latitude, false);
+    } else {
+      nearLand = hasEarthNeighborState(sample.longitude, sample.latitude, true);
+    }
+    
+    const terrainValue = getEarthTerrainValue(sample.longitude, sample.latitude);
+    const moistureValue = getEarthMoistureValue(sample.longitude, sample.latitude);
+    const oceanValue = getEarthOceanValue(sample.longitude, sample.latitude);
+
+    let color;
+    if (Math.abs(sample.latitude) > 77) {
+      color = mixColor(
+        makeColor(...EARTH_ICE_SHADOW, 1),
+        makeColor(...EARTH_ICE_BRIGHT, 1),
+        sample.light,
+      );
+    } else if (isLand) {
+      color = resolveEarthLandColor(
+        sample.latitude,
+        sample.light,
+        terrainValue,
+        moistureValue,
+        isCoastline,
+      );
+    } else {
+      color = resolveEarthOceanColor(sample.latitude, sample.light, oceanValue, nearLand);
+    }
+
+    blendPixel(buffer, offset, color, 1);
+    renderEarthAtmosphere(buffer, offset, distanceFromCenter, sample.light);
+  });
+}
+
+function renderEarthClouds(buffer, frame) {
+  renderClouds(buffer, frame, {
+    planeScale: 1,
+    pixelsScale: 1,
+    lightOrigin: [0.38, 0.38],
+    cloudCover: getEarthCloudCover(frame.config.seed),
+    timeSpeed: 0.12,      // 改回接近原来的值，稍微调整
+    timeFactor: 0.72,     // 改回原来的值
+    stretch: 2.15,        // 改回原来的值
+    cloudCurve: 1.18,     // 改回原来的值
+    lightBorder1: 0.52,   // 改回原来的值
+    lightBorder2: 0.66,   // 改回原来的值
+    size: 8.6,            // 改回原来的值
+    octaves: 4,           // 改回原来的值
+    colors: [
+      EARTH_CLOUD_BRIGHT,
+      EARTH_CLOUD_SOFT,
+      EARTH_CLOUD_MID,
+      EARTH_CLOUD_SHADOW,
+    ],
+  });
+}
+
+function renderEarth(buffer, frame) {
+  renderEarthSurface(buffer, frame);
+  renderEarthClouds(buffer, frame);
+}
+
 function buildFrameState(config, preset, progressValue) {
   const progress = clamp(progressValue, 0, 1);
   const directionFactor = getDirectionFactor(config.direction);
@@ -2038,6 +2663,16 @@ function buildFrameState(config, preset, progressValue) {
   const motionFactor = directionFactor;
   const spinFactor = directionFactor;
   const spinAngle = progress * spinFactor * TWO_PI;
+  
+  // 预计算地球旋转矩阵（避免每像素重复计算）
+  const earthRotation = EARTH_CENTER_LONGITUDE_RADIANS + spinAngle;
+  const earthCosRotation = Math.cos(earthRotation);
+  const earthSinRotation = Math.sin(earthRotation);
+  
+  // 传送门使用真实时间（固定60秒周期），不受速度影响
+  const realTimeSeconds = (Date.now() / 1000) % 60;  // 0-60秒循环
+  const portalProgress = realTimeSeconds / 60;  // 0-1
+  
   return {
     config,
     preset,
@@ -2051,20 +2686,22 @@ function buildFrameState(config, preset, progressValue) {
     frameDelay: getFrameDelay(speedValue),
     sizeScale: getSizeScaleForPreset(config.preset, config.size),
     shaderSeed: convertShaderSeed(config.seed),
+    earthCosRotation,
+    earthSinRotation,
+    portalProgress,  // 传送门专用的progress（固定60秒）
   };
 }
 
 function buildPlanetScreensaverPreviewFrame(config, progressValue) {
   const normalized = normalizeConfig(config);
   const preset = PRESET_DEFINITIONS[normalized.preset];
-  const frame = buildFrameState(normalized, preset, progressValue);
-  const buffer = createFrameBuffer();
-  renderPresetFrame(buffer, frame);
-  return bufferToMap(buffer);
+  const progress = FRAME_COUNT > 0
+    ? clamp(progressValue, 0, 1)
+    : 0;
+  return renderPlanetScreensaverPreviewMap(normalized, preset, progress);
 }
 
 function renderTerranWet(buffer, frame) {
-  const palette = buildRandomizedPresetPalette(frame);
   renderLandRivers(buffer, frame, {
     planeScale: 1,
     pixelsScale: 1,
@@ -2077,14 +2714,14 @@ function renderTerranWet(buffer, frame) {
     riverCutoff: 0.368,
     size: 4.6,
     octaves: 6,
-    colors: pickPaletteColors(palette, "terranWetLand", [
+    colors: [
       rgba(0.388235, 0.670588, 0.247059),
       rgba(0.231373, 0.490196, 0.309804),
       rgba(0.184314, 0.341176, 0.32549),
       rgba(0.156863, 0.207843, 0.25098),
       rgba(0.309804, 0.643137, 0.721569),
       rgba(0.25098, 0.286275, 0.45098),
-    ]),
+    ],
   });
 
   renderClouds(buffer, frame, {
@@ -2100,17 +2737,16 @@ function renderTerranWet(buffer, frame) {
     lightBorder2: 0.62,
     size: 7.315,
     octaves: 2,
-    colors: pickPaletteColors(palette, "terranWetClouds", [
+    colors: [
       rgba(0.960784, 1, 0.909804),
       rgba(0.87451, 0.878431, 0.909804),
       rgba(0.407843, 0.435294, 0.6),
       rgba(0.25098, 0.286275, 0.45098),
-    ]),
+    ],
   });
 }
 
 function renderTerranDry(buffer, frame) {
-  const palette = buildRandomizedPresetPalette(frame);
   renderDryTerran(buffer, frame, {
     planeScale: 1,
     pixelsScale: 1,
@@ -2120,18 +2756,17 @@ function renderTerranDry(buffer, frame) {
     timeSpeed: 0.1,
     size: 8,
     octaves: 3,
-    colors: pickPaletteColors(palette, "terranDry", [
+    colors: [
       rgba(1, 0.537255, 0.2),
       rgba(0.901961, 0.270588, 0.223529),
       rgba(0.678431, 0.184314, 0.270588),
       rgba(0.321569, 0.2, 0.247059),
       rgba(0.239216, 0.160784, 0.211765),
-    ]),
+    ],
   });
 }
 
 function renderIslands(buffer, frame) {
-  const palette = buildRandomizedPresetPalette(frame);
   renderPlanetUnder(buffer, frame, {
     planeScale: 1,
     pixelsScale: 1,
@@ -2142,11 +2777,11 @@ function renderIslands(buffer, frame) {
     lightBorder2: 0.6,
     size: 5.228,
     octaves: 3,
-    colors: pickPaletteColors(palette, "islandsWater", [
+    colors: [
       rgba(0.572549, 0.909804, 0.752941),
       rgba(0.309804, 0.643137, 0.721569),
       rgba(0.172549, 0.207843, 0.301961),
-    ]),
+    ],
   });
 
   renderLandMass(buffer, frame, {
@@ -2160,12 +2795,12 @@ function renderIslands(buffer, frame) {
     landCutoff: 0.633,
     size: 4.292,
     octaves: 6,
-    colors: pickPaletteColors(palette, "islandsLand", [
+    colors: [
       rgba(0.784314, 0.831373, 0.364706),
       rgba(0.388235, 0.670588, 0.247059),
       rgba(0.184314, 0.341176, 0.32549),
       rgba(0.156863, 0.207843, 0.25098),
-    ]),
+    ],
   });
 
   renderClouds(buffer, frame, {
@@ -2180,17 +2815,16 @@ function renderIslands(buffer, frame) {
     lightBorder2: 0.62,
     size: 7.745,
     octaves: 2,
-    colors: pickPaletteColors(palette, "islandsClouds", [
+    colors: [
       rgba(0.87451, 0.878431, 0.909804),
       rgba(0.639216, 0.654902, 0.760784),
       rgba(0.407843, 0.435294, 0.6),
       rgba(0.25098, 0.286275, 0.45098),
-    ]),
+    ],
   });
 }
 
 function renderNoAtmosphere(buffer, frame) {
-  const palette = buildRandomizedPresetPalette(frame);
   renderNoAtmosphereBase(buffer, frame, {
     planeScale: 1,
     pixelsScale: 1,
@@ -2201,11 +2835,11 @@ function renderNoAtmosphere(buffer, frame) {
     lightBorder2: 0.729,
     size: 8,
     octaves: 4,
-    colors: pickPaletteColors(palette, "noAtmosphereGround", [
+    colors: [
       rgba(0.639216, 0.654902, 0.760784),
       rgba(0.298039, 0.407843, 0.521569),
       rgba(0.227451, 0.247059, 0.368627),
-    ]),
+    ],
   });
 
   renderCraters(buffer, frame, {
@@ -2216,15 +2850,14 @@ function renderNoAtmosphere(buffer, frame) {
     lightBorder: 0.465,
     size: 5,
     offset: 0.03,
-    colors: pickPaletteColors(palette, "noAtmosphereCraters", [
+    colors: [
       rgba(0.298039, 0.407843, 0.521569),
       rgba(0.227451, 0.247059, 0.368627),
-    ]),
+    ],
   });
 }
 
 function renderGasGiantOne(buffer, frame) {
-  const palette = buildRandomizedPresetPalette(frame);
   renderGasClouds(buffer, frame, {
     planeScale: 1,
     pixelsScale: 1,
@@ -2237,12 +2870,12 @@ function renderGasGiantOne(buffer, frame) {
     lightBorder2: 0.666,
     size: 9,
     octaves: 5,
-    colors: pickPaletteColors(palette, "gasGiantOneBase", [
+    colors: [
       rgba(0.231373, 0.12549, 0.152941),
       rgba(0.231373, 0.12549, 0.152941),
       rgba(0, 0, 0),
       rgba(0.129412, 0.0941176, 0.105882),
-    ]),
+    ],
   });
 
   renderGasClouds(buffer, frame, {
@@ -2257,17 +2890,16 @@ function renderGasGiantOne(buffer, frame) {
     lightBorder2: 0.746,
     size: 9,
     octaves: 5,
-    colors: pickPaletteColors(palette, "gasGiantOneAccent", [
+    colors: [
       rgba(0.941176, 0.709804, 0.254902),
       rgba(0.811765, 0.458824, 0.168627),
       rgba(0.670588, 0.317647, 0.188235),
       rgba(0.490196, 0.219608, 0.2),
-    ]),
+    ],
   });
 }
 
 function renderGasGiantTwo(buffer, frame) {
-  const palette = buildRandomizedPresetPalette(frame);
   renderDenseGas(buffer, frame, {
     planeScale: 1,
     pixelsScale: 1,
@@ -2276,16 +2908,16 @@ function renderGasGiantTwo(buffer, frame) {
     bands: 0.892,
     size: 10.107,
     octaves: 3,
-    colors: pickPaletteColors(palette, "gasGiantTwoColors", [
+    colors: [
       rgba(0.933333, 0.764706, 0.603922),
       rgba(0.85098, 0.627451, 0.4),
       rgba(0.560784, 0.337255, 0.231373),
-    ]),
-    darkColors: pickPaletteColors(palette, "gasGiantTwoDarkColors", [
+    ],
+    darkColors: [
       rgba(0.4, 0.223529, 0.192157),
       rgba(0.270588, 0.156863, 0.235294),
       rgba(0.133333, 0.12549, 0.203922),
-    ]),
+    ],
   });
 
   renderRing(buffer, frame, {
@@ -2299,21 +2931,20 @@ function renderGasGiantTwo(buffer, frame) {
     rotationOffset: 0.7,
     size: 15,
     octaves: 4,
-    colors: pickPaletteColors(palette, "gasGiantTwoColors", [
+    colors: [
       rgba(0.933333, 0.764706, 0.603922),
       rgba(0.701961, 0.478431, 0.313726),
       rgba(0.560784, 0.337255, 0.231373),
-    ]),
-    darkColors: pickPaletteColors(palette, "gasGiantTwoDarkColors", [
+    ],
+    darkColors: [
       rgba(0.333333, 0.188235, 0.211765),
       rgba(0.196078, 0.137255, 0.215686),
       rgba(0.133333, 0.12549, 0.203922),
-    ]),
+    ],
   });
 }
 
 function renderIceWorld(buffer, frame) {
-  const palette = buildRandomizedPresetPalette(frame);
   renderPlanetUnder(buffer, frame, {
     planeScale: 1,
     pixelsScale: 1,
@@ -2324,11 +2955,11 @@ function renderIceWorld(buffer, frame) {
     lightBorder2: 0.632,
     size: 8,
     octaves: 2,
-    colors: pickPaletteColors(palette, "iceWorldLand", [
+    colors: [
       rgba(0.980392, 1, 1),
       rgba(0.780392, 0.831373, 0.882353),
       rgba(0.572549, 0.560784, 0.721569),
-    ]),
+    ],
   });
 
   renderIceLakes(buffer, frame, {
@@ -2341,11 +2972,11 @@ function renderIceWorld(buffer, frame) {
     lakeCutoff: 0.55,
     size: 10,
     octaves: 3,
-    colors: pickPaletteColors(palette, "iceWorldLakes", [
+    colors: [
       rgba(0.309804, 0.643137, 0.721569),
       rgba(0.298039, 0.407843, 0.521569),
       rgba(0.227451, 0.247059, 0.368627),
-    ]),
+    ],
   });
 
   renderClouds(buffer, frame, {
@@ -2360,17 +2991,16 @@ function renderIceWorld(buffer, frame) {
     lightBorder2: 0.781,
     size: 4,
     octaves: 4,
-    colors: pickPaletteColors(palette, "iceWorldClouds", [
+    colors: [
       rgba(0.882353, 0.94902, 1),
       rgba(0.752941, 0.890196, 1),
       rgba(0.368627, 0.439216, 0.647059),
       rgba(0.25098, 0.286275, 0.45098),
-    ]),
+    ],
   });
 }
 
 function renderLavaWorld(buffer, frame) {
-  const palette = buildRandomizedPresetPalette(frame);
   renderNoAtmosphereBase(buffer, frame, {
     planeScale: 1,
     pixelsScale: 1,
@@ -2381,11 +3011,11 @@ function renderLavaWorld(buffer, frame) {
     lightBorder2: 0.6,
     size: 10,
     octaves: 3,
-    colors: pickPaletteColors(palette, "lavaWorldLand", [
+    colors: [
       rgba(0.560784, 0.301961, 0.341176),
       rgba(0.321569, 0.2, 0.247059),
       rgba(0.239216, 0.160784, 0.211765),
-    ]),
+    ],
   });
 
   renderCraters(buffer, frame, {
@@ -2396,10 +3026,10 @@ function renderLavaWorld(buffer, frame) {
     lightBorder: 0.4,
     size: 3.5,
     offset: 0.03,
-    colors: pickPaletteColors(palette, "lavaWorldCraters", [
+    colors: [
       rgba(0.321569, 0.2, 0.247059),
       rgba(0.239216, 0.160784, 0.211765),
-    ]),
+    ],
   });
 
   renderLavaRivers(buffer, frame, {
@@ -2412,42 +3042,40 @@ function renderLavaWorld(buffer, frame) {
     riverCutoff: 0.579,
     size: 10,
     octaves: 4,
-    colors: pickPaletteColors(palette, "lavaWorldRivers", [
+    colors: [
       rgba(1, 0.537255, 0.2),
       rgba(0.901961, 0.270588, 0.223529),
       rgba(0.678431, 0.184314, 0.270588),
-    ]),
+    ],
   });
 }
 
 function renderAsteroidPreset(buffer, frame) {
-  const palette = buildRandomizedPresetPalette(frame);
   renderAsteroid(buffer, frame, {
     planeScale: 1,
     pixelsScale: 1,
     lightOrigin: [0, 0],
     size: 5.294,
     octaves: 2,
-    colors: pickPaletteColors(palette, "asteroid", [
+    colors: [
       rgba(0.639216, 0.654902, 0.760784),
       rgba(0.298039, 0.407843, 0.521569),
       rgba(0.227451, 0.247059, 0.368627),
-    ]),
+    ],
   });
 }
 
 function renderBlackHolePreset(buffer, frame) {
-  const palette = buildRandomizedPresetPalette(frame);
   renderBlackHoleCore(buffer, frame, {
     planeScale: 1,
     pixelsScale: 1,
     radius: 0.247,
     lightWidth: 0.028,
-    colors: pickPaletteColors(palette, "blackHoleCore", [
+    colors: [
       rgba(0.152941, 0.152941, 0.211765),
       rgba(1, 1, 0.921569),
       rgba(0.929412, 0.482353, 0.223529),
-    ]),
+    ],
   });
 
   renderBlackHoleDisk(buffer, frame, {
@@ -2459,18 +3087,17 @@ function renderBlackHolePreset(buffer, frame) {
     rotationOffset: 0.766,
     size: 6.598,
     octaves: 3,
-    colors: pickPaletteColors(palette, "blackHoleDisk", [
+    colors: [
       rgba(1, 1, 0.921569),
       rgba(1, 0.960784, 0.25098),
       rgba(1, 0.721569, 0.290196),
       rgba(0.929412, 0.482353, 0.223529),
       rgba(0.741176, 0.25098, 0.207843),
-    ]),
+    ],
   });
 }
 
 function renderGalaxyPreset(buffer, frame) {
-  const palette = buildRandomizedPresetPalette(frame);
   renderGalaxy(buffer, frame, {
     planeScale: 1,
     pixelsScale: 1,
@@ -2484,7 +3111,7 @@ function renderGalaxyPreset(buffer, frame) {
     zoom: 1.375,
     swirl: -9,
     nColors: 6,
-    colors: pickPaletteColors(palette, "galaxy", [
+    colors: [
       rgba(1, 1, 0.921569),
       rgba(1, 0.913725, 0.552941),
       rgba(0.709804, 0.878431, 0.4),
@@ -2492,22 +3119,12 @@ function renderGalaxyPreset(buffer, frame) {
       rgba(0.223529, 0.364706, 0.392157),
       rgba(0.196078, 0.223529, 0.301961),
       rgba(0.196078, 0.160784, 0.278431),
-    ]),
+    ],
   });
 }
 
 function renderStarPreset(buffer, frame) {
-  const palette = buildRandomizedPresetPalette(frame);
-  const starColors = pickPaletteColors(palette, "starCore", [
-    rgba(0.960784, 1, 0.909804),
-    rgba(0.466667, 0.839216, 0.756863),
-    rgba(0.109804, 0.572549, 0.654902),
-    rgba(0.0117647, 0.243137, 0.368627),
-  ]);
-  const flareColors = pickPaletteColors(palette, "starFlares", [
-    rgba(0.466667, 0.839216, 0.756863),
-    rgba(0.960784, 1, 0.909804),
-  ]);
+  const palette = buildStarPresetPalette(frame);
 
   renderStarBlobs(buffer, frame, {
     planeScale: 2,
@@ -2516,7 +3133,7 @@ function renderStarPreset(buffer, frame) {
     size: 4.93,
     circleAmount: 2,
     circleSize: 1,
-    color: palette && palette.starBlob ? palette.starBlob : rgba(1, 1, 0.894118),
+    color: palette.starBlob,
   });
 
   renderStarCore(buffer, frame, {
@@ -2524,7 +3141,7 @@ function renderStarPreset(buffer, frame) {
     pixelsScale: 1,
     timeSpeed: 0.05,
     tiles: 1,
-    colors: starColors,
+    colors: palette.starCore,
   });
 
   renderStarFlares(buffer, frame, {
@@ -2538,12 +3155,15 @@ function renderStarPreset(buffer, frame) {
     scale: 1,
     size: 1.6,
     octaves: 4,
-    colors: flareColors,
+    colors: palette.starFlares,
   });
 }
 
 function renderPresetToBuffer(buffer, frame) {
   switch (frame.preset.id) {
+    case "earth":
+      renderEarth(buffer, frame);
+      return;
     case "terran_wet":
       renderTerranWet(buffer, frame);
       return;
@@ -2576,6 +3196,11 @@ function renderPresetToBuffer(buffer, frame) {
       return;
     case "galaxy":
       renderGalaxyPreset(buffer, frame);
+      return;
+    case "portal_green":
+    case "portal_blue":
+    case "portal_yellow":
+      renderPortalPreset(buffer, frame);
       return;
     case "star":
       renderStarPreset(buffer, frame);
@@ -2641,31 +3266,29 @@ function normalizeConfig(config) {
     pixels: normalizePixels(nextConfig.pixels),
     size,
     seed: normalizeSeed(nextConfig.seed),
-    colorSeed: normalizeColorSeed(nextConfig.colorSeed),
+    colorSeed:
+      isFixedPalettePlanetPreset(preset)
+        ? PLANET_REFERENCE_DEFAULT_COLOR_SEED
+        : normalizeColorSeed(nextConfig.colorSeed),
     planetX: normalizePlanetAxis(nextConfig.planetX),
     planetY: normalizePlanetAxis(nextConfig.planetY),
     direction,
     speed,
     dither: typeof nextConfig.dither === "boolean" ? nextConfig.dither : defaults.dither,
-    useDefaultColors: nextConfig.useDefaultColors === true,
   };
 }
 
-function readPreviewCache(key) {
-  return PREVIEW_CACHE.get(key);
-}
-
-function writePreviewCache(key, sequence) {
-  if (PREVIEW_CACHE.size >= 8) {
-    const firstKey = PREVIEW_CACHE.keys().next().value;
-    PREVIEW_CACHE.delete(firstKey);
+function resolveSequenceFrameIndex(progressValue) {
+  const numericValue = Number(progressValue);
+  if (!Number.isFinite(numericValue)) {
+    return 0;
   }
-  PREVIEW_CACHE.set(key, sequence);
+  const wrappedProgress = mod(numericValue, 1);
+  return Math.floor(wrappedProgress * FRAME_COUNT);
 }
 
-function buildPlanetScreensaverPreviewSequence(config) {
-  const normalized = normalizeConfig(config);
-  const cacheKey = [
+function buildSequenceCacheKey(normalized) {
+  return [
     normalized.preset,
     normalized.pixels,
     normalized.size,
@@ -2673,12 +3296,33 @@ function buildPlanetScreensaverPreviewSequence(config) {
     normalized.colorSeed,
     normalized.planetX,
     normalized.planetY,
-    normalized.useDefaultColors ? "1" : "0",
     normalized.direction,
     normalized.speed,
     normalized.dither ? "1" : "0",
   ].join("|");
+}
 
+function renderPlanetScreensaverPreviewMap(normalized, preset, progressValue) {
+  const frame = buildFrameState(normalized, preset, progressValue);
+  const buffer = createFrameBuffer();
+  renderPresetFrame(buffer, frame);
+  return bufferToMap(buffer);
+}
+
+function readPreviewCache(key) {
+  return PREVIEW_CACHE.get(key);
+}
+
+function writePreviewCache(key, sequence) {
+  if (PREVIEW_CACHE.size >= 16) {  // 从8增加到16，减少缓存失效
+    const firstKey = PREVIEW_CACHE.keys().next().value;
+    PREVIEW_CACHE.delete(firstKey);
+  }
+  PREVIEW_CACHE.set(key, sequence);
+}
+
+function buildPlanetScreensaverPreviewSequenceFromNormalized(normalized) {
+  const cacheKey = buildSequenceCacheKey(normalized);
   const cached = readPreviewCache(cacheKey);
   if (cached) {
     return cached;
@@ -2687,26 +3331,34 @@ function buildPlanetScreensaverPreviewSequence(config) {
   const preset = PRESET_DEFINITIONS[normalized.preset];
   const maps = [];
   const delays = [];
+  const frameDelay = getFrameDelay(normalized.speed);
 
-  for (let frameIndex = 0; frameIndex < FRAME_COUNT; frameIndex += 1) {
-    const progress = FRAME_COUNT > 0 ? frameIndex / FRAME_COUNT : 0;
-    const frame = buildFrameState(normalized, preset, progress);
-    const buffer = createFrameBuffer();
-    renderPresetFrame(buffer, frame);
-    maps.push(bufferToMap(buffer));
-    delays.push(frame.frameDelay);
-  }
+  // 只渲染第一帧作为静态预览
+  const firstProgress = 0;
+  maps.push(renderPlanetScreensaverPreviewMap(normalized, preset, firstProgress));
+  delays.push(frameDelay);
 
   const sequence = {
+    cacheKey,
+    config: normalized,
+    frameCount: 1,  // 只有1帧
+    frameDelay,
     maps,
     delays,
   };
+  
   writePreviewCache(cacheKey, sequence);
   return sequence;
 }
 
+function buildPlanetScreensaverPreviewSequence(config) {
+  const normalized = normalizeConfig(config);
+  return buildPlanetScreensaverPreviewSequenceFromNormalized(normalized);
+}
+
 export {
   FRAME_COUNT,
+  PLANET_REFERENCE_DEFAULT_COLOR_SEED,
   PLANET_SCREEN_PRESETS,
   PLANET_PREVIEW_MAX_PIXELS,
   PLANET_PREVIEW_MIN_PIXELS,

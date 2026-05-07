@@ -6,7 +6,7 @@
     <view class="header glx-topbar glx-page-shell__fixed">
       <view class="header-content">
         <view class="header-placeholder"></view>
-        <text class="header-title glx-topbar__title">设备控制</text>
+        <text class="header-title glx-topbar__title">光格像素工坊</text>
         <view class="header-placeholder"></view>
       </view>
     </view>
@@ -184,11 +184,7 @@ export default {
       toast: null,
 
       deviceIp: "",
-
-      // 连接弹窗
       showConnectModal: false,
-
-      // JSON 导入弹窗
       showJsonImportModal: false,
       jsonImportSending: false,
     };
@@ -324,10 +320,6 @@ export default {
       return this.activeDeviceMode === entry.key;
     },
 
-    handleModeSelect(entry) {
-      this.switchMode(entry.key);
-    },
-
     async handleConnect() {
       this.showConnectModal = true;
     },
@@ -372,6 +364,10 @@ export default {
 
     handleConnectTimeout() {
       this.toast.showError("连接超时，请重试");
+    },
+
+    handleModeSelect(entry) {
+      this.switchMode(entry.key);
     },
 
     async switchMode(mode) {
@@ -495,16 +491,13 @@ export default {
 
     async handleJsonImport(jsonData) {
       try {
-        // 验证 JSON 数据格式
         if (!jsonData || typeof jsonData !== "object") {
           this.toast.showError("无效的配置数据");
           return;
         }
 
-        // 开始传输，禁止关闭弹窗
         this.jsonImportSending = true;
 
-        // 检查设备是否连接
         if (!this.deviceStore.connected) {
           this.jsonImportSending = false;
           this.showJsonImportModal = false;
@@ -514,14 +507,11 @@ export default {
 
         const ws = this.deviceStore.getWebSocket();
 
-        // 检查是否为动画数据（包含 f 和 d 字段的紧凑格式）
         if (
           jsonData.f !== undefined &&
           jsonData.d !== undefined &&
           Array.isArray(jsonData.d)
         ) {
-          console.log("检测到动画数据，走紧凑动画命令发送到 ESP32");
-
           try {
             const frameCount = jsonData.f;
             const frames = jsonData.d;
@@ -539,11 +529,8 @@ export default {
           return;
         }
 
-        // 原有的闹钟配置处理逻辑
-        // 保存配置到本地存储
         uni.setStorageSync("clock_config", JSON.stringify(jsonData));
 
-        // 如果有像素数据，也保存
         if (jsonData.imagePixels) {
           uni.setStorageSync(
             "clock_image_pixels",
@@ -551,7 +538,6 @@ export default {
           );
         }
 
-        // 直接发送到设备
         try {
           if (jsonData.clockMode !== "clock" || !jsonData.config) {
             throw new Error("请导入静态时钟页面导出的配置文件");
@@ -636,7 +622,6 @@ export default {
             this.toast.showSuccess("配置已发送到设备！");
           }
 
-          // 传输完成，关闭弹窗
           this.jsonImportSending = false;
           this.showJsonImportModal = false;
         } catch (err) {
@@ -655,7 +640,6 @@ export default {
 
     handleJsonImportError(message) {
       this.toast.showError(message);
-      // 错误时不关闭弹窗，让用户可以修改
     },
 
     hexToRgb(hex) {

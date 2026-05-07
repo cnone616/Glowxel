@@ -16,8 +16,8 @@ static int s_loopBlendStep = 0;
 static unsigned long s_loopBlendDelay = 0;
 static const int LOOP_BLEND_STEPS = 4;
 static const int LOOP_BRIDGE_PIXELS = 64 * 64;
-static uint16_t s_loopBridgeFromBuffer[LOOP_BRIDGE_PIXELS];
-static uint16_t s_loopBridgeToBuffer[LOOP_BRIDGE_PIXELS];
+static uint16_t* s_loopBridgeFromBuffer = nullptr;
+static uint16_t* s_loopBridgeToBuffer = nullptr;
 
 uint16_t maxPixelsForFrameType(const String& type) {
   return type == "full" ? kMaxFullFramePixels : kMaxDiffFramePixels;
@@ -89,6 +89,25 @@ bool writeAnimationBlobToPath(const char* path, const uint8_t* data, size_t len)
 bool prepareLoopBridgeFrames() {
   if (AnimationManager::currentGIF == nullptr || AnimationManager::currentGIF->frameCount <= 0) {
     return false;
+  }
+
+  // 按需分配 loopBridge 缓冲区
+  if (s_loopBridgeFromBuffer == nullptr) {
+    s_loopBridgeFromBuffer = (uint16_t*)malloc(LOOP_BRIDGE_PIXELS * sizeof(uint16_t));
+    if (s_loopBridgeFromBuffer == nullptr) {
+      Serial.println("[LoopBridge] Failed to allocate FromBuffer, skipping transition");
+      return false;
+    }
+    Serial.println("[LoopBridge] Allocated FromBuffer (8 KB)");
+  }
+  
+  if (s_loopBridgeToBuffer == nullptr) {
+    s_loopBridgeToBuffer = (uint16_t*)malloc(LOOP_BRIDGE_PIXELS * sizeof(uint16_t));
+    if (s_loopBridgeToBuffer == nullptr) {
+      Serial.println("[LoopBridge] Failed to allocate ToBuffer, skipping transition");
+      return false;
+    }
+    Serial.println("[LoopBridge] Allocated ToBuffer (8 KB)");
   }
 
   for (int y = 0; y < 64; y++) {
@@ -180,9 +199,7 @@ bool saveGIFAnimationToPath(const char* path, GIFAnimation* gif) {
     yield();
   }
 
-  size_t fileSize = file.size();
   file.close();
-  Serial.printf("动画已保存: %d 帧, %d bytes\n", frameCount, fileSize);
   return true;
 }
 
@@ -192,17 +209,19 @@ bool loadGIFAnimationFromPath(const char* path, GIFAnimation*& outGif) {
     return false;
   }
 
+  if (!LittleFS.exists(path)) {
+    return false;
+  }
+
   File file = LittleFS.open(path, "r");
   if (!file) {
     Serial.printf("动画文件打开失败: %s\n", path);
-    Serial.println("没有保存的动画数据");
     return false;
   }
 
   if (file.size() < 2) {
     Serial.printf("动画文件过小: %s size=%u\n", path, static_cast<unsigned>(file.size()));
     file.close();
-    Serial.println("动画文件内容无效");
     return false;
   }
 
@@ -214,7 +233,6 @@ bool loadGIFAnimationFromPath(const char* path, GIFAnimation*& outGif) {
   }
   if (frameCount == 0 || frameCount > 30) {
     Serial.printf("动画文件帧数非法: %s frameCount=%u\n", path, frameCount);
-    Serial.printf("无效帧数: %d\n", frameCount);
     file.close();
     return false;
   }
@@ -354,7 +372,6 @@ void AnimationManager::init() {
   }
 
   if (loadAnimation() && currentGIF != nullptr) {
-    Serial.printf("已恢复保存的动画: %d 帧\n", currentGIF->frameCount);
     if (DisplayManager::currentMode == MODE_ANIMATION) {
       currentGIF->isPlaying = true;
       currentGIF->currentFrame = 0;
@@ -545,7 +562,6 @@ bool AnimationManager::loadGIFAnimation(JsonVariant animData) {
   }
 
   activateLoadedGif(nextGIF);
-  Serial.printf("紧凑GIF动画加载完成: %d 帧, 总计 %d 像素\n", currentGIF->frameCount, totalPixels);
   return true;
 }
 
@@ -582,7 +598,6 @@ bool AnimationManager::loadStagedGIFAnimationUpload() {
   }
 
   activateLoadedGif(nextGIF);
-  Serial.printf("动画二进制加载完成: %d 帧\n", currentGIF->frameCount);
   return true;
 }
 
@@ -649,7 +664,6 @@ bool AnimationManager::beginAnimation(int frameCount) {
   currentGIF = nextGIF;
   receivingFrameIndex = -1;
   resetLoopBridgeState();
-  Serial.printf("动画上传会话已创建: frameCount=%d\n", frameCount);
   return true;
 }
 
@@ -696,11 +710,6 @@ bool AnimationManager::beginFrame(int index, int type, int delay, int totalPixel
   }
 
   receivingFrameIndex = index;
-  Serial.printf("动画帧已初始化: index=%d type=%s totalPixels=%d delay=%d\n",
-                index,
-                frame.type.c_str(),
-                totalPixels,
-                delay);
   return true;
 }
 
@@ -775,7 +784,6 @@ bool AnimationManager::endAnimation() {
   currentGIF->currentFrame = 0;
   currentGIF->lastFrameTime = millis();
   currentGIF->isPlaying = true;
-  Serial.printf("动画上传完成: frameCount=%d\n", currentGIF->frameCount);
   return true;
 }
 
@@ -794,7 +802,6 @@ bool AnimationManager::saveAnimation() {
       return false;
     }
 
-    Serial.println("已清除保存的动画文件");
     return true;
   }
 
@@ -808,6 +815,5 @@ bool AnimationManager::loadAnimation() {
   }
 
   activateLoadedGif(nextGIF);
-  Serial.printf("动画已加载: %d 帧\n", currentGIF->frameCount);
   return true;
 }

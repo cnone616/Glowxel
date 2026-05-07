@@ -94,10 +94,8 @@ void readDeviceParamsConfigFromPreferences(DeviceParamsConfig& targetConfig) {
     loadedConfig.nightEnd[sizeof(loadedConfig.nightEnd) - 1] = '\0';
     loadedConfig.ntpServer[sizeof(loadedConfig.ntpServer) - 1] = '\0';
     targetConfig = loadedConfig;
-    Serial.printf("device params config loaded (%u bytes)\n", (unsigned int)bytesToRead);
   } else {
     targetConfig = makeDefaultDeviceParamsConfig();
-    Serial.println("device params config: using default");
   }
 
   ConfigManager::preferences.end();
@@ -412,8 +410,6 @@ uint8_t* ConfigManager::pacmanRouteData = nullptr;
 uint16_t ConfigManager::pacmanRouteLength = 0;
 
 void ConfigManager::init() {
-  Serial.println("2. 加载闹钟配置...");
-
   // 检查配置版本，版本不匹配说明固件更新了默认配置，清除旧的
   preferences.begin("clock", true);
   int savedVersion = preferences.getInt("cfgVer", 0);
@@ -455,7 +451,6 @@ void ConfigManager::preloadDeviceParamsConfig() {
   if (savedVersion != CONFIG_VERSION) {
     deviceParamsConfig = makeDefaultDeviceParamsConfig();
     DisplayManager::currentBrightness = deviceParamsConfig.displayBright;
-    Serial.println("device params preload: using default because config version changed");
     return;
   }
 
@@ -466,33 +461,23 @@ void ConfigManager::preloadDeviceParamsConfig() {
 void ConfigManager::loadDeviceParamsConfig() {
   readDeviceParamsConfigFromPreferences(deviceParamsConfig);
   DisplayManager::currentBrightness = deviceParamsConfig.displayBright;
-  Serial.println("device params config loaded for runtime state");
 }
 
 void ConfigManager::saveDeviceParamsConfig() {
   preferences.begin("device", false);
   preferences.putBytes("config", &deviceParamsConfig, sizeof(DeviceParamsConfig));
   preferences.end();
-  Serial.println("device params config saved");
 }
 
 void ConfigManager::loadClockConfig() {
   preferences.begin("clock", true);
 
-  // 加载配置
   size_t configSize = preferences.getBytesLength("config");
-  Serial.printf("配置大小: %d bytes (期望: %d bytes)\n", configSize, sizeof(ClockConfig));
-
   if (configSize == sizeof(ClockConfig)) {
     preferences.getBytes("config", &clockConfig, sizeof(ClockConfig));
     if (migrateLegacyDefaultClockLayout(clockConfig)) {
-      Serial.println("已迁移静态时钟默认布局");
       saveClockConfig();
     }
-    Serial.println("已加载保存的闹钟配置");
-    Serial.printf("  image.show = %d\n", clockConfig.image.show);
-  } else {
-    Serial.println("使用默认闹钟配置");
   }
 
   // 恢复上次的显示模式
@@ -513,15 +498,6 @@ void ConfigManager::loadClockConfig() {
   DisplayManager::lastBusinessModeTag = savedLastBusinessMode;
   DisplayManager::lastBusinessMode =
     resolveTopLevelModeFromBusinessModeTag(savedLastBusinessMode);
-
-  const char* modeStr =
-    savedMode == MODE_ANIMATION
-      ? "ANIMATION"
-      : (savedMode == MODE_CLOCK
-          ? "CLOCK"
-          : (savedMode == MODE_THEME ? "THEME" : "CANVAS"));
-  Serial.printf("恢复显示模式: %s\n", modeStr);
-  Serial.printf("恢复业务模式: %s\n", DisplayManager::currentBusinessModeTag.c_str());
 
   preferences.end();
 }
@@ -550,7 +526,6 @@ void ConfigManager::saveClockConfig() {
   preferences.putString("bizMode", bizModeToSave);
   preferences.putString("lastBizMode", lastBusinessModeToSave);
   preferences.end();
-  Serial.println("static clock config saved");
 }
 
 void ConfigManager::loadAnimClockConfig() {
@@ -559,12 +534,8 @@ void ConfigManager::loadAnimClockConfig() {
   if (configSize == sizeof(ClockConfig)) {
     preferences.getBytes("config", &animClockConfig, sizeof(ClockConfig));
     if (migrateLegacyDefaultClockLayout(animClockConfig)) {
-      Serial.println("已迁移动态时钟默认布局");
       saveAnimClockConfig();
     }
-    Serial.println("anim clock config loaded");
-  } else {
-    Serial.println("anim clock config: using default");
   }
   preferences.end();
 }
@@ -573,7 +544,6 @@ void ConfigManager::saveAnimClockConfig() {
   preferences.begin("anim", false);
   preferences.putBytes("config", &animClockConfig, sizeof(ClockConfig));
   preferences.end();
-  Serial.println("anim clock config saved");
 }
 
 void ConfigManager::loadLedMatrixShowcaseClockConfig() {
@@ -582,12 +552,8 @@ void ConfigManager::loadLedMatrixShowcaseClockConfig() {
   if (configSize == sizeof(ClockConfig)) {
     preferences.getBytes("config", &ledMatrixShowcaseClockConfig, sizeof(ClockConfig));
     if (migrateLegacyDefaultClockLayout(ledMatrixShowcaseClockConfig)) {
-      Serial.println("已迁移像素场景集时钟默认布局");
       saveLedMatrixShowcaseClockConfig();
     }
-    Serial.println("led matrix showcase clock config loaded");
-  } else {
-    Serial.println("led matrix showcase clock config: using default");
   }
   preferences.end();
 }
@@ -596,7 +562,6 @@ void ConfigManager::saveLedMatrixShowcaseClockConfig() {
   preferences.begin("ledmx_clk", false);
   preferences.putBytes("config", &ledMatrixShowcaseClockConfig, sizeof(ClockConfig));
   preferences.end();
-  Serial.println("led matrix showcase clock config saved");
 }
 
 void ConfigManager::loadTetrisOverlayClockConfig() {
@@ -605,12 +570,8 @@ void ConfigManager::loadTetrisOverlayClockConfig() {
   if (configSize == sizeof(ClockConfig)) {
     preferences.getBytes("config", &tetrisOverlayClockConfig, sizeof(ClockConfig));
     if (migrateLegacyDefaultClockLayout(tetrisOverlayClockConfig)) {
-      Serial.println("已迁移俄罗斯方块屏保时钟默认布局");
       saveTetrisOverlayClockConfig();
     }
-    Serial.println("tetris overlay clock config loaded");
-  } else {
-    Serial.println("tetris overlay clock config: using default");
   }
   preferences.end();
 }
@@ -619,29 +580,19 @@ void ConfigManager::saveTetrisOverlayClockConfig() {
   preferences.begin("tetris_ovr", false);
   preferences.putBytes("config", &tetrisOverlayClockConfig, sizeof(ClockConfig));
   preferences.end();
-  Serial.println("tetris overlay clock config saved");
 }
 
 void ConfigManager::loadStaticImagePixels() {
   preferences.begin("clock", true);
 
   staticImagePixelCount = preferences.getInt("pixelCount", 0);
-  Serial.printf("静态时钟像素数量: %d\n", staticImagePixelCount);
-
   if (staticImagePixelCount > 0) {
     size_t pixelDataSize = preferences.getBytesLength("pixels");
-    Serial.printf("静态时钟像素数据大小: %d bytes (期望: %d bytes)\n",
-      pixelDataSize, sizeof(PixelData) * staticImagePixelCount);
-
     if (pixelDataSize == sizeof(PixelData) * staticImagePixelCount) {
       staticImagePixels = (PixelData*)malloc(pixelDataSize);
       if (staticImagePixels != nullptr) {
         preferences.getBytes("pixels", staticImagePixels, pixelDataSize);
-        Serial.printf("✓ 已加载静态时钟像素数据: %d 个像素\n", staticImagePixelCount);
-
-        // 如果有像素数据，自动启用图片显示
         clockConfig.image.show = true;
-        Serial.println("✓ 已自动启用静态时钟图片显示");
       } else {
         Serial.println("✗ 静态时钟像素数据内存分配失败");
         staticImagePixelCount = 0;
@@ -650,8 +601,6 @@ void ConfigManager::loadStaticImagePixels() {
       Serial.println("✗ 静态时钟像素数据大小不匹配");
       staticImagePixelCount = 0;
     }
-  } else {
-    Serial.println("无保存的静态时钟像素数据");
   }
 
   preferences.end();
@@ -664,7 +613,6 @@ void ConfigManager::saveStaticImagePixels() {
     preferences.remove("pixels");
     preferences.putInt("pixelCount", 0);
     preferences.end();
-    Serial.println("静态时钟像素数据已清空");
     return;
   }
 
@@ -674,7 +622,6 @@ void ConfigManager::saveStaticImagePixels() {
   if (dataSize <= maxDataSize) {
     preferences.putBytes("pixels", staticImagePixels, dataSize);
     preferences.putInt("pixelCount", staticImagePixelCount);
-    Serial.printf("静态时钟像素数据已保存: %d 个像素（%d bytes）\n", staticImagePixelCount, dataSize);
   } else {
     Serial.printf("静态时钟像素数据太大（%d bytes），无法保存\n", dataSize);
   }
@@ -686,22 +633,13 @@ void ConfigManager::loadAnimImagePixels() {
   preferences.begin("anim", true);
 
   animImagePixelCount = preferences.getInt("pixelCount", 0);
-  Serial.printf("动态时钟像素数量: %d\n", animImagePixelCount);
-
   if (animImagePixelCount > 0) {
     size_t pixelDataSize = preferences.getBytesLength("pixels");
-    Serial.printf("动态时钟像素数据大小: %d bytes (期望: %d bytes)\n",
-      pixelDataSize, sizeof(PixelData) * animImagePixelCount);
-
     if (pixelDataSize == sizeof(PixelData) * animImagePixelCount) {
       animImagePixels = (PixelData*)malloc(pixelDataSize);
       if (animImagePixels != nullptr) {
         preferences.getBytes("pixels", animImagePixels, pixelDataSize);
-        Serial.printf("✓ 已加载动态时钟像素数据: %d 个像素\n", animImagePixelCount);
-
-        // 如果有像素数据，自动启用图片显示
         animClockConfig.image.show = true;
-        Serial.println("✓ 已自动启用动态时钟图片显示");
       } else {
         Serial.println("✗ 动态时钟像素数据内存分配失败");
         animImagePixelCount = 0;
@@ -710,8 +648,6 @@ void ConfigManager::loadAnimImagePixels() {
       Serial.println("✗ 动态时钟像素数据大小不匹配");
       animImagePixelCount = 0;
     }
-  } else {
-    Serial.println("无保存的动态时钟像素数据");
   }
 
   preferences.end();
@@ -724,7 +660,6 @@ void ConfigManager::saveAnimImagePixels() {
     preferences.remove("pixels");
     preferences.putInt("pixelCount", 0);
     preferences.end();
-    Serial.println("动态时钟像素数据已清空");
     return;
   }
 
@@ -734,7 +669,6 @@ void ConfigManager::saveAnimImagePixels() {
   if (dataSize <= maxDataSize) {
     preferences.putBytes("pixels", animImagePixels, dataSize);
     preferences.putInt("pixelCount", animImagePixelCount);
-    Serial.printf("动态时钟像素数据已保存: %d 个像素（%d bytes）\n", animImagePixelCount, dataSize);
   } else {
     Serial.printf("动态时钟像素数据太大（%d bytes），无法保存\n", dataSize);
   }
@@ -748,14 +682,9 @@ void ConfigManager::loadEyesConfig() {
   size_t configSize = preferences.getBytesLength("config");
   if (configSize == sizeof(EyesConfig)) {
     preferences.getBytes("config", &eyesConfig, sizeof(EyesConfig));
-    if (sanitizeEyesConfig(eyesConfig)) {
-      Serial.println("eyes config loaded and sanitized");
-    } else {
-      Serial.println("eyes config loaded");
-    }
+    sanitizeEyesConfig(eyesConfig);
   } else {
     eyesConfig = makeDefaultEyesConfig();
-    Serial.println("eyes config: using default");
   }
 
   preferences.end();
@@ -765,7 +694,6 @@ void ConfigManager::saveEyesConfig() {
   preferences.begin("eyes", false);
   preferences.putBytes("config", &eyesConfig, sizeof(EyesConfig));
   preferences.end();
-  Serial.println("eyes config saved");
 }
 
 void ConfigManager::loadAmbientEffectConfig() {
@@ -780,12 +708,9 @@ void ConfigManager::loadAmbientEffectConfig() {
         DisplayManager::ambientEffectConfig.preset == 24) {
       DisplayManager::ambientEffectConfig = {AMBIENT_PRESET_AURORA, 6, 72, 72, 100, 200, 255, true};
       removedPresetMigrated = true;
-      Serial.println("ambient effect config migrated from removed preset");
     }
-    Serial.println("ambient effect config loaded");
   } else {
     DisplayManager::ambientEffectConfig = {AMBIENT_PRESET_AURORA, 6, 72, 72, 100, 200, 255, true};
-    Serial.println("ambient effect config: using default");
   }
 
   preferences.end();
@@ -799,7 +724,6 @@ void ConfigManager::saveAmbientEffectConfig() {
   preferences.begin("ambient", false);
   preferences.putBytes("config", &DisplayManager::ambientEffectConfig, sizeof(AmbientEffectConfig));
   preferences.end();
-  Serial.println("ambient effect config saved");
 }
 
 void ConfigManager::loadThemeConfig() {
@@ -808,10 +732,8 @@ void ConfigManager::loadThemeConfig() {
   if (configSize == sizeof(ThemeConfig)) {
     preferences.getBytes("config", &themeConfig, sizeof(ThemeConfig));
     themeConfig.themeId[sizeof(themeConfig.themeId) - 1] = '\0';
-    Serial.printf("theme config loaded: %s\n", themeConfig.themeId);
   } else {
     themeConfig.themeId[0] = '\0';
-    Serial.println("theme config: using default");
   }
   preferences.end();
 }
@@ -820,7 +742,6 @@ void ConfigManager::saveThemeConfig() {
   preferences.begin("theme", false);
   preferences.putBytes("config", &themeConfig, sizeof(ThemeConfig));
   preferences.end();
-  Serial.printf("theme config saved: %s\n", themeConfig.themeId);
 }
 
 void ConfigManager::loadThemeClockConfig() {
@@ -829,12 +750,8 @@ void ConfigManager::loadThemeClockConfig() {
   if (configSize == sizeof(ClockConfig)) {
     preferences.getBytes("config", &themeClockConfig, sizeof(ClockConfig));
     if (migrateLegacyDefaultClockLayout(themeClockConfig)) {
-      Serial.println("已迁移主题模式默认布局");
       saveThemeClockConfig();
     }
-    Serial.println("theme clock config loaded");
-  } else {
-    Serial.println("theme clock config: using default");
   }
   preferences.end();
 }
@@ -843,7 +760,6 @@ void ConfigManager::saveThemeClockConfig() {
   preferences.begin("theme_clk", false);
   preferences.putBytes("config", &themeClockConfig, sizeof(ClockConfig));
   preferences.end();
-  Serial.println("theme clock config saved");
 }
 
 void ConfigManager::loadTetrisConfig() {
@@ -851,10 +767,8 @@ void ConfigManager::loadTetrisConfig() {
   size_t configSize = preferences.getBytesLength("config");
   if (configSize == sizeof(TetrisModeConfig)) {
     preferences.getBytes("config", &tetrisConfig, sizeof(TetrisModeConfig));
-    Serial.println("tetris config loaded");
   } else {
     tetrisConfig = makeDefaultTetrisModeConfig(false);
-    Serial.println("tetris config: using default");
   }
   preferences.end();
 }
@@ -863,7 +777,6 @@ void ConfigManager::saveTetrisConfig() {
   preferences.begin("tetris", false);
   preferences.putBytes("config", &tetrisConfig, sizeof(TetrisModeConfig));
   preferences.end();
-  Serial.println("tetris config saved");
 }
 
 void ConfigManager::loadTetrisClockConfig() {
@@ -871,10 +784,8 @@ void ConfigManager::loadTetrisClockConfig() {
   size_t configSize = preferences.getBytesLength("config");
   if (configSize == sizeof(TetrisClockModeConfig)) {
     preferences.getBytes("config", &tetrisClockConfig, sizeof(TetrisClockModeConfig));
-    Serial.println("tetris clock config loaded");
   } else {
     tetrisClockConfig = makeDefaultTetrisClockModeConfig();
-    Serial.println("tetris clock config: using default");
   }
   preferences.end();
 }
@@ -883,7 +794,6 @@ void ConfigManager::saveTetrisClockConfig() {
   preferences.begin("tetris_clk", false);
   preferences.putBytes("config", &tetrisClockConfig, sizeof(TetrisClockModeConfig));
   preferences.end();
-  Serial.println("tetris clock config saved");
 }
 
 void ConfigManager::loadMazeConfig() {
@@ -901,14 +811,12 @@ void ConfigManager::loadMazeConfig() {
     mazeConfig.solvedPathStartColor[sizeof(mazeConfig.solvedPathStartColor) - 1] = '\0';
     mazeConfig.solvedPathEndColor[sizeof(mazeConfig.solvedPathEndColor) - 1] = '\0';
     if (isValidMazeModeConfig(mazeConfig)) {
-      Serial.println("maze config loaded");
     } else {
       mazeConfig = makeDefaultMazeModeConfig();
       Serial.println("maze config invalid: using default");
     }
   } else {
     mazeConfig = makeDefaultMazeModeConfig();
-    Serial.println("maze config: using default");
   }
   preferences.end();
 }
@@ -917,7 +825,6 @@ void ConfigManager::saveMazeConfig() {
   preferences.begin("maze", false);
   preferences.putBytes("config", &mazeConfig, sizeof(MazeModeConfig));
   preferences.end();
-  Serial.println("maze config saved");
 }
 
 void ConfigManager::loadSnakeConfig() {
@@ -926,10 +833,8 @@ void ConfigManager::loadSnakeConfig() {
   if (configSize == sizeof(SnakeModeConfig)) {
     preferences.getBytes("config", &snakeConfig, sizeof(SnakeModeConfig));
     snakeConfig.snakeSkin[sizeof(snakeConfig.snakeSkin) - 1] = '\0';
-    Serial.println("snake config loaded");
   } else {
     snakeConfig = makeDefaultSnakeModeConfig();
-    Serial.println("snake config: using default");
   }
   preferences.end();
 }
@@ -938,7 +843,6 @@ void ConfigManager::saveSnakeConfig() {
   preferences.begin("snake", false);
   preferences.putBytes("config", &snakeConfig, sizeof(SnakeModeConfig));
   preferences.end();
-  Serial.println("snake config saved");
 }
 
 void ConfigManager::loadPlanetScreensaverConfig() {
@@ -951,9 +855,6 @@ void ConfigManager::loadPlanetScreensaverConfig() {
     config.size[sizeof(config.size) - 1] = '\0';
     config.direction[sizeof(config.direction) - 1] = '\0';
     BoardNativeEffect::setPlanetScreensaverConfig(config);
-    Serial.println("planet screensaver config loaded");
-  } else {
-    Serial.println("planet screensaver config: keep current");
   }
   preferences.end();
 }
@@ -964,7 +865,6 @@ void ConfigManager::savePlanetScreensaverConfig() {
   preferences.begin("planet_ss", false);
   preferences.putBytes("config", &config, sizeof(PlanetScreensaverNativeConfig));
   preferences.end();
-  Serial.println("planet screensaver config saved");
 }
 
 void ConfigManager::loadPacmanRoute() {
@@ -984,12 +884,9 @@ void ConfigManager::loadPacmanRoute() {
     if (pacmanRouteData != nullptr) {
       preferences.getBytes("pcRouteData", pacmanRouteData, savedLength);
       pacmanRouteLength = static_cast<uint16_t>(savedLength);
-      Serial.printf("pacman route loaded: %u steps\n", pacmanRouteLength);
     } else {
       Serial.println("pacman route load failed: out of memory");
     }
-  } else {
-    Serial.println("pacman route: using generated route");
   }
 
   preferences.end();
@@ -1023,7 +920,6 @@ bool ConfigManager::savePacmanRoute(const uint8_t* routeData, uint16_t routeLeng
 
   memcpy(pacmanRouteData, routeData, routeLength);
   pacmanRouteLength = routeLength;
-  Serial.printf("pacman route saved: %u steps\n", pacmanRouteLength);
   return true;
 }
 
@@ -1038,7 +934,6 @@ void ConfigManager::clearPacmanRoute() {
     pacmanRouteData = nullptr;
   }
   pacmanRouteLength = 0;
-  Serial.println("pacman route cleared");
 }
 
 void ConfigManager::loadCanvasPixels() {
@@ -1051,9 +946,6 @@ void ConfigManager::loadCanvasPixels() {
   if (initialized && dataSize == sizeof(DisplayManager::canvasBuffer)) {
     preferences.getBytes("buffer", DisplayManager::canvasBuffer, sizeof(DisplayManager::canvasBuffer));
     DisplayManager::canvasInitialized = true;
-    Serial.println("画板像素数据已加载");
-  } else {
-    Serial.println("无可用画板像素数据，使用空画板");
   }
 
   preferences.end();
@@ -1070,19 +962,15 @@ void ConfigManager::saveCanvasPixels() {
   }
 
   preferences.end();
-  Serial.println("画板像素数据已保存");
 }
 
 void ConfigManager::clearCanvasPixels() {
   preferences.begin("canvas", false);
   preferences.clear();
   preferences.end();
-  Serial.println("画板像素持久化已清空");
 }
 
 void ConfigManager::resetToDefault() {
-  Serial.println("清除所有配置，恢复默认...");
-
   preferences.begin("clock", false);
   preferences.clear();
   preferences.end();
@@ -1215,5 +1103,4 @@ void ConfigManager::resetToDefault() {
   deviceParamsConfig = makeDefaultDeviceParamsConfig();
   DisplayManager::currentBrightness = deviceParamsConfig.displayBright;
 
-  Serial.println("配置已恢复默认");
 }

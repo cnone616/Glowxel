@@ -21,12 +21,7 @@
 </template>
 
 <script setup>
-const previewRoutes = [
-  { title: "设计系统", to: "/design-system", description: "检查当前 tokens、壳层和按钮组件。" },
-  { title: "工作台", to: "/workspace", description: "检查项目列表、创作入口和工作台结构。" },
-  { title: "社区", to: "/community", description: "检查公开作品列表和详情页跳转。" },
-  { title: "设备控制", to: "/device-control", description: "检查网站保留的关键设备主链。" },
-  { title: "个人中心", to: "/profile", description: "检查我的作品、收藏、设置等个人链路。" },
-  { title: "云端同步", to: "/cloud-sync", description: "检查项目同步状态和云端项目列表。" },
-];
+import { devicePreviewRoutes } from "@/config/appNavigation.js";
+
+const previewRoutes = devicePreviewRoutes;
 </script>

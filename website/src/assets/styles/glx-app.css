@@ -14,6 +14,7 @@
   --glx-shadow-soft: 2px 2px 0 #111111;
   --glx-shadow-card: 3px 3px 0 #111111;
   --glx-shadow-strong: 4px 4px 0 #111111;
+  --glx-text-muted: #4b5563;
 }
 
 .glx-public-shell {
@@ -23,9 +24,7 @@
 
 .glx-app-shell {
   min-height: 100vh;
-  background:
-    linear-gradient(180deg, #fff4cf 0, #ffffff 120px),
-    linear-gradient(90deg, rgba(94, 168, 255, 0.08), rgba(255, 255, 255, 0) 35%);
+  background: var(--nb-paper);
 }
 
 .glx-app-shell__header {
@@ -33,8 +32,7 @@
   top: 0;
   z-index: 1100;
   border-bottom: var(--glx-shell-border-strong);
-  background: rgba(255, 255, 255, 0.96);
-  backdrop-filter: blur(10px);
+  background: #ffffff;
 }
 
 .glx-app-shell__header-inner {
@@ -98,6 +96,25 @@
   align-items: center;
   gap: 10px;
   justify-content: flex-end;
+}
+
+.glx-app-shell__device-chip {
+  min-height: 42px;
+  padding: 8px 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: var(--glx-shell-border);
+  background: #ffffff;
+  color: var(--nb-ink);
+  font-size: 13px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.glx-app-shell__device-chip.is-connected {
+  background: var(--nb-yellow);
+  box-shadow: var(--glx-shadow-soft);
 }
 
 .glx-app-shell__content {

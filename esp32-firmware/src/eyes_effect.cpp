@@ -286,6 +286,9 @@ static const ExpressionDedupeProfile kExpressionDedupeProfiles[3] = {
 
 EyesRuntimeState s_state = {};
 unsigned long s_lastEyesRenderAt = 0;
+char s_lastEyesTimeOverlayText[16] = "";
+bool s_lastEyesTimeOverlayValid = false;
+bool s_lastEyesTimeOverlayShowSeconds = false;
 
 static uint8_t clampByte(int value) {
   if (value < 0) {
@@ -1102,6 +1105,9 @@ static void startExpressionTransition(EyeExpressionId nextExpression, unsigned l
 static void resetState() {
   unsigned long now = millis();
   s_lastEyesRenderAt = 0;
+  s_lastEyesTimeOverlayText[0] = '\0';
+  s_lastEyesTimeOverlayValid = false;
+  s_lastEyesTimeOverlayShowSeconds = false;
   s_state.lookX = 0.0f;
   s_state.lookY = 0.0f;
   s_state.targetLookX = 0.0f;
@@ -1504,15 +1510,22 @@ static void drawTimeOverlay(MatrixPanel_I2S_DMA* display, const EyesConfig& conf
   }
 
   struct tm timeinfo;
-  if (!getLocalTime(&timeinfo, 0)) {
-    return;
-  }
-
   char buffer[16];
-  if (config.time.showSeconds) {
-    snprintf(buffer, sizeof(buffer), "%02d:%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
+  if (getLocalTime(&timeinfo, 0)) {
+    if (config.time.showSeconds) {
+      snprintf(buffer, sizeof(buffer), "%02d:%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
+    } else {
+      snprintf(buffer, sizeof(buffer), "%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min);
+    }
+    snprintf(s_lastEyesTimeOverlayText, sizeof(s_lastEyesTimeOverlayText), "%s", buffer);
+    s_lastEyesTimeOverlayValid = true;
+    s_lastEyesTimeOverlayShowSeconds = config.time.showSeconds;
   } else {
-    snprintf(buffer, sizeof(buffer), "%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min);
+    if (!s_lastEyesTimeOverlayValid ||
+        s_lastEyesTimeOverlayShowSeconds != config.time.showSeconds) {
+      return;
+    }
+    snprintf(buffer, sizeof(buffer), "%s", s_lastEyesTimeOverlayText);
   }
 
   uint8_t r = 0;

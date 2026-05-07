@@ -80,6 +80,9 @@ uint8_t* s_snakeVisited = nullptr;
 int16_t* s_snakeDistance = nullptr;
 uint16_t* s_snakeQueue = nullptr;
 SnakeClockLayout s_clockLayout = {};
+char s_lastSnakeClockText[9] = "";
+bool s_lastSnakeClockTextValid = false;
+bool s_lastSnakeClockShowSeconds = false;
 
 void clearLastError() {
   s_lastError[0] = '\0';
@@ -676,9 +679,17 @@ void formatSnakeClockText(char* text, size_t textSize) {
   if (getLocalTime(&timeinfo, 0)) {
     if (s_config.showSeconds) {
       snprintf(text, textSize, "%02d:%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
-      return;
+    } else {
+      snprintf(text, textSize, "%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min);
     }
-    snprintf(text, textSize, "%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min);
+    snprintf(s_lastSnakeClockText, sizeof(s_lastSnakeClockText), "%s", text);
+    s_lastSnakeClockTextValid = true;
+    s_lastSnakeClockShowSeconds = s_config.showSeconds;
+    return;
+  }
+
+  if (s_lastSnakeClockTextValid && s_lastSnakeClockShowSeconds == s_config.showSeconds) {
+    snprintf(text, textSize, "%s", s_lastSnakeClockText);
     return;
   }
 
@@ -765,6 +776,9 @@ void init() {
   s_snakeWon = false;
   s_snakeHoldTicks = 0;
   s_playableCellCount = 0;
+  s_lastSnakeClockText[0] = '\0';
+  s_lastSnakeClockTextValid = false;
+  s_lastSnakeClockShowSeconds = false;
   resetSnakeClockLayout();
   releaseSnakeBuffers();
 }
@@ -780,6 +794,9 @@ void deactivate() {
   s_snakeWon = false;
   s_snakeHoldTicks = 0;
   s_playableCellCount = 0;
+  s_lastSnakeClockText[0] = '\0';
+  s_lastSnakeClockTextValid = false;
+  s_lastSnakeClockShowSeconds = false;
   resetSnakeClockLayout();
   releaseSnakeBuffers();
 }
@@ -788,6 +805,9 @@ void applyConfig(const SnakeModeConfig& config) {
   clearLastError();
   s_config = config;
   s_config.snakeSkin[sizeof(s_config.snakeSkin) - 1] = '\0';
+  s_lastSnakeClockText[0] = '\0';
+  s_lastSnakeClockTextValid = false;
+  s_lastSnakeClockShowSeconds = false;
 
   if (s_config.snakeWidth < 2 || s_config.snakeWidth > 4) {
     setLastError("snake invalid width");

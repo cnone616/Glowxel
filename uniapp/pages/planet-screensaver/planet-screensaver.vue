@@ -75,12 +75,29 @@
                 v-for="preset in presetOptions"
                 :key="preset.id"
                 class="glx-feature-option glx-feature-option--scene"
-                :class="{ active: config.preset === preset.id }"
+                :class="{ active: isPresetOptionActive(preset.id) }"
                 @click="handlePresetSelect(preset.id)"
               >
                 <text class="glx-feature-option__label">{{
                   preset.label
                 }}</text>
+              </view>
+            </view>
+
+            <view v-if="isPortalPreset" class="option-stack portal-color-stack">
+              <text class="form-label">传送门颜色</text>
+              <view class="option-row option-row-triple">
+                <view
+                  v-for="option in portalColorOptions"
+                  :key="option.id"
+                  class="option-btn glx-feature-option"
+                  :class="{ active: config.preset === option.id }"
+                  @click="handlePortalColorSelect(option.id)"
+                >
+                  <text class="glx-feature-option__label">{{
+                    option.label
+                  }}</text>
+                </view>
               </view>
             </view>
           </view>
@@ -90,8 +107,16 @@
               <text class="glx-panel-title">参数</text>
             </view>
 
-            <view class="bottom-action-row">
+            <view
+              v-if="showRandomColorAction || showRandomPlanetAction"
+              class="bottom-action-row"
+              :class="{
+                'bottom-action-row--single':
+                  !showRandomColorAction || !showRandomPlanetAction,
+              }"
+            >
               <view
+                v-if="showRandomColorAction"
                 class="action-btn-sm glx-secondary-action"
                 :class="{ disabled: isSending }"
                 @click="handleRandomColor"
@@ -100,12 +125,13 @@
                 <text>随机颜色</text>
               </view>
               <view
+                v-if="showRandomPlanetAction"
                 class="action-btn-sm glx-secondary-action"
                 :class="{ disabled: isSending }"
                 @click="handleRandomPlanet"
               >
                 <Icon name="refresh" :size="32" color="var(--nb-ink)" />
-                <text>随机星球</text>
+                <text>{{ randomPlanetActionLabel }}</text>
               </view>
             </view>
 
@@ -143,10 +169,10 @@
             </view>
 
             <view class="option-stack">
-              <text class="form-label">星球大小</text>
+              <text class="form-label">{{ sizeSectionLabel }}</text>
               <view class="option-row option-row-triple">
                 <view
-                  v-for="option in sizeOptions"
+                  v-for="option in displaySizeOptions"
                   :key="option.id"
                   class="option-btn glx-feature-option"
                   :class="{ active: config.size === option.id }"
@@ -159,7 +185,7 @@
               </view>
             </view>
 
-            <view class="option-stack">
+            <view v-if="!isPortalPreset" class="option-stack">
               <text class="form-label">自转方向</text>
               <view class="option-row option-row-double">
                 <view
@@ -279,6 +305,7 @@ import {
   getCurrentTimeText,
 } from "../../utils/clockCanvas.js";
 import {
+  PLANET_REFERENCE_DEFAULT_COLOR_SEED,
   PLANET_SCREEN_PRESETS,
   PLANET_PREVIEW_MIN_SPEED,
   PLANET_PREVIEW_MAX_SPEED,
@@ -290,6 +317,7 @@ import {
   createRandomPlanetColorSeed,
   getPlanetPreviewCycleDuration,
   buildPlanetScreensaverPreviewFrame,
+  buildPlanetScreensaverPreviewSequence,
 } from "../../utils/planetScreensaverPreview.js";
 
 const PLANET_TIME_FONT_OPTIONS = getClockFontOptions();
@@ -297,6 +325,31 @@ const PLANET_TIME_FONT_IDS = new Set(
   PLANET_TIME_FONT_OPTIONS.map((item) => item.id),
 );
 const PLANET_PAGE_STORAGE_KEY = "planet_screensaver_page_state";
+const PLANET_FIXED_PALETTE_COLOR_SEED = PLANET_REFERENCE_DEFAULT_COLOR_SEED;
+const PLANET_EARTH_SIZE_OPTIONS = Object.freeze([
+  { id: "small", label: "远景" },
+  { id: "medium", label: "标准" },
+  { id: "large", label: "近景" },
+]);
+const PLANET_PORTAL_COLOR_OPTIONS = Object.freeze([
+  { id: "portal_green", label: "绿色" },
+  { id: "portal_blue", label: "蓝色" },
+  { id: "portal_yellow", label: "黄色" },
+]);
+const PLANET_DISPLAY_PRESETS = Object.freeze(
+  PLANET_SCREEN_PRESETS
+    .filter((preset) => preset.id !== "portal_blue" && preset.id !== "portal_yellow")
+    .map((preset) => {
+      if (preset.id === "portal_green") {
+        return {
+          id: preset.id,
+          label: "传送门",
+          hint: preset.hint,
+        };
+      }
+      return preset;
+    }),
+);
 const PLANET_TIME_COLOR_OPTIONS = Object.freeze([
   { name: "青色", hex: "#64c8ff" },
   { name: "绿色", hex: "#00ff9d" },
@@ -435,8 +488,23 @@ function normalizePlanetPageState(saved) {
   return {
     config,
     clockConfig,
-    previewUseDefaultColors: state.previewUseDefaultColors === true,
   };
+}
+
+function isEarthPresetValue(preset) {
+  return preset === "earth";
+}
+
+function isPortalPresetValue(preset) {
+  return (
+    preset === "portal_green" ||
+    preset === "portal_blue" ||
+    preset === "portal_yellow"
+  );
+}
+
+function isFixedPalettePresetValue(preset) {
+  return isEarthPresetValue(preset) || isPortalPresetValue(preset);
 }
 
 export default {
@@ -463,14 +531,15 @@ export default {
       previewZoom: 4,
       previewOffset: { x: 0, y: 0 },
       previewContainerSize: { width: 320, height: 320 },
-      previewFrameMaps: [],
+      previewDisplayPixels: new Map(),
       sendingPreviewPixels: new Map(),
       sendingPreviewTick: 0,
       previewPlaybackStartedAt: 0,
       previewTimer: null,
       previewRefreshTimer: null,
-      previewUseDefaultColors: true,
-      presetOptions: PLANET_SCREEN_PRESETS,
+      previewSequence: null,
+      presetOptions: PLANET_DISPLAY_PRESETS,
+      portalColorOptions: PLANET_PORTAL_COLOR_OPTIONS,
       sizeOptions: PLANET_SIZE_OPTIONS,
       directionOptions: PLANET_DIRECTION_OPTIONS,
       clockConfig: createDefaultPlanetClockConfig(),
@@ -487,10 +556,7 @@ export default {
   },
   computed: {
     currentPreviewPixels() {
-      if (this.previewFrameMaps.length === 0) {
-        return new Map();
-      }
-      return this.previewFrameMaps[0];
+      return this.previewDisplayPixels;
     },
     previewCanvasBoxStyle() {
       const size =
@@ -507,6 +573,45 @@ export default {
       }
       return this.deviceStore.isConnected;
     },
+    isEarthPreset() {
+      return isEarthPresetValue(this.config.preset);
+    },
+    isFixedPalettePreset() {
+      return isFixedPalettePresetValue(this.config.preset);
+    },
+    isPortalPreset() {
+      return isPortalPresetValue(this.config.preset);
+    },
+    displaySizeOptions() {
+      if (this.isEarthPreset) {
+        return PLANET_EARTH_SIZE_OPTIONS;
+      }
+      return this.sizeOptions;
+    },
+    sizeSectionLabel() {
+      if (this.isEarthPreset) {
+        return "地球视角";
+      }
+      if (this.isPortalPreset) {
+        return "传送门大小";
+      }
+      return "星球大小";
+    },
+    showRandomColorAction() {
+      return !this.isFixedPalettePreset;
+    },
+    showRandomPlanetAction() {
+      return !isPortalPresetValue(this.config.preset);
+    },
+    randomPlanetActionLabel() {
+      if (this.isEarthPreset) {
+        return "随机云层";
+      }
+      if (isPortalPresetValue(this.config.preset)) {
+        return "随机纹理";
+      }
+      return "随机星球";
+    },
   },
   watch: {
     config: {
@@ -521,9 +626,6 @@ export default {
         this.persistLocalState();
       },
     },
-    previewUseDefaultColors(value) {
-      this.persistLocalState();
-    },
   },
   onLoad() {
     this.deviceStore = useDeviceStore();
@@ -534,7 +636,6 @@ export default {
     );
     this.config = savedState.config;
     this.clockConfig = savedState.clockConfig;
-    this.previewUseDefaultColors = savedState.previewUseDefaultColors;
   },
   onReady() {
     if (this.$refs.toastRef) {
@@ -597,7 +698,6 @@ export default {
             align: this.clockConfig.time.align,
           },
         },
-        previewUseDefaultColors: this.previewUseDefaultColors,
       });
     },
     getPlanetTimeText() {
@@ -650,39 +750,44 @@ export default {
       if (!status || typeof status !== "object") {
         return;
       }
-      if (status.businessMode !== "planet_screensaver") {
+      const {
+        businessMode,
+        preset,
+        size,
+        direction,
+        speed: rawSpeed,
+        seed: rawSeed,
+        colorSeed: rawColorSeed,
+        planetX: rawPlanetX,
+        planetY: rawPlanetY,
+        font,
+        showSeconds,
+        time,
+      } = status;
+      if (businessMode !== "planet_screensaver") {
         return;
       }
-      if (
-        typeof status.preset !== "string" ||
-        typeof status.size !== "string"
-      ) {
+      if (typeof preset !== "string" || typeof size !== "string") {
         return;
       }
-      if (
-        typeof status.direction !== "string" ||
-        !status.time ||
-        typeof status.time !== "object"
-      ) {
+      if (typeof direction !== "string" || !time || typeof time !== "object") {
         return;
       }
-      if (!status.time.color || typeof status.time.color !== "object") {
+      if (!time.color || typeof time.color !== "object") {
         return;
       }
 
-      if (PLANET_SCREEN_PRESETS.some((item) => item.id === status.preset)) {
-        this.config.preset = status.preset;
+      if (PLANET_SCREEN_PRESETS.some((item) => item.id === preset)) {
+        this.config.preset = preset;
       }
-      if (PLANET_SIZE_OPTIONS.some((item) => item.id === status.size)) {
-        this.config.size = status.size;
+      if (PLANET_SIZE_OPTIONS.some((item) => item.id === size)) {
+        this.config.size = size;
       }
-      if (
-        PLANET_DIRECTION_OPTIONS.some((item) => item.id === status.direction)
-      ) {
-        this.config.direction = status.direction;
+      if (PLANET_DIRECTION_OPTIONS.some((item) => item.id === direction)) {
+        this.config.direction = direction;
       }
 
-      const speed = Number(status.speed);
+      const speed = Number(rawSpeed);
       if (Number.isFinite(speed)) {
         this.config.speed = Math.max(
           PLANET_PREVIEW_MIN_SPEED,
@@ -690,53 +795,53 @@ export default {
         );
       }
 
-      const seed = Number(status.seed);
+      const seed = Number(rawSeed);
       if (Number.isFinite(seed) && seed >= 0) {
         this.config.seed = Math.round(seed);
       }
 
-      const colorSeed = Number(status.colorSeed);
+      const colorSeed = Number(rawColorSeed);
       if (Number.isFinite(colorSeed) && colorSeed >= 0) {
         this.config.colorSeed = Math.round(colorSeed);
       }
-      const planetX = Number(status.planetX);
+      const planetX = Number(rawPlanetX);
       if (Number.isFinite(planetX)) {
         this.config.planetX = Math.max(0, Math.min(63, Math.round(planetX)));
       }
-      const planetY = Number(status.planetY);
+      const planetY = Number(rawPlanetY);
       if (Number.isFinite(planetY)) {
         this.config.planetY = Math.max(0, Math.min(63, Math.round(planetY)));
       }
 
-      if (PLANET_TIME_FONT_IDS.has(status.font)) {
-        this.clockConfig.font = status.font;
+      if (PLANET_TIME_FONT_IDS.has(font)) {
+        this.clockConfig.font = font;
       }
-      if (status.showSeconds === true || status.showSeconds === false) {
-        this.clockConfig.showSeconds = status.showSeconds;
+      if (showSeconds === true || showSeconds === false) {
+        this.clockConfig.showSeconds = showSeconds;
       }
 
-      if (status.time.show === true || status.time.show === false) {
-        this.clockConfig.time.show = status.time.show;
+      if (time.show === true || time.show === false) {
+        this.clockConfig.time.show = time.show;
       }
-      const fontSize = Number(status.time.fontSize);
+      const fontSize = Number(time.fontSize);
       if (Number.isFinite(fontSize)) {
         this.clockConfig.time.fontSize = Math.max(
           1,
           Math.min(3, Math.round(fontSize)),
         );
       }
-      const boardX = Number(status.time.x);
+      const boardX = Number(time.x);
       if (Number.isFinite(boardX)) {
         this.clockConfig.time.x = this.resolveAnchorTimeXFromBoardX(
           boardX,
           this.getPlanetTimeText(),
         );
       }
-      const y = Number(status.time.y);
+      const y = Number(time.y);
       if (Number.isFinite(y)) {
         this.clockConfig.time.y = Math.max(0, Math.min(63, Math.round(y)));
       }
-      this.clockConfig.time.color = this.rgbToHex(status.time.color);
+      this.clockConfig.time.color = this.rgbToHex(time.color);
 
       if (this.previewCanvasReady) {
         this.schedulePreviewRefresh(this.getCurrentPreviewProgress());
@@ -815,28 +920,54 @@ export default {
       });
     },
     renderPreviewFrame(progress) {
-      const frameMap = buildPlanetScreensaverPreviewFrame(
-        {
-          ...this.config,
-          useDefaultColors: this.previewUseDefaultColors,
-        },
-        progress,
-      );
-      if (this.clockConfig.time.show) {
-        const text = this.getPlanetTimeText();
-        const placement = this.resolveBoardTimePlacement(text);
-        drawClockTextToPixels(
-          text,
-          placement.x,
-          placement.y,
-          this.clockConfig.time.color,
-          frameMap,
-          this.clockConfig.font,
-          placement.fontSize,
-          "left",
+      // 使用预渲染的第一帧（静态预览）
+      let frameMap;
+      if (this.previewSequence && this.previewSequence.maps && this.previewSequence.maps.length > 0) {
+        // 始终使用第一帧
+        frameMap = this.previewSequence.maps[0];
+        
+        // 只有显示时钟时才复制frameMap，避免污染缓存
+        if (this.clockConfig.time.show) {
+          frameMap = new Map(frameMap);
+          const text = this.getPlanetTimeText();
+          const placement = this.resolveBoardTimePlacement(text);
+          drawClockTextToPixels(
+            text,
+            placement.x,
+            placement.y,
+            this.clockConfig.time.color,
+            frameMap,
+            this.clockConfig.font,
+            placement.fontSize,
+            "left",
+          );
+        }
+      } else {
+        // 回退：如果没有序列，实时渲染第一帧
+        frameMap = buildPlanetScreensaverPreviewFrame(
+          {
+            ...this.config,
+          },
+          0,  // 始终使用第一帧
         );
+        
+        if (this.clockConfig.time.show) {
+          const text = this.getPlanetTimeText();
+          const placement = this.resolveBoardTimePlacement(text);
+          drawClockTextToPixels(
+            text,
+            placement.x,
+            placement.y,
+            this.clockConfig.time.color,
+            frameMap,
+            this.clockConfig.font,
+            placement.fontSize,
+            "left",
+          );
+        }
       }
-      this.previewFrameMaps = [frameMap];
+      
+      this.previewDisplayPixels = frameMap;
     },
     resolveBoardTimePlacement(text) {
       const { fontSize, width, height } = this.getPlanetTimeMetrics(text);
@@ -900,13 +1031,35 @@ export default {
         this.startPreviewPlayback(nextProgress);
       }, 40);
     },
+    isPresetOptionActive(presetId) {
+      if (presetId === "portal_green") {
+        return isPortalPresetValue(this.config.preset);
+      }
+      return this.config.preset === presetId;
+    },
     handlePresetSelect(presetId) {
+      if (
+        presetId === "portal_green" &&
+        isPortalPresetValue(this.config.preset)
+      ) {
+        return;
+      }
       if (this.config.preset === presetId) {
         return;
       }
       const progress = this.getCurrentPreviewProgress();
       this.config.preset = presetId;
-      this.previewUseDefaultColors = true;
+      this.schedulePreviewRefresh(progress);
+    },
+    handlePortalColorSelect(presetId) {
+      if (!isPortalPresetValue(presetId)) {
+        return;
+      }
+      if (this.config.preset === presetId) {
+        return;
+      }
+      const progress = this.getCurrentPreviewProgress();
+      this.config.preset = presetId;
       this.schedulePreviewRefresh(progress);
     },
     handleSizeSelect(sizeId) {
@@ -918,12 +1071,17 @@ export default {
       this.schedulePreviewRefresh(progress);
     },
     handleRandomColor() {
+      if (this.isEarthPreset) {
+        return;
+      }
       const progress = this.getCurrentPreviewProgress();
       this.config.colorSeed = createRandomPlanetColorSeed();
-      this.previewUseDefaultColors = false;
       this.schedulePreviewRefresh(progress);
     },
     handleRandomPlanet() {
+      if (isPortalPresetValue(this.config.preset)) {
+        return;
+      }
       const progress = this.getCurrentPreviewProgress();
       this.config.seed = createRandomPlanetPreviewSeed();
       this.schedulePreviewRefresh(progress);
@@ -1056,6 +1214,9 @@ export default {
       }
       const timeText = this.getPlanetTimeText();
       const timePlacement = this.resolveBoardTimePlacement(timeText);
+      const colorSeed = this.isFixedPalettePreset
+        ? PLANET_FIXED_PALETTE_COLOR_SEED
+        : this.config.colorSeed;
       return {
         preset: this.config.preset,
         size: this.config.size,
@@ -1064,7 +1225,7 @@ export default {
         planetY: this.config.planetY,
         speed: this.config.speed,
         seed: this.config.seed,
-        colorSeed: this.config.colorSeed,
+        colorSeed,
         font: this.clockConfig.font,
         showSeconds: this.clockConfig.showSeconds,
         time: {
@@ -1081,33 +1242,12 @@ export default {
       if (!this.previewCanvasReady) {
         return;
       }
-      const cycleDuration = getPlanetPreviewCycleDuration(this.config.speed);
-      const normalizedProgress =
-        typeof preservedProgress === "number" &&
-        Number.isFinite(preservedProgress)
-          ? ((preservedProgress % 1) + 1) % 1
-          : 0;
-      this.previewPlaybackStartedAt =
-        cycleDuration > 0
-          ? Date.now() - normalizedProgress * cycleDuration
-          : Date.now();
-      this.renderPreviewFrame(normalizedProgress);
-
-      const tick = () => {
-        const cycleDuration = getPlanetPreviewCycleDuration(this.config.speed);
-        const elapsed = Date.now() - this.previewPlaybackStartedAt;
-        let progress = 0;
-        if (cycleDuration > 0) {
-          progress = (elapsed % cycleDuration) / cycleDuration;
-        }
-        this.renderPreviewFrame(progress);
-        this.previewTimer = setTimeout(
-          tick,
-          PLANET_PREVIEW_PLAYBACK_INTERVAL_MS,
-        );
-      };
-
-      this.previewTimer = setTimeout(tick, PLANET_PREVIEW_PLAYBACK_INTERVAL_MS);
+      
+      // 只渲染第一帧作为静态预览
+      this.previewSequence = buildPlanetScreensaverPreviewSequence(this.config);
+      
+      // 显示静态预览（不启动动画循环）
+      this.renderPreviewFrame(0);
     },
     stopPreviewPlayback() {
       if (this.previewTimer) {
@@ -1230,6 +1370,10 @@ export default {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12rpx;
   margin: 12rpx 0;
+}
+
+.bottom-action-row--single {
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .bottom-action-row .action-btn-sm {

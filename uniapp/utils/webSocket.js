@@ -452,15 +452,7 @@ class WebSocket {
   }
 
   _debugLog(socketId, label, detail = null) {
-    if (!WS_DEBUG_VERBOSE && !WS_DEBUG_KEY_LABELS.has(label)) {
-      return;
-    }
-    const prefix = `[WS DEBUG] ${this._debugTimestamp()} socket=${socketId} state=${this.connectionState} connected=${this.connected}`;
-    if (detail === null || typeof detail === "undefined") {
-      console.log(prefix, label);
-      return;
-    }
-    console.log(prefix, label, detail);
+    return;
   }
 
   _summarizeSocketEventPayload(payload) {
@@ -657,11 +649,7 @@ class WebSocket {
     this._debugLog(socketId, "closeSocketTask", meta || {});
     this._registerCloseMeta(socketId, meta);
     socketTask.close({
-      success: () => {
-        if (meta && meta.logClose) {
-          console.log(meta.logClose);
-        }
-      },
+      success: () => {},
       fail: (err) => {
         this._debugLog(
           socketId,
@@ -974,10 +962,8 @@ class WebSocket {
     const previousSocketId = this._currentSocketId;
     if (previousSocket) {
       this._debugLog(previousSocketId, "closing previous socket before connect");
-      console.log("关闭旧连接");
       this._closeSocketTask(previousSocket, previousSocketId, {
         suppressReconnect: true,
-        logClose: "旧连接已关闭",
       });
     }
 
@@ -1028,7 +1014,6 @@ class WebSocket {
         previousSocketId,
         hasPreviousSocket: !!previousSocket,
       });
-      console.log("准备连接 WebSocket:", url);
 
       if (WS_DEBUG_VERBOSE) {
         try {
@@ -1070,7 +1055,6 @@ class WebSocket {
         url,
         success: () => {
           this._debugLog(socketId, "connectSocket success callback");
-          console.log("WebSocket 创建成功");
         },
         fail: (err) => {
           if (socketId !== this._currentSocketId) {
@@ -1115,7 +1099,6 @@ class WebSocket {
           return;
         }
         this._debugLog(socketId, "task onOpen");
-        console.log("WebSocket 连接成功");
         hasOpened = true;
         this.connected = true;
         this.connectionState = "open";
@@ -1135,7 +1118,6 @@ class WebSocket {
           "task onMessage",
           this._summarizeSocketEventPayload(res),
         );
-        console.log("收到消息:", res.data);
         try {
           const data = JSON.parse(res.data);
           const callbacks = this.onMessageCallbacks.slice();
@@ -1164,9 +1146,6 @@ class WebSocket {
           event && typeof event.code !== "undefined" ? event.code : "unknown";
         const closeReason =
           event && typeof event.reason === "string" ? event.reason : "";
-        console.log(
-          `WebSocket 连接已关闭 code=${closeCode}${closeReason ? ` reason=${closeReason}` : ""}`,
-        );
         if (this.socket === socketTask) {
           this.socket = null;
         }

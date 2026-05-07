@@ -29,13 +29,16 @@ TextDisplayNativeConfig s_textConfig = {
   36
 };
 
+constexpr uint32_t kPlanetDefaultColorSeed = 33521UL;
+constexpr uint32_t kPlanetReferenceDefaultColorSeed = 20260415UL;
+
 PlanetScreensaverNativeConfig s_planetConfig = {
-  "gas_giant_1",
+  "terran_wet",
   "medium",
   "right",
   3,
   20260415UL,
-  20260415UL,
+  kPlanetDefaultColorSeed,
   32,
   32,
   CLOCK_FONT_CLASSIC_5X7,
@@ -55,6 +58,9 @@ float s_planetPhase = 0.0f;
 unsigned long s_planetPhaseBaseAt = 0;
 bool s_planetDirty = false;
 bool s_planetForceFullRefresh = false;
+char s_lastPlanetClockText[8] = "";
+bool s_lastPlanetClockTextValid = false;
+bool s_lastPlanetClockShowSeconds = false;
 
 struct PlanetRgb {
   uint8_t r;
@@ -72,10 +78,30 @@ constexpr int kPlanetCanvasSize = 64;
 constexpr int kPlanetBufferChannels = 3;
 constexpr int kPlanetPreviewPixels = 100;
 constexpr unsigned long kPlanetPreviewFrameCount = 48UL;
-constexpr unsigned long kPlanetRenderTickMs = 16UL;
+constexpr unsigned long kPlanetRenderTickMs = 16UL;  // 16ms实现62.5 FPS，平衡性能和质量
 constexpr int kPlanetDirectColorCacheSize = 32;
 
+// 地球云层瓦片缓存配置（类似湿润星球）
+constexpr int kPlanetEarthCloudTileWidth = 64;
+constexpr int kPlanetEarthCloudTileHeight = 64;
+constexpr int kPlanetEarthCloudNoiseSamples = 3;  // circleNoise采样次数
+constexpr float kPlanetEarthCloudNoiseMax = 3.0f;  // 噪声最大值
+
 float* s_planetPreviewBuffer = nullptr;
+
+// 地球云层瓦片缓存（独立于湿润星球）
+static uint8_t* s_planetEarthCloudTile = nullptr;
+static uint8_t* s_planetEarthCloudNoiseTile = nullptr;
+
+// 地球地表瓦片缓存（预计算的陆地/海洋位图）
+constexpr int kPlanetEarthLandTileWidth = 64;
+constexpr int kPlanetEarthLandTileHeight = 64;
+static uint8_t* s_planetEarthLandTile = nullptr;
+
+// 传送门时间同步：启动时记录基准点，之后用millis()推算
+static unsigned long s_portalSyncBaseMillis = 0;  // 记录同步时的millis()值
+static int s_portalSyncBaseSecond = 0;            // 记录同步时真实时钟的秒数（0-59）
+static bool s_portalTimeSynced = false;           // 是否已同步
 
 struct PlanetBufferColor {
   float r;
@@ -106,22 +132,124 @@ bool s_planetDirectRenderActive = false;
 
 constexpr bool kPlanetPerfTraceEnabled = false;
 constexpr unsigned long kPlanetPerfLogIntervalMs = 1000UL;
-constexpr int kPlanetDirectMaxOctaves = 3;
-constexpr int kPlanetDirectMaxCloudNoiseSamples = 4;
+constexpr int kPlanetDirectMaxOctaves = 4;  // 恢复到4，保证云层细节质量
+constexpr int kPlanetDirectMaxCloudNoiseSamples = 6;  // 从3恢复到6，平衡质量和性能
 constexpr int kPlanetDirectSphereRenderStep = 1;
 constexpr int kPlanetDirectSpecialRenderStep = 1;
 constexpr int kPlanetTerranWetLandTileWidth = 96;
 constexpr int kPlanetTerranWetLandTileHeight = 48;
 constexpr int kPlanetTerranWetCloudTileWidth = 64;
 constexpr int kPlanetTerranWetCloudTileHeight = 64;
-constexpr int kPlanetTerranWetCloudNoiseSamples = 5;
+constexpr int kPlanetTerranWetCloudNoiseSamples = 4;  // 从5减少到4，提升性能
 constexpr float kPlanetTerranWetCloudNoiseMax = (float)kPlanetTerranWetCloudNoiseSamples;
 constexpr int kPlanetTerranWetRandCacheMax = 128;
 constexpr int kPlanetGenericFbmTileWidth = 64;
 constexpr int kPlanetGenericFbmTileHeight = 64;
 constexpr int kPlanetGenericFbmTileSlotCount = 4;
+constexpr int kPlanetUntiledFbmRectWidth = 96;
+constexpr int kPlanetUntiledFbmRectHeight = 96;
+constexpr int kPlanetUntiledFbmRectSlotCount = 1;
+constexpr int kPlanetStarCellsTileWidth = 64;
+constexpr int kPlanetStarCellsTileHeight = 64;
+constexpr int kPlanetStarBlobTileWidth = 64;
+constexpr int kPlanetStarBlobTileHeight = 64;
+constexpr float kPlanetStarCellsTilePeriod = 1.0f;
+constexpr float kPlanetStarBlobTilePeriod = 2.0f;
+constexpr uint32_t kPlanetEarthBackgroundSeed = 20260415UL;
+constexpr int kPlanetEarthMapWidth = 128;
+constexpr int kPlanetEarthMapHeight = 64;
+constexpr float kPlanetEarthCenterLongitudeRadians = 2.3561945f;
+constexpr float kPlanetEarthStaticDetailSeed = 4.15f;
+constexpr float kPlanetEarthStaticClimateSeed = 7.31f;
+constexpr float kPlanetEarthOceanSeed = 13697.0f;
+constexpr uint32_t kPlanetEarthFastTerrainSalt = 0x45a9f32bUL;
+constexpr uint32_t kPlanetEarthFastMoistureSalt = 0x73c1d65fUL;
+constexpr uint32_t kPlanetEarthFastOceanSalt = 0x1f8b9a42UL;
+constexpr uint32_t kPlanetEarthFastCloudSalt = 0x59d3e781UL;
+constexpr uint32_t kPlanetEarthFastCloudDetailSalt = 0x2b7f4c19UL;
+constexpr float kPlanetEarthLightDirectionX = -0.45f;
+constexpr float kPlanetEarthLightDirectionY = 0.35f;
+constexpr float kPlanetEarthLightDirectionZ = 0.82f;
+constexpr const char* kPlanetEarthLandHexRows[kPlanetEarthMapHeight] = {
+  "00000000000000000000000000000000",
+  "00000000000000000000000000000000",
+  "000000001f80ff000000000000000000",
+  "00000003feffff8003c0000060000000",
+  "0000060070ffff80040000000c000000",
+  "00000000c00fff8000000801fe000000",
+  "00001beefc0fff00000030fffffc3800",
+  "07fffc93a703fe0003f802dffffffff7",
+  "f7ffffff83c7e0600ff5ffffffffffff",
+  "13ffffff038380001effffffffffffff",
+  "07effffc0e0080003cfffffffffffe38",
+  "00c0fffe07c000020e7fffffffffc0c0",
+  "00003fffefe0000711ffffffffff01c0",
+  "00001fffeff00003ffffffffffffe000",
+  "00001fffff180001ffffffffffffe000",
+  "00000fffffe00001fffb9fffffffa000",
+  "00000ffffe000005ebc3bfffffff3000",
+  "00000ffffc00000705ffdffffffc0000",
+  "00000ffff800000708ff9fffffcc4000",
+  "000007fff8000003f007ffffffc5c000",
+  "000003ffe0000007f90fffffffe20000",
+  "000000fd2000000fffffbfffffe00000",
+  "000000781800001ffff7dfffffe00000",
+  "000000380000003ffffbf0ffffc00000",
+  "000000188800003ffffbf87e7c000000",
+  "0000001d8a80003ffffdf03c3c000000",
+  "00000001c000003ffffdc0301e000000",
+  "000000004000003fffff00101e000000",
+  "0000000025c0001fffffc01004000000",
+  "000000000fe0000fffffc00810080000",
+  "000000000ffc00001fff800028400000",
+  "000000000ffc00001fff000011cc0000",
+  "000000001fff00001ffe000009b10000",
+  "000000001fffe0000ffc00000c10f000",
+  "000000000ffff00007fc000003007000",
+  "000000000fffe00007fc000000200800",
+  "0000000007ffc00007fc40000003a000",
+  "0000000007ffc0000ffc4000000f3000",
+  "0000000001ffc0000ff8c000001ff000",
+  "0000000001ff800007f08000007ff800",
+  "0000000001ff000007f8800000fffc00",
+  "0000000001fe000007f0000000fffc00",
+  "0000000001fc000003e00000007ffe00",
+  "0000000001f8000003c000000078fc00",
+  "0000000003f000000000000000007c00",
+  "0000000003f000000000000000002802",
+  "0000000003c000000000000000001002",
+  "00000000038000000000000000000008",
+  "00000000070000000000000000000000",
+  "00000000070000000000008000000000",
+  "00000000072000000000000000000000",
+  "00000000018000000000000000000000",
+  "00000000000000000000000000000000",
+  "00000000000000000000000000000000",
+  "00000000000000000000000000000000",
+  "00000000004000000000100008800000",
+  "00000000008000000009ff8ffffffe00",
+  "0000000007c0000fffffff7ffffffff8",
+  "0001ff8fffc0003fffffffffffffffe0",
+  "00fffffff80007ffffffffffffffffc0",
+  "000ffffff82703ffffffffffffffff80",
+  "003fffffffefffffffffffffffffffe0",
+  "00000000000000000000000000000000",
+  "00000000000000000000000000000000"
+};
 
 void releasePlanetRuntimeBuffers();
+uint8_t quantizePlanetTileValue(float value, float maxValue);
+float decodePlanetTileValue(uint8_t value, float maxValue);
+float samplePlanetTileBilinear(
+  const uint8_t* tile,
+  int width,
+  int height,
+  float periodX,
+  float periodY,
+  float sampleX,
+  float sampleY,
+  float maxValue
+);
 
 struct PlanetPerfStats {
   unsigned long windowStartedAt;
@@ -156,7 +284,8 @@ struct PlanetDirectColorCacheEntry {
   bool valid;
 };
 
-PlanetDirectColorCacheEntry s_planetDirectColorCache[kPlanetDirectColorCacheSize] = {};
+PlanetDirectColorCacheEntry* s_planetDirectColorCache = nullptr;
+bool s_planetDirectColorCacheDisabled = false;
 
 struct PlanetTerranWetTileState {
   bool valid;
@@ -170,6 +299,11 @@ uint8_t* s_planetTerranWetLandTile = nullptr;
 uint8_t* s_planetTerranWetCloudTile = nullptr;
 uint8_t* s_planetTerranWetCloudNoiseTile = nullptr;
 bool s_planetTerranWetTileCacheDisabled = false;
+
+// 地球瓦片缓存状态（独立于湿润星球）
+PlanetTerranWetTileState s_planetEarthCloudTileState = {};
+PlanetTerranWetTileState s_planetEarthCloudNoiseTileState = {};
+PlanetTerranWetTileState s_planetEarthLandTileState = {};
 
 struct PlanetTerranWetStaticPixel {
   uint16_t offset;
@@ -204,6 +338,7 @@ struct PlanetTiledRandCache {
 PlanetTerranWetStaticCache s_planetTerranWetStaticCache = {};
 PlanetTiledRandCache s_planetTerranWetLandRandCache = {};
 PlanetTiledRandCache s_planetTerranWetCloudRandCache = {};
+PlanetTiledRandCache s_planetDirectNoiseRandCache = {};
 
 struct PlanetGenericFbmTileCache {
   bool valid;
@@ -221,6 +356,45 @@ bool s_planetGenericFbmTileCacheDisabled = false;
 unsigned long s_planetGenericFbmTileUseTick = 0UL;
 int s_planetGenericFbmTileBuildDepth = 0;
 
+struct PlanetUntiledFbmRectCache {
+  bool valid;
+  uint32_t seedBits;
+  uint32_t sizeBits;
+  uint32_t minXBits;
+  uint32_t maxXBits;
+  uint32_t minYBits;
+  uint32_t maxYBits;
+  int octaves;
+  uint8_t* values;
+  unsigned long useTick;
+};
+
+PlanetUntiledFbmRectCache* s_planetUntiledFbmRectCaches = nullptr;
+bool s_planetUntiledFbmRectCacheDisabled = false;
+unsigned long s_planetUntiledFbmRectUseTick = 0UL;
+
+struct PlanetStarCellsTileCache {
+  bool valid;
+  int numCells;
+  int tiles;
+  uint8_t* values;
+};
+
+PlanetStarCellsTileCache* s_planetStarCellsTileCaches = nullptr;
+bool s_planetStarCellsTileCacheDisabled = false;
+
+struct PlanetStarBlobTileCache {
+  bool valid;
+  uint32_t seedBits;
+  uint32_t sizeBits;
+  uint32_t circleAmountBits;
+  uint32_t circleSizeBits;
+  uint8_t* values;
+};
+
+PlanetStarBlobTileCache* s_planetStarBlobTileCache = nullptr;
+bool s_planetStarBlobTileCacheDisabled = false;
+
 struct PlanetRenderFrame {
   const char* presetId;
   uint32_t seed;
@@ -228,6 +402,7 @@ struct PlanetRenderFrame {
   float centerX;
   float centerY;
   float progress;
+  float portalProgress;  // 传送门独立进度，基于真实60秒
   float motionFactor;
   float spinFactor;
   float spinAngle;
@@ -524,10 +699,24 @@ float smoothstepFloat(float edge0, float edge1, float value) {
   return t * t * (3.0f - 2.0f * t);
 }
 
+// 更平滑的缓动函数 - 用于传送门动画
+float easeInOutCubic(float t) {
+  return t < 0.5f ? 4.0f * t * t * t : 1.0f - powf(-2.0f * t + 2.0f, 3.0f) / 2.0f;
+}
+
+float easeInOutBack(float t) {
+  const float c1 = 1.70158f;
+  const float c2 = c1 * 1.525f;
+  return t < 0.5f
+    ? (powf(2.0f * t, 2.0f) * ((c2 + 1.0f) * 2.0f * t - c2)) / 2.0f
+    : (powf(2.0f * t - 2.0f, 2.0f) * ((c2 + 1.0f) * (t * 2.0f - 2.0f) + c2) + 2.0f) / 2.0f;
+}
+
 PlanetRgb mixPlanetRgb(const PlanetRgb& left, const PlanetRgb& right, float amount);
 void rgbToPlanetHsv(const PlanetRgb& color, float& hue, float& saturation, float& value);
 PlanetRgb hsvToPlanetRgb(float hue, float saturation, float value);
 bool shouldDrawPlanetDirectPixel(int x, int y, float alpha);
+void spherifyPlanetUv(float x, float y, float& outX, float& outY);
 
 PlanetRgb makePlanetRgbRaw(uint8_t r, uint8_t g, uint8_t b) {
   PlanetRgb color = { r, g, b };
@@ -693,13 +882,40 @@ uint32_t planetFloatBits(float value) {
 }
 
 void invalidatePlanetDirectCaches() {
+  if (s_planetDirectColorCache == nullptr) {
+    return;
+  }
   for (int index = 0; index < kPlanetDirectColorCacheSize; index += 1) {
     s_planetDirectColorCache[index].valid = false;
   }
 }
 
+bool isReferenceDefaultPlanetColorSeed(uint32_t seed) {
+  return seed == kPlanetReferenceDefaultColorSeed;
+}
+
+bool isPlanetPortalPresetValue(const char* preset) {
+  return strcmp(preset, "portal_green") == 0 ||
+         strcmp(preset, "portal_blue") == 0 ||
+         strcmp(preset, "portal_yellow") == 0;
+}
+
+bool isPlanetFixedPalettePresetValue(const char* preset) {
+  return strcmp(preset, "earth") == 0 || isPlanetPortalPresetValue(preset);
+}
+
 void refreshPlanetColorVariant() {
   uint32_t seed = s_planetConfig.colorSeed;
+  if (isReferenceDefaultPlanetColorSeed(seed) ||
+      isPlanetFixedPalettePresetValue(s_planetConfig.preset)) {
+    s_planetHueShift = 0.0f;
+    s_planetSaturationScale = 1.0f;
+    s_planetTintBrightness = 1.0f;
+    s_planetTintColor = makePlanetRgb(0, 0, 0);
+    s_planetTintMix = 0.0f;
+    invalidatePlanetDirectCaches();
+    return;
+  }
   char key[48];
   snprintf(key, sizeof(key), "%s_color_variant_hue", s_planetConfig.preset);
   s_planetHueShift = seededPlanetRange(seed, key, -0.32f, 0.32f);
@@ -767,6 +983,17 @@ float resolveDefaultPlanetSizeScale(const char* size) {
 }
 
 float resolvePlanetSizeScaleFor(const char* preset, const char* size) {
+  if (strcmp(preset, "earth") == 0) {
+    if (strcmp(size, "small") == 0) {
+      return 0.72f;
+    }
+    if (strcmp(size, "medium") == 0) {
+      return 0.86f;
+    }
+    if (strcmp(size, "large") == 0) {
+      return 0.98f;
+    }
+  }
   if (strcmp(preset, "gas_giant_2") == 0) {
     if (strcmp(size, "small") == 0) {
       return 1.15f;
@@ -800,6 +1027,17 @@ float resolvePlanetSizeScaleFor(const char* preset, const char* size) {
       return 1.50f;
     }
   }
+  if (isPlanetPortalPresetValue(preset)) {
+    if (strcmp(size, "small") == 0) {
+      return 0.673f;  // 35像素: 35/52
+    }
+    if (strcmp(size, "medium") == 0) {
+      return 0.962f;  // 50像素: 50/52
+    }
+    if (strcmp(size, "large") == 0) {
+      return 1.154f;  // 60像素: 60/52
+    }
+  }
   if (strcmp(preset, "star") == 0) {
     if (strcmp(size, "small") == 0) {
       return 1.00f;
@@ -826,6 +1064,7 @@ float resolvePlanetDirectionFactor(const char* direction) {
 }
 
 unsigned long resolvePlanetFrameDelay(uint8_t speed) {
+  // 恢复原来的延迟数组，保持动画播放速度不变
   static const unsigned long kPlanetDelayBySpeed[10] = {
     840UL, 720UL, 620UL, 530UL, 450UL, 380UL, 320UL, 270UL, 220UL, 180UL
   };
@@ -1223,6 +1462,11 @@ float getGasGiantCloudCover(uint32_t seed) {
   return seededPlanetRange(seed, "gas_giant_one_cloud_cover", 0.28f, 0.50f);
 }
 
+float getEarthCloudCover(uint32_t seed) {
+  // 恢复原来的云层覆盖率范围
+  return seededPlanetRange(seed, "earth_cloud_cover", 0.46f, 0.60f);
+}
+
 float samplePlanetCloudMask(float longitude, float latitude, float dx, float flow, uint32_t seed, float stretch, float scale, int octaves) {
   float cloudLatitude = latitude * stretch + smoothstepFloat(0.0f, 0.55f, fabsf(dx));
   float base = fbmPlanet(longitude * scale - flow * 1.8f + 31.0f, cloudLatitude * scale + 17.0f, seed + 43U, octaves);
@@ -1261,7 +1505,7 @@ float samplePlanetLakeMask(float longitude, float latitude, float flow, uint32_t
 }
 
 float samplePlanetGasMask(float longitude, float latitude, float flow, uint32_t seed, float scale, float bandScale) {
-  float band = fbmPlanet(0.0f, latitude * scale * bandScale + 17.0f, seed + 163U, 4);
+  float band = fbmPlanet(0.0f, latitude * scale * bandScale + 17.0f, seed + 163U, 3);  // 从4减少到3
   float turbulence = fbmPlanet(
     longitude * scale * 0.35f - flow * 1.4f + 11.0f,
     latitude * scale * 0.55f + 23.0f,
@@ -1556,7 +1800,7 @@ void drawStarPlanet() {
       }
 
       float angle = atan2f(dx, dy);
-      float flareNoise = fbmPlanet(dist * 1.6f - flow * 0.05f + 43.0f, angle * 1.6f + 79.0f, seed + 331U, 4);
+      float flareNoise = fbmPlanet(dist * 1.6f - flow * 0.05f + 43.0f, angle * 1.6f + 79.0f, seed + 331U, 3);  // 从4减少到3
       if (flareNoise <= 0.66f) {
         continue;
       }
@@ -2116,6 +2360,14 @@ bool planetPresetEqualsValue(const char* left, const char* right) {
   return strcmp(left, right) == 0;
 }
 
+bool planetPresetUsesLightweightDirectSampling(const char* presetId) {
+  return planetPresetEqualsValue(presetId, "asteroid") ||
+         planetPresetEqualsValue(presetId, "black_hole") ||
+         planetPresetEqualsValue(presetId, "galaxy") ||
+         isPlanetPortalPresetValue(presetId) ||
+         planetPresetEqualsValue(presetId, "star");
+}
+
 float resolvePlanetPresetRelativeScaleFor(const char* presetId) {
   if (planetPresetEqualsValue(presetId, "gas_giant_2")) {
     return 3.0f;
@@ -2234,6 +2486,15 @@ PlanetBufferColor applyActivePlanetColorVariant(const PlanetBufferColor& color) 
 
 PlanetColorVariant buildPlanetColorVariant(const PlanetRenderFrame& frame) {
   PlanetColorVariant variant;
+  if (isReferenceDefaultPlanetColorSeed(frame.colorSeed) ||
+      isPlanetFixedPalettePresetValue(frame.presetId)) {
+    variant.hueShift = 0.0f;
+    variant.saturationScale = 1.0f;
+    variant.valueScale = 1.0f;
+    variant.tintMix = 0.0f;
+    variant.tint = makePlanetBufferColor(0.0f, 0.0f, 0.0f, 1.0f);
+    return variant;
+  }
   char key[48];
 
   snprintf(key, sizeof(key), "%s_color_variant_hue", frame.presetId);
@@ -2422,8 +2683,8 @@ float circleNoisePlanetCloud(float x, float y, float seed, float size) {
   float dx = fx - 0.25f - h * 0.5f;
   float dy = fy - 0.25f - h * 0.5f;
   float magnitude = sqrtf(dx * dx + dy * dy);
-  float radius = h * 0.25f;
-  return smoothstepFloat(0.0f, radius, magnitude * 0.75f);
+  float radius = h * 0.28f;  // 增加半径，让云层更连贯
+  return smoothstepFloat(0.0f, radius, magnitude * 0.68f);  // 调整边缘处理，改善云层形状
 }
 
 float circleNoisePlanetCrater(float x, float y, float seed, float size) {
@@ -2472,6 +2733,410 @@ float cellsPlanetValue(float x, float y, float numCells, float tiles) {
   }
 
   return sqrtf(minDistance);
+}
+
+float samplePlanetRectBilinear(
+  const uint8_t* tile,
+  int width,
+  int height,
+  float minX,
+  float maxX,
+  float minY,
+  float maxY,
+  float sampleX,
+  float sampleY,
+  float maxValue
+) {
+  if (tile == nullptr || width <= 0 || height <= 0) {
+    return 0.0f;
+  }
+  if (maxX <= minX || maxY <= minY) {
+    return decodePlanetTileValue(tile[0], maxValue);
+  }
+
+  float normalizedX = clampFloat((sampleX - minX) / (maxX - minX), 0.0f, 1.0f);
+  float normalizedY = clampFloat((sampleY - minY) / (maxY - minY), 0.0f, 1.0f);
+  float texX = normalizedX * (float)(width - 1);
+  float texY = normalizedY * (float)(height - 1);
+  int x0 = clampInt((int)floorf(texX), 0, width - 1);
+  int y0 = clampInt((int)floorf(texY), 0, height - 1);
+  int x1 = clampInt(x0 + 1, 0, width - 1);
+  int y1 = clampInt(y0 + 1, 0, height - 1);
+  float fx = texX - (float)x0;
+  float fy = texY - (float)y0;
+
+  float v00 = decodePlanetTileValue(tile[y0 * width + x0], maxValue);
+  float v10 = decodePlanetTileValue(tile[y0 * width + x1], maxValue);
+  float v01 = decodePlanetTileValue(tile[y1 * width + x0], maxValue);
+  float v11 = decodePlanetTileValue(tile[y1 * width + x1], maxValue);
+  float top = mixFloat(v00, v10, fx);
+  float bottom = mixFloat(v01, v11, fx);
+  return mixFloat(top, bottom, fy);
+}
+
+bool planetUntiledFbmRectMatches(
+  const PlanetUntiledFbmRectCache& cache,
+  float seed,
+  float size,
+  int octaves,
+  float minX,
+  float maxX,
+  float minY,
+  float maxY
+) {
+  return cache.valid &&
+         cache.seedBits == planetFloatBits(seed) &&
+         cache.sizeBits == planetFloatBits(size) &&
+         cache.minXBits == planetFloatBits(minX) &&
+         cache.maxXBits == planetFloatBits(maxX) &&
+         cache.minYBits == planetFloatBits(minY) &&
+         cache.maxYBits == planetFloatBits(maxY) &&
+         cache.octaves == octaves;
+}
+
+bool ensurePlanetUntiledFbmRectCacheMetadata() {
+  if (s_planetUntiledFbmRectCaches != nullptr) {
+    return true;
+  }
+
+  s_planetUntiledFbmRectCaches = static_cast<PlanetUntiledFbmRectCache*>(
+    allocatePlanetBuffer(sizeof(PlanetUntiledFbmRectCache) * kPlanetUntiledFbmRectSlotCount)
+  );
+  if (s_planetUntiledFbmRectCaches == nullptr) {
+    s_planetUntiledFbmRectCacheDisabled = true;
+    return false;
+  }
+  memset(
+    s_planetUntiledFbmRectCaches,
+    0,
+    sizeof(PlanetUntiledFbmRectCache) * kPlanetUntiledFbmRectSlotCount
+  );
+  return true;
+}
+
+PlanetUntiledFbmRectCache* acquirePlanetUntiledFbmRectCache(
+  float seed,
+  float size,
+  int octaves,
+  float minX,
+  float maxX,
+  float minY,
+  float maxY
+) {
+  if (s_planetUntiledFbmRectCacheDisabled) {
+    return nullptr;
+  }
+  if (!ensurePlanetUntiledFbmRectCacheMetadata()) {
+    return nullptr;
+  }
+
+  int effectiveOctaves = resolvePlanetDirectOctaves(octaves);
+  s_planetUntiledFbmRectUseTick += 1UL;
+  PlanetUntiledFbmRectCache* reuseSlot = nullptr;
+  for (int index = 0; index < kPlanetUntiledFbmRectSlotCount; index += 1) {
+    PlanetUntiledFbmRectCache& cache = s_planetUntiledFbmRectCaches[index];
+    if (planetUntiledFbmRectMatches(cache, seed, size, effectiveOctaves, minX, maxX, minY, maxY)) {
+      cache.useTick = s_planetUntiledFbmRectUseTick;
+      return &cache;
+    }
+    if (reuseSlot == nullptr && !cache.valid) {
+      reuseSlot = &cache;
+    }
+  }
+
+  if (reuseSlot == nullptr) {
+    reuseSlot = &s_planetUntiledFbmRectCaches[0];
+    for (int index = 1; index < kPlanetUntiledFbmRectSlotCount; index += 1) {
+      if (s_planetUntiledFbmRectCaches[index].useTick < reuseSlot->useTick) {
+        reuseSlot = &s_planetUntiledFbmRectCaches[index];
+      }
+    }
+  }
+
+  if (reuseSlot->values == nullptr) {
+    reuseSlot->values = static_cast<uint8_t*>(
+      allocatePlanetBuffer((size_t)kPlanetUntiledFbmRectWidth * (size_t)kPlanetUntiledFbmRectHeight)
+    );
+    if (reuseSlot->values == nullptr) {
+      s_planetUntiledFbmRectCacheDisabled = true;
+      return nullptr;
+    }
+  }
+
+  for (int y = 0; y < kPlanetUntiledFbmRectHeight; y += 1) {
+    float sampleY = minY + (((float)y + 0.5f) / (float)kPlanetUntiledFbmRectHeight) * (maxY - minY);
+    for (int x = 0; x < kPlanetUntiledFbmRectWidth; x += 1) {
+      float sampleX = minX + (((float)x + 0.5f) / (float)kPlanetUntiledFbmRectWidth) * (maxX - minX);
+      float value = fbmPlanetPreviewUntiled(sampleX, sampleY, seed, effectiveOctaves);
+      reuseSlot->values[y * kPlanetUntiledFbmRectWidth + x] =
+        quantizePlanetTileValue(value, 1.0f);
+    }
+  }
+
+  reuseSlot->valid = true;
+  reuseSlot->seedBits = planetFloatBits(seed);
+  reuseSlot->sizeBits = planetFloatBits(size);
+  reuseSlot->minXBits = planetFloatBits(minX);
+  reuseSlot->maxXBits = planetFloatBits(maxX);
+  reuseSlot->minYBits = planetFloatBits(minY);
+  reuseSlot->maxYBits = planetFloatBits(maxY);
+  reuseSlot->octaves = effectiveOctaves;
+  reuseSlot->useTick = s_planetUntiledFbmRectUseTick;
+  return reuseSlot;
+}
+
+float samplePlanetUntiledFbmRectCached(
+  float x,
+  float y,
+  float seed,
+  float size,
+  int octaves,
+  float minX,
+  float maxX,
+  float minY,
+  float maxY
+) {
+  PlanetUntiledFbmRectCache* cache = acquirePlanetUntiledFbmRectCache(
+    seed,
+    size,
+    octaves,
+    minX,
+    maxX,
+    minY,
+    maxY
+  );
+  if (cache == nullptr || cache->values == nullptr) {
+    return fbmPlanetPreviewUntiled(x, y, seed, resolvePlanetDirectOctaves(octaves));
+  }
+
+  return samplePlanetRectBilinear(
+    cache->values,
+    kPlanetUntiledFbmRectWidth,
+    kPlanetUntiledFbmRectHeight,
+    minX,
+    maxX,
+    minY,
+    maxY,
+    x,
+    y,
+    1.0f
+  );
+}
+
+bool ensurePlanetStarCellsCacheMetadata() {
+  if (s_planetStarCellsTileCaches != nullptr) {
+    return true;
+  }
+
+  s_planetStarCellsTileCaches = static_cast<PlanetStarCellsTileCache*>(
+    allocatePlanetBuffer(sizeof(PlanetStarCellsTileCache) * 2U)
+  );
+  if (s_planetStarCellsTileCaches == nullptr) {
+    s_planetStarCellsTileCacheDisabled = true;
+    return false;
+  }
+  memset(s_planetStarCellsTileCaches, 0, sizeof(PlanetStarCellsTileCache) * 2U);
+  return true;
+}
+
+bool ensurePlanetStarCellsTileStorage(PlanetStarCellsTileCache& cache) {
+  if (cache.values != nullptr) {
+    return true;
+  }
+
+  cache.values = static_cast<uint8_t*>(
+    allocatePlanetBuffer((size_t)kPlanetStarCellsTileWidth * (size_t)kPlanetStarCellsTileHeight)
+  );
+  if (cache.values == nullptr) {
+    s_planetStarCellsTileCacheDisabled = true;
+    return false;
+  }
+  memset(cache.values, 0, (size_t)kPlanetStarCellsTileWidth * (size_t)kPlanetStarCellsTileHeight);
+  return true;
+}
+
+bool preparePlanetStarCellsTile(PlanetStarCellsTileCache& cache, int numCells, int tiles) {
+  if (s_planetStarCellsTileCacheDisabled) {
+    return false;
+  }
+  if (!ensurePlanetStarCellsTileStorage(cache)) {
+    return false;
+  }
+  if (cache.valid && cache.numCells == numCells && cache.tiles == tiles) {
+    return true;
+  }
+
+  for (int y = 0; y < kPlanetStarCellsTileHeight; y += 1) {
+    float sampleY = ((float)y + 0.5f) / (float)kPlanetStarCellsTileHeight * kPlanetStarCellsTilePeriod;
+    for (int x = 0; x < kPlanetStarCellsTileWidth; x += 1) {
+      float sampleX = ((float)x + 0.5f) / (float)kPlanetStarCellsTileWidth * kPlanetStarCellsTilePeriod;
+      float value = cellsPlanetValue(sampleX, sampleY, (float)numCells, (float)tiles);
+      cache.values[y * kPlanetStarCellsTileWidth + x] = quantizePlanetTileValue(value, 1.0f);
+    }
+  }
+
+  cache.valid = true;
+  cache.numCells = numCells;
+  cache.tiles = tiles;
+  return true;
+}
+
+float samplePlanetStarCellsCached(float x, float y, int numCells, int tiles) {
+  if (s_planetStarCellsTileCacheDisabled || !ensurePlanetStarCellsCacheMetadata()) {
+    return cellsPlanetValue(x, y, (float)numCells, (float)tiles);
+  }
+  int slotIndex = numCells <= 10 ? 0 : 1;
+  PlanetStarCellsTileCache& cache = s_planetStarCellsTileCaches[slotIndex];
+  if (!preparePlanetStarCellsTile(cache, numCells, tiles) || cache.values == nullptr) {
+    return cellsPlanetValue(x, y, (float)numCells, (float)tiles);
+  }
+
+  return samplePlanetTileBilinear(
+    cache.values,
+    kPlanetStarCellsTileWidth,
+    kPlanetStarCellsTileHeight,
+    kPlanetStarCellsTilePeriod,
+    kPlanetStarCellsTilePeriod,
+    x,
+    y,
+    1.0f
+  );
+}
+
+float computePlanetStarBlobPattern(
+  const PlanetRenderFrame& frame,
+  const PlanetStarBlobLayer& layer,
+  float circleUvX,
+  float circleUvY
+) {
+  float value = 0.0f;
+  for (int index = 0; index < 15; index += 1) {
+    float randomValue = tiledPlanetRand(frame.shaderSeed, layer.size, (float)index, 0.0f);
+    float invert = 1.0f / layer.circleAmount;
+    float adjustedX = circleUvX + randomValue;
+    if (modPlanetFloat(circleUvY, invert * 2.0f) < invert) {
+      adjustedX += invert * 0.5f;
+    }
+    float randCoordX = floorf(adjustedX * layer.circleAmount) / layer.circleAmount;
+    float randCoordY = floorf(circleUvY * layer.circleAmount) / layer.circleAmount;
+    float localX = modPlanetFloat(adjustedX, invert) * layer.circleAmount;
+    float localY = modPlanetFloat(circleUvY, invert) * layer.circleAmount;
+    float radius = tiledPlanetRand(frame.shaderSeed, layer.size, randCoordX, randCoordY);
+    radius = clampFloat(radius, invert, 1.0f - invert);
+    float circleDistance = distancePlanet(localX, localY, radius, radius);
+    float circleAlpha = smoothstepFloat(
+      circleDistance,
+      circleDistance + 0.5f,
+      invert * layer.circleSize *
+        tiledPlanetRand(frame.shaderSeed, layer.size, randCoordX * 1.5f, randCoordY * 1.5f)
+    );
+    value += circleAlpha;
+  }
+  return value;
+}
+
+bool ensurePlanetStarBlobCacheMetadata() {
+  if (s_planetStarBlobTileCache != nullptr) {
+    return true;
+  }
+
+  s_planetStarBlobTileCache = static_cast<PlanetStarBlobTileCache*>(
+    allocatePlanetBuffer(sizeof(PlanetStarBlobTileCache))
+  );
+  if (s_planetStarBlobTileCache == nullptr) {
+    s_planetStarBlobTileCacheDisabled = true;
+    return false;
+  }
+  memset(s_planetStarBlobTileCache, 0, sizeof(PlanetStarBlobTileCache));
+  return true;
+}
+
+bool ensurePlanetStarBlobTileStorage() {
+  if (!ensurePlanetStarBlobCacheMetadata()) {
+    return false;
+  }
+  if (s_planetStarBlobTileCache->values != nullptr) {
+    return true;
+  }
+
+  s_planetStarBlobTileCache->values = static_cast<uint8_t*>(
+    allocatePlanetBuffer((size_t)kPlanetStarBlobTileWidth * (size_t)kPlanetStarBlobTileHeight)
+  );
+  if (s_planetStarBlobTileCache->values == nullptr) {
+    s_planetStarBlobTileCacheDisabled = true;
+    return false;
+  }
+  memset(
+    s_planetStarBlobTileCache->values,
+    0,
+    (size_t)kPlanetStarBlobTileWidth * (size_t)kPlanetStarBlobTileHeight
+  );
+  return true;
+}
+
+bool preparePlanetStarBlobTile(const PlanetRenderFrame& frame, const PlanetStarBlobLayer& layer) {
+  if (s_planetStarBlobTileCacheDisabled) {
+    return false;
+  }
+  if (!ensurePlanetStarBlobTileStorage()) {
+    return false;
+  }
+
+  uint32_t seedBits = planetFloatBits(frame.shaderSeed);
+  uint32_t sizeBits = planetFloatBits(layer.size);
+  uint32_t circleAmountBits = planetFloatBits(layer.circleAmount);
+  uint32_t circleSizeBits = planetFloatBits(layer.circleSize);
+  if (s_planetStarBlobTileCache->valid &&
+      s_planetStarBlobTileCache->seedBits == seedBits &&
+      s_planetStarBlobTileCache->sizeBits == sizeBits &&
+      s_planetStarBlobTileCache->circleAmountBits == circleAmountBits &&
+      s_planetStarBlobTileCache->circleSizeBits == circleSizeBits) {
+    return true;
+  }
+
+  for (int y = 0; y < kPlanetStarBlobTileHeight; y += 1) {
+    float circleUvY =
+      ((float)y + 0.5f) / (float)kPlanetStarBlobTileHeight * kPlanetStarBlobTilePeriod;
+    for (int x = 0; x < kPlanetStarBlobTileWidth; x += 1) {
+      float circleUvX =
+        ((float)x + 0.5f) / (float)kPlanetStarBlobTileWidth * kPlanetStarBlobTilePeriod;
+      float value = computePlanetStarBlobPattern(frame, layer, circleUvX, circleUvY);
+      s_planetStarBlobTileCache->values[y * kPlanetStarBlobTileWidth + x] =
+        quantizePlanetTileValue(value, 15.0f);
+    }
+  }
+
+  s_planetStarBlobTileCache->valid = true;
+  s_planetStarBlobTileCache->seedBits = seedBits;
+  s_planetStarBlobTileCache->sizeBits = sizeBits;
+  s_planetStarBlobTileCache->circleAmountBits = circleAmountBits;
+  s_planetStarBlobTileCache->circleSizeBits = circleSizeBits;
+  return true;
+}
+
+bool samplePlanetStarBlobPatternCached(
+  const PlanetRenderFrame& frame,
+  const PlanetStarBlobLayer& layer,
+  float circleUvX,
+  float circleUvY,
+  float& outValue
+) {
+  if (!preparePlanetStarBlobTile(frame, layer) || s_planetStarBlobTileCache == nullptr ||
+      s_planetStarBlobTileCache->values == nullptr) {
+    return false;
+  }
+
+  outValue = samplePlanetTileBilinear(
+    s_planetStarBlobTileCache->values,
+    kPlanetStarBlobTileWidth,
+    kPlanetStarBlobTileHeight,
+    kPlanetStarBlobTilePeriod,
+    kPlanetStarBlobTilePeriod,
+    circleUvX,
+    circleUvY,
+    15.0f
+  );
+  return true;
 }
 
 void spherifyPlanetUv(float x, float y, float& outX, float& outY) {
@@ -2615,6 +3280,20 @@ float circleNoisePlanetCloudCached(float x, float y, const PlanetTiledRandCache&
   return smoothstepFloat(0.0f, radius, magnitude * 0.75f);
 }
 
+float circleNoisePlanetCraterCached(float x, float y, const PlanetTiledRandCache& cache) {
+  float uvYFloat = floorf(y);
+  int uvY = (int)uvYFloat;
+  float shiftedX = x + uvYFloat * 0.31f;
+  float fx = fractFloat(shiftedX);
+  float fy = fractFloat(y);
+  float h = samplePlanetTiledRandCache(cache, (int)floorf(shiftedX), uvY);
+  float dx = fx - 0.25f - h * 0.5f;
+  float dy = fy - 0.25f - h * 0.5f;
+  float magnitude = sqrtf(dx * dx + dy * dy);
+  float radius = h * 0.25f;
+  return smoothstepFloat(radius - 0.1f * radius, radius, magnitude);
+}
+
 bool ensurePlanetTerranWetStaticCache(const PlanetRenderFrame& frame) {
   if (s_planetTerranWetStaticCache.valid &&
       s_planetTerranWetStaticCache.sizeScale == frame.sizeScale &&
@@ -2700,6 +3379,9 @@ float planetBackgroundStarExclusionRadius(const PlanetRenderFrame& frame) {
   if (planetPresetEqualsValue(frame.presetId, "galaxy")) {
     return 30.0f;
   }
+  if (isPlanetPortalPresetValue(frame.presetId)) {
+    return 30.0f;
+  }
   if (planetPresetEqualsValue(frame.presetId, "star")) {
     return 28.0f;
   }
@@ -2718,7 +3400,9 @@ void renderPlanetBackgroundStars(const PlanetRenderFrame& frame) {
   if (!ensurePlanetPreviewBuffer()) {
     return;
   }
-  uint32_t state = frame.seed ^ hashPlanetString("planet_starfield_sparse");
+  uint32_t starSeed =
+    strcmp(frame.presetId, "earth") == 0 ? kPlanetEarthBackgroundSeed : frame.seed;
+  uint32_t state = starSeed ^ hashPlanetString("planet_starfield_sparse");
   float exclusionRadius = planetBackgroundStarExclusionRadius(frame);
   int attempts = 0;
   int placed = 0;
@@ -2750,6 +3434,22 @@ PlanetRenderFrame buildPlanetRenderFrame(unsigned long now) {
   frame.centerX = (float)s_planetConfig.planetX;
   frame.centerY = (float)s_planetConfig.planetY;
   frame.progress = resolvePlanetPlaybackPhase(now);
+  
+  // 传送门独立进度：基于真实时钟秒数（启动时同步一次，之后用millis推算）
+  if (s_portalTimeSynced) {
+    // 计算从同步点到现在经过了多少毫秒
+    unsigned long elapsedMs = now - s_portalSyncBaseMillis;
+    // 推算当前应该是第几秒（0-59）
+    int currentSecond = (s_portalSyncBaseSecond + (int)(elapsedMs / 1000)) % 60;
+    // 加上毫秒内的小数部分，让动画更平滑
+    float secondFraction = (float)(elapsedMs % 1000) / 1000.0f;
+    frame.portalProgress = ((float)currentSecond + secondFraction) / 60.0f;
+  } else {
+    // 时间未同步时，使用相对时间模式
+    constexpr unsigned long kPortalCycleDuration = 60000UL;
+    frame.portalProgress = wrapPlanetUnit((float)(now % kPortalCycleDuration) / (float)kPortalCycleDuration);
+  }
+  
   frame.motionFactor = planetFlowSign();
   frame.spinFactor = planetFlowSign();
   frame.spinAngle = frame.progress * frame.spinFactor * kPlanetTwoPi;
@@ -4549,7 +5249,1029 @@ void renderStarPreview(const PlanetRenderFrame& frame) {
   renderStarFlaresBuffer(frame, flareLayer);
 }
 
+struct PlanetEarthSphereSample {
+  float longitude;
+  float latitude;
+  float light;
+};
+
+PlanetBufferColor mixPlanetBufferColor(
+  const PlanetBufferColor& left,
+  const PlanetBufferColor& right,
+  float amount
+) {
+  float mixAmount = clampFloat(amount, 0.0f, 1.0f);
+  return makePlanetBufferColor(
+    mixFloat(left.r, right.r, mixAmount),
+    mixFloat(left.g, right.g, mixAmount),
+    mixFloat(left.b, right.b, mixAmount),
+    mixFloat(left.a, right.a, mixAmount)
+  );
+}
+
+PlanetBufferColor scalePlanetBufferColor(const PlanetBufferColor& color, float factor) {
+  return makePlanetBufferColor(color.r * factor, color.g * factor, color.b * factor, color.a);
+}
+
+// 压缩后的传送门模板数据（节省69.5%空间：4608→1404字节）
+constexpr int kPortalTemplateStartRow = 5;
+constexpr int kPortalTemplateStartCol = 6;
+constexpr int kPortalTemplateRows = 54;
+constexpr int kPortalTemplateCols = 52;
+
+constexpr uint8_t kPortalTemplateData[54][26] = {
+  {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x11, 0x11, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+  {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x17, 0x71, 0x01, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+  {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x11, 0x11, 0x7F, 0x11, 0x11, 0x11, 0x11, 0x2F, 0xF5, 0x02, 0xF2, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+  {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x11, 0x11, 0x11, 0x35, 0x21, 0x48, 0x11, 0x11, 0x16, 0xA3, 0x01, 0x31, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+  {0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x11, 0x11, 0x11, 0x22, 0x21, 0x24, 0xAF, 0x98, 0x86, 0x31, 0x00, 0x11, 0x22, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+  {0x00, 0x00, 0x00, 0x00, 0x00, 0x11, 0x11, 0x11, 0x12, 0x22, 0x36, 0xAC, 0xCC, 0xCD, 0xDD, 0xCB, 0x84, 0x2A, 0xFF, 0xF2, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+  {0x00, 0x00, 0x00, 0x00, 0x01, 0x11, 0x11, 0x13, 0x65, 0x37, 0xBD, 0xCB, 0xAA, 0xAA, 0xAA, 0xBC, 0xDD, 0xCF, 0xFF, 0xFF, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00},
+  {0x00, 0x00, 0x00, 0x00, 0x11, 0x11, 0x47, 0x8F, 0xFF, 0xBD, 0xEE, 0xEE, 0xED, 0xDC, 0xBA, 0x9A, 0xBB, 0xDF, 0xFF, 0xFF, 0x60, 0x00, 0x00, 0x00, 0x00, 0x00},
+  {0x00, 0x00, 0x00, 0x00, 0x11, 0x17, 0xFF, 0xFF, 0xFF, 0xEE, 0xEE, 0xEE, 0xEE, 0xFF, 0xFD, 0xB9, 0x99, 0x9C, 0xFF, 0xFF, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00},
+  {0x00, 0x00, 0x00, 0x14, 0x21, 0x2F, 0xFF, 0xFF, 0xFF, 0xEF, 0xFF, 0xFF, 0xFE, 0xFF, 0xEE, 0xED, 0xA9, 0x98, 0xBF, 0xFF, 0xD9, 0x10, 0x00, 0x00, 0x00, 0x00},
+  {0x00, 0x00, 0x00, 0x1F, 0x81, 0x3F, 0xFF, 0xDE, 0xEE, 0xEE, 0xEE, 0xEE, 0xEE, 0xEE, 0xEE, 0xEE, 0xEB, 0x99, 0x89, 0xBC, 0xCD, 0xA1, 0x00, 0x00, 0x00, 0x00},
+  {0x00, 0x00, 0x00, 0x12, 0x23, 0x8A, 0xAB, 0xDE, 0xEE, 0xEE, 0xEE, 0xEE, 0xEE, 0xEE, 0xDC, 0xDE, 0xEE, 0xC9, 0x88, 0x89, 0xCC, 0xDB, 0x20, 0x00, 0x00, 0x00},
+  {0x00, 0x00, 0x01, 0x11, 0x39, 0xA9, 0xBD, 0xEE, 0xED, 0xCB, 0xBB, 0xAA, 0xAB, 0xEE, 0xEC, 0xBC, 0xEE, 0xED, 0x98, 0x87, 0x89, 0xAD, 0xB1, 0x00, 0x00, 0x00},
+  {0x00, 0x00, 0x01, 0x11, 0x89, 0x8C, 0xEE, 0xED, 0xA9, 0xAA, 0xBB, 0xBB, 0xBA, 0xCD, 0xEE, 0xBA, 0xBD, 0xEC, 0xC8, 0x88, 0x88, 0x79, 0xD9, 0x00, 0x00, 0x00},
+  {0x00, 0x00, 0x11, 0x15, 0xA9, 0xAE, 0xEE, 0xB9, 0xAC, 0xDD, 0xDE, 0xEE, 0xDE, 0xED, 0xDD, 0xEA, 0x9A, 0xDC, 0xBB, 0x89, 0xA8, 0x87, 0xAD, 0x60, 0x00, 0x00},
+  {0x00, 0x00, 0x11, 0x1A, 0xDA, 0xBE, 0xEA, 0x9C, 0xED, 0xCC, 0xCB, 0xBA, 0xBB, 0xCD, 0xDC, 0xBC, 0xB9, 0xAD, 0xBB, 0xAB, 0xF9, 0x87, 0x8C, 0xB1, 0x00, 0x00},
+  {0x00, 0x01, 0x11, 0x9C, 0xFF, 0xCE, 0xDA, 0xDD, 0xAA, 0xCB, 0xAB, 0xBB, 0xBA, 0xAA, 0xCE, 0xDA, 0xBC, 0xA9, 0xD9, 0xBA, 0x99, 0x99, 0x8A, 0xD5, 0x00, 0x00},
+  {0x00, 0x11, 0x08, 0xDA, 0x9B, 0xEE, 0xBD, 0xC9, 0xFF, 0xAA, 0xAB, 0xDE, 0xEE, 0xDB, 0xAA, 0xDE, 0xAA, 0xC9, 0xAB, 0x9A, 0x88, 0x99, 0x89, 0xD9, 0x00, 0x00},
+  {0x00, 0x98, 0x3D, 0xB9, 0x9D, 0xEB, 0xDB, 0x9F, 0xFA, 0xAC, 0xDD, 0xCC, 0xDE, 0xDD, 0xDA, 0xAC, 0xEA, 0x9B, 0x9B, 0x99, 0x98, 0x99, 0x98, 0xBD, 0xF1, 0x00},
+  {0x00, 0x54, 0x9C, 0x98, 0xCE, 0xAC, 0xB9, 0xCF, 0xBA, 0xCE, 0xEE, 0xEE, 0xDD, 0xEB, 0xCD, 0xAA, 0xDD, 0x9A, 0xA9, 0xA9, 0x99, 0x99, 0x98, 0x9F, 0xF3, 0x00},
+  {0x00, 0x02, 0xCA, 0x99, 0xBA, 0xBC, 0x9A, 0xFF, 0xAA, 0xAA, 0xBE, 0xEE, 0xEE, 0xEE, 0xAC, 0xCA, 0xAE, 0xC8, 0xA9, 0xA8, 0x99, 0x99, 0x98, 0x8D, 0x80, 0x00},
+  {0x00, 0x05, 0xDA, 0x99, 0xAA, 0xF9, 0x9A, 0xFB, 0xBB, 0xAA, 0xAC, 0xEE, 0xEE, 0xEE, 0xD9, 0xDB, 0xAB, 0xEA, 0x99, 0xA9, 0x9A, 0xA9, 0x99, 0x8A, 0x20, 0x00},
+  {0x00, 0x1F, 0xFF, 0xBA, 0xAF, 0xB9, 0x9B, 0xFB, 0xEE, 0xAA, 0xAA, 0xCE, 0xEE, 0xEE, 0xEA, 0xBD, 0xAA, 0xEC, 0x99, 0xA9, 0x9A, 0xB9, 0xF9, 0x88, 0x10, 0x00},
+  {0x00, 0x1F, 0xFF, 0xFC, 0xBF, 0x99, 0x9F, 0xDE, 0xED, 0xAA, 0xAB, 0xDE, 0xEE, 0xDE, 0xEB, 0xAD, 0xB9, 0xCE, 0x99, 0x98, 0x99, 0xF8, 0x99, 0x98, 0x10, 0x00},
+  {0x01, 0x19, 0xFF, 0xFB, 0xDF, 0x99, 0xAF, 0xEE, 0xED, 0xAA, 0xCE, 0xEE, 0xEC, 0xAD, 0xEA, 0xAC, 0xC9, 0xBE, 0xC9, 0xA9, 0x99, 0xF7, 0x89, 0x89, 0x40, 0x00},
+  {0x01, 0x06, 0xFF, 0xFA, 0xFB, 0x99, 0xCE, 0xEE, 0xEC, 0xAB, 0xED, 0xBB, 0xAA, 0xAB, 0xB9, 0xAB, 0xD9, 0xAE, 0xEA, 0xAA, 0xA9, 0xF8, 0x89, 0x98, 0x50, 0x00},
+  {0x01, 0x07, 0xDC, 0xBA, 0xFB, 0x9A, 0xEE, 0xEE, 0xDA, 0xAD, 0xDA, 0xAA, 0xAA, 0xAB, 0xCC, 0xAB, 0xD9, 0xAE, 0xEC, 0xFA, 0xBC, 0xF8, 0x89, 0x98, 0x60, 0x00},
+  {0x01, 0x19, 0xCB, 0xBB, 0xFB, 0x9C, 0xEE, 0xEE, 0xC9, 0xBE, 0xBA, 0xAA, 0xAA, 0x9A, 0xBD, 0xBC, 0xDA, 0xAE, 0xED, 0xFA, 0xFF, 0xB8, 0x89, 0x98, 0x71, 0x00},
+  {0x10, 0x2C, 0xFF, 0xBB, 0xFB, 0xAD, 0xEE, 0xEE, 0xB9, 0xCD, 0xAA, 0xAA, 0xAA, 0xBC, 0xCD, 0xBE, 0xBA, 0xBE, 0xED, 0xF9, 0xDF, 0xA8, 0x99, 0x98, 0x71, 0x00},
+  {0x10, 0x6E, 0xFF, 0xCB, 0xFB, 0xAE, 0xED, 0xEE, 0xBA, 0xDD, 0xAA, 0xAA, 0xAD, 0xEE, 0xDB, 0xDD, 0xAA, 0xDE, 0xEE, 0xB9, 0xED, 0x98, 0x9A, 0xB8, 0x70, 0x00},
+  {0x10, 0x9D, 0xFF, 0xBB, 0xFB, 0xAE, 0xEB, 0xCE, 0xCA, 0xCD, 0xAA, 0xAA, 0xAD, 0xEE, 0xEE, 0xDB, 0xAA, 0xEE, 0xEF, 0x9B, 0xEF, 0x89, 0x99, 0x98, 0x63, 0x30},
+  {0x01, 0xAD, 0xCC, 0xCB, 0xFC, 0xAE, 0xEB, 0xBE, 0xDA, 0xBE, 0xAA, 0xAA, 0xAB, 0xCD, 0xDC, 0xAA, 0x9A, 0xDB, 0xFB, 0x8C, 0xEC, 0x8A, 0x98, 0x78, 0x4F, 0xF1},
+  {0x01, 0xAD, 0xCB, 0xDB, 0xFD, 0xAE, 0xEC, 0xAD, 0xEB, 0xAD, 0xDA, 0xAA, 0xAA, 0xAA, 0xA9, 0x99, 0x99, 0x9B, 0xC9, 0x9D, 0xEC, 0xAA, 0x98, 0x87, 0x18, 0xF2},
+  {0x10, 0x9D, 0xCB, 0xED, 0xDE, 0xBD, 0xED, 0xAB, 0xED, 0xAB, 0xEC, 0xAA, 0xAA, 0xAA, 0xAA, 0x99, 0x99, 0xAB, 0x99, 0x9D, 0xEC, 0xA9, 0x88, 0x89, 0x10, 0x10},
+  {0x10, 0x6F, 0xDC, 0xDE, 0xBE, 0xCC, 0xED, 0xBA, 0xDE, 0xBA, 0xBE, 0xDB, 0xAA, 0xAA, 0xAA, 0xAA, 0xBB, 0xA9, 0x99, 0xAE, 0xDB, 0xB9, 0x88, 0x9C, 0x81, 0x00},
+  {0x10, 0x3D, 0xDC, 0xCE, 0xCF, 0xED, 0xEE, 0xBA, 0xBE, 0xEB, 0xAB, 0xDE, 0xDC, 0xBA, 0xAB, 0xDE, 0xDB, 0xAA, 0x99, 0xDE, 0xCD, 0xEA, 0x88, 0xBD, 0xF4, 0x00},
+  {0x01, 0x08, 0xDC, 0xCE, 0xDB, 0xDE, 0xEE, 0xCA, 0xBD, 0xEE, 0xCA, 0xAB, 0xDE, 0xEE, 0xDD, 0xCB, 0xAA, 0xA9, 0xAD, 0xEC, 0xCC, 0xD9, 0x89, 0xCB, 0x61, 0x00},
+  {0x01, 0x12, 0xBD, 0xCC, 0xEC, 0xCE, 0xEE, 0xEB, 0xAB, 0xEE, 0xED, 0xBA, 0xAA, 0xAB, 0xAA, 0xA9, 0x99, 0xAC, 0xEE, 0xB9, 0x8A, 0xB8, 0x99, 0xD8, 0x00, 0x00},
+  {0x00, 0x11, 0x4C, 0xDC, 0xCE, 0xBC, 0xEF, 0xEC, 0xAA, 0xBE, 0xEE, 0xED, 0xBB, 0xAA, 0xAA, 0xAA, 0xBD, 0xEE, 0xC9, 0x8A, 0xDB, 0x89, 0x9B, 0xD4, 0x00, 0x00},
+  {0x00, 0x11, 0x15, 0xDF, 0xBE, 0xDA, 0xDE, 0xFE, 0xBA, 0xAB, 0xDE, 0xEE, 0xED, 0xDD, 0xDD, 0xDE, 0xED, 0xBA, 0xAB, 0xDF, 0xC8, 0x99, 0xAC, 0xB1, 0x00, 0x00},
+  {0x00, 0x11, 0x11, 0x6D, 0xCC, 0xED, 0xBE, 0xEF, 0xDA, 0xAB, 0xDE, 0xEE, 0xED, 0xDD, 0xDD, 0xDB, 0xBB, 0xBD, 0xFF, 0xF9, 0x89, 0x99, 0xFE, 0x60, 0x00, 0x00},
+  {0x00, 0x01, 0x11, 0x16, 0xDB, 0xDE, 0xDC, 0xEF, 0xFA, 0xAC, 0xEE, 0xEE, 0xEE, 0xEE, 0xEE, 0xED, 0xDE, 0xEE, 0xFB, 0xFB, 0x99, 0x9A, 0xDB, 0x10, 0x00, 0x00},
+  {0x00, 0x00, 0x11, 0x11, 0x7D, 0xBD, 0xEC, 0xDF, 0xFF, 0xAA, 0xEE, 0xEE, 0xEE, 0xEE, 0xEE, 0xEE, 0xEE, 0xFC, 0xAA, 0xFB, 0x99, 0xAC, 0xC3, 0x00, 0x00, 0x00},
+  {0x00, 0x00, 0x01, 0x11, 0x19, 0xDC, 0xCB, 0xBF, 0xFF, 0xFB, 0xDE, 0xEE, 0xEE, 0xEE, 0xEE, 0xEE, 0xEE, 0xBA, 0xBA, 0x9A, 0xBC, 0xCD, 0x40, 0x00, 0x00, 0x00},
+  {0x00, 0x00, 0x01, 0x11, 0x11, 0x9D, 0xCC, 0xBC, 0xCA, 0xAC, 0xEE, 0xEE, 0xEE, 0xEE, 0xEE, 0xED, 0xCA, 0xAB, 0xBB, 0xCC, 0xCD, 0xC4, 0x00, 0x00, 0x00, 0x00},
+  {0x00, 0x00, 0x00, 0x01, 0x11, 0x18, 0xDC, 0xCC, 0xAA, 0xAB, 0xBE, 0xEE, 0xEE, 0xEE, 0xEE, 0xDB, 0xBC, 0xCC, 0xCD, 0xFD, 0xDA, 0x20, 0x00, 0x00, 0x00, 0x00},
+  {0x00, 0x00, 0x00, 0x00, 0x11, 0x11, 0x5C, 0xDC, 0xCB, 0xBB, 0x9A, 0xCD, 0xEE, 0xEE, 0xEE, 0xED, 0xDD, 0xCC, 0xCD, 0xFF, 0x60, 0x00, 0x00, 0x00, 0x00, 0x00},
+  {0x00, 0x00, 0x00, 0x00, 0x01, 0x11, 0x03, 0x9D, 0xDC, 0xCC, 0xBA, 0x9A, 0xBC, 0xCD, 0xDC, 0xCC, 0xCC, 0xCC, 0xDC, 0xA5, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+  {0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x11, 0x14, 0x9C, 0xFF, 0xDC, 0xCB, 0xBA, 0xAA, 0xAB, 0xCC, 0xDD, 0xDB, 0x72, 0x11, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00},
+  {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x10, 0x13, 0x7A, 0xBB, 0xCF, 0xFF, 0xDF, 0xFF, 0xDC, 0xB9, 0x52, 0x00, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+  {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x10, 0x01, 0x12, 0x5F, 0xFF, 0xFF, 0xFF, 0x82, 0x11, 0x01, 0x11, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+  {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x11, 0x11, 0x1F, 0xF9, 0xFF, 0xFF, 0x51, 0x11, 0x11, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+  {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x11, 0x11, 0x21, 0x14, 0xA6, 0x11, 0x11, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+  {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x11, 0x11, 0x11, 0x11, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
+};
+
+constexpr float kPlanetPortalSwirlRotationsPerCycle = 1.35f;
+constexpr float kPlanetPortalBubbleRotationsPerCycle = 1.18f;
+constexpr float kPlanetPortalLifecycleRepeatsPerCycle = 1.0f;     // 1分钟1次循环
+constexpr float kPlanetPortalOpenEnd = 1.5f/60.0f;               // 1.5秒打开
+constexpr float kPlanetPortalCloseStart = 58.5f/60.0f;           // 58.5秒开始关闭
+
+struct PlanetPortalBubbleOrbit {
+  float angle;
+  float radius;
+  float size;
+  float alpha;
+  float speed;
+  float wobble;
+  float life;
+  float offset;
+};
+
+constexpr PlanetPortalBubbleOrbit kPlanetPortalBubbleOrbits[] = {
+  {-1.45f, 0.43f, 0.038f, 0.96f, 1.00f, 0.72f, 0.86f, 0.02f},
+  {-0.92f, 0.46f, 0.024f, 0.82f, 0.82f, 1.08f, 1.14f, 0.31f},
+  {-0.34f, 0.44f, 0.020f, 0.78f, 1.17f, 0.94f, 0.98f, 0.58f},
+  {0.26f, 0.46f, 0.031f, 0.92f, 0.91f, 1.22f, 1.06f, 0.17f},
+  {0.86f, 0.43f, 0.018f, 0.76f, 1.11f, 0.84f, 1.20f, 0.72f},
+  {1.34f, 0.45f, 0.033f, 0.94f, 0.76f, 1.16f, 0.92f, 0.46f},
+  {2.02f, 0.42f, 0.023f, 0.80f, 1.24f, 0.78f, 1.10f, 0.64f},
+  {2.62f, 0.46f, 0.034f, 0.94f, 0.96f, 1.30f, 0.88f, 0.25f},
+  {3.20f, 0.43f, 0.018f, 0.72f, 1.08f, 0.88f, 1.24f, 0.83f},
+  {3.74f, 0.45f, 0.027f, 0.86f, 0.87f, 1.02f, 1.02f, 0.39f},
+};
+constexpr size_t kPlanetPortalBubbleOrbitCount =
+  sizeof(kPlanetPortalBubbleOrbits) / sizeof(kPlanetPortalBubbleOrbits[0]);
+
+struct PlanetPortalLifecycle {
+  float scale;
+  float alpha;
+};
+
+struct PlanetPortalPalette {
+  PlanetBufferColor shadow;
+  PlanetBufferColor body;
+  PlanetBufferColor bright;
+  PlanetBufferColor highlight;
+};
+
+struct PlanetPortalBubbleState {
+  float centerX;
+  float centerY;
+  float tangentSin;
+  float tangentCos;
+  float tangentScale;
+  float radialScale;
+  float maxReach;
+  float alpha;
+};
+
+struct PlanetPortalRenderContext {
+  PlanetPortalLifecycle lifecycle;
+  PlanetPortalPalette palette;
+  float swirlPhase;
+  float bubblePhase;
+  PlanetPortalBubbleState bubbles[kPlanetPortalBubbleOrbitCount];
+};
+
+PlanetPortalPalette resolvePlanetPortalPalette(const char* presetId) {
+  PlanetPortalPalette palette;
+  if (strcmp(presetId, "portal_green") == 0) {
+    palette.shadow = makePlanetBufferColor(0.0f, 0.20f, 0.0f);
+    palette.body = makePlanetBufferColor(0.0f, 0.63f, 0.0f);
+    palette.bright = makePlanetBufferColor(0.14f, 0.94f, 0.0f);
+    palette.highlight = makePlanetBufferColor(0.74f, 1.0f, 0.14f);
+    return palette;
+  }
+  if (strcmp(presetId, "portal_blue") == 0) {
+    palette.shadow = makePlanetBufferColor(0.0f, 0.16f, 0.46f);
+    palette.body = makePlanetBufferColor(0.02f, 0.55f, 1.0f);
+    palette.bright = makePlanetBufferColor(0.16f, 0.88f, 1.0f);
+    palette.highlight = makePlanetBufferColor(0.78f, 1.0f, 1.0f);
+    return palette;
+  }
+  palette.shadow = makePlanetBufferColor(0.48f, 0.22f, 0.0f);
+  palette.body = makePlanetBufferColor(1.0f, 0.58f, 0.0f);
+  palette.bright = makePlanetBufferColor(1.0f, 0.84f, 0.05f);
+  palette.highlight = makePlanetBufferColor(1.0f, 0.98f, 0.52f);
+  return palette;
+}
+
+int readPlanetPortalTemplateLevel(float u, float v) {
+  if (u < 0.0f || u > 1.0f || v < 0.0f || v > 1.0f) {
+    return 0;
+  }
+  
+  // 将UV坐标映射到64x64网格
+  int x = clampInt((int)roundf(u * 63.0f), 0, 63);
+  int y = clampInt((int)roundf(v * 63.0f), 0, 63);
+  
+  // 检查是否在有效区域内
+  if (y < kPortalTemplateStartRow || y >= kPortalTemplateStartRow + kPortalTemplateRows ||
+      x < kPortalTemplateStartCol || x >= kPortalTemplateStartCol + kPortalTemplateCols) {
+    return 0;
+  }
+  
+  // 计算在压缩数组中的位置
+  int dataRow = y - kPortalTemplateStartRow;
+  int dataCol = x - kPortalTemplateStartCol;
+  
+  // 从压缩数组中读取（每个字节存2个值）
+  uint8_t byte = kPortalTemplateData[dataRow][dataCol / 2];
+  int value = (dataCol % 2 == 0) ? (byte >> 4) : (byte & 0x0F);
+  
+  return value;
+}
+
+PlanetBufferColor planetPortalColorForLevel(const PlanetPortalPalette& palette, int level) {
+  if (level >= 15) {
+    return makePlanetBufferColor(1.0f, 1.0f, 1.0f);
+  }
+  float t = clampFloat((float)level / 14.0f, 0.0f, 1.0f);
+  if (t < 0.35f) {
+    return mixPlanetBufferColor(palette.shadow, palette.body, t / 0.35f);
+  }
+  if (t < 0.78f) {
+    return mixPlanetBufferColor(palette.body, palette.bright, (t - 0.35f) / 0.43f);
+  }
+  return mixPlanetBufferColor(palette.bright, palette.highlight, (t - 0.78f) / 0.22f);
+}
+
+float resolvePlanetPortalClockwisePhase(float progress) {
+  return progress * kPlanetTwoPi * kPlanetPortalSwirlRotationsPerCycle;
+}
+
+PlanetPortalLifecycle resolvePlanetPortalLifecycle(float progress) {
+  PlanetPortalLifecycle lifecycle;
+  float cycleProgress = modPlanetFloat(progress * kPlanetPortalLifecycleRepeatsPerCycle, 1.0f);
+  
+  if (cycleProgress < kPlanetPortalOpenEnd) {
+    // 打开阶段 - 从圆心向外扩展
+    float t = cycleProgress / kPlanetPortalOpenEnd;
+    float ease = easeInOutCubic(t);
+    
+    lifecycle.scale = ease;  // 从0.0放大到1.0（完全打开/关闭）
+    lifecycle.alpha = ease;
+    return lifecycle;
+  }
+  
+  if (cycleProgress > kPlanetPortalCloseStart) {
+    // 关闭阶段 - 从外圈向圆心收缩
+    float t = (cycleProgress - kPlanetPortalCloseStart) / (1.0f - kPlanetPortalCloseStart);
+    float ease = easeInOutCubic(1.0f - t);
+    
+    lifecycle.scale = ease;  // 从1.0缩小到0.0（完全关闭）
+    lifecycle.alpha = ease;
+    return lifecycle;
+  }
+  
+  // 持续阶段 - 保持稳定
+  lifecycle.scale = 1.0f;
+  lifecycle.alpha = 1.0f;
+  return lifecycle;
+}
+
+PlanetPortalRenderContext buildPlanetPortalRenderContext(const PlanetRenderFrame& frame) {
+  PlanetPortalRenderContext context;
+  context.lifecycle = resolvePlanetPortalLifecycle(frame.portalProgress);
+  context.palette = resolvePlanetPortalPalette(frame.presetId);
+  // 使用portalProgress而不是progress，实现连续旋转而不是48帧循环
+  context.swirlPhase = resolvePlanetPortalClockwisePhase(frame.portalProgress);
+  context.bubblePhase = frame.portalProgress * kPlanetTwoPi * kPlanetPortalBubbleRotationsPerCycle;
+  
+  // 使用固定的气泡轨道数组
+  for (size_t index = 0; index < kPlanetPortalBubbleOrbitCount; index += 1) {
+    const PlanetPortalBubbleOrbit& bubble = kPlanetPortalBubbleOrbits[index];
+    PlanetPortalBubbleState& state = context.bubbles[index];
+    state.alpha = 0.0f;
+
+    float localLife = modPlanetFloat(frame.portalProgress * bubble.life + bubble.offset, 1.0f);
+    float visible =
+      smoothstepFloat(0.0f, 0.16f, localLife) *
+      (1.0f - smoothstepFloat(0.72f, 1.0f, localLife));
+    if (visible <= 0.0f) {
+      continue;
+    }
+
+    // 使用portalProgress而不是progress，避免48帧循环跳帧
+    float wobblePhase = frame.portalProgress * kPlanetTwoPi * bubble.wobble +
+                        bubble.offset * kPlanetTwoPi;
+    float drift = context.bubblePhase * bubble.speed + sinf(wobblePhase) * 0.18f;
+    float angle = bubble.angle + drift;
+    float radius = bubble.radius + sinf(wobblePhase * 0.73f + (float)index) * 0.025f;
+    float size = bubble.size * (0.82f + (sinf(wobblePhase * 1.37f) + 1.0f) * 0.18f);
+    float sinAngle = sinf(angle);
+    float cosAngle = cosf(angle);
+    state.centerX = 0.5f + cosAngle * radius;
+    state.centerY = 0.5f + sinAngle * radius;
+    state.tangentSin = sinAngle;
+    state.tangentCos = cosAngle;
+    state.tangentScale = size * 1.42f;
+    state.radialScale = size * 0.74f;
+    state.maxReach = fmaxf(state.tangentScale, state.radialScale);
+    state.alpha = bubble.alpha * visible * context.lifecycle.alpha;
+  }
+  return context;
+}
+
+bool resolvePlanetPortalLifecycleUv(
+  float u,
+  float v,
+  const PlanetPortalLifecycle& lifecycle,
+  float& outU,
+  float& outV
+) {
+  if (lifecycle.alpha <= 0.0f) {
+    return false;
+  }
+  
+  // 计算到中心的距离
+  float dx = u - 0.5f;
+  float dy = v - 0.5f;
+  float distanceFromCenter = sqrtf(dx * dx + dy * dy);
+  
+  // 缩放后的距离
+  float scaledDistance = distanceFromCenter / lifecycle.scale;
+  
+  // 使用更大的有效区域，不做硬截断
+  if (scaledDistance > 0.55f) {
+    return false;
+  }
+  
+  // 进行缩放变换
+  outU = 0.5f + dx / lifecycle.scale;
+  outV = 0.5f + dy / lifecycle.scale;
+  return true;
+}
+
+int resolvePlanetPortalAnimatedLevel(
+  int baseLevel,
+  float u,
+  float v,
+  const PlanetRenderFrame& frame,
+  const PlanetPortalRenderContext& context
+) {
+  if (baseLevel <= 0) {
+    return 0;
+  }
+  float dx = u - 0.5f;
+  float dy = v - 0.5f;
+  float radius = sqrtf(dx * dx + dy * dy);
+  float phase = context.swirlPhase;
+  float radialDrag = 1.18f - smoothstepFloat(0.14f, 0.48f, radius) * 0.34f;
+  float rotatedU = 0.0f;
+  float rotatedV = 0.0f;
+  rotatePlanetUv(u, v, -phase * radialDrag, rotatedU, rotatedV);
+  int sampledLevel = readPlanetPortalTemplateLevel(rotatedU, rotatedV);
+  if (sampledLevel <= 0) {
+    sampledLevel = baseLevel;
+  }
+  if (sampledLevel >= 15) {
+    return 15;
+  }
+  if (baseLevel >= 15 && radius >= 0.42f) {
+    return 0;
+  }
+  float rimLock = smoothstepFloat(0.46f, 0.52f, radius);
+  float wave = sinf(atan2f(dy, dx) * 3.2f + radius * 18.0f - phase * 1.7f);
+  int animatedLevel = clampInt((int)roundf((float)sampledLevel + wave * 1.45f), 1, 14);
+  if (rimLock > 0.0f) {
+    return clampInt((int)roundf((float)animatedLevel * (1.0f - rimLock) + (float)baseLevel * rimLock), 1, 14);
+  }
+  return animatedLevel;
+}
+
+float resolvePlanetPortalBubbleAlpha(
+  float u,
+  float v,
+  const PlanetPortalRenderContext& context
+) {
+  float portalRadius = distancePlanet(u, v, 0.5f, 0.5f);
+  if (portalRadius < 0.28f) {
+    return 0.0f;
+  }
+  if (portalRadius > 0.60f) {
+    return 0.0f;
+  }
+
+  float alpha = 0.0f;
+  for (size_t index = 0; index < kPlanetPortalBubbleOrbitCount; index += 1) {
+    const PlanetPortalBubbleState& bubble = context.bubbles[index];
+    if (bubble.alpha <= 0.0f) {
+      continue;
+    }
+    float dx = u - bubble.centerX;
+    float dy = v - bubble.centerY;
+    if (fabsf(dx) > bubble.maxReach || fabsf(dy) > bubble.maxReach) {
+      continue;
+    }
+    float tangent = dx * -bubble.tangentSin + dy * bubble.tangentCos;
+    float radial = dx * bubble.tangentCos + dy * bubble.tangentSin;
+    float ellipseDistance = sqrtf(
+      (tangent / bubble.tangentScale) * (tangent / bubble.tangentScale) +
+      (radial / bubble.radialScale) * (radial / bubble.radialScale)
+    );
+    if (ellipseDistance >= 1.0f) {
+      continue;
+    }
+    float edge = smoothstepFloat(1.0f, 0.35f, ellipseDistance);
+    alpha = fmaxf(alpha, edge * bubble.alpha);
+  }
+  return clampFloat(alpha, 0.0f, 1.0f);
+}
+
+bool samplePlanetPortal(
+  const PlanetRenderFrame& frame,
+  const PlanetPortalRenderContext& context,
+  float pixelU,
+  float pixelV,
+  PlanetBufferColor& outColor,
+  float& outAlpha,
+  float& outBubbleAlpha
+) {
+  float sampleU = 0.0f;
+  float sampleV = 0.0f;
+  if (!resolvePlanetPortalLifecycleUv(pixelU, pixelV, context.lifecycle, sampleU, sampleV)) {
+    return false;
+  }
+  
+  float dx = pixelU - 0.5f;
+  float dy = pixelV - 0.5f;
+  float distanceFromCenter = sqrtf(dx * dx + dy * dy);
+  float scaledDistance = distanceFromCenter / context.lifecycle.scale;
+  
+  float edgeFade = 1.0f;
+  if (scaledDistance > 0.48f) {
+    edgeFade = (0.52f - scaledDistance) / 0.04f;
+    edgeFade = clampFloat(edgeFade, 0.0f, 1.0f);
+  }
+  
+  int baseLevel = readPlanetPortalTemplateLevel(sampleU, sampleV);
+  int level = resolvePlanetPortalAnimatedLevel(baseLevel, sampleU, sampleV, frame, context);
+  outBubbleAlpha = resolvePlanetPortalBubbleAlpha(sampleU, sampleV, context) * edgeFade;
+  if (level <= 0) {
+    outColor = makePlanetBufferColor(0.0f, 0.0f, 0.0f, 0.0f);
+    outAlpha = 0.0f;
+    return outBubbleAlpha > 0.0f;
+  }
+  outColor = planetPortalColorForLevel(context.palette, level);
+  outAlpha = (baseLevel <= 2 ? 0.74f : 1.0f) * context.lifecycle.alpha * edgeFade;
+  return true;
+}
+
+void renderPortalPreview(const PlanetRenderFrame& frame) {
+  PlanetPortalRenderContext context = buildPlanetPortalRenderContext(frame);
+  for (int y = 0; y < kPlanetCanvasSize; y += 1) {
+    for (int x = 0; x < kPlanetCanvasSize; x += 1) {
+      float u = 0.0f;
+      float v = 0.0f;
+      if (!mapPlanetPreviewPixelToUv(frame, 1.0f, x, y, u, v)) {
+        continue;
+      }
+      int offset = (y * kPlanetCanvasSize + x) * kPlanetBufferChannels;
+      PlanetBufferColor color;
+      float alpha = 0.0f;
+      float bubbleAlpha = 0.0f;
+      if (!samplePlanetPortal(frame, context, u, v, color, alpha, bubbleAlpha)) {
+        continue;
+      }
+      blendPlanetPreviewPixel(offset, color, alpha * color.a);
+      if (bubbleAlpha > 0.0f) {
+        blendPlanetPreviewPixel(offset, makePlanetBufferColor(1.0f, 1.0f, 1.0f), bubbleAlpha);
+      }
+    }
+  }
+}
+
+float normalizePlanetEarthLongitude360(float value) {
+  return modPlanetFloat(value, 360.0f);
+}
+
+float normalizePlanetEarthLongitudeDegrees(float value) {
+  return modPlanetFloat(value + 180.0f, 360.0f) - 180.0f;
+}
+
+int wrapPlanetEarthColumn(int column) {
+  int wrapped = column % kPlanetEarthMapWidth;
+  if (wrapped < 0) {
+    wrapped += kPlanetEarthMapWidth;
+  }
+  return wrapped;
+}
+
+int clampPlanetEarthRow(int row) {
+  if (row < 0) {
+    return 0;
+  }
+  if (row >= kPlanetEarthMapHeight) {
+    return kPlanetEarthMapHeight - 1;
+  }
+  return row;
+}
+
+uint8_t decodePlanetEarthHexDigit(char value) {
+  if (value >= '0' && value <= '9') {
+    return (uint8_t)(value - '0');
+  }
+  if (value >= 'a' && value <= 'f') {
+    return (uint8_t)(value - 'a' + 10);
+  }
+  if (value >= 'A' && value <= 'F') {
+    return (uint8_t)(value - 'A' + 10);
+  }
+  return 0;
+}
+
+bool readPlanetEarthLandMask(int column, int row) {
+  int wrappedColumn = wrapPlanetEarthColumn(column);
+  int clampedRow = clampPlanetEarthRow(row);
+  const char* line = kPlanetEarthLandHexRows[clampedRow];
+  int hexIndex = wrappedColumn / 4;
+  uint8_t hexValue = decodePlanetEarthHexDigit(line[hexIndex]);
+  int shift = 3 - (wrappedColumn & 3);
+  return ((hexValue >> shift) & 0x01U) != 0U;
+}
+
+void resolvePlanetEarthMapCell(
+  float longitudeDegrees,
+  float latitudeDegrees,
+  int& column,
+  int& row
+) {
+  float longitude360 = normalizePlanetEarthLongitude360(longitudeDegrees);
+  float latitudeClamped = clampFloat(latitudeDegrees, -89.999f, 89.999f);
+  column = (int)floorf((longitude360 / 360.0f) * (float)kPlanetEarthMapWidth);
+  row = (int)floorf(((90.0f - latitudeClamped) / 180.0f) * (float)kPlanetEarthMapHeight);
+}
+
+bool isPlanetEarthLandCoordinate(float longitudeDegrees, float latitudeDegrees) {
+  int column = 0;
+  int row = 0;
+  resolvePlanetEarthMapCell(longitudeDegrees, latitudeDegrees, column, row);
+  return readPlanetEarthLandMask(column, row);
+}
+
+bool hasPlanetEarthNeighborCellState(
+  int column,
+  int row,
+  bool expectedLand,
+  int radius
+) {
+  for (int dy = -radius; dy <= radius; dy += 1) {
+    int nextRow = clampPlanetEarthRow(row + dy);
+    for (int dx = -radius; dx <= radius; dx += 1) {
+      if (dx == 0 && dy == 0) {
+        continue;
+      }
+      if (readPlanetEarthLandMask(column + dx, nextRow) == expectedLand) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+bool hasPlanetEarthNeighborState(
+  float longitudeDegrees,
+  float latitudeDegrees,
+  bool expectedLand,
+  int radius
+) {
+  int column = 0;
+  int row = 0;
+  resolvePlanetEarthMapCell(longitudeDegrees, latitudeDegrees, column, row);
+  return hasPlanetEarthNeighborCellState(column, row, expectedLand, radius);
+}
+
+bool resolvePlanetEarthSphereSampleWithRotation(
+  float u,
+  float v,
+  const PlanetRenderFrame& frame,
+  float cosRotation,
+  float sinRotation,
+  PlanetEarthSphereSample& outSample
+) {
+  float viewX = u * 2.0f - 1.0f;
+  float viewY = 1.0f - v * 2.0f;
+  float radiusSquared = viewX * viewX + viewY * viewY;
+  if (radiusSquared > 1.0f) {
+    return false;
+  }
+
+  float sphereZ = sqrtf(fmaxf(0.0f, 1.0f - radiusSquared));
+  float worldX = viewX * cosRotation + sphereZ * sinRotation;
+  float worldZ = sphereZ * cosRotation - viewX * sinRotation;
+
+  outSample.longitude = normalizePlanetEarthLongitudeDegrees(
+    atan2f(worldX, worldZ) * 57.2957795f
+  );
+  outSample.latitude = clampFloat(asinf(viewY) * 57.2957795f, -90.0f, 90.0f);
+  outSample.light = clampFloat(
+    viewX * kPlanetEarthLightDirectionX +
+      viewY * kPlanetEarthLightDirectionY +
+      sphereZ * kPlanetEarthLightDirectionZ,
+    0.0f,
+    1.0f
+  );
+  return true;
+}
+
+bool resolvePlanetEarthSphereSample(
+  float u,
+  float v,
+  const PlanetRenderFrame& frame,
+  PlanetEarthSphereSample& outSample
+) {
+  float rotation = kPlanetEarthCenterLongitudeRadians + frame.spinAngle;
+  float cosRotation = cosf(rotation);
+  float sinRotation = sinf(rotation);
+  return resolvePlanetEarthSphereSampleWithRotation(
+    u, v, frame, cosRotation, sinRotation, outSample
+  );
+}
+
+float samplePlanetEarthTerrainValue(float longitudeDegrees, float latitudeDegrees) {
+  float longitude = normalizePlanetEarthLongitude360(longitudeDegrees) / 360.0f;
+  float latitude = (latitudeDegrees + 90.0f) / 180.0f;
+  return fbmPlanetPreviewTiled(
+    longitude * 8.2f + 0.37f,
+    latitude * 5.6f + 0.19f,
+    kPlanetEarthStaticDetailSeed,
+    18.0f,
+    4,
+    2.0f,
+    1.0f
+  );
+}
+
+float samplePlanetEarthMoistureValue(float longitudeDegrees, float latitudeDegrees) {
+  float longitude = normalizePlanetEarthLongitude360(longitudeDegrees) / 360.0f;
+  float latitude = (latitudeDegrees + 90.0f) / 180.0f;
+  return fbmPlanetPreviewTiled(
+    longitude * 6.1f + 1.73f,
+    latitude * 4.9f + 0.88f,
+    kPlanetEarthStaticClimateSeed,
+    20.0f,
+    3,
+    1.0f,
+    1.0f
+  );
+}
+
+float samplePlanetEarthOceanValue(float longitudeDegrees, float latitudeDegrees) {
+  float longitude = normalizePlanetEarthLongitude360(longitudeDegrees) / 360.0f;
+  float latitude = (latitudeDegrees + 90.0f) / 180.0f;
+  return fbmPlanetPreviewTiled(
+    longitude * 7.4f + 2.31f,
+    latitude * 7.2f + 1.17f,
+    kPlanetEarthOceanSeed,
+    24.0f,
+    3,
+    2.0f,
+    1.0f
+  );
+}
+
+PlanetBufferColor resolvePlanetEarthOceanColor(
+  float latitudeDegrees,
+  float lightValue,
+  float oceanValue,
+  bool nearLand
+) {
+  PlanetBufferColor deepOcean = makePlanetBufferColor(0.031373f, 0.152941f, 0.443137f);
+  PlanetBufferColor midOcean = makePlanetBufferColor(0.058824f, 0.32549f, 0.639216f);
+  PlanetBufferColor tropicalOcean = makePlanetBufferColor(0.164706f, 0.568627f, 0.8f);
+  PlanetBufferColor shorelineOcean = makePlanetBufferColor(0.470588f, 0.772549f, 0.847059f);
+  PlanetBufferColor polarOcean = makePlanetBufferColor(0.666667f, 0.819608f, 0.905882f);
+  float tropicalFactor = 1.0f - smoothstepFloat(10.0f, 48.0f, fabsf(latitudeDegrees));
+  float polarFactor = smoothstepFloat(58.0f, 82.0f, fabsf(latitudeDegrees));
+  PlanetBufferColor color = mixPlanetBufferColor(
+    deepOcean,
+    midOcean,
+    clampFloat(lightValue * 0.6f + oceanValue * 0.35f, 0.0f, 1.0f)
+  );
+  color = mixPlanetBufferColor(color, tropicalOcean, tropicalFactor * 0.42f);
+  color = mixPlanetBufferColor(color, polarOcean, polarFactor * 0.35f);
+  if (nearLand) {
+    color = mixPlanetBufferColor(color, shorelineOcean, 0.4f);
+  }
+  return scalePlanetBufferColor(color, 0.76f + lightValue * 0.48f);
+}
+
+PlanetBufferColor resolvePlanetEarthLandColor(
+  float latitudeDegrees,
+  float lightValue,
+  float terrainValue,
+  float moistureValue,
+  bool isCoastline
+) {
+  PlanetBufferColor tropicalForest = makePlanetBufferColor(0.188235f, 0.545098f, 0.258824f);
+  PlanetBufferColor temperateGreen = makePlanetBufferColor(0.431373f, 0.658824f, 0.290196f);
+  PlanetBufferColor dryGrass = makePlanetBufferColor(0.627451f, 0.623529f, 0.305882f);
+  PlanetBufferColor desert = makePlanetBufferColor(0.560784f, 0.482353f, 0.239216f);
+  PlanetBufferColor mountain = makePlanetBufferColor(0.337255f, 0.290196f, 0.172549f);
+  PlanetBufferColor taiga = makePlanetBufferColor(0.094118f, 0.321569f, 0.160784f);
+  PlanetBufferColor snow = makePlanetBufferColor(0.921569f, 0.964706f, 1.0f);
+  PlanetBufferColor coast = makePlanetBufferColor(0.756863f, 0.701961f, 0.447059f);
+  float polarFactor = smoothstepFloat(56.0f, 80.0f, fabsf(latitudeDegrees));
+  PlanetBufferColor color = temperateGreen;
+
+  if (fabsf(latitudeDegrees) > 52.0f) {
+    color = taiga;
+  }
+  if (moistureValue < 0.3f && fabsf(latitudeDegrees) < 38.0f) {
+    color = desert;
+  } else if (moistureValue < 0.45f && fabsf(latitudeDegrees) < 42.0f) {
+    color = dryGrass;
+  } else if (moistureValue > 0.62f && fabsf(latitudeDegrees) < 28.0f) {
+    color = tropicalForest;
+  }
+  if (terrainValue > 0.7f) {
+    color = mountain;
+  }
+  color = mixPlanetBufferColor(color, snow, polarFactor * 0.78f);
+  if (isCoastline) {
+    color = mixPlanetBufferColor(color, coast, 0.34f);
+  }
+  return scalePlanetBufferColor(color, 0.74f + lightValue * 0.5f);
+}
+
+bool samplePlanetEarthSurface(
+  float pixelU,
+  float pixelV,
+  const PlanetRenderFrame& frame,
+  PlanetBufferColor& outColor
+) {
+  PlanetEarthSphereSample sample;
+  if (!resolvePlanetEarthSphereSample(pixelU, pixelV, frame, sample)) {
+    return false;
+  }
+
+  float distanceFromCenter = distancePlanet(pixelU, pixelV, 0.5f, 0.5f);
+  bool isLand = isPlanetEarthLandCoordinate(sample.longitude, sample.latitude);
+  bool isCoastline = isLand && hasPlanetEarthNeighborState(
+    sample.longitude,
+    sample.latitude,
+    false,
+    1
+  );
+  bool nearLand = !isLand && hasPlanetEarthNeighborState(
+    sample.longitude,
+    sample.latitude,
+    true,
+    2
+  );
+  float terrainValue = samplePlanetEarthTerrainValue(sample.longitude, sample.latitude);
+  float moistureValue = samplePlanetEarthMoistureValue(sample.longitude, sample.latitude);
+  float oceanValue = samplePlanetEarthOceanValue(sample.longitude, sample.latitude);
+  PlanetBufferColor color;
+
+  if (fabsf(sample.latitude) > 77.0f) {
+    color = mixPlanetBufferColor(
+      makePlanetBufferColor(0.678431f, 0.803922f, 0.921569f),
+      makePlanetBufferColor(0.921569f, 0.964706f, 1.0f),
+      sample.light
+    );
+  } else if (isLand) {
+    color = resolvePlanetEarthLandColor(
+      sample.latitude,
+      sample.light,
+      terrainValue,
+      moistureValue,
+      isCoastline
+    );
+  } else {
+    color = resolvePlanetEarthOceanColor(sample.latitude, sample.light, oceanValue, nearLand);
+  }
+
+  float outerGlow = smoothstepFloat(0.34f, 0.5f, distanceFromCenter) *
+                    (1.0f - smoothstepFloat(0.47f, 0.5f, distanceFromCenter));
+  if (outerGlow > 0.0f) {
+    PlanetBufferColor atmosphere = makePlanetBufferColor(0.427451f, 0.803922f, 1.0f);
+    color = mixPlanetBufferColor(color, atmosphere, outerGlow * (0.2f + sample.light * 0.18f));
+  }
+
+  outColor = color;
+  return true;
+}
+
+float resolvePlanetEarthCloudTimeOffset(const PlanetRenderFrame& frame) {
+  return frame.progress * frame.motionFactor * 18.0f * 0.72f;
+}
+
+bool resolvePlanetEarthCloudSample(
+  float pixelU,
+  float pixelV,
+  const PlanetRenderFrame& frame,
+  PlanetBufferColor& outColor,
+  float& outAlpha
+) {
+  float distanceFromCenter = distancePlanet(pixelU, pixelV, 0.5f, 0.5f);
+  float alphaCircle = planetStep(distanceFromCenter, 0.49999f);
+  if (alphaCircle == 0.0f) {
+    return false;
+  }
+
+  // 优化：缓存 cloudCover 值，避免重复调用 getEarthCloudCover
+  const float cloudCover = getEarthCloudCover(frame.seed);
+
+  float dLight = distancePlanet(pixelU, pixelV, 0.38f, 0.38f);
+  float sphereX = 0.0f;
+  float sphereY = 0.0f;
+  spherifyPlanetUv(pixelU, pixelV, sphereX, sphereY);
+  float sphereCloudY =
+    (sphereY + smoothstepFloat(0.0f, 1.18f, fabsf(sphereX - 0.4f))) * 2.15f;
+  float timeOffset = resolvePlanetEarthCloudTimeOffset(frame);
+  float scaledSphereX = sphereX * 8.6f;
+  float scaledSphereCloudY = sphereCloudY * 8.6f;
+  
+  // 优化：预计算循环不变量
+  const float baseCloudX = scaledSphereX * 0.3f + 11.0f + timeOffset;
+  const float baseCloudY = scaledSphereCloudY * 0.3f;
+  float cloudNoise = 0.0f;
+
+  for (int index = 0; index < 3; index += 1) {
+    cloudNoise += circleNoisePlanetCloud(
+      baseCloudX + (float)index,
+      baseCloudY,
+      frame.shaderSeed,
+      8.6f
+    );
+  }
+
+  float cloudValue = fbmPlanetPreviewTiled(
+    scaledSphereX + cloudNoise + timeOffset,
+    scaledSphereCloudY,
+    frame.shaderSeed,
+    8.6f,
+    4,  // 恢复原来的4，保证云层细节
+    1.0f,
+    1.0f
+  );
+  PlanetBufferColor color = makePlanetBufferColor(0.980392f, 1.0f, 0.992157f);
+  if (cloudValue < cloudCover + 0.03f) {
+    color = makePlanetBufferColor(0.878431f, 0.92549f, 0.972549f);
+  }
+  if (dLight + cloudValue * 0.2f > 0.52f) {
+    color = makePlanetBufferColor(0.470588f, 0.580392f, 0.752941f);
+  }
+  if (dLight + cloudValue * 0.2f > 0.66f) {
+    color = makePlanetBufferColor(0.262745f, 0.329412f, 0.490196f);
+  }
+
+  outColor = color;
+  outAlpha = planetStep(cloudCover, cloudValue) * alphaCircle;
+  return outAlpha > 0.0f;
+}
+
+struct PlanetEarthRenderContext {
+  float cloudCover;
+  float cloudColumnOffset;
+};
+
+PlanetEarthRenderContext buildPlanetEarthRenderContext(const PlanetRenderFrame& frame) {
+  PlanetEarthRenderContext context;
+  context.cloudCover = getEarthCloudCover(frame.seed);
+  context.cloudColumnOffset = frame.progress * frame.motionFactor * 42.0f;
+  return context;
+}
+
+float samplePlanetEarthCellHash(int column, int row, uint32_t salt) {
+  uint32_t value = salt;
+  value ^= (uint32_t)wrapPlanetEarthColumn(column) * 374761393UL;
+  value ^= (uint32_t)clampPlanetEarthRow(row) * 668265263UL;
+  return (float)(hashPlanet(value) & 0x00ffffffUL) / 16777215.0f;
+}
+
+float samplePlanetEarthCellTextureValue(int column, int row, uint32_t salt) {
+  float center = samplePlanetEarthCellHash(column, row, salt);
+  float east = samplePlanetEarthCellHash(column + 1, row, salt);
+  float west = samplePlanetEarthCellHash(column - 1, row, salt);
+  float north = samplePlanetEarthCellHash(column, row - 1, salt);
+  float south = samplePlanetEarthCellHash(column, row + 1, salt);
+  return clampFloat(center * 0.52f + (east + west + north + south) * 0.12f, 0.0f, 1.0f);
+}
+
+float samplePlanetEarthCellTextureValueBilinear(float column, float row, uint32_t salt) {
+  int column0 = (int)floorf(column);
+  int row0 = (int)floorf(row);
+  float tx = fractFloat(column);
+  float ty = fractFloat(row);
+  float v00 = samplePlanetEarthCellHash(column0, row0, salt);
+  float v10 = samplePlanetEarthCellHash(column0 + 1, row0, salt);
+  float v01 = samplePlanetEarthCellHash(column0, row0 + 1, salt);
+  float v11 = samplePlanetEarthCellHash(column0 + 1, row0 + 1, salt);
+  float vx0 = mixFloat(v00, v10, tx);
+  float vx1 = mixFloat(v01, v11, tx);
+  return mixFloat(vx0, vx1, ty);
+}
+
+bool samplePlanetEarthSurfaceFast(
+  float pixelU,
+  float pixelV,
+  const PlanetRenderFrame& frame,
+  PlanetBufferColor& outColor
+) {
+  PlanetEarthSphereSample sample;
+  if (!resolvePlanetEarthSphereSample(pixelU, pixelV, frame, sample)) {
+    return false;
+  }
+
+  float distanceFromCenter = distancePlanet(pixelU, pixelV, 0.5f, 0.5f);
+  int column = 0;
+  int row = 0;
+  resolvePlanetEarthMapCell(sample.longitude, sample.latitude, column, row);
+  bool isLand = readPlanetEarthLandMask(column, row);
+  bool isCoastline = isLand &&
+    hasPlanetEarthNeighborCellState(column, row, false, 1);
+  bool nearLand = !isLand &&
+    hasPlanetEarthNeighborCellState(column, row, true, 2);
+  float terrainValue =
+    samplePlanetEarthCellTextureValue(column, row, kPlanetEarthFastTerrainSalt);
+  float moistureValue =
+    samplePlanetEarthCellTextureValue(column, row, kPlanetEarthFastMoistureSalt);
+  float oceanValue =
+    samplePlanetEarthCellTextureValue(column, row, kPlanetEarthFastOceanSalt);
+  PlanetBufferColor color;
+
+  if (fabsf(sample.latitude) > 77.0f) {
+    color = mixPlanetBufferColor(
+      makePlanetBufferColor(0.678431f, 0.803922f, 0.921569f),
+      makePlanetBufferColor(0.921569f, 0.964706f, 1.0f),
+      sample.light
+    );
+  } else if (isLand) {
+    color = resolvePlanetEarthLandColor(
+      sample.latitude,
+      sample.light,
+      terrainValue,
+      moistureValue,
+      isCoastline
+    );
+  } else {
+    color = resolvePlanetEarthOceanColor(sample.latitude, sample.light, oceanValue, nearLand);
+  }
+
+  float outerGlow = smoothstepFloat(0.34f, 0.5f, distanceFromCenter) *
+                    (1.0f - smoothstepFloat(0.47f, 0.5f, distanceFromCenter));
+  if (outerGlow > 0.0f) {
+    PlanetBufferColor atmosphere = makePlanetBufferColor(0.427451f, 0.803922f, 1.0f);
+    color = mixPlanetBufferColor(color, atmosphere, outerGlow * (0.2f + sample.light * 0.18f));
+  }
+
+  outColor = color;
+  return true;
+}
+
+bool resolvePlanetEarthCloudSampleFast(
+  float pixelU,
+  float pixelV,
+  const PlanetRenderFrame& frame,
+  const PlanetEarthRenderContext& context,
+  PlanetBufferColor& outColor,
+  float& outAlpha
+) {
+  PlanetEarthSphereSample sample;
+  if (!resolvePlanetEarthSphereSample(pixelU, pixelV, frame, sample)) {
+    return false;
+  }
+
+  int column = 0;
+  int row = 0;
+  resolvePlanetEarthMapCell(sample.longitude, sample.latitude, column, row);
+  float cloudColumn = (float)column + context.cloudColumnOffset;
+  float cloudRow = (float)row;
+  float cloudValue = samplePlanetEarthCellTextureValueBilinear(
+    cloudColumn * 0.72f + 11.0f,
+    cloudRow * 0.62f + 7.0f,
+    kPlanetEarthFastCloudSalt
+  );
+  float cloudDetail = samplePlanetEarthCellTextureValueBilinear(
+    cloudColumn * 1.38f + 29.0f,
+    cloudRow * 1.16f + 17.0f,
+    kPlanetEarthFastCloudDetailSalt
+  );
+  float combinedCloud = clampFloat(cloudValue * 0.68f + cloudDetail * 0.32f, 0.0f, 1.0f);
+  float threshold = context.cloudCover;
+  outAlpha = smoothstepFloat(threshold, threshold + 0.18f, combinedCloud) *
+             (0.34f + sample.light * 0.5f);
+  if (outAlpha <= 0.0f) {
+    return false;
+  }
+
+  PlanetBufferColor brightCloud = makePlanetBufferColor(0.980392f, 1.0f, 0.992157f);
+  PlanetBufferColor coolCloud = makePlanetBufferColor(0.878431f, 0.92549f, 0.972549f);
+  PlanetBufferColor shadowCloud = makePlanetBufferColor(0.470588f, 0.580392f, 0.752941f);
+  PlanetBufferColor deepShadowCloud = makePlanetBufferColor(0.262745f, 0.329412f, 0.490196f);
+  PlanetBufferColor color = mixPlanetBufferColor(coolCloud, brightCloud, sample.light);
+  if (sample.light < 0.44f) {
+    color = mixPlanetBufferColor(shadowCloud, color, sample.light / 0.44f);
+  }
+  if (sample.light < 0.22f) {
+    color = mixPlanetBufferColor(deepShadowCloud, color, sample.light / 0.22f);
+  }
+
+  outColor = color;
+  return true;
+}
+
+void renderEarthPreview(const PlanetRenderFrame& frame) {
+  float pixels = (float)frame.pixels;
+  for (int y = 0; y < kPlanetCanvasSize; y += 1) {
+    for (int x = 0; x < kPlanetCanvasSize; x += 1) {
+      float u = 0.0f;
+      float v = 0.0f;
+      if (!mapPlanetPreviewPixelToUv(frame, 1.0f, x, y, u, v)) {
+        continue;
+      }
+
+      int offset = (y * kPlanetCanvasSize + x) * kPlanetBufferChannels;
+      float pixelU = quantizePlanetUv(u, pixels);
+      float pixelV = quantizePlanetUv(v, pixels);
+      PlanetBufferColor surfaceColor;
+      if (samplePlanetEarthSurface(pixelU, pixelV, frame, surfaceColor)) {
+        blendPlanetPreviewPixel(offset, surfaceColor, surfaceColor.a);
+      }
+      PlanetBufferColor cloudColor;
+      float cloudAlpha = 0.0f;
+      // 使用连贯的噪声函数版本
+      if (resolvePlanetEarthCloudSample(pixelU, pixelV, frame, cloudColor, cloudAlpha)) {
+        coverPlanetPreviewPixel(offset, cloudColor, cloudAlpha * cloudColor.a);
+      }
+    }
+  }
+}
+
 void renderPlanetPreviewToBuffer(const PlanetRenderFrame& frame) {
+  if (planetPresetEqualsValue(frame.presetId, "earth")) {
+    renderEarthPreview(frame);
+    return;
+  }
   if (planetPresetEqualsValue(frame.presetId, "terran_wet")) {
     renderTerranWetPreview(frame);
     return;
@@ -4594,6 +6316,10 @@ void renderPlanetPreviewToBuffer(const PlanetRenderFrame& frame) {
     renderGalaxyPreview(frame);
     return;
   }
+  if (isPlanetPortalPresetValue(frame.presetId)) {
+    renderPortalPreview(frame);
+    return;
+  }
   if (planetPresetEqualsValue(frame.presetId, "star")) {
     renderStarPreview(frame);
     return;
@@ -4606,7 +6332,9 @@ void renderPlanetPreviewFrame() {
   PlanetRenderFrame frame = buildPlanetRenderFrame(millis());
   clearPlanetPreviewBuffer();
   s_activePlanetColorVariant = buildPlanetColorVariant(frame);
-  s_planetColorVariantActive = true;
+  s_planetColorVariantActive =
+    !isPlanetFixedPalettePresetValue(frame.presetId) &&
+    !isReferenceDefaultPlanetColorSeed(frame.colorSeed);
   renderPlanetPreviewToBuffer(frame);
   s_planetColorVariantActive = false;
   renderPlanetBackgroundStars(frame);
@@ -4616,7 +6344,9 @@ void renderPlanetPreviewFrame() {
 void renderPlanetPreviewToAnimationBuffer(const PlanetRenderFrame& frame) {
   clearPlanetPreviewBuffer();
   s_activePlanetColorVariant = buildPlanetColorVariant(frame);
-  s_planetColorVariantActive = true;
+  s_planetColorVariantActive =
+    !isPlanetFixedPalettePresetValue(frame.presetId) &&
+    !isReferenceDefaultPlanetColorSeed(frame.colorSeed);
   if (planetPresetEqualsValue(frame.presetId, "terran_wet")) {
     renderTerranWetPreviewOptimized(frame);
   } else {
@@ -4638,7 +6368,7 @@ struct PlanetDirectLayerSample {
 struct PlanetDirectLayerSampleCache {
   bool valid;
   bool hit;
-  const char* presetId;
+  uint32_t presetHash;
   float progress;
   float sizeScale;
   float centerX;
@@ -4662,7 +6392,7 @@ struct PlanetDirectSphereGeometry {
 struct PlanetDirectSphereGeometryCache {
   bool valid;
   bool hit;
-  const char* presetId;
+  uint32_t presetHash;
   float progress;
   float sizeScale;
   float centerX;
@@ -4675,8 +6405,47 @@ struct PlanetDirectSphereGeometryCache {
   PlanetDirectSphereGeometry geometry;
 };
 
-PlanetDirectLayerSampleCache s_planetDirectLayerSampleCache = {};
-PlanetDirectSphereGeometryCache s_planetDirectSphereGeometryCache = {};
+struct PlanetDirectLayerSampleGridCell {
+  bool hit;
+  PlanetDirectLayerSample sample;
+};
+
+struct PlanetDirectLayerSampleGridCache {
+  bool valid;
+  uint32_t presetHash;
+  float progress;
+  float sizeScale;
+  float centerX;
+  float centerY;
+  int pixels;
+  float planeScale;
+  float pixelsScale;
+  PlanetDirectLayerSampleGridCell* cells;
+};
+
+struct PlanetDirectSphereGeometryGridCell {
+  bool hit;
+  PlanetDirectSphereGeometry geometry;
+};
+
+struct PlanetDirectSphereGeometryGridCache {
+  bool valid;
+  uint32_t presetHash;
+  float progress;
+  float sizeScale;
+  float centerX;
+  float centerY;
+  int pixels;
+  float planeScale;
+  float pixelsScale;
+  PlanetDirectSphereGeometryGridCell* cells;
+};
+
+PlanetDirectLayerSampleCache* s_planetDirectLayerSampleCache = nullptr;
+PlanetDirectSphereGeometryCache* s_planetDirectSphereGeometryCache = nullptr;
+PlanetDirectLayerSampleGridCache* s_planetDirectLayerSampleGridCache = nullptr;
+PlanetDirectSphereGeometryGridCache* s_planetDirectSphereGeometryGridCache = nullptr;
+bool s_planetDirectGridCacheDisabled = false;
 
 bool planetDirectDitherPixelU(const PlanetDirectLayerSample& sample);
 bool planetDirectDitherPixelV(const PlanetDirectLayerSample& sample);
@@ -4687,7 +6456,8 @@ bool planetDirectCacheMatches(
   float pixelsScale,
   int x,
   int y,
-  const char* cachedPresetId,
+  uint32_t presetHash,
+  uint32_t cachedPresetHash,
   float cachedProgress,
   float cachedSizeScale,
   float cachedCenterX,
@@ -4698,7 +6468,7 @@ bool planetDirectCacheMatches(
   int cachedX,
   int cachedY
 ) {
-  return cachedPresetId == frame.presetId &&
+  return cachedPresetHash == presetHash &&
          cachedProgress == frame.progress &&
          cachedSizeScale == frame.sizeScale &&
          cachedCenterX == frame.centerX &&
@@ -4710,6 +6480,304 @@ bool planetDirectCacheMatches(
          cachedY == y;
 }
 
+int planetDirectGridCellIndex(int x, int y) {
+  return y * kPlanetCanvasSize + x;
+}
+
+bool ensurePlanetDirectColorCacheStorage() {
+  if (s_planetDirectColorCacheDisabled) {
+    return false;
+  }
+  if (s_planetDirectColorCache != nullptr) {
+    return true;
+  }
+
+  s_planetDirectColorCache = static_cast<PlanetDirectColorCacheEntry*>(
+    allocatePlanetBuffer(sizeof(PlanetDirectColorCacheEntry) * (size_t)kPlanetDirectColorCacheSize)
+  );
+  if (s_planetDirectColorCache == nullptr) {
+    s_planetDirectColorCacheDisabled = true;
+    return false;
+  }
+  memset(s_planetDirectColorCache, 0, sizeof(PlanetDirectColorCacheEntry) * (size_t)kPlanetDirectColorCacheSize);
+  return true;
+}
+
+bool ensurePlanetDirectLayerSampleCacheStorage() {
+  if (s_planetDirectLayerSampleCache != nullptr) {
+    return true;
+  }
+
+  s_planetDirectLayerSampleCache = static_cast<PlanetDirectLayerSampleCache*>(
+    allocatePlanetBuffer(sizeof(PlanetDirectLayerSampleCache))
+  );
+  if (s_planetDirectLayerSampleCache == nullptr) {
+    return false;
+  }
+  memset(s_planetDirectLayerSampleCache, 0, sizeof(PlanetDirectLayerSampleCache));
+  return true;
+}
+
+bool ensurePlanetDirectSphereGeometryCacheStorage() {
+  if (s_planetDirectSphereGeometryCache != nullptr) {
+    return true;
+  }
+
+  s_planetDirectSphereGeometryCache = static_cast<PlanetDirectSphereGeometryCache*>(
+    allocatePlanetBuffer(sizeof(PlanetDirectSphereGeometryCache))
+  );
+  if (s_planetDirectSphereGeometryCache == nullptr) {
+    return false;
+  }
+  memset(s_planetDirectSphereGeometryCache, 0, sizeof(PlanetDirectSphereGeometryCache));
+  return true;
+}
+
+bool ensurePlanetDirectLayerSampleGridCacheStorage() {
+  if (s_planetDirectGridCacheDisabled) {
+    return false;
+  }
+  if (s_planetDirectLayerSampleGridCache != nullptr) {
+    return true;
+  }
+
+  s_planetDirectLayerSampleGridCache = static_cast<PlanetDirectLayerSampleGridCache*>(
+    allocatePlanetBuffer(sizeof(PlanetDirectLayerSampleGridCache))
+  );
+  if (s_planetDirectLayerSampleGridCache == nullptr) {
+    s_planetDirectGridCacheDisabled = true;
+    return false;
+  }
+  memset(s_planetDirectLayerSampleGridCache, 0, sizeof(PlanetDirectLayerSampleGridCache));
+  return true;
+}
+
+bool ensurePlanetDirectSphereGeometryGridCacheStorage() {
+  if (s_planetDirectGridCacheDisabled) {
+    return false;
+  }
+  if (s_planetDirectSphereGeometryGridCache != nullptr) {
+    return true;
+  }
+
+  s_planetDirectSphereGeometryGridCache = static_cast<PlanetDirectSphereGeometryGridCache*>(
+    allocatePlanetBuffer(sizeof(PlanetDirectSphereGeometryGridCache))
+  );
+  if (s_planetDirectSphereGeometryGridCache == nullptr) {
+    s_planetDirectGridCacheDisabled = true;
+    return false;
+  }
+  memset(s_planetDirectSphereGeometryGridCache, 0, sizeof(PlanetDirectSphereGeometryGridCache));
+  return true;
+}
+
+bool ensurePlanetDirectLayerSampleGridStorage() {
+  if (!ensurePlanetDirectLayerSampleGridCacheStorage() || s_planetDirectGridCacheDisabled) {
+    return false;
+  }
+  if (s_planetDirectLayerSampleGridCache->cells != nullptr) {
+    return true;
+  }
+
+  s_planetDirectLayerSampleGridCache->cells = static_cast<PlanetDirectLayerSampleGridCell*>(
+    allocatePlanetBuffer(sizeof(PlanetDirectLayerSampleGridCell) * (size_t)kPlanetCanvasSize * (size_t)kPlanetCanvasSize)
+  );
+  if (s_planetDirectLayerSampleGridCache->cells == nullptr) {
+    s_planetDirectGridCacheDisabled = true;
+    return false;
+  }
+  return true;
+}
+
+bool ensurePlanetDirectSphereGeometryGridStorage() {
+  if (!ensurePlanetDirectSphereGeometryGridCacheStorage() || s_planetDirectGridCacheDisabled) {
+    return false;
+  }
+  if (s_planetDirectSphereGeometryGridCache->cells != nullptr) {
+    return true;
+  }
+
+  s_planetDirectSphereGeometryGridCache->cells = static_cast<PlanetDirectSphereGeometryGridCell*>(
+    allocatePlanetBuffer(
+      sizeof(PlanetDirectSphereGeometryGridCell) * (size_t)kPlanetCanvasSize * (size_t)kPlanetCanvasSize
+    )
+  );
+  if (s_planetDirectSphereGeometryGridCache->cells == nullptr) {
+    s_planetDirectGridCacheDisabled = true;
+    return false;
+  }
+  return true;
+}
+
+void buildPlanetDirectLayerSampleGrid(
+  const PlanetRenderFrame& frame,
+  uint32_t presetHash,
+  float planeScale,
+  float pixelsScale
+) {
+  PlanetDirectLayerSampleGridCache& cache = *s_planetDirectLayerSampleGridCache;
+  float pixels = (float)frame.pixels * pixelsScale;
+  for (int y = 0; y < kPlanetCanvasSize; y += 1) {
+    for (int x = 0; x < kPlanetCanvasSize; x += 1) {
+      PlanetDirectLayerSampleGridCell& cell = cache.cells[planetDirectGridCellIndex(x, y)];
+      if (!mapPlanetPreviewPixelToUv(frame, planeScale, x, y, cell.sample.u, cell.sample.v)) {
+        cell.hit = false;
+        continue;
+      }
+
+      cell.hit = true;
+      cell.sample.pixels = pixels;
+      cell.sample.pixelU = quantizePlanetUv(cell.sample.u, pixels);
+      cell.sample.pixelV = quantizePlanetUv(cell.sample.v, pixels);
+    }
+  }
+
+  cache.valid = true;
+  cache.presetHash = presetHash;
+  cache.progress = frame.progress;
+  cache.sizeScale = frame.sizeScale;
+  cache.centerX = frame.centerX;
+  cache.centerY = frame.centerY;
+  cache.pixels = frame.pixels;
+  cache.planeScale = planeScale;
+  cache.pixelsScale = pixelsScale;
+}
+
+void buildPlanetDirectSphereGeometryGrid(
+  const PlanetRenderFrame& frame,
+  uint32_t presetHash,
+  float planeScale,
+  float pixelsScale
+) {
+  PlanetDirectSphereGeometryGridCache& cache = *s_planetDirectSphereGeometryGridCache;
+  float pixels = (float)frame.pixels * pixelsScale;
+  for (int y = 0; y < kPlanetCanvasSize; y += 1) {
+    for (int x = 0; x < kPlanetCanvasSize; x += 1) {
+      PlanetDirectSphereGeometryGridCell& cell = cache.cells[planetDirectGridCellIndex(x, y)];
+      PlanetDirectLayerSample& sample = cell.geometry.sample;
+      if (!mapPlanetPreviewPixelToUv(frame, planeScale, x, y, sample.u, sample.v)) {
+        cell.hit = false;
+        continue;
+      }
+
+      sample.pixels = pixels;
+      sample.pixelU = quantizePlanetUv(sample.u, pixels);
+      sample.pixelV = quantizePlanetUv(sample.v, pixels);
+      if (!planetDirectInsideCircle(sample.pixelU, sample.pixelV)) {
+        cell.hit = false;
+        continue;
+      }
+
+      cell.hit = true;
+      cell.geometry.ditherPixelU = planetDirectDitherPixelU(sample);
+      cell.geometry.ditherPixelV = planetDirectDitherPixelV(sample);
+      spherifyPlanetUv(sample.pixelU, sample.pixelV, cell.geometry.sphereX, cell.geometry.sphereY);
+    }
+  }
+
+  cache.valid = true;
+  cache.presetHash = presetHash;
+  cache.progress = frame.progress;
+  cache.sizeScale = frame.sizeScale;
+  cache.centerX = frame.centerX;
+  cache.centerY = frame.centerY;
+  cache.pixels = frame.pixels;
+  cache.planeScale = planeScale;
+  cache.pixelsScale = pixelsScale;
+}
+
+bool preparePlanetDirectLayerSampleFromGrid(
+  const PlanetRenderFrame& frame,
+  float planeScale,
+  float pixelsScale,
+  int x,
+  int y,
+  PlanetDirectLayerSample& sample
+) {
+  if (!ensurePlanetDirectLayerSampleGridStorage()) {
+    return false;
+  }
+
+  uint32_t presetHash = hashPlanetString(frame.presetId);
+  PlanetDirectLayerSampleGridCache& cache = *s_planetDirectLayerSampleGridCache;
+  if (!cache.valid ||
+      !planetDirectCacheMatches(
+        frame,
+        planeScale,
+        pixelsScale,
+        x,
+        y,
+        presetHash,
+        cache.presetHash,
+        cache.progress,
+        cache.sizeScale,
+        cache.centerX,
+        cache.centerY,
+        cache.pixels,
+        cache.planeScale,
+        cache.pixelsScale,
+        x,
+        y
+      )) {
+    buildPlanetDirectLayerSampleGrid(frame, presetHash, planeScale, pixelsScale);
+  }
+
+  const PlanetDirectLayerSampleGridCell& cell =
+    cache.cells[planetDirectGridCellIndex(x, y)];
+  if (!cell.hit) {
+    return false;
+  }
+
+  sample = cell.sample;
+  return true;
+}
+
+bool preparePlanetDirectSphereGeometryFromGrid(
+  const PlanetRenderFrame& frame,
+  float planeScale,
+  float pixelsScale,
+  int x,
+  int y,
+  PlanetDirectSphereGeometry& geometry
+) {
+  if (!ensurePlanetDirectSphereGeometryGridStorage()) {
+    return false;
+  }
+
+  uint32_t presetHash = hashPlanetString(frame.presetId);
+  PlanetDirectSphereGeometryGridCache& cache = *s_planetDirectSphereGeometryGridCache;
+  if (!cache.valid ||
+      !planetDirectCacheMatches(
+        frame,
+        planeScale,
+        pixelsScale,
+        x,
+        y,
+        presetHash,
+        cache.presetHash,
+        cache.progress,
+        cache.sizeScale,
+        cache.centerX,
+        cache.centerY,
+        cache.pixels,
+        cache.planeScale,
+        cache.pixelsScale,
+        x,
+        y
+      )) {
+    buildPlanetDirectSphereGeometryGrid(frame, presetHash, planeScale, pixelsScale);
+  }
+
+  const PlanetDirectSphereGeometryGridCell& cell =
+    cache.cells[planetDirectGridCellIndex(x, y)];
+  if (!cell.hit) {
+    return false;
+  }
+
+  geometry = cell.geometry;
+  return true;
+}
+
 bool preparePlanetDirectLayerSample(
   const PlanetRenderFrame& frame,
   float planeScale,
@@ -4718,7 +6786,31 @@ bool preparePlanetDirectLayerSample(
   int y,
   PlanetDirectLayerSample& sample
 ) {
-  PlanetDirectLayerSampleCache& cache = s_planetDirectLayerSampleCache;
+  if (planetPresetUsesLightweightDirectSampling(frame.presetId)) {
+    if (!mapPlanetPreviewPixelToUv(frame, planeScale, x, y, sample.u, sample.v)) {
+      return false;
+    }
+    sample.pixels = (float)frame.pixels * pixelsScale;
+    sample.pixelU = quantizePlanetUv(sample.u, sample.pixels);
+    sample.pixelV = quantizePlanetUv(sample.v, sample.pixels);
+    return true;
+  }
+
+  if (preparePlanetDirectLayerSampleFromGrid(frame, planeScale, pixelsScale, x, y, sample)) {
+    return true;
+  }
+  if (!ensurePlanetDirectLayerSampleCacheStorage()) {
+    if (!mapPlanetPreviewPixelToUv(frame, planeScale, x, y, sample.u, sample.v)) {
+      return false;
+    }
+    sample.pixels = (float)frame.pixels * pixelsScale;
+    sample.pixelU = quantizePlanetUv(sample.u, sample.pixels);
+    sample.pixelV = quantizePlanetUv(sample.v, sample.pixels);
+    return true;
+  }
+
+  PlanetDirectLayerSampleCache& cache = *s_planetDirectLayerSampleCache;
+  uint32_t presetHash = hashPlanetString(frame.presetId);
   if (cache.valid &&
       planetDirectCacheMatches(
         frame,
@@ -4726,7 +6818,8 @@ bool preparePlanetDirectLayerSample(
         pixelsScale,
         x,
         y,
-        cache.presetId,
+        presetHash,
+        cache.presetHash,
         cache.progress,
         cache.sizeScale,
         cache.centerX,
@@ -4747,7 +6840,7 @@ bool preparePlanetDirectLayerSample(
   if (!mapPlanetPreviewPixelToUv(frame, planeScale, x, y, sample.u, sample.v)) {
     cache.valid = true;
     cache.hit = false;
-    cache.presetId = frame.presetId;
+    cache.presetHash = presetHash;
     cache.progress = frame.progress;
     cache.sizeScale = frame.sizeScale;
     cache.centerX = frame.centerX;
@@ -4765,7 +6858,7 @@ bool preparePlanetDirectLayerSample(
   sample.pixelV = quantizePlanetUv(sample.v, sample.pixels);
   cache.valid = true;
   cache.hit = true;
-  cache.presetId = frame.presetId;
+  cache.presetHash = presetHash;
   cache.progress = frame.progress;
   cache.sizeScale = frame.sizeScale;
   cache.centerX = frame.centerX;
@@ -4787,7 +6880,24 @@ bool preparePlanetDirectSphereGeometry(
   int y,
   PlanetDirectSphereGeometry& geometry
 ) {
-  PlanetDirectSphereGeometryCache& cache = s_planetDirectSphereGeometryCache;
+  if (preparePlanetDirectSphereGeometryFromGrid(frame, planeScale, pixelsScale, x, y, geometry)) {
+    return true;
+  }
+  if (!ensurePlanetDirectSphereGeometryCacheStorage()) {
+    PlanetDirectLayerSample sample;
+    if (!preparePlanetDirectLayerSample(frame, planeScale, pixelsScale, x, y, sample) ||
+        !planetDirectInsideCircle(sample.pixelU, sample.pixelV)) {
+      return false;
+    }
+    geometry.sample = sample;
+    geometry.ditherPixelU = planetDirectDitherPixelU(sample);
+    geometry.ditherPixelV = planetDirectDitherPixelV(sample);
+    spherifyPlanetUv(sample.pixelU, sample.pixelV, geometry.sphereX, geometry.sphereY);
+    return true;
+  }
+
+  PlanetDirectSphereGeometryCache& cache = *s_planetDirectSphereGeometryCache;
+  uint32_t presetHash = hashPlanetString(frame.presetId);
   if (cache.valid &&
       planetDirectCacheMatches(
         frame,
@@ -4795,7 +6905,8 @@ bool preparePlanetDirectSphereGeometry(
         pixelsScale,
         x,
         y,
-        cache.presetId,
+        presetHash,
+        cache.presetHash,
         cache.progress,
         cache.sizeScale,
         cache.centerX,
@@ -4818,7 +6929,7 @@ bool preparePlanetDirectSphereGeometry(
       !planetDirectInsideCircle(sample.pixelU, sample.pixelV)) {
     cache.valid = true;
     cache.hit = false;
-    cache.presetId = frame.presetId;
+    cache.presetHash = presetHash;
     cache.progress = frame.progress;
     cache.sizeScale = frame.sizeScale;
     cache.centerX = frame.centerX;
@@ -4838,7 +6949,7 @@ bool preparePlanetDirectSphereGeometry(
 
   cache.valid = true;
   cache.hit = true;
-  cache.presetId = frame.presetId;
+  cache.presetHash = presetHash;
   cache.progress = frame.progress;
   cache.sizeScale = frame.sizeScale;
   cache.centerX = frame.centerX;
@@ -4930,13 +7041,23 @@ float accumulatePlanetDirectCloudNoise(
   float noise = 0.0f;
   float noiseX = scaledX * 0.3f + 11.0f + timeOffset;
   float noiseY = scaledY * 0.3f;
+  bool cachedNoiseReady =
+    buildPlanetTiledRandCache(s_planetDirectNoiseRandCache, shaderSeed, size, 1.0f, 1.0f);
   for (int index = 0; index < effectiveCount; index += 1) {
-    noise += circleNoisePlanetCloud(
-      noiseX + (float)index,
-      noiseY,
-      shaderSeed,
-      size
-    );
+    if (cachedNoiseReady) {
+      noise += circleNoisePlanetCloudCached(
+        noiseX + (float)index,
+        noiseY,
+        s_planetDirectNoiseRandCache
+      );
+    } else {
+      noise += circleNoisePlanetCloud(
+        noiseX + (float)index,
+        noiseY,
+        shaderSeed,
+        size
+      );
+    }
   }
   return noise;
 }
@@ -5340,6 +7461,13 @@ uint16_t resolvePlanetDirectColor565(const PlanetBufferColor& color) {
   uint32_t redBits = planetFloatBits(color.r);
   uint32_t greenBits = planetFloatBits(color.g);
   uint32_t blueBits = planetFloatBits(color.b);
+  PlanetRgb resolved = planetBufferColorToRgb(color);
+  if (s_planetDirectColorVariantActive) {
+    resolved = applyPlanetDirectColorVariant(resolved);
+  }
+  if (!ensurePlanetDirectColorCacheStorage()) {
+    return planetColor565(resolved);
+  }
   uint32_t hash = redBits;
   hash ^= greenBits * 33UL;
   hash ^= blueBits * 97UL;
@@ -5352,10 +7480,6 @@ uint16_t resolvePlanetDirectColor565(const PlanetBufferColor& color) {
     return entry.color565;
   }
 
-  PlanetRgb resolved = planetBufferColorToRgb(color);
-  if (s_planetDirectColorVariantActive) {
-    resolved = applyPlanetDirectColorVariant(resolved);
-  }
   entry.redBits = redBits;
   entry.greenBits = greenBits;
   entry.blueBits = blueBits;
@@ -5662,7 +7786,7 @@ bool samplePlanetUnderDirect(
   float timeOffset = loopPlanetDirectTimeFromMultiplier(frame, layer.size, layer.timeSpeed) *
                      layer.timeSpeed;
   float dLight = dLightBase;
-  dLight += fbmPlanetPreviewTiled(
+  dLight += samplePlanetGenericFbmTiled(
     rotatedX * layer.size + timeOffset,
     rotatedY * layer.size,
     frame.shaderSeed,
@@ -5712,8 +7836,16 @@ bool samplePlanetLandMassDirect(
                      layer.timeSpeed;
   float baseX = sphereX * layer.size + timeOffset;
   float baseY = sphereY * layer.size;
-  float fbm1 = fbmPlanetPreviewTiled(baseX, baseY, frame.shaderSeed, layer.size, layer.octaves, 2.0f, 1.0f);
-  float fbm2Value = fbmPlanetPreviewTiled(
+  float fbm1 = samplePlanetGenericFbmTiled(
+    baseX,
+    baseY,
+    frame.shaderSeed,
+    layer.size,
+    layer.octaves,
+    2.0f,
+    1.0f
+  );
+  float fbm2Value = samplePlanetGenericFbmTiled(
     baseX - layer.lightOriginX * fbm1,
     baseY - layer.lightOriginY * fbm1,
     frame.shaderSeed,
@@ -5722,7 +7854,7 @@ bool samplePlanetLandMassDirect(
     2.0f,
     1.0f
   );
-  float fbm3Value = fbmPlanetPreviewTiled(
+  float fbm3Value = samplePlanetGenericFbmTiled(
     baseX - layer.lightOriginX * 1.5f * fbm1,
     baseY - layer.lightOriginY * 1.5f * fbm1,
     frame.shaderSeed,
@@ -5731,7 +7863,7 @@ bool samplePlanetLandMassDirect(
     2.0f,
     1.0f
   );
-  float fbm4Value = fbmPlanetPreviewTiled(
+  float fbm4Value = samplePlanetGenericFbmTiled(
     baseX - layer.lightOriginX * 2.0f * fbm1,
     baseY - layer.lightOriginY * 2.0f * fbm1,
     frame.shaderSeed,
@@ -5820,12 +7952,14 @@ bool samplePlanetCloudDirectWithNoiseSamples(
     noiseSamples
   );
 
-  float cloudValue = fbmPlanetPreviewTiled(
+  float cloudValue = samplePlanetGenericFbmTiled(
     scaledSphereX + cloudNoise + timeOffset,
     scaledSphereCloudY,
     frame.shaderSeed,
     layer.size,
-    layer.octaves
+    layer.octaves,
+    1.0f,
+    1.0f
   );
 
   PlanetBufferColor color = layer.colors[0];
@@ -5881,12 +8015,14 @@ bool samplePlanetGasCloudDirect(
     9
   );
 
-  float cloudValue = fbmPlanetPreviewTiled(
+  float cloudValue = samplePlanetGenericFbmTiled(
     scaledSphereX + cloudNoise + timeOffset,
     scaledSphereCloudY,
     frame.shaderSeed,
     layer.size,
-    layer.octaves
+    layer.octaves,
+    1.0f,
+    1.0f
   );
 
   PlanetBufferColor color = layer.colors[0];
@@ -5934,7 +8070,7 @@ bool samplePlanetIceLakeDirect(
   spherifyPlanetUv(rotatedX, rotatedY, sphereX, sphereY);
   float timeOffset = loopPlanetDirectTimeFromMultiplier(frame, layer.size, layer.timeSpeed) *
                      layer.timeSpeed;
-  float lake = fbmPlanetPreviewTiled(
+  float lake = samplePlanetGenericFbmTiled(
     sphereX * layer.size + timeOffset,
     sphereY * layer.size,
     frame.shaderSeed,
@@ -5985,16 +8121,26 @@ bool samplePlanetNoAtmosphereBaseDirect(
   float rotatedX = 0.0f;
   float rotatedY = 0.0f;
   resolvePlanetDirectRotatedPixelUv(sample, layer.rotationOffset, rotatedX, rotatedY);
-  float fbm1 = fbmPlanetPreviewTiled(rotatedX, rotatedY, frame.shaderSeed, layer.size, layer.octaves);
+  float fbm1 = samplePlanetGenericFbmTiled(
+    rotatedX,
+    rotatedY,
+    frame.shaderSeed,
+    layer.size,
+    layer.octaves,
+    1.0f,
+    1.0f
+  );
   float timeOffset = loopPlanetDirectTimeFromMultiplier(frame, layer.size, layer.timeSpeed) *
                      layer.timeSpeed;
   float dLight = dLightBase;
-  dLight += fbmPlanetPreviewTiled(
+  dLight += samplePlanetGenericFbmTiled(
     rotatedX * layer.size + fbm1 + timeOffset,
     rotatedY * layer.size,
     frame.shaderSeed,
     layer.size,
-    layer.octaves
+    layer.octaves,
+    1.0f,
+    1.0f
   ) * 0.3f;
 
   float ditherBorder = 1.0f / sample.pixels * layer.ditherSize;
@@ -6035,22 +8181,46 @@ bool samplePlanetCraterDirect(
   resolvePlanetDirectSphereUv(geometry, layer.rotationOffset, true, sphereX, sphereY);
   float timeOffset = loopPlanetDirectTimeFromMultiplier(frame, layer.size, layer.timeSpeed) *
                      layer.timeSpeed;
+  bool cachedNoiseReady =
+    buildPlanetTiledRandCache(s_planetDirectNoiseRandCache, frame.shaderSeed, layer.size, 1.0f, 1.0f);
 
   float craterOne = 1.0f;
   float craterTwo = 1.0f;
   for (int index = 0; index < 2; index += 1) {
-    craterOne *= circleNoisePlanetCrater(
-      sphereX * layer.size + (float)index + 11.0f + timeOffset,
-      sphereY * layer.size,
-      frame.shaderSeed,
-      layer.size
-    );
-    craterTwo *= circleNoisePlanetCrater(
-      (sphereX + (layer.lightOriginX - 0.5f) * layer.offset) * layer.size + (float)index + 11.0f + timeOffset,
-      (sphereY + (layer.lightOriginY - 0.5f) * layer.offset) * layer.size,
-      frame.shaderSeed,
-      layer.size
-    );
+    float craterX = sphereX * layer.size + (float)index + 11.0f + timeOffset;
+    float craterY = sphereY * layer.size;
+    float shiftedCraterX =
+      (sphereX + (layer.lightOriginX - 0.5f) * layer.offset) * layer.size +
+      (float)index +
+      11.0f +
+      timeOffset;
+    float shiftedCraterY =
+      (sphereY + (layer.lightOriginY - 0.5f) * layer.offset) * layer.size;
+    if (cachedNoiseReady) {
+      craterOne *= circleNoisePlanetCraterCached(
+        craterX,
+        craterY,
+        s_planetDirectNoiseRandCache
+      );
+      craterTwo *= circleNoisePlanetCraterCached(
+        shiftedCraterX,
+        shiftedCraterY,
+        s_planetDirectNoiseRandCache
+      );
+    } else {
+      craterOne *= circleNoisePlanetCrater(
+        craterX,
+        craterY,
+        frame.shaderSeed,
+        layer.size
+      );
+      craterTwo *= circleNoisePlanetCrater(
+        shiftedCraterX,
+        shiftedCraterY,
+        frame.shaderSeed,
+        layer.size
+      );
+    }
   }
   craterOne = 1.0f - craterOne;
   craterTwo = 1.0f - craterTwo;
@@ -6089,7 +8259,7 @@ bool samplePlanetLavaRiverDirect(
   resolvePlanetDirectSphereUv(geometry, layer.rotationOffset, true, sphereX, sphereY);
   float timeOffset = loopPlanetDirectTimeFromMultiplier(frame, layer.size, layer.timeSpeed) *
                      layer.timeSpeed;
-  float fbm1 = fbmPlanetPreviewTiled(
+  float fbm1 = samplePlanetGenericFbmTiled(
     sphereX * layer.size + timeOffset,
     sphereY * layer.size,
     frame.shaderSeed,
@@ -6100,7 +8270,7 @@ bool samplePlanetLavaRiverDirect(
   );
   float river = planetStep(
     layer.riverCutoff,
-    fbmPlanetPreviewTiled(
+    samplePlanetGenericFbmTiled(
       sphereX + fbm1 * 2.5f,
       sphereY + fbm1 * 2.5f,
       frame.shaderSeed,
@@ -6151,7 +8321,7 @@ bool samplePlanetDryTerranDirect(
   resolvePlanetDirectSphereUv(geometry, layer.rotationOffset, false, rotatedX, rotatedY);
   float timeOffset = loopPlanetDirectTimeFromMultiplier(frame, layer.size, layer.timeSpeed) *
                      layer.timeSpeed;
-  float noiseValue = fbmPlanetPreviewTiled(
+  float noiseValue = samplePlanetGenericFbmTiled(
     rotatedX * layer.size + timeOffset,
     rotatedY * layer.size,
     frame.shaderSeed,
@@ -6212,8 +8382,16 @@ bool samplePlanetLandRiversDirect(
                      layer.timeSpeed;
   float baseX = rotatedX * layer.size + timeOffset;
   float baseY = rotatedY * layer.size;
-  float fbm1 = fbmPlanetPreviewTiled(baseX, baseY, frame.shaderSeed, layer.size, layer.octaves, 2.0f, 1.0f);
-  float fbm2Value = fbmPlanetPreviewTiled(
+  float fbm1 = samplePlanetGenericFbmTiled(
+    baseX,
+    baseY,
+    frame.shaderSeed,
+    layer.size,
+    layer.octaves,
+    2.0f,
+    1.0f
+  );
+  float fbm2Value = samplePlanetGenericFbmTiled(
     baseX - layer.lightOriginX * fbm1,
     baseY - layer.lightOriginY * fbm1,
     frame.shaderSeed,
@@ -6222,7 +8400,7 @@ bool samplePlanetLandRiversDirect(
     2.0f,
     1.0f
   );
-  float fbm3Value = fbmPlanetPreviewTiled(
+  float fbm3Value = samplePlanetGenericFbmTiled(
     baseX - layer.lightOriginX * 1.5f * fbm1,
     baseY - layer.lightOriginY * 1.5f * fbm1,
     frame.shaderSeed,
@@ -6231,7 +8409,7 @@ bool samplePlanetLandRiversDirect(
     2.0f,
     1.0f
   );
-  float fbm4Value = fbmPlanetPreviewTiled(
+  float fbm4Value = samplePlanetGenericFbmTiled(
     baseX - layer.lightOriginX * 2.0f * fbm1,
     baseY - layer.lightOriginY * 2.0f * fbm1,
     frame.shaderSeed,
@@ -6242,7 +8420,7 @@ bool samplePlanetLandRiversDirect(
   );
   float riverValue = planetStep(
     layer.riverCutoff,
-    fbmPlanetPreviewTiled(
+    samplePlanetGenericFbmTiled(
       baseX + fbm1 * 6.0f,
       baseY + fbm1 * 6.0f,
       frame.shaderSeed,
@@ -6315,7 +8493,7 @@ bool samplePlanetDenseGasDirect(
                      layer.timeSpeed;
   float scaledSphereX = sphereX * layer.size;
   float scaledSphereY = sphereY * layer.size;
-  float band = fbmPlanetPreviewTiled(
+  float band = samplePlanetGenericFbmTiled(
     0.0f,
     scaledSphereY * layer.bands,
     frame.shaderSeed,
@@ -6334,7 +8512,7 @@ bool samplePlanetDenseGasDirect(
     10
   );
 
-  float fbm1 = fbmPlanetPreviewTiled(
+  float fbm1 = samplePlanetGenericFbmTiled(
     scaledSphereX,
     scaledSphereY,
     frame.shaderSeed,
@@ -6343,7 +8521,7 @@ bool samplePlanetDenseGasDirect(
     2.0f,
     1.0f
   );
-  float fbm2Value = fbmPlanetPreviewTiled(
+  float fbm2Value = samplePlanetGenericFbmTiled(
     scaledSphereX + fbm1 - timeOffset + turbulence,
     scaledSphereY * 2.0f,
     frame.shaderSeed,
@@ -6412,7 +8590,7 @@ bool samplePlanetRingDirect(
   float materialU = 0.0f;
   float materialV = 0.0f;
   rotatePlanetUv(centerX, centerY + 0.5f, time * layer.timeSpeed, materialU, materialV);
-  ringValue *= fbmPlanetPreviewTiled(
+  ringValue *= samplePlanetGenericFbmTiled(
     materialU * layer.size,
     materialV * layer.size,
     frame.shaderSeed,
@@ -6444,9 +8622,130 @@ bool samplePlanetRingDirect(
   return true;
 }
 
+struct PlanetAsteroidRenderContext {
+  float rotation;
+  float rotatedLightX;
+  float rotatedLightY;
+  float lightShiftX;
+  float lightShiftY;
+  float untiledMin;
+  float untiledMax;
+  bool cachedNoiseReady;
+};
+
+struct PlanetStarCoreRenderContext {
+  float primaryShift;
+  float secondaryShift;
+};
+
+struct PlanetStarBlobRenderContext {
+  float timeShift;
+};
+
+struct PlanetStarFlareRenderContext {
+  float timeShift;
+  float noiseShift;
+  float invert;
+};
+
+struct PlanetBlackHoleDiskRenderContext {
+  float wobbleRotation;
+  float flowRotation;
+};
+
+struct PlanetGalaxyRenderContext {
+  float timeRotation;
+  float untiledMin;
+  float untiledMax;
+  float zoomOffset;
+  float tiltOffset;
+};
+
+PlanetAsteroidRenderContext buildPlanetAsteroidRenderContext(
+  const PlanetRenderFrame& frame,
+  const PlanetAsteroidLayer& layer
+) {
+  PlanetAsteroidRenderContext context = {};
+  context.rotation = frame.spinAngle + layer.rotationOffset;
+  rotatePlanetUv(
+    layer.lightOriginX,
+    layer.lightOriginY,
+    context.rotation,
+    context.rotatedLightX,
+    context.rotatedLightY
+  );
+  context.lightShiftX = (layer.lightOriginX - 0.5f) * 0.03f;
+  context.lightShiftY = (layer.lightOriginY - 0.5f) * 0.03f;
+  context.untiledMin = -0.75f * layer.size;
+  context.untiledMax = 1.4f * layer.size;
+  context.cachedNoiseReady =
+    buildPlanetTiledRandCache(s_planetDirectNoiseRandCache, frame.shaderSeed, layer.size, 1.0f, 1.0f);
+  return context;
+}
+
+PlanetStarCoreRenderContext buildPlanetStarCoreRenderContext(
+  const PlanetRenderFrame& frame,
+  const PlanetStarCoreLayer& layer
+) {
+  PlanetStarCoreRenderContext context = {};
+  float time = loopPlanetDirectTimeFromProgress(frame, layer.timeSpeed);
+  context.primaryShift = time * layer.timeSpeed * 2.0f;
+  context.secondaryShift = time * layer.timeSpeed;
+  return context;
+}
+
+PlanetStarBlobRenderContext buildPlanetStarBlobRenderContext(
+  const PlanetRenderFrame& frame,
+  const PlanetStarBlobLayer& layer
+) {
+  PlanetStarBlobRenderContext context = {};
+  context.timeShift =
+    loopPlanetDirectTimeFromMultiplier(frame, layer.size, layer.timeSpeed) * layer.timeSpeed;
+  return context;
+}
+
+PlanetStarFlareRenderContext buildPlanetStarFlareRenderContext(
+  const PlanetRenderFrame& frame,
+  const PlanetStarFlareLayer& layer
+) {
+  PlanetStarFlareRenderContext context = {};
+  float time = loopPlanetDirectTimeFromMultiplier(frame, layer.size, layer.timeSpeed);
+  context.timeShift = time * layer.timeSpeed;
+  context.noiseShift = time;
+  context.invert = 1.0f / layer.circleAmount;
+  return context;
+}
+
+PlanetBlackHoleDiskRenderContext buildPlanetBlackHoleDiskRenderContext(
+  const PlanetRenderFrame& frame,
+  const PlanetBlackHoleDiskLayer& layer
+) {
+  PlanetBlackHoleDiskRenderContext context = {};
+  float wobbleTime = loopPlanetDirectTimeFromRing(frame, layer.timeSpeed, frame.motionFactor);
+  float flowTime = loopPlanetDirectTimeFromRing(frame, layer.timeSpeed, frame.spinFactor);
+  context.wobbleRotation = sinf(wobbleTime * layer.timeSpeed * 2.0f) * 0.01f;
+  context.flowRotation = flowTime * layer.timeSpeed * 3.0f;
+  return context;
+}
+
+PlanetGalaxyRenderContext buildPlanetGalaxyRenderContext(
+  const PlanetRenderFrame& frame,
+  const PlanetGalaxyLayer& layer
+) {
+  PlanetGalaxyRenderContext context = {};
+  context.timeRotation =
+    loopPlanetDirectTimeFromRotation(frame, layer.timeSpeed, frame.motionFactor) * layer.timeSpeed;
+  context.untiledMin = -1.75f * layer.size;
+  context.untiledMax = 3.8f * layer.size;
+  context.zoomOffset = (layer.zoom - 1.0f) / 2.0f;
+  context.tiltOffset = (layer.tilt - 1.0f) / 2.0f;
+  return context;
+}
+
 bool samplePlanetAsteroidDirect(
   const PlanetRenderFrame& frame,
   const PlanetAsteroidLayer& layer,
+  const PlanetAsteroidRenderContext& context,
   int x,
   int y,
   PlanetBufferColor& outColor
@@ -6458,20 +8757,30 @@ bool samplePlanetAsteroidDirect(
 
   bool dith = planetDirectDitherPixelU(sample);
   float distanceFromCenter = distancePlanet(sample.pixelU, sample.pixelV, 0.5f, 0.5f);
-  float rotation = frame.spinAngle + layer.rotationOffset;
   float rotatedX = 0.0f;
   float rotatedY = 0.0f;
-  rotatePlanetUv(sample.pixelU, sample.pixelV, rotation, rotatedX, rotatedY);
-  float rotatedLightX = 0.0f;
-  float rotatedLightY = 0.0f;
-  rotatePlanetUv(layer.lightOriginX, layer.lightOriginY, rotation, rotatedLightX, rotatedLightY);
-
-  float n = fbmPlanetPreviewUntiled(rotatedX * layer.size, rotatedY * layer.size, frame.shaderSeed, layer.octaves);
-  float n2 = fbmPlanetPreviewUntiled(
-    rotatedX * layer.size + (rotatedLightX - 0.5f) * 0.5f,
-    rotatedY * layer.size + (rotatedLightY - 0.5f) * 0.5f,
+  rotatePlanetUv(sample.pixelU, sample.pixelV, context.rotation, rotatedX, rotatedY);
+  float n = samplePlanetUntiledFbmRectCached(
+    rotatedX * layer.size,
+    rotatedY * layer.size,
     frame.shaderSeed,
-    layer.octaves
+    layer.size,
+    layer.octaves,
+    context.untiledMin,
+    context.untiledMax,
+    context.untiledMin,
+    context.untiledMax
+  );
+  float n2 = samplePlanetUntiledFbmRectCached(
+    rotatedX * layer.size + (context.rotatedLightX - 0.5f) * 0.5f,
+    rotatedY * layer.size + (context.rotatedLightY - 0.5f) * 0.5f,
+    frame.shaderSeed,
+    layer.size,
+    layer.octaves,
+    context.untiledMin,
+    context.untiledMax,
+    context.untiledMin,
+    context.untiledMax
   );
   float nStep = planetStep(0.2f, n - distanceFromCenter);
   if (nStep == 0.0f) {
@@ -6483,18 +8792,39 @@ bool samplePlanetAsteroidDirect(
   float craterOne = 1.0f;
   float craterTwo = 1.0f;
   for (int index = 0; index < 2; index += 1) {
-    craterOne *= circleNoisePlanetCrater(
-      rotatedX * layer.size + (float)index + 11.0f,
-      rotatedY * layer.size,
-      frame.shaderSeed,
-      layer.size
-    );
-    craterTwo *= circleNoisePlanetCrater(
-      (rotatedX + (layer.lightOriginX - 0.5f) * 0.03f) * layer.size + (float)index + 11.0f,
-      (rotatedY + (layer.lightOriginY - 0.5f) * 0.03f) * layer.size,
-      frame.shaderSeed,
-      layer.size
-    );
+    float craterX = rotatedX * layer.size + (float)index + 11.0f;
+    float craterY = rotatedY * layer.size;
+    float shiftedCraterX =
+      (rotatedX + context.lightShiftX) * layer.size +
+      (float)index +
+      11.0f;
+    float shiftedCraterY =
+      (rotatedY + context.lightShiftY) * layer.size;
+    if (context.cachedNoiseReady) {
+      craterOne *= circleNoisePlanetCraterCached(
+        craterX,
+        craterY,
+        s_planetDirectNoiseRandCache
+      );
+      craterTwo *= circleNoisePlanetCraterCached(
+        shiftedCraterX,
+        shiftedCraterY,
+        s_planetDirectNoiseRandCache
+      );
+    } else {
+      craterOne *= circleNoisePlanetCrater(
+        craterX,
+        craterY,
+        frame.shaderSeed,
+        layer.size
+      );
+      craterTwo *= circleNoisePlanetCrater(
+        shiftedCraterX,
+        shiftedCraterY,
+        frame.shaderSeed,
+        layer.size
+      );
+    }
   }
   craterOne = 1.0f - craterOne;
   craterTwo = 1.0f - craterTwo;
@@ -6520,6 +8850,7 @@ bool samplePlanetAsteroidDirect(
 bool samplePlanetStarCoreDirect(
   const PlanetRenderFrame& frame,
   const PlanetStarCoreLayer& layer,
+  const PlanetStarCoreRenderContext& context,
   int x,
   int y,
   PlanetBufferColor& outColor
@@ -6541,18 +8872,17 @@ bool samplePlanetStarCoreDirect(
   float sphereX = 0.0f;
   float sphereY = 0.0f;
   spherifyPlanetUv(rotatedX, rotatedY, sphereX, sphereY);
-  float time = loopPlanetDirectTimeFromProgress(frame, layer.timeSpeed);
-  float cellValue = cellsPlanetValue(
-    sphereX - time * layer.timeSpeed * 2.0f,
+  float cellValue = samplePlanetStarCellsCached(
+    sphereX - context.primaryShift,
     sphereY,
-    10.0f,
-    (float)layer.tiles
+    10,
+    layer.tiles
   );
-  cellValue *= cellsPlanetValue(
-    sphereX - time * layer.timeSpeed,
+  cellValue *= samplePlanetStarCellsCached(
+    sphereX - context.secondaryShift,
     sphereY,
-    20.0f,
-    (float)layer.tiles
+    20,
+    layer.tiles
   );
   cellValue *= 2.0f;
   cellValue = clampFloat(cellValue, 0.0f, 1.0f);
@@ -6573,6 +8903,7 @@ bool samplePlanetStarCoreDirect(
 bool samplePlanetStarBlobDirect(
   const PlanetRenderFrame& frame,
   const PlanetStarBlobLayer& layer,
+  const PlanetStarBlobRenderContext& context,
   int x,
   int y,
   PlanetBufferColor& outColor
@@ -6587,33 +8918,12 @@ bool samplePlanetStarBlobDirect(
   rotatePlanetUv(sample.pixelU, sample.pixelV, layer.rotationOffset, rotatedX, rotatedY);
   float angle = atan2f(rotatedX - 0.5f, rotatedY - 0.5f);
   float distanceFromCenter = distancePlanet(sample.pixelU, sample.pixelV, 0.5f, 0.5f);
-  float time = loopPlanetDirectTimeFromMultiplier(frame, layer.size, layer.timeSpeed);
-
+  float circleUvX = distanceFromCenter * layer.size - context.timeShift -
+                    0.1f / fmaxf(distanceFromCenter, 0.0001f);
+  float circleUvY = angle * layer.size;
   float value = 0.0f;
-  for (int index = 0; index < 15; index += 1) {
-    float randomValue = tiledPlanetRand(frame.shaderSeed, layer.size, (float)index, 0.0f);
-    float circleUvX = distanceFromCenter * layer.size - time * layer.timeSpeed -
-                      0.1f / fmaxf(distanceFromCenter, 0.0001f) + randomValue;
-    float circleUvY = angle * layer.size;
-    float invert = 1.0f / layer.circleAmount;
-    float adjustedX = circleUvX;
-    if (modPlanetFloat(circleUvY, invert * 2.0f) < invert) {
-      adjustedX += invert * 0.5f;
-    }
-    float randCoordX = floorf(adjustedX * layer.circleAmount) / layer.circleAmount;
-    float randCoordY = floorf(circleUvY * layer.circleAmount) / layer.circleAmount;
-    float localX = modPlanetFloat(adjustedX, invert) * layer.circleAmount;
-    float localY = modPlanetFloat(circleUvY, invert) * layer.circleAmount;
-    float radius = tiledPlanetRand(frame.shaderSeed, layer.size, randCoordX, randCoordY);
-    radius = clampFloat(radius, invert, 1.0f - invert);
-    float circleDistance = distancePlanet(localX, localY, radius, radius);
-    float circleAlpha = smoothstepFloat(
-      circleDistance,
-      circleDistance + 0.5f,
-      invert * layer.circleSize *
-        tiledPlanetRand(frame.shaderSeed, layer.size, randCoordX * 1.5f, randCoordY * 1.5f)
-    );
-    value += circleAlpha;
+  if (!samplePlanetStarBlobPatternCached(frame, layer, circleUvX, circleUvY, value)) {
+    value = computePlanetStarBlobPattern(frame, layer, circleUvX, circleUvY);
   }
 
   value *= 0.37f - distanceFromCenter;
@@ -6629,6 +8939,7 @@ bool samplePlanetStarBlobDirect(
 bool samplePlanetStarFlareDirect(
   const PlanetRenderFrame& frame,
   const PlanetStarFlareLayer& layer,
+  const PlanetStarFlareRenderContext& context,
   int x,
   int y,
   PlanetBufferColor& outColor
@@ -6646,41 +8957,43 @@ bool samplePlanetStarFlareDirect(
   float distanceFromCenter = distancePlanet(sample.pixelU, sample.pixelV, 0.5f, 0.5f);
   float circleUvX = distanceFromCenter;
   float circleUvY = angle;
-  float time = loopPlanetDirectTimeFromMultiplier(frame, layer.size, layer.timeSpeed);
 
-  float n = fbmPlanetPreviewTiled(
-    circleUvX * layer.size - time * layer.timeSpeed,
+  float n = samplePlanetGenericFbmTiled(
+    circleUvX * layer.size - context.timeShift,
     circleUvY * layer.size,
     frame.shaderSeed,
     layer.size,
-    layer.octaves
+    layer.octaves,
+    1.0f,
+    1.0f
   );
-  float invert = 1.0f / layer.circleAmount;
-  float adjustedX = circleUvX * layer.scale - time * layer.timeSpeed + n;
+  float adjustedX = circleUvX * layer.scale - context.timeShift + n;
   float adjustedY = circleUvY * layer.scale;
-  if (modPlanetFloat(adjustedY, invert * 2.0f) < invert) {
-    adjustedX += invert * 0.5f;
+  if (modPlanetFloat(adjustedY, context.invert * 2.0f) < context.invert) {
+    adjustedX += context.invert * 0.5f;
   }
   float randCoordX = floorf(adjustedX * layer.circleAmount) / layer.circleAmount;
   float randCoordY = floorf(adjustedY * layer.circleAmount) / layer.circleAmount;
-  float localX = modPlanetFloat(adjustedX, invert) * layer.circleAmount;
-  float localY = modPlanetFloat(adjustedY, invert) * layer.circleAmount;
+  float localX = modPlanetFloat(adjustedX, context.invert) * layer.circleAmount;
+  float localY = modPlanetFloat(adjustedY, context.invert) * layer.circleAmount;
   float radius = tiledPlanetRand(frame.shaderSeed, layer.size, randCoordX, randCoordY);
-  radius = clampFloat(radius, invert, 1.0f - invert);
+  radius = clampFloat(radius, context.invert, 1.0f - context.invert);
   float circleDistance = distancePlanet(localX, localY, radius, radius);
   float nc = smoothstepFloat(
     circleDistance,
     circleDistance + 0.5f,
-    invert * layer.circleScale *
+    context.invert * layer.circleScale *
       tiledPlanetRand(frame.shaderSeed, layer.size, randCoordX * 1.5f, randCoordY * 1.5f)
   );
   nc *= 1.5f;
-  float n2 = fbmPlanetPreviewTiled(
-    circleUvX * layer.size - time + 100.0f,
+  float n2 = samplePlanetGenericFbmTiled(
+    circleUvX * layer.size - context.noiseShift + 100.0f,
     circleUvY * layer.size + 100.0f,
     frame.shaderSeed,
     layer.size,
-    layer.octaves
+    layer.octaves,
+    1.0f,
+    1.0f
   );
   nc -= n2 * 0.1f;
 
@@ -6742,6 +9055,7 @@ bool samplePlanetBlackHoleCoreDirect(
 bool samplePlanetBlackHoleDiskDirect(
   const PlanetRenderFrame& frame,
   const PlanetBlackHoleDiskLayer& layer,
+  const PlanetBlackHoleDiskRenderContext& context,
   int x,
   int y,
   PlanetBufferColor& outColor
@@ -6758,15 +9072,13 @@ bool samplePlanetBlackHoleDiskDirect(
   float preservedX = rotatedX;
   float preservedY = rotatedY;
 
-  float wobbleTime = loopPlanetDirectTimeFromRing(frame, layer.timeSpeed, frame.motionFactor);
-  float flowTime = loopPlanetDirectTimeFromRing(frame, layer.timeSpeed, frame.spinFactor);
   float compressedX = (rotatedX - 0.5f) * 1.3f + 0.5f;
   float compressedU = 0.0f;
   float compressedV = 0.0f;
   rotatePlanetUv(
     compressedX,
     rotatedY,
-    sinf(wobbleTime * layer.timeSpeed * 2.0f) * 0.01f,
+    context.wobbleRotation,
     compressedU,
     compressedV
   );
@@ -6801,9 +9113,9 @@ bool samplePlanetBlackHoleDiskDirect(
 
   float materialU = 0.0f;
   float materialV = 0.0f;
-  rotatePlanetUv(centerX, centerY + 0.5f, flowTime * layer.timeSpeed * 3.0f, materialU, materialV);
+  rotatePlanetUv(centerX, centerY + 0.5f, context.flowRotation, materialU, materialV);
   disk *= sqrtf(clampFloat(
-    fbmPlanetPreviewTiled(
+    samplePlanetGenericFbmTiled(
       materialU * layer.size,
       materialV * layer.size,
       frame.shaderSeed,
@@ -6838,6 +9150,7 @@ bool samplePlanetBlackHoleDiskDirect(
 bool samplePlanetGalaxyDirect(
   const PlanetRenderFrame& frame,
   const PlanetGalaxyLayer& layer,
+  const PlanetGalaxyRenderContext& context,
   int x,
   int y,
   PlanetBufferColor& outColor
@@ -6848,42 +9161,51 @@ bool samplePlanetGalaxyDirect(
   }
 
   bool dith = planetDirectDitherPixelU(sample);
-  float quantizedU = sample.pixelU * layer.zoom - (layer.zoom - 1.0f) / 2.0f;
-  float quantizedV = sample.pixelV * layer.zoom - (layer.zoom - 1.0f) / 2.0f;
+  float quantizedU = sample.pixelU * layer.zoom - context.zoomOffset;
+  float quantizedV = sample.pixelV * layer.zoom - context.zoomOffset;
   float rotatedX = 0.0f;
   float rotatedY = 0.0f;
   rotatePlanetUv(quantizedU, quantizedV, layer.rotationOffset, rotatedX, rotatedY);
   float preservedX = rotatedX;
   float preservedY = rotatedY;
 
-  float time = loopPlanetDirectTimeFromRotation(frame, layer.timeSpeed, frame.motionFactor);
   float layerU = rotatedX;
-  float layerV = rotatedY * layer.tilt - (layer.tilt - 1.0f) / 2.0f;
+  float layerV = rotatedY * layer.tilt - context.tiltOffset;
   float distanceOne = distancePlanet(layerU, layerV, 0.5f, 0.5f);
   float swirlOne = layer.swirl * powf(distanceOne, 0.4f);
   float rotatedLayerU = 0.0f;
   float rotatedLayerV = 0.0f;
-  rotatePlanetUv(layerU, layerV, swirlOne + time * layer.timeSpeed, rotatedLayerU, rotatedLayerV);
-  float f1 = fbmPlanetPreviewUntiled(
+  rotatePlanetUv(layerU, layerV, swirlOne + context.timeRotation, rotatedLayerU, rotatedLayerV);
+  float f1 = samplePlanetUntiledFbmRectCached(
     rotatedLayerU * layer.size,
     rotatedLayerV * layer.size,
     frame.shaderSeed,
-    layer.octaves
+    layer.size,
+    layer.octaves,
+    context.untiledMin,
+    context.untiledMax,
+    context.untiledMin,
+    context.untiledMax
   );
   f1 = floorf(f1 * layer.layerCount) / layer.layerCount;
 
   float galaxyU = preservedX;
-  float galaxyV = preservedY * layer.tilt - (layer.tilt - 1.0f) / 2.0f - f1 * layer.layerHeight;
+  float galaxyV = preservedY * layer.tilt - context.tiltOffset - f1 * layer.layerHeight;
   float distanceTwo = distancePlanet(galaxyU, galaxyV, 0.5f, 0.5f);
   float swirlTwo = layer.swirl * powf(distanceTwo, 0.4f);
   float rotatedGalaxyU = 0.0f;
   float rotatedGalaxyV = 0.0f;
-  rotatePlanetUv(galaxyU, galaxyV, swirlTwo + time * layer.timeSpeed, rotatedGalaxyU, rotatedGalaxyV);
-  float f2 = fbmPlanetPreviewUntiled(
+  rotatePlanetUv(galaxyU, galaxyV, swirlTwo + context.timeRotation, rotatedGalaxyU, rotatedGalaxyV);
+  float f2 = samplePlanetUntiledFbmRectCached(
     rotatedGalaxyU * layer.size + f1 * 10.0f,
     rotatedGalaxyV * layer.size + f1 * 10.0f,
     frame.shaderSeed,
-    layer.octaves
+    layer.size,
+    layer.octaves,
+    context.untiledMin,
+    context.untiledMax,
+    context.untiledMin,
+    context.untiledMax
   );
 
   float alpha = planetStep(f2 + distanceTwo, 0.7f);
@@ -6901,10 +9223,395 @@ bool samplePlanetGalaxyDirect(
   return true;
 }
 
+bool samplePlanetEarthSurfaceDirectCached(
+  const PlanetRenderFrame& frame,
+  float cosRotation,
+  float sinRotation,
+  int x,
+  int y,
+  PlanetBufferColor& outColor
+) {
+  // 从瓦片缓存采样地表（避免 HEX 解码）
+  if (!s_planetEarthLandTile || !s_planetEarthLandTileState.valid) {
+    return false;
+  }
+
+  PlanetDirectLayerSample sample;
+  if (!preparePlanetDirectLayerSample(frame, 1.0f, 1.0f, x, y, sample)) {
+    return false;
+  }
+
+  PlanetEarthSphereSample sphereSample;
+  if (!resolvePlanetEarthSphereSampleWithRotation(
+        sample.pixelU, sample.pixelV, frame, cosRotation, sinRotation, sphereSample)) {
+    return false;
+  }
+
+  // 计算经纬度对应的瓦片坐标
+  float longitude360 = normalizePlanetEarthLongitude360(sphereSample.longitude);
+  float latitudeClamped = clampFloat(sphereSample.latitude, -89.999f, 89.999f);
+  float tileX = (longitude360 / 360.0f) * (float)kPlanetEarthLandTileWidth;
+  float tileY = ((90.0f - latitudeClamped) / 180.0f) * (float)kPlanetEarthLandTileHeight;
+
+  // 双线性采样瓦片
+  int x0 = (int)floorf(tileX);
+  int y0 = (int)floorf(tileY);
+  int x1 = (x0 + 1) % kPlanetEarthLandTileWidth;
+  int y1 = (y0 + 1) % kPlanetEarthLandTileHeight;
+  float fx = tileX - (float)x0;
+  float fy = tileY - (float)y0;
+
+  if (x0 < 0 || x0 >= kPlanetEarthLandTileWidth || 
+      y0 < 0 || y0 >= kPlanetEarthLandTileHeight) {
+    return false;
+  }
+
+  uint8_t v00 = s_planetEarthLandTile[y0 * kPlanetEarthLandTileWidth + x0];
+  uint8_t v10 = s_planetEarthLandTile[y0 * kPlanetEarthLandTileWidth + x1];
+  uint8_t v01 = s_planetEarthLandTile[y1 * kPlanetEarthLandTileWidth + x0];
+  uint8_t v11 = s_planetEarthLandTile[y1 * kPlanetEarthLandTileWidth + x1];
+
+  float landValue = (float)v00 * (1.0f - fx) * (1.0f - fy) +
+                    (float)v10 * fx * (1.0f - fy) +
+                    (float)v01 * (1.0f - fx) * fy +
+                    (float)v11 * fx * fy;
+  landValue /= 255.0f;
+
+  // 判断是陆地还是海洋（阈值 0.5）
+  bool isLand = landValue > 0.5f;
+  
+  // 计算地形参数（优化：单点采样，避免 5 点平滑）
+  int column = (int)floorf((longitude360 / 360.0f) * (float)kPlanetEarthMapWidth);
+  int row = (int)floorf(((90.0f - latitudeClamped) / 180.0f) * (float)kPlanetEarthMapHeight);
+  
+  // 一次性计算所有纹理哈希（从 15 次 → 3 次）
+  float terrainValue = samplePlanetEarthCellHash(column, row, kPlanetEarthFastTerrainSalt);
+  float moistureValue = samplePlanetEarthCellHash(column, row, kPlanetEarthFastMoistureSalt);
+  float oceanValue = samplePlanetEarthCellHash(column, row, kPlanetEarthFastOceanSalt);
+
+  PlanetBufferColor color;
+  float distanceFromCenter = distancePlanet(sample.pixelU, sample.pixelV, 0.5f, 0.5f);
+
+  // 极地冰盖
+  if (fabsf(sphereSample.latitude) > 77.0f) {
+    color = mixPlanetBufferColor(
+      makePlanetBufferColor(0.678431f, 0.803922f, 0.921569f),
+      makePlanetBufferColor(0.921569f, 0.964706f, 1.0f),
+      sphereSample.light
+    );
+  } else if (isLand) {
+    // 陆地颜色（简化版，不检测海岸线）
+    color = resolvePlanetEarthLandColor(
+      sphereSample.latitude,
+      sphereSample.light,
+      terrainValue,
+      moistureValue,
+      false  // 不检测海岸线以提升性能
+    );
+  } else {
+    // 海洋颜色（简化版，不检测近陆）
+    color = resolvePlanetEarthOceanColor(
+      sphereSample.latitude,
+      sphereSample.light,
+      oceanValue,
+      false  // 不检测近陆以提升性能
+    );
+  }
+
+  // 大气层光晕
+  float outerGlow = smoothstepFloat(0.34f, 0.5f, distanceFromCenter) *
+                    (1.0f - smoothstepFloat(0.47f, 0.5f, distanceFromCenter));
+  if (outerGlow > 0.0f) {
+    PlanetBufferColor atmosphere = makePlanetBufferColor(0.427451f, 0.803922f, 1.0f);
+    color = mixPlanetBufferColor(color, atmosphere, outerGlow * (0.2f + sphereSample.light * 0.18f));
+  }
+
+  outColor = color;
+  return true;
+}
+
+bool samplePlanetEarthSurfaceDirect(
+  const PlanetRenderFrame& frame,
+  int x,
+  int y,
+  PlanetBufferColor& outColor
+) {
+  PlanetDirectLayerSample sample;
+  if (!preparePlanetDirectLayerSample(frame, 1.0f, 1.0f, x, y, sample)) {
+    return false;
+  }
+  return samplePlanetEarthSurfaceFast(sample.pixelU, sample.pixelV, frame, outColor);
+}
+
+bool samplePlanetEarthCloudDirect(
+  const PlanetRenderFrame& frame,
+  const PlanetEarthRenderContext& context,
+  int x,
+  int y,
+  PlanetBufferColor& outColor
+) {
+  PlanetDirectLayerSample sample;
+  if (!preparePlanetDirectLayerSample(frame, 1.0f, 1.0f, x, y, sample)) {
+    return false;
+  }
+
+  PlanetBufferColor cloudColor;
+  float cloudAlpha = 0.0f;
+  if (!resolvePlanetEarthCloudSample(
+        sample.pixelU,
+        sample.pixelV,
+        frame,
+        cloudColor,
+        cloudAlpha
+      ) ||
+      !planetDirectAlphaHit(frame, x, y, cloudAlpha * cloudColor.a)) {
+    return false;
+  }
+
+  outColor = cloudColor;
+  return true;
+}
+
+// 使用瓦片缓存的地球云层采样（快速版本）
+bool samplePlanetEarthCloudDirectCached(
+  const PlanetRenderFrame& frame,
+  const PlanetEarthRenderContext& context,
+  int x,
+  int y,
+  PlanetBufferColor& outColor
+) {
+  PlanetDirectLayerSample sample;
+  if (!preparePlanetDirectLayerSample(frame, 1.0f, 1.0f, x, y, sample)) {
+    return false;
+  }
+
+  float distanceFromCenter = distancePlanet(sample.pixelU, sample.pixelV, 0.5f, 0.5f);
+  float alphaCircle = planetStep(distanceFromCenter, 0.49999f);
+  if (alphaCircle == 0.0f) {
+    return false;
+  }
+
+  float dLight = distancePlanet(sample.pixelU, sample.pixelV, 0.38f, 0.38f);
+  float sphereX = 0.0f;
+  float sphereY = 0.0f;
+  spherifyPlanetUv(sample.pixelU, sample.pixelV, sphereX, sphereY);
+  float sphereCloudY = (sphereY + smoothstepFloat(0.0f, 1.18f, fabsf(sphereX - 0.4f))) * 2.15f;
+  
+  float timeOffset = resolvePlanetEarthCloudTimeOffset(frame);
+  float scaledSphereX = sphereX * 8.6f;
+  float scaledSphereCloudY = sphereCloudY * 8.6f;
+  float cloudPeriod = resolvePlanetTiledNoisePeriod(8.6f, 1.0f);
+  
+  // 从瓦片查询云层噪声（替代3次circleNoise）
+  float cloudNoise = samplePlanetTileBilinear(
+    s_planetEarthCloudNoiseTile,
+    kPlanetEarthCloudTileWidth,
+    kPlanetEarthCloudTileHeight,
+    cloudPeriod,
+    cloudPeriod,
+    scaledSphereX * 0.3f + timeOffset,
+    scaledSphereCloudY * 0.3f,
+    kPlanetEarthCloudNoiseMax
+  );
+  
+  // 从瓦片查询云层主体（替代FBM）
+  float cloudValue = samplePlanetTileBilinear(
+    s_planetEarthCloudTile,
+    kPlanetEarthCloudTileWidth,
+    kPlanetEarthCloudTileHeight,
+    cloudPeriod,
+    cloudPeriod,
+    scaledSphereX + cloudNoise + timeOffset,
+    scaledSphereCloudY,
+    1.0f
+  );
+  
+  PlanetBufferColor cloudColor = makePlanetBufferColor(0.980392f, 1.0f, 0.992157f);
+  if (cloudValue < context.cloudCover + 0.03f) {
+    cloudColor = makePlanetBufferColor(0.878431f, 0.92549f, 0.972549f);
+  }
+  if (dLight + cloudValue * 0.2f > 0.52f) {
+    cloudColor = makePlanetBufferColor(0.470588f, 0.580392f, 0.752941f);
+  }
+  if (dLight + cloudValue * 0.2f > 0.66f) {
+    cloudColor = makePlanetBufferColor(0.262745f, 0.329412f, 0.490196f);
+  }
+  
+  float cloudAlpha = planetStep(context.cloudCover, cloudValue) * alphaCircle;
+  if (!planetDirectAlphaHit(frame, x, y, cloudAlpha * cloudColor.a)) {
+    return false;
+  }
+  
+  outColor = cloudColor;
+  return true;
+}
+
+// 地球云层瓦片缓存实现（类似湿润星球）
+
+bool ensureEarthTileStorage(uint8_t*& tile, size_t bytes, const char* name) {
+  if (tile != nullptr) {
+    return true;
+  }
+  tile = (uint8_t*)allocatePlanetBuffer(bytes);
+  if (tile == nullptr) {
+    Serial.printf("[Earth Tile] Failed to allocate %s tile: %u bytes\n", name, (unsigned int)bytes);
+    return false;
+  }
+  return true;
+}
+
+void buildEarthCloudTile(const PlanetRenderFrame& frame) {
+  bool directRenderWasActive = s_planetDirectRenderActive;
+  s_planetDirectRenderActive = false;
+  float period = resolvePlanetTiledNoisePeriod(8.6f, 1.0f);
+
+  for (int y = 0; y < kPlanetEarthCloudTileHeight; y += 1) {
+    float sampleY = ((float)y + 0.5f) / (float)kPlanetEarthCloudTileHeight * period;
+    for (int x = 0; x < kPlanetEarthCloudTileWidth; x += 1) {
+      float sampleX = ((float)x + 0.5f) / (float)kPlanetEarthCloudTileWidth * period;
+      float value = fbmPlanetPreviewTiled(
+        sampleX,
+        sampleY,
+        frame.shaderSeed,
+        8.6f,
+        4  // 4个octaves
+      );
+      s_planetEarthCloudTile[y * kPlanetEarthCloudTileWidth + x] =
+        quantizePlanetTileValue(value, 1.0f);
+    }
+  }
+
+  s_planetDirectRenderActive = directRenderWasActive;
+  s_planetEarthCloudTileState.valid = true;
+  s_planetEarthCloudTileState.seed = frame.seed;
+}
+
+void buildEarthCloudNoiseTile(const PlanetRenderFrame& frame) {
+  float period = resolvePlanetTiledNoisePeriod(8.6f, 1.0f);
+
+  for (int y = 0; y < kPlanetEarthCloudTileHeight; y += 1) {
+    float sampleY = ((float)y + 0.5f) / (float)kPlanetEarthCloudTileHeight * period;
+    for (int x = 0; x < kPlanetEarthCloudTileWidth; x += 1) {
+      float sampleX = ((float)x + 0.5f) / (float)kPlanetEarthCloudTileWidth * period;
+      float noise = 0.0f;
+      for (int index = 0; index < kPlanetEarthCloudNoiseSamples; index += 1) {
+        noise += circleNoisePlanetCloud(
+          sampleX + (float)index + 11.0f,
+          sampleY,
+          frame.shaderSeed,
+          8.6f
+        );
+      }
+      s_planetEarthCloudNoiseTile[y * kPlanetEarthCloudTileWidth + x] =
+        quantizePlanetTileValue(noise, kPlanetEarthCloudNoiseMax);
+    }
+  }
+
+  s_planetEarthCloudNoiseTileState.valid = true;
+  s_planetEarthCloudNoiseTileState.seed = frame.seed;
+}
+
+void buildEarthLandTile(const PlanetRenderFrame& frame) {
+  // 预计算地球地表位图到瓦片
+  // 将 128×64 的 HEX 位图转换为 64×64 的瓦片（双线性采样）
+  
+  for (int tileY = 0; tileY < kPlanetEarthLandTileHeight; tileY++) {
+    for (int tileX = 0; tileX < kPlanetEarthLandTileWidth; tileX++) {
+      // 计算在原始 128×64 位图中的位置
+      float mapX = ((float)tileX / (float)kPlanetEarthLandTileWidth) * (float)kPlanetEarthMapWidth;
+      float mapY = ((float)tileY / (float)kPlanetEarthLandTileHeight) * (float)kPlanetEarthMapHeight;
+      
+      // 双线性采样 4 个相邻像素
+      int x0 = (int)floorf(mapX);
+      int y0 = (int)floorf(mapY);
+      int x1 = x0 + 1;
+      int y1 = y0 + 1;
+      float fx = mapX - (float)x0;
+      float fy = mapY - (float)y0;
+      
+      // 读取 4 个角的陆地值
+      bool land00 = readPlanetEarthLandMask(x0, y0);
+      bool land10 = readPlanetEarthLandMask(x1, y0);
+      bool land01 = readPlanetEarthLandMask(x0, y1);
+      bool land11 = readPlanetEarthLandMask(x1, y1);
+      
+      // 双线性插值
+      float v0 = land00 ? (1.0f - fx) : 0.0f;
+      v0 += land10 ? fx : 0.0f;
+      float v1 = land01 ? (1.0f - fx) : 0.0f;
+      v1 += land11 ? fx : 0.0f;
+      float value = v0 * (1.0f - fy) + v1 * fy;
+      
+      // 存储为 0-255
+      s_planetEarthLandTile[tileY * kPlanetEarthLandTileWidth + tileX] = 
+        (uint8_t)(value * 255.0f);
+    }
+  }
+  
+  s_planetEarthLandTileState.valid = true;
+  s_planetEarthLandTileState.seed = frame.seed;
+  Serial.println("[Earth] Land tile built");
+}
+
+bool prepareEarthTiles(const PlanetRenderFrame& frame) {
+  if (s_planetTerranWetTileCacheDisabled) {
+    return false;
+  }
+
+  bool cloudTilesReady = true;
+  
+  if (!ensureEarthTileStorage(
+        s_planetEarthCloudTile,
+        (size_t)kPlanetEarthCloudTileWidth * (size_t)kPlanetEarthCloudTileHeight,
+        "cloud"
+      )) {
+    cloudTilesReady = false;
+  }
+  if (cloudTilesReady && !ensureEarthTileStorage(
+        s_planetEarthCloudNoiseTile,
+        (size_t)kPlanetEarthCloudTileWidth * (size_t)kPlanetEarthCloudTileHeight,
+        "cloud_noise"
+      )) {
+    cloudTilesReady = false;
+  }
+
+  if (cloudTilesReady) {
+    if (!s_planetEarthCloudTileState.valid || s_planetEarthCloudTileState.seed != frame.seed) {
+      buildEarthCloudTile(frame);
+    }
+    if (!s_planetEarthCloudNoiseTileState.valid ||
+        s_planetEarthCloudNoiseTileState.seed != frame.seed) {
+      buildEarthCloudNoiseTile(frame);
+    }
+  }
+
+  // 地表瓦片独立分配（即使云层失败也要尝试）
+  if (!ensureEarthTileStorage(
+        s_planetEarthLandTile,
+        (size_t)kPlanetEarthLandTileWidth * (size_t)kPlanetEarthLandTileHeight,
+        "land"
+      )) {
+    // 地表瓦片分配失败，但不影响云层
+    if (!cloudTilesReady) {
+      s_planetTerranWetTileCacheDisabled = true;
+      return false;
+    }
+    return cloudTilesReady;
+  }
+
+  if (!s_planetEarthLandTileState.valid || s_planetEarthLandTileState.seed != frame.seed) {
+    buildEarthLandTile(frame);
+  }
+
+  return true;
+}
+
 void drawPlanetBackgroundFastPreview(const PlanetRenderFrame& frame) {
   MatrixPanel_I2S_DMA* display = DisplayManager::dma_display;
 
-  uint32_t state = frame.seed ^ hashPlanetString("planet_starfield_sparse");
+  uint32_t starSeed =
+    strcmp(frame.presetId, "earth") == 0 ? kPlanetEarthBackgroundSeed : frame.seed;
+  uint32_t state = starSeed ^ hashPlanetString("planet_starfield_sparse");
   float exclusionRadius = planetBackgroundStarExclusionRadius(frame);
   int attempts = 0;
   int placed = 0;
@@ -6930,6 +9637,97 @@ void drawPlanetBackgroundFastPreview(const PlanetRenderFrame& frame) {
 void drawSpherePlanetFastPreview(const PlanetRenderFrame& frame) {
   MatrixPanel_I2S_DMA* display = DisplayManager::dma_display;
   int sampleStep = resolvePlanetDirectRenderStep(frame);
+
+  if (planetPresetEqualsValue(frame.presetId, "earth")) {
+    // 使用瓦片缓存（类似湿润星球）
+    bool earthTilesReady = prepareEarthTiles(frame);
+    PlanetEarthRenderContext context = buildPlanetEarthRenderContext(frame);
+    
+    // 预计算旋转角度（每帧固定，避免重复计算）
+    float rotation = kPlanetEarthCenterLongitudeRadians + frame.spinAngle;
+    float cosRotation = cosf(rotation);
+    float sinRotation = sinf(rotation);
+    
+    int minX = 0;
+    int maxXExclusive = kPlanetCanvasSize;
+    int minY = 0;
+    int maxYExclusive = kPlanetCanvasSize;
+    resolvePlanetDirectBounds(frame, 1.0f, minX, maxXExclusive, minY, maxYExclusive);
+
+    // 性能统计（调试用）
+    static int s_earthPerfFrameCount = 0;
+    static int s_earthCachedSuccess = 0;
+    static int s_earthCloudSuccess = 0;
+    static int s_earthSurfaceCached = 0;
+    static int s_earthSurfaceDirect = 0;
+    static int s_earthTotalPixels = 0;
+    static unsigned long s_earthPerfStartTime = 0;
+    
+    if (s_earthPerfFrameCount == 0) {
+      s_earthPerfStartTime = millis();
+    }
+    
+    // 逐像素渲染（和湿润星球一样）
+    for (int y = minY; y < maxYExclusive; y += 1) {
+      for (int x = minX; x < maxXExclusive; x += 1) {
+        PlanetBufferColor color;
+        // 优先使用缓存版本，失败时回退到实时计算
+        bool hasPixel = false;
+        if (earthTilesReady) {
+          hasPixel = samplePlanetEarthCloudDirectCached(frame, context, x, y, color);
+          if (hasPixel) s_earthCachedSuccess++;
+        }
+        if (!hasPixel) {
+          hasPixel = samplePlanetEarthCloudDirect(frame, context, x, y, color);
+          if (hasPixel) s_earthCloudSuccess++;
+        }
+        if (!hasPixel) {
+          // 优先使用地表瓦片缓存（独立检查，不依赖 earthTilesReady）
+          hasPixel = samplePlanetEarthSurfaceDirectCached(frame, cosRotation, sinRotation, x, y, color);
+          if (hasPixel) {
+            s_earthSurfaceCached++;
+          } else {
+            // 回退到实时解码
+            hasPixel = samplePlanetEarthSurfaceDirect(frame, x, y, color);
+            if (hasPixel) s_earthSurfaceDirect++;
+          }
+        }
+        if (hasPixel) {
+          drawPlanetDirectBufferColor(display, x, y, color);
+          s_earthTotalPixels++;
+        }
+      }
+    }
+    
+    // 每 60 帧输出一次统计
+    s_earthPerfFrameCount++;
+    if (s_earthPerfFrameCount >= 60) {
+      unsigned long elapsed = millis() - s_earthPerfStartTime;
+      float fps = (elapsed > 0) ? (60000.0f / (float)elapsed) : 0.0f;
+      
+      Serial.printf("[Earth Perf] 60 frames in %lu ms (%.1f FPS)\n", elapsed, fps);
+      Serial.printf("  Total pixels: %d\n", s_earthTotalPixels);
+      Serial.printf("  Cloud cached: %d (%.1f%%)\n", s_earthCachedSuccess, 
+                    s_earthTotalPixels > 0 ? (s_earthCachedSuccess * 100.0f / s_earthTotalPixels) : 0);
+      Serial.printf("  Cloud direct: %d (%.1f%%)\n", s_earthCloudSuccess,
+                    s_earthTotalPixels > 0 ? (s_earthCloudSuccess * 100.0f / s_earthTotalPixels) : 0);
+      Serial.printf("  Surface cached: %d (%.1f%%)\n", s_earthSurfaceCached,
+                    s_earthTotalPixels > 0 ? (s_earthSurfaceCached * 100.0f / s_earthTotalPixels) : 0);
+      Serial.printf("  Surface direct: %d (%.1f%%)\n", s_earthSurfaceDirect,
+                    s_earthTotalPixels > 0 ? (s_earthSurfaceDirect * 100.0f / s_earthTotalPixels) : 0);
+      
+      // 重置计数器
+      s_earthPerfFrameCount = 0;
+      s_earthCachedSuccess = 0;
+      s_earthCloudSuccess = 0;
+      s_earthSurfaceCached = 0;
+      s_earthSurfaceDirect = 0;
+      s_earthTotalPixels = 0;
+      s_earthPerfStartTime = 0;
+    }
+    
+    return;
+  }
 
   if (planetPresetEqualsValue(frame.presetId, "terran_wet")) {
     const PlanetBufferColor landColors[] = {
@@ -6972,6 +9770,14 @@ void drawSpherePlanetFastPreview(const PlanetRenderFrame& frame) {
     resolvePlanetDirectBounds(frame, cloudLayer.planeScale, minX, maxXExclusive, minY, maxYExclusive);
     bool terranWetTilesReady = prepareTerranWetTiles(frame, landLayer, cloudLayer);
 
+    // 性能统计（对比用）
+    static int s_wetPerfFrameCount = 0;
+    static unsigned long s_wetPerfStartTime = 0;
+    
+    if (s_wetPerfFrameCount == 0) {
+      s_wetPerfStartTime = millis();
+    }
+
     for (int y = minY; y < maxYExclusive; y += 1) {
       for (int x = minX; x < maxXExclusive; x += 1) {
         PlanetBufferColor color;
@@ -6980,6 +9786,17 @@ void drawSpherePlanetFastPreview(const PlanetRenderFrame& frame) {
         }
       }
     }
+    
+    // 每 60 帧输出一次统计
+    s_wetPerfFrameCount++;
+    if (s_wetPerfFrameCount >= 60) {
+      unsigned long elapsed = millis() - s_wetPerfStartTime;
+      float fps = (elapsed > 0) ? (60000.0f / (float)elapsed) : 0.0f;
+      Serial.printf("[Wet Terran Perf] 60 frames in %lu ms (%.1f FPS)\n", elapsed, fps);
+      s_wetPerfFrameCount = 0;
+      s_wetPerfStartTime = 0;
+    }
+    
     return;
   }
 
@@ -7371,6 +10188,7 @@ void drawAsteroidPlanetFastPreview(const PlanetRenderFrame& frame) {
   int minY = 0;
   int maxYExclusive = kPlanetCanvasSize;
   resolvePlanetDirectBounds(frame, layer.planeScale, minX, maxXExclusive, minY, maxYExclusive);
+  PlanetAsteroidRenderContext context = buildPlanetAsteroidRenderContext(frame, layer);
 
   for (int y = minY; y < maxYExclusive; y += sampleStep) {
     for (int x = minX; x < maxXExclusive; x += sampleStep) {
@@ -7386,7 +10204,7 @@ void drawAsteroidPlanetFastPreview(const PlanetRenderFrame& frame) {
         sampleY
       );
       PlanetBufferColor color;
-      if (samplePlanetAsteroidDirect(frame, layer, sampleX, sampleY, color)) {
+      if (samplePlanetAsteroidDirect(frame, layer, context, sampleX, sampleY, color)) {
         drawPlanetDirectBlockColor(display, x, y, sampleStep, color);
       }
     }
@@ -7419,6 +10237,7 @@ void drawBlackHolePlanetFastPreview(const PlanetRenderFrame& frame) {
   int minY = 0;
   int maxYExclusive = kPlanetCanvasSize;
   resolvePlanetDirectBounds(frame, diskLayer.planeScale, minX, maxXExclusive, minY, maxYExclusive);
+  PlanetBlackHoleDiskRenderContext context = buildPlanetBlackHoleDiskRenderContext(frame, diskLayer);
 
   for (int y = minY; y < maxYExclusive; y += sampleStep) {
     for (int x = minX; x < maxXExclusive; x += sampleStep) {
@@ -7434,7 +10253,7 @@ void drawBlackHolePlanetFastPreview(const PlanetRenderFrame& frame) {
         sampleY
       );
       PlanetBufferColor color;
-      if (samplePlanetBlackHoleDiskDirect(frame, diskLayer, sampleX, sampleY, color) ||
+      if (samplePlanetBlackHoleDiskDirect(frame, diskLayer, context, sampleX, sampleY, color) ||
           samplePlanetBlackHoleCoreDirect(frame, coreLayer, sampleX, sampleY, color)) {
         drawPlanetDirectBlockColor(display, x, y, sampleStep, color);
       }
@@ -7462,6 +10281,7 @@ void drawGalaxyPlanetFastPreview(const PlanetRenderFrame& frame) {
   int minY = 0;
   int maxYExclusive = kPlanetCanvasSize;
   resolvePlanetDirectBounds(frame, layer.planeScale, minX, maxXExclusive, minY, maxYExclusive);
+  PlanetGalaxyRenderContext context = buildPlanetGalaxyRenderContext(frame, layer);
 
   for (int y = minY; y < maxYExclusive; y += sampleStep) {
     for (int x = minX; x < maxXExclusive; x += sampleStep) {
@@ -7477,8 +10297,67 @@ void drawGalaxyPlanetFastPreview(const PlanetRenderFrame& frame) {
         sampleY
       );
       PlanetBufferColor color;
-      if (samplePlanetGalaxyDirect(frame, layer, sampleX, sampleY, color)) {
+      if (samplePlanetGalaxyDirect(frame, layer, context, sampleX, sampleY, color)) {
         drawPlanetDirectBlockColor(display, x, y, sampleStep, color);
+      }
+    }
+  }
+}
+
+void drawPortalPlanetFastPreview(const PlanetRenderFrame& frame) {
+  MatrixPanel_I2S_DMA* display = DisplayManager::dma_display;
+  PlanetPortalRenderContext context = buildPlanetPortalRenderContext(frame);
+  
+  // 传送门固定尺寸（根据 sizeScale 选择）
+  // 用户指定尺寸：35, 50, 60像素
+  int portalSize = 35;  // small (0.673)
+  if (frame.sizeScale >= 1.05f) {
+    portalSize = 60;  // large (1.154)
+  } else if (frame.sizeScale >= 0.81f) {
+    portalSize = 50;  // medium (0.962)
+  }
+  
+  // 根据 lifecycle.scale 缩放传送门尺寸
+  int scaledSize = (int)roundf((float)portalSize * context.lifecycle.scale);
+  if (scaledSize < 1) {
+    return;  // 尺寸太小，不渲染
+  }
+  
+  // 传送门居中位置
+  int offsetX = (kPlanetCanvasSize - scaledSize) / 2;
+  int offsetY = (kPlanetCanvasSize - scaledSize) / 2;
+  
+  // 渲染传送门区域
+  for (int y = 0; y < scaledSize; y++) {
+    for (int x = 0; x < scaledSize; x++) {
+      int screenX = offsetX + x;
+      int screenY = offsetY + y;
+      
+      // 映射到64×64模板的坐标
+      float templateU = (float)x / (float)scaledSize;
+      float templateV = (float)y / (float)scaledSize;
+      
+      int baseLevel = readPlanetPortalTemplateLevel(templateU, templateV);
+      int level = resolvePlanetPortalAnimatedLevel(baseLevel, templateU, templateV, frame, context);
+      float bubbleAlpha = resolvePlanetPortalBubbleAlpha(templateU, templateV, context);
+      
+      if (level > 0 || bubbleAlpha > 0.0f) {
+        PlanetBufferColor color;
+        float alpha = 0.0f;
+        
+        if (level > 0) {
+          color = planetPortalColorForLevel(context.palette, level);
+          // 移除淡入淡出，完全不透明
+          alpha = (baseLevel <= 2 ? 0.74f : 1.0f);
+        }
+        
+        float finalAlpha = fmaxf(alpha * color.a, bubbleAlpha);
+        if (planetDirectAlphaHit(frame, screenX, screenY, finalAlpha)) {
+          PlanetBufferColor finalColor = bubbleAlpha > alpha * color.a
+            ? makePlanetBufferColor(1.0f, 1.0f, 1.0f)
+            : color;
+          drawPlanetDirectBufferColor(display, screenX, screenY, finalColor);
+        }
       }
     }
   }
@@ -7520,6 +10399,9 @@ void drawStarPlanetFastPreview(const PlanetRenderFrame& frame) {
   int minY = 0;
   int maxYExclusive = kPlanetCanvasSize;
   resolvePlanetDirectBounds(frame, flareLayer.planeScale, minX, maxXExclusive, minY, maxYExclusive);
+  PlanetStarCoreRenderContext coreContext = buildPlanetStarCoreRenderContext(frame, coreLayer);
+  PlanetStarBlobRenderContext blobContext = buildPlanetStarBlobRenderContext(frame, blobLayer);
+  PlanetStarFlareRenderContext flareContext = buildPlanetStarFlareRenderContext(frame, flareLayer);
 
   for (int y = minY; y < maxYExclusive; y += sampleStep) {
     for (int x = minX; x < maxXExclusive; x += sampleStep) {
@@ -7535,9 +10417,9 @@ void drawStarPlanetFastPreview(const PlanetRenderFrame& frame) {
         sampleY
       );
       PlanetBufferColor color;
-      if (samplePlanetStarFlareDirect(frame, flareLayer, sampleX, sampleY, color) ||
-          samplePlanetStarCoreDirect(frame, coreLayer, sampleX, sampleY, color) ||
-          samplePlanetStarBlobDirect(frame, blobLayer, sampleX, sampleY, color)) {
+      if (samplePlanetStarFlareDirect(frame, flareLayer, flareContext, sampleX, sampleY, color) ||
+          samplePlanetStarCoreDirect(frame, coreLayer, coreContext, sampleX, sampleY, color) ||
+          samplePlanetStarBlobDirect(frame, blobLayer, blobContext, sampleX, sampleY, color)) {
         drawPlanetDirectBlockColor(display, x, y, sampleStep, color);
       }
     }
@@ -7549,13 +10431,17 @@ void drawStarPlanetFastPreview(const PlanetRenderFrame& frame) {
 float drawPlanetScreensaver() {
   PlanetRenderFrame frame = buildPlanetRenderFrame(millis());
   drawPlanetBackgroundFastPreview(frame);
-  s_planetDirectColorVariantActive = true;
+  s_planetDirectColorVariantActive =
+    !isPlanetFixedPalettePresetValue(frame.presetId) &&
+    !isReferenceDefaultPlanetColorSeed(frame.colorSeed);
   s_planetDirectRenderActive = true;
 
   if (planetPresetEqualsValue(frame.presetId, "black_hole")) {
     drawBlackHolePlanetFastPreview(frame);
   } else if (planetPresetEqualsValue(frame.presetId, "galaxy")) {
     drawGalaxyPlanetFastPreview(frame);
+  } else if (isPlanetPortalPresetValue(frame.presetId)) {
+    drawPortalPlanetFastPreview(frame);
   } else if (planetPresetEqualsValue(frame.presetId, "star")) {
     drawStarPlanetFastPreview(frame);
   } else if (planetPresetEqualsValue(frame.presetId, "asteroid")) {
@@ -7568,9 +10454,10 @@ float drawPlanetScreensaver() {
   s_planetDirectColorVariantActive = false;
 
   if (s_planetConfig.time.show) {
+    char buffer[16];
+    bool hasClockText = false;
     struct tm timeinfo;
     if (getLocalTime(&timeinfo, 0)) {
-      char buffer[16];
       if (s_planetConfig.showSeconds) {
         snprintf(
           buffer,
@@ -7589,7 +10476,19 @@ float drawPlanetScreensaver() {
           timeinfo.tm_min
         );
       }
+      strncpy(s_lastPlanetClockText, buffer, sizeof(s_lastPlanetClockText) - 1);
+      s_lastPlanetClockText[sizeof(s_lastPlanetClockText) - 1] = '\0';
+      s_lastPlanetClockTextValid = true;
+      s_lastPlanetClockShowSeconds = s_planetConfig.showSeconds;
+      hasClockText = true;
+    } else if (s_lastPlanetClockTextValid &&
+               s_lastPlanetClockShowSeconds == s_planetConfig.showSeconds) {
+      strncpy(buffer, s_lastPlanetClockText, sizeof(buffer) - 1);
+      buffer[sizeof(buffer) - 1] = '\0';
+      hasClockText = true;
+    }
 
+    if (hasClockText) {
       uint8_t fontId = s_planetConfig.font;
       if (fontId > CLOCK_FONT_PIXEL_RAIL_5X8) {
         fontId = CLOCK_FONT_CLASSIC_5X7;
@@ -7666,10 +10565,43 @@ void setActiveMode(BoardNativeMode mode) {
   }
 }
 
+bool planetScreensaverConfigsEqual(
+  const PlanetScreensaverNativeConfig& left,
+  const PlanetScreensaverNativeConfig& right
+) {
+  return strcmp(left.preset, right.preset) == 0 &&
+         strcmp(left.size, right.size) == 0 &&
+         strcmp(left.direction, right.direction) == 0 &&
+         left.speed == right.speed &&
+         left.seed == right.seed &&
+         left.colorSeed == right.colorSeed &&
+         left.planetX == right.planetX &&
+         left.planetY == right.planetY &&
+         left.font == right.font &&
+         left.showSeconds == right.showSeconds &&
+         left.time.show == right.time.show &&
+         left.time.fontSize == right.time.fontSize &&
+         left.time.x == right.time.x &&
+         left.time.y == right.time.y &&
+         left.time.r == right.time.r &&
+         left.time.g == right.time.g &&
+         left.time.b == right.time.b;
+}
+
 void releasePlanetRuntimeBuffers() {
   if (s_planetPreviewBuffer != nullptr) {
     free(s_planetPreviewBuffer);
     s_planetPreviewBuffer = nullptr;
+  }
+  
+  // 释放地球瓦片缓存
+  if (s_planetEarthCloudTile != nullptr) {
+    free(s_planetEarthCloudTile);
+    s_planetEarthCloudTile = nullptr;
+  }
+  if (s_planetEarthCloudNoiseTile != nullptr) {
+    free(s_planetEarthCloudNoiseTile);
+    s_planetEarthCloudNoiseTile = nullptr;
   }
 
   if (s_planetTerranWetStaticCache.pixelsData != nullptr) {
@@ -7706,6 +10638,96 @@ void releasePlanetRuntimeBuffers() {
   s_planetGenericFbmTileUseTick = 0UL;
   s_planetGenericFbmTileBuildDepth = 0;
 
+  if (s_planetUntiledFbmRectCaches != nullptr) {
+    for (int index = 0; index < kPlanetUntiledFbmRectSlotCount; index += 1) {
+      if (s_planetUntiledFbmRectCaches[index].values != nullptr) {
+        free(s_planetUntiledFbmRectCaches[index].values);
+        s_planetUntiledFbmRectCaches[index].values = nullptr;
+      }
+      s_planetUntiledFbmRectCaches[index].valid = false;
+      s_planetUntiledFbmRectCaches[index].useTick = 0UL;
+    }
+    free(s_planetUntiledFbmRectCaches);
+    s_planetUntiledFbmRectCaches = nullptr;
+  }
+  s_planetUntiledFbmRectCacheDisabled = false;
+  s_planetUntiledFbmRectUseTick = 0UL;
+
+  if (s_planetStarCellsTileCaches != nullptr) {
+    for (int index = 0; index < 2; index += 1) {
+      if (s_planetStarCellsTileCaches[index].values != nullptr) {
+        free(s_planetStarCellsTileCaches[index].values);
+        s_planetStarCellsTileCaches[index].values = nullptr;
+      }
+      s_planetStarCellsTileCaches[index].valid = false;
+      s_planetStarCellsTileCaches[index].numCells = 0;
+      s_planetStarCellsTileCaches[index].tiles = 0;
+    }
+    free(s_planetStarCellsTileCaches);
+    s_planetStarCellsTileCaches = nullptr;
+  }
+  s_planetStarCellsTileCacheDisabled = false;
+
+  if (s_planetStarBlobTileCache != nullptr) {
+    if (s_planetStarBlobTileCache->values != nullptr) {
+      free(s_planetStarBlobTileCache->values);
+      s_planetStarBlobTileCache->values = nullptr;
+    }
+    s_planetStarBlobTileCache->valid = false;
+    s_planetStarBlobTileCache->seedBits = 0U;
+    s_planetStarBlobTileCache->sizeBits = 0U;
+    s_planetStarBlobTileCache->circleAmountBits = 0U;
+    s_planetStarBlobTileCache->circleSizeBits = 0U;
+    free(s_planetStarBlobTileCache);
+    s_planetStarBlobTileCache = nullptr;
+  }
+  s_planetStarBlobTileCacheDisabled = false;
+
+  if (s_planetDirectColorCache != nullptr) {
+    free(s_planetDirectColorCache);
+    s_planetDirectColorCache = nullptr;
+  }
+  s_planetDirectColorCacheDisabled = false;
+
+  if (s_planetDirectLayerSampleGridCache != nullptr) {
+    if (s_planetDirectLayerSampleGridCache->cells != nullptr) {
+      free(s_planetDirectLayerSampleGridCache->cells);
+      s_planetDirectLayerSampleGridCache->cells = nullptr;
+    }
+    s_planetDirectLayerSampleGridCache->valid = false;
+    s_planetDirectLayerSampleGridCache->presetHash = 0U;
+    free(s_planetDirectLayerSampleGridCache);
+    s_planetDirectLayerSampleGridCache = nullptr;
+  }
+
+  if (s_planetDirectSphereGeometryGridCache != nullptr) {
+    if (s_planetDirectSphereGeometryGridCache->cells != nullptr) {
+      free(s_planetDirectSphereGeometryGridCache->cells);
+      s_planetDirectSphereGeometryGridCache->cells = nullptr;
+    }
+    s_planetDirectSphereGeometryGridCache->valid = false;
+    s_planetDirectSphereGeometryGridCache->presetHash = 0U;
+    free(s_planetDirectSphereGeometryGridCache);
+    s_planetDirectSphereGeometryGridCache = nullptr;
+  }
+  s_planetDirectGridCacheDisabled = false;
+
+  if (s_planetDirectLayerSampleCache != nullptr) {
+    s_planetDirectLayerSampleCache->valid = false;
+    s_planetDirectLayerSampleCache->hit = false;
+    s_planetDirectLayerSampleCache->presetHash = 0U;
+    free(s_planetDirectLayerSampleCache);
+    s_planetDirectLayerSampleCache = nullptr;
+  }
+  if (s_planetDirectSphereGeometryCache != nullptr) {
+    s_planetDirectSphereGeometryCache->valid = false;
+    s_planetDirectSphereGeometryCache->hit = false;
+    s_planetDirectSphereGeometryCache->presetHash = 0U;
+    free(s_planetDirectSphereGeometryCache);
+    s_planetDirectSphereGeometryCache = nullptr;
+  }
+  invalidatePlanetDirectCaches();
+
   s_planetTerranWetLandTileState.valid = false;
   s_planetTerranWetLandTileState.seed = 0U;
   s_planetTerranWetCloudTileState.valid = false;
@@ -7714,7 +10736,7 @@ void releasePlanetRuntimeBuffers() {
   s_planetTerranWetCloudNoiseTileState.seed = 0U;
   s_planetTerranWetLandRandCache.valid = false;
   s_planetTerranWetCloudRandCache.valid = false;
-  s_planetTerranWetTileCacheDisabled = false;
+  s_planetDirectNoiseRandCache.valid = false;
 }
 }
 
@@ -7757,11 +10779,18 @@ void applyTextDisplayConfig(const TextDisplayNativeConfig& config) {
 }
 
 void setPlanetScreensaverConfig(const PlanetScreensaverNativeConfig& config) {
+  bool runtimeConfigChanged = !planetScreensaverConfigsEqual(s_planetConfig, config);
   unsigned long now = millis();
   if (s_active && s_mode == BOARD_NATIVE_PLANET) {
     s_planetPhase = resolvePlanetPlaybackPhase(now);
     s_planetPhaseBaseAt = now;
     s_planetDirty = true;
+    if (runtimeConfigChanged) {
+      s_planetForceFullRefresh = true;
+    }
+  }
+  if (runtimeConfigChanged) {
+    releasePlanetRuntimeBuffers();
   }
   s_planetConfig = config;
   refreshPlanetColorVariant();
@@ -7770,6 +10799,17 @@ void setPlanetScreensaverConfig(const PlanetScreensaverNativeConfig& config) {
 void applyPlanetScreensaverConfig(const PlanetScreensaverNativeConfig& config) {
   setPlanetScreensaverConfig(config);
   setActiveMode(BOARD_NATIVE_PLANET);
+  
+  // 初始化传送门时间同步：记录当前真实时钟的秒数作为基准
+  s_portalSyncBaseMillis = millis();
+  time_t currentTime = time(nullptr);
+  if (currentTime >= 1700000000) {  // 时间已同步（2023年后）
+    s_portalSyncBaseSecond = currentTime % 60;
+    s_portalTimeSynced = true;
+  } else {
+    s_portalSyncBaseSecond = 0;
+    s_portalTimeSynced = false;
+  }
 }
 
 void update() {
@@ -7818,6 +10858,7 @@ void render() {
   }
 
   unsigned long now = millis();
+  bool clearRedirectFrame = false;
   if (s_mode == BOARD_NATIVE_PLANET) {
     ensurePlanetPerfWindowStarted(now);
     if (!s_planetDirty) {
@@ -7826,10 +10867,10 @@ void render() {
       return;
     }
     if (s_planetForceFullRefresh) {
-      DisplayManager::dma_display->clearScreen();
       DisplayManager::liveFrameValid = false;
       DisplayManager::animationBufferValid = false;
     }
+    clearRedirectFrame = true;
     s_lastRenderAt = now;
   } else {
     if (s_lastRenderAt != 0 && now - s_lastRenderAt < 33) {
@@ -7839,7 +10880,7 @@ void render() {
   }
 
   uint16_t* frameBuffer = &DisplayManager::animationBuffer[0][0];
-  if (!DisplayManager::beginRedirectedFrame(frameBuffer, 0)) {
+  if (!DisplayManager::beginRedirectedFrame(frameBuffer, 0, clearRedirectFrame)) {
     return;
   }
 

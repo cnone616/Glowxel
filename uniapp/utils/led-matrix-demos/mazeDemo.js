@@ -35,6 +35,15 @@ const MAZE_LAYOUTS = {
   },
 };
 
+const MAZE_RUNTIME_COLORS = {
+  wall: { r: 12, g: 12, b: 14 },
+  generationCursor: { r: 76, g: 220, b: 72 },
+  solveCursor: { r: 255, g: 196, b: 92 },
+  revealCursor: { r: 255, g: 244, b: 172 },
+  start: { r: 40, g: 255, b: 120 },
+  end: { r: 90, g: 188, b: 255 },
+};
+
 const DIRS = [
   { dx: 0, dy: -1, key: "top", opposite: "bottom" },
   { dx: 1, dy: 0, key: "right", opposite: "left" },
@@ -762,10 +771,18 @@ function buildMazeSequence(speed, intensity, options) {
     }
 
     const map = new Map();
-    const wallShade = 12;
     const showFullMaze = phase !== "generation" && phase !== "generation_hold";
 
-    fillRect(map, 0, 0, DISPLAY_SIZE, DISPLAY_SIZE, wallShade, wallShade, wallShade + 2);
+    fillRect(
+      map,
+      0,
+      0,
+      DISPLAY_SIZE,
+      DISPLAY_SIZE,
+      MAZE_RUNTIME_COLORS.wall.r,
+      MAZE_RUNTIME_COLORS.wall.g,
+      MAZE_RUNTIME_COLORS.wall.b,
+    );
     drawVisitedMaze(
       layout,
       map,
@@ -778,7 +795,15 @@ function buildMazeSequence(speed, intensity, options) {
     );
 
     if (phase === "generation" || phase === "generation_hold") {
-      drawCell(layout, map, generationHead.x, generationHead.y, 40, 255, 120);
+      drawCell(
+        layout,
+        map,
+        generationHead.x,
+        generationHead.y,
+        MAZE_RUNTIME_COLORS.generationCursor.r,
+        MAZE_RUNTIME_COLORS.generationCursor.g,
+        MAZE_RUNTIME_COLORS.generationCursor.b,
+      );
     }
 
     if (phase === "solve" || phase === "solve_hold") {
@@ -816,6 +841,19 @@ function buildMazeSequence(speed, intensity, options) {
           searchFrontierColor.r,
           searchFrontierColor.g,
           searchFrontierColor.b,
+        );
+      }
+
+      if (closedSet.length > 0) {
+        const solveCursor = closedSet[closedSet.length - 1];
+        drawCell(
+          layout,
+          map,
+          solveCursor.x,
+          solveCursor.y,
+          MAZE_RUNTIME_COLORS.solveCursor.r,
+          MAZE_RUNTIME_COLORS.solveCursor.g,
+          MAZE_RUNTIME_COLORS.solveCursor.b,
         );
       }
     }
@@ -858,26 +896,42 @@ function buildMazeSequence(speed, intensity, options) {
         layout,
         map,
         travelerRoute[Math.max(0, travelerIndex)],
-        255,
-        244,
-        172,
+        MAZE_RUNTIME_COLORS.revealCursor.r,
+        MAZE_RUNTIME_COLORS.revealCursor.g,
+        MAZE_RUNTIME_COLORS.revealCursor.b,
       );
     } else if (phase === "reveal" && revealCount > 0) {
       const currentNode = path[Math.max(0, revealCount - 1)];
       if (currentNode) {
-        drawCell(layout, map, currentNode.x, currentNode.y, 255, 244, 172);
+        drawCell(
+          layout,
+          map,
+          currentNode.x,
+          currentNode.y,
+          MAZE_RUNTIME_COLORS.revealCursor.r,
+          MAZE_RUNTIME_COLORS.revealCursor.g,
+          MAZE_RUNTIME_COLORS.revealCursor.b,
+        );
       }
     }
 
-    drawCell(layout, map, startNode.x, startNode.y, 40, 255, 120);
+    drawCell(
+      layout,
+      map,
+      startNode.x,
+      startNode.y,
+      MAZE_RUNTIME_COLORS.start.r,
+      MAZE_RUNTIME_COLORS.start.g,
+      MAZE_RUNTIME_COLORS.start.b,
+    );
     drawCell(
       layout,
       map,
       endNode.x,
       endNode.y,
-      90,
-      188,
-      255,
+      MAZE_RUNTIME_COLORS.end.r,
+      MAZE_RUNTIME_COLORS.end.g,
+      MAZE_RUNTIME_COLORS.end.b,
     );
     drawMazeInfoPanel(map, mazeInfoPanel, mazeConfig);
     maps.push(map);

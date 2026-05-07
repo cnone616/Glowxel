@@ -27,6 +27,7 @@ size_t gQueueCount = 0;
 portMUX_TYPE gRuntimeCommandQueueMux = portMUX_INITIALIZER_UNLOCKED;
 constexpr size_t kModeActivationErrorMessageSize = 160;
 constexpr size_t kRuntimeCommandsPerTick = 2;
+volatile uint8_t gPostTransactionYieldHint = 0;
 
 bool isWaterWorldAmbientPreset(uint8_t preset) {
   return preset == AMBIENT_PRESET_WATER_SURFACE ||
@@ -312,24 +313,15 @@ bool enqueuePendingClientResponse(PendingClientResponse* response) {
   }
 
   bool queued = false;
-  size_t pendingCount = 0;
   portENTER_CRITICAL(&gPendingClientResponseQueueMux);
   if (gPendingClientResponseQueueCount < kPendingClientResponseQueueCapacity) {
     gPendingClientResponseQueue[gPendingClientResponseQueueTail] = response;
     gPendingClientResponseQueueTail =
       (gPendingClientResponseQueueTail + 1) % kPendingClientResponseQueueCapacity;
     gPendingClientResponseQueueCount += 1;
-    pendingCount = gPendingClientResponseQueueCount;
     queued = true;
   }
   portEXIT_CRITICAL(&gPendingClientResponseQueueMux);
-
-  if (queued) {
-    Serial.printf("[RuntimeBus] queued delayed response client=%u len=%u pending=%u\n",
-                  response->clientId,
-                  static_cast<unsigned>(response->len),
-                  static_cast<unsigned>(pendingCount));
-  }
   return queued;
 }
 
@@ -376,20 +368,10 @@ bool trySendClientResponseNow(
   }
 
   if (!WebSocketHandler::ws.availableForWrite(clientId)) {
-    Serial.printf("[RuntimeBus] response deferred client=%u queue=%u len=%u\n",
-                  clientId,
-                  static_cast<unsigned>(client->queueLen()),
-                  static_cast<unsigned>(len));
     return false;
   }
 
-  bool sent = WebSocketHandler::ws.text(clientId, payload, len);
-  Serial.printf("[RuntimeBus] response send %s client=%u len=%u queue=%u\n",
-                sent ? "ok" : "failed",
-                clientId,
-                static_cast<unsigned>(len),
-                static_cast<unsigned>(client->queueLen()));
-  return sent;
+  return WebSocketHandler::ws.text(clientId, payload, len);
 }
 
 bool shouldClearScreenBeforeBusinessModeEntry(const String& businessModeTag) {
@@ -411,8 +393,6 @@ void flushPendingClientResponses() {
     }
 
     if (!clientStillConnected(response->clientId)) {
-      Serial.printf("[RuntimeBus] drop delayed response for disconnected client=%u\n",
-                    response->clientId);
       portENTER_CRITICAL(&gPendingClientResponseQueueMux);
       PendingClientResponse* dropped = dequeuePendingClientResponse();
       portEXIT_CRITICAL(&gPendingClientResponseQueueMux);
@@ -433,7 +413,6 @@ void flushPendingClientResponses() {
 
 void sendClientResponse(uint32_t clientId, StaticJsonDocument<768>& response) {
   if (!clientStillConnected(clientId)) {
-    Serial.printf("[RuntimeBus] drop response for disconnected client=%u\n", clientId);
     return;
   }
 
@@ -1988,6 +1967,7 @@ bool switchToTargetMode(
   const char* successMessage,
   StaticJsonDocument<768>& response
 ) {
+  (void)fromMode;
   RuntimeModeCoordinator::deactivateRuntimeContent();
   if (shouldClearScreenBeforeBusinessModeEntry(businessModeTag)) {
     DisplayManager::clearScreen();
@@ -2002,9 +1982,6 @@ bool switchToTargetMode(
     return false;
   }
 
-  Serial.printf("模式切换: %s -> %s\n",
-                DeviceModeTagCodec::toTagOrUnknown(fromMode),
-                businessModeTag.c_str());
   response["message"] = successMessage;
   return true;
 }
@@ -2024,9 +2001,6 @@ bool executeModeSwitch(
     DisplayManager::clearScreen();
     DisplayManager::currentMode = MODE_TRANSFERRING;
     DisplayManager::currentBusinessModeTag = fromBusinessModeTag;
-    Serial.printf("模式切换: %s -> %s\n",
-                  DeviceModeTagCodec::toTagOrUnknown(fromMode),
-                  ModeTags::TRANSFERRING);
     response["message"] = command.successMessage;
     return true;
   }
@@ -2054,9 +2028,6 @@ bool executeModeSwitch(
       return false;
     }
 
-    Serial.printf("模式切换: %s -> %s\n",
-                  fromBusinessModeTag.c_str(),
-                  command.businessModeTag.c_str());
     ConfigManager::saveTetrisConfig();
     response["message"] = command.successMessage;
     return true;
@@ -2083,9 +2054,6 @@ bool executeModeSwitch(
       return false;
     }
 
-    Serial.printf("模式切换: %s -> %s\n",
-                  fromBusinessModeTag.c_str(),
-                  command.businessModeTag.c_str());
     ConfigManager::saveTetrisClockConfig();
     response["message"] = command.successMessage;
     return true;
@@ -2116,9 +2084,6 @@ bool executeModeSwitch(
       return false;
     }
 
-    Serial.printf("模式切换: %s -> %s\n",
-                  fromBusinessModeTag.c_str(),
-                  command.businessModeTag.c_str());
     ConfigManager::saveMazeConfig();
     response["message"] = command.successMessage;
     response["speed"] = ConfigManager::mazeConfig.speed;
@@ -2162,9 +2127,6 @@ bool executeModeSwitch(
       return false;
     }
 
-    Serial.printf("模式切换: %s -> %s\n",
-                  fromBusinessModeTag.c_str(),
-                  command.businessModeTag.c_str());
     ConfigManager::saveSnakeConfig();
     response["message"] = command.successMessage;
     response["speed"] = ConfigManager::snakeConfig.speed;
@@ -2355,7 +2317,6 @@ bool executeEyesAction(
 bool executeClear(StaticJsonDocument<768>& response) {
   DisplayManager::dma_display->clearScreen();
   if (DisplayManager::currentMode == MODE_CANVAS && DisplayManager::canvasInitialized) {
-    Serial.println("清空画布缓冲区");
     DisplayManager::clearCanvas();
   }
   response["message"] = "cleared";
@@ -2772,14 +2733,12 @@ bool enqueue(RuntimeCommand* command) {
     return false;
   }
 
-  size_t pendingCount = 0;
   bool queued = false;
   portENTER_CRITICAL(&gRuntimeCommandQueueMux);
   if (gQueueCount < kRuntimeCommandQueueCapacity) {
     gCommandQueue[gQueueTail] = command;
     gQueueTail = (gQueueTail + 1) % kRuntimeCommandQueueCapacity;
     gQueueCount += 1;
-    pendingCount = gQueueCount;
     queued = true;
   }
   portEXIT_CRITICAL(&gRuntimeCommandQueueMux);
@@ -2788,11 +2747,6 @@ bool enqueue(RuntimeCommand* command) {
     return false;
   }
 
-  Serial.printf("[RuntimeBus] queued type=%s source=%d client=%u pending=%u\n",
-                commandTypeLabel(command->type),
-                static_cast<int>(command->source),
-                command->clientId,
-                static_cast<unsigned>(pendingCount));
   return true;
 }
 
@@ -3158,16 +3112,9 @@ void tick() {
 
     if (command->source == RuntimeCommandSource::WEBSOCKET &&
         !clientStillConnected(command->clientId)) {
-      Serial.printf("[RuntimeBus] drop disconnected client command=%s client=%u\n",
-                    commandTypeLabel(command->type),
-                    command->clientId);
       destroyCommand(command);
       continue;
     }
-
-    Serial.printf("[RuntimeBus] executing on main loop type=%s client=%u\n",
-                  commandTypeLabel(command->type),
-                  command->clientId);
 
     StaticJsonDocument<768> response;
     bool success = false;
@@ -3175,24 +3122,25 @@ void tick() {
     success = executeCommand(*command, response);
     DisplayManager::unlockRuntimeAccess();
 
-    if (!success) {
-      Serial.printf("[RuntimeBus] rollback type=%s client=%u\n",
-                    commandTypeLabel(command->type),
-                    command->clientId);
-    }
-
-    Serial.printf("[RuntimeBus] finished type=%s client=%u status=%s\n",
-                  commandTypeLabel(command->type),
-                  command->clientId,
-                  success ? "ok" : "error");
-
     if (command->source == RuntimeCommandSource::WEBSOCKET) {
       sendClientResponse(command->clientId, response);
+      if (command->type == RuntimeCommandType::WEBSOCKET_TRANSACTION_COMMIT ||
+          command->type == RuntimeCommandType::WEBSOCKET_TRANSACTION_ABORT) {
+        gPostTransactionYieldHint = 2;
+      }
     }
 
     destroyCommand(command);
     flushPendingClientResponses();
   }
+}
+
+bool consumePostTransactionYieldHint() {
+  if (gPostTransactionYieldHint == 0) {
+    return false;
+  }
+  gPostTransactionYieldHint -= 1;
+  return true;
 }
 
 const char* commandTypeLabel(RuntimeCommandType type) {

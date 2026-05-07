@@ -593,7 +593,6 @@ export default {
       }
       this.previewPixels = pixels;
       this.previewTick += 1;
-      console.log("[clock-preview] static size=", pixels.size);
     },
     drawGIFFrame() {
       const pixels = this.buildPreviewPixels();
