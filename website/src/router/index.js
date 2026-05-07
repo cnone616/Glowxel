@@ -2,7 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import { getStoredAuthToken } from '@/utils/session.js'
 
 const routes = [
-  { path: '/', name: 'Home', component: () => import('@/views/Home.vue'), meta: { shell: 'app' } },
+  { path: '/', name: 'Home', component: () => import('@/views/Home.vue'), meta: { shell: 'public' } },
   { path: '/community', name: 'Community', component: () => import('@/views/Community.vue'), meta: { shell: 'public' } },
   { path: '/templates', name: 'Templates', component: () => import('@/views/Templates.vue'), meta: { shell: 'public' } },
   { path: '/challenges', name: 'Challenges', component: () => import('@/views/Challenges.vue'), meta: { shell: 'public' } },

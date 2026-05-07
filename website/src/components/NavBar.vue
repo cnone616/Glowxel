@@ -18,11 +18,33 @@
       </div>
 
       <div class="nav-actions">
-        <router-link to="/device-params" class="btn-create" @click="closeMobileMenu">
-          设备参数
+        <router-link to="/create" class="btn-create" @click="closeMobileMenu">
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.5"
+          >
+            <line x1="12" y1="5" x2="12" y2="19" />
+            <line x1="5" y1="12" x2="19" y2="12" />
+          </svg>
+          新建
         </router-link>
-        <router-link to="/ble-config" class="btn-login" @click="closeMobileMenu">
-          热点配网
+        <template v-if="isLoggedIn">
+          <router-link to="/profile" class="btn-login" @click="closeMobileMenu">我的</router-link>
+          <button class="btn-login btn-logout" @click="handleLogout">
+            退出
+          </button>
+        </template>
+        <router-link
+          v-else
+          to="/login"
+          class="btn-login"
+          @click="closeMobileMenu"
+        >
+          登录
         </router-link>
       </div>
 
@@ -64,22 +86,69 @@
 
 <script setup>
 import { computed, ref } from "vue";
-import { useRoute } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import BrandLogo from "@/components/BrandLogo.vue";
-import { publicNavigation, resolveAppNavKey } from "@/config/appNavigation.js";
+import { clearStoredSession } from "@/utils/session.js";
 
+const router = useRouter();
 const route = useRoute();
 const mobileMenuOpen = ref(false);
-const navItems = publicNavigation;
+const isLoggedIn = computed(() => !!localStorage.getItem("auth_token"));
+const navItems = [
+  { key: "home", label: "首页", to: "/" },
+  { key: "workspace", label: "工作台", to: "/workspace" },
+  { key: "device", label: "设备", to: "/device-control" },
+  { key: "community", label: "社区", to: "/community" },
+  { key: "design-system", label: "控件库", to: "/design-system" },
+  { key: "templates", label: "边框", to: "/templates" },
+  { key: "challenges", label: "挑战", to: "/challenges" },
+];
 
 const activeNavKey = computed(() => {
-  return resolveAppNavKey(route.path);
+  const path = route.path;
+  if (path === "/") return "home";
+  if (
+    path.startsWith("/workspace") ||
+    path.startsWith("/create") ||
+    path.startsWith("/pattern-workbench") ||
+    path.startsWith("/editor")
+  ) {
+    return "workspace";
+  }
+  if (
+    path.startsWith("/device-control") ||
+    path.startsWith("/device-params") ||
+    path.startsWith("/ble-config") ||
+    path.startsWith("/canvas-editor")
+  ) {
+    return "device";
+  }
+  if (path.startsWith("/design-system")) return "design-system";
+  if (path.startsWith("/templates")) return "templates";
+  if (path.startsWith("/challenges") || path.startsWith("/challenge/")) {
+    return "challenges";
+  }
+  if (
+    path.startsWith("/community") ||
+    path.startsWith("/artwork/") ||
+    path.startsWith("/user/") ||
+    path === "/followers" ||
+    path === "/following"
+  ) {
+    return "community";
+  }
+  return "";
 });
 const toggleMobileMenu = () => {
   mobileMenuOpen.value = !mobileMenuOpen.value;
 };
 const closeMobileMenu = () => {
   mobileMenuOpen.value = false;
+};
+const handleLogout = () => {
+  clearStoredSession();
+  closeMobileMenu();
+  router.push("/login");
 };
 </script>
 
