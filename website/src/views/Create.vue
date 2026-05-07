@@ -142,7 +142,7 @@ watch(
 <style scoped>
 .create-page {
   min-height: calc(100vh - 60px);
-  padding: 20px 0 36px;
+  padding: 24px 0 48px;
   background: transparent;
 }
 

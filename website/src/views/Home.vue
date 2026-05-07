@@ -206,11 +206,11 @@ onMounted(async () => {
 }
 
 .home {
-  padding: 28px 0 72px;
+  padding: 24px 0 48px;
 }
 
 .hero {
-  padding: 18px 0 48px;
+  padding: 0 0 32px;
 }
 
 .hero .container {

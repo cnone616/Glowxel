@@ -1553,7 +1553,7 @@ async function handleFileChange(event, type) {
 .pattern-workbench {
   max-width: 1520px;
   margin: 0 auto;
-  padding: 40px 24px 72px;
+  padding: 24px 24px 48px;
 }
 
 .workbench-header {

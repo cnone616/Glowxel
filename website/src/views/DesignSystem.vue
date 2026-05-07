@@ -87,3 +87,9 @@ const currentTab = computed(() => {
   return tabs[0];
 });
 </script>
+
+<style scoped>
+.design-system-page {
+  padding: 24px 0 48px;
+}
+</style>

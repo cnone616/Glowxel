@@ -109,36 +109,59 @@ const navItems = [
 const activeNavKey = computed(() => {
   const path = route.path;
   if (path === "/") return "home";
+  
+  if (path.startsWith("/pattern-workbench")) {
+    return "workbench";
+  }
+  
   if (
     path.startsWith("/workspace") ||
     path.startsWith("/create") ||
-    path.startsWith("/pattern-workbench") ||
-    path.startsWith("/editor")
+    path.startsWith("/editor") ||
+    path.startsWith("/overview") ||
+    path.startsWith("/assist") ||
+    path.startsWith("/publish-project")
   ) {
     return "workspace";
   }
+  
   if (
     path.startsWith("/device-control") ||
     path.startsWith("/device-params") ||
     path.startsWith("/ble-config") ||
-    path.startsWith("/canvas-editor")
+    path.startsWith("/canvas-editor") ||
+    path.startsWith("/clock") ||
+    path.startsWith("/animation-clock") ||
+    path.startsWith("/theme-clock") ||
+    path.startsWith("/spirit-screen") ||
+    path.startsWith("/gif-player") ||
+    path.startsWith("/led-matrix") ||
+    path.startsWith("/maze-mode") ||
+    path.startsWith("/snake-mode") ||
+    path.startsWith("/planet-screensaver") ||
+    path.startsWith("/tetris") ||
+    path.startsWith("/water-world")
   ) {
     return "device";
   }
-  if (path.startsWith("/design-system")) return "design-system";
-  if (path.startsWith("/templates")) return "templates";
+  
+  if (path.startsWith("/templates")) {
+    return "templates";
+  }
+  
   if (path.startsWith("/challenges") || path.startsWith("/challenge/")) {
     return "challenges";
   }
+  
   if (
     path.startsWith("/community") ||
     path.startsWith("/artwork/") ||
     path.startsWith("/user/") ||
-    path === "/followers" ||
-    path === "/following"
+    path.startsWith("/gallery")
   ) {
     return "community";
   }
+  
   return "";
 });
 const toggleMobileMenu = () => {
@@ -169,8 +192,8 @@ const handleLogout = () => {
   padding: 0 24px;
   display: flex;
   align-items: center;
-  min-height: 88px;
-  gap: 28px;
+  min-height: 72px;
+  gap: 20px;
 }
 
 .logo {
@@ -184,7 +207,7 @@ const handleLogout = () => {
 .nav-links {
   display: flex;
   align-items: center;
-  gap: 28px;
+  gap: 8px;
   flex: 1;
   flex-wrap: wrap;
 }
@@ -195,10 +218,10 @@ const handleLogout = () => {
   justify-content: center;
   color: var(--text-secondary);
   text-decoration: none;
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 700;
-  min-height: 42px;
-  padding: 0 14px;
+  min-height: 38px;
+  padding: 0 12px;
   line-height: 1;
   border: var(--nb-border-width) solid transparent;
   box-shadow: none;
